@@ -43,6 +43,9 @@ pub enum Rule {
     /// A method of the `list` or the `arr` namespace is run on an element dtype that Polars has
     /// an implementation of it for: for the others it panics where the rows run.
     ElementDtypeIsImplemented,
+    /// A method whose answer depends on the element dtype of a list or an array is run on one the
+    /// tables are measured for: for another Polars is not asked, and may panic.
+    ElementDtypeIsMeasured,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
@@ -81,10 +84,11 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementDtypeIsImplemented,
+        Self::ElementDtypeIsMeasured,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
@@ -110,6 +114,7 @@ impl Rule {
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::DurationIsValid => "duration-is-valid",
             Self::ElementDtypeIsImplemented => "element-dtype-is-implemented",
+            Self::ElementDtypeIsMeasured => "element-dtype-is-measured",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
@@ -141,6 +146,9 @@ impl Rule {
                 "a pivot's aggregate must give one value for each group"
             }
             Self::ConditionPredicateIsBoolean => "a condition's predicate must be Boolean",
+            Self::ElementDtypeIsMeasured => {
+                "a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on"
+            }
             Self::ElementOnlyInPivotAggregate => {
                 "`polars.element` stands only in a pivot's aggregate"
             }
@@ -201,6 +209,7 @@ impl Rule {
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
+            | Self::ElementDtypeIsMeasured
             | Self::MomentsShareAZone
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -349,6 +358,7 @@ impl Rule {
             | Self::KeyIsElementwise
             | Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
+            | Self::ElementDtypeIsMeasured
             | Self::PatternIsValid
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber

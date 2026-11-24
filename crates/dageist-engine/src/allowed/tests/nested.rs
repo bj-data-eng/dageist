@@ -159,7 +159,7 @@ fn a_list_or_an_array_of_a_nested_dtype_has_no_class() {
 
 #[test]
 fn a_cast_is_allowed_as_polars_allows_it_and_gives_the_dtype_it_is_given_after_any_list_or_array() {
-    use polars::prelude::{DataType, Expr, IntoLazy, col};
+    use polars::prelude::{DataType, Expr, col};
 
     use crate::allowed::offers::{After, Chosen, Place, RefusalSource, Verdict, offer};
     use crate::allowed::{Context, Outer, Shape};

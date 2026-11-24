@@ -996,7 +996,7 @@ impl Walker<'_> {
         };
         if matches!(
             refusal.source(),
-            RefusalSource::Rule(Rule::ElementDtypeIsImplemented)
+            RefusalSource::Rule(Rule::ElementDtypeIsImplemented | Rule::ElementDtypeIsMeasured)
         ) && self.unsafe_to_run.is_none()
         {
             self.unsafe_to_run = Some(found.clone());
@@ -2479,33 +2479,6 @@ impl Walker<'_> {
             }
             Verdict::Allowed(allowance) => allowance,
         };
-        // Where the tables hold no lines for the class of a value the call follows or is given,
-        // the call stands and nothing is said of what it gives, or of what follows it.
-        if !allowance.is_judged() {
-            self.blind(format!(
-                "the tables do not judge {} of the dtypes it is given",
-                entry.id().as_str()
-            ));
-            *last_end = None;
-            let receiver = match &cur {
-                Cur::Value {
-                    shape,
-                    count,
-                    taken,
-                    ..
-                } => (*shape, *count, *taken),
-                _ => (Shape::Many, Count::NotKnown, Taken::default()),
-            };
-            return (
-                Cur::Value {
-                    dtype: None,
-                    shape: receiver.0,
-                    count: receiver.1,
-                    taken: receiver.2,
-                },
-                standing,
-            );
-        }
         // Polars refuses the rows of a replacement given values of other numbers than it takes,
         // which the shapes of the arguments say.
         if let Cur::Value { shape, .. } = &cur

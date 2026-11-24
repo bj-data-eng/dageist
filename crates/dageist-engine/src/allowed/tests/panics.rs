@@ -16,7 +16,7 @@ use polars::prelude::{DataType, Expr, IntoLazy, col};
 use crate::allowed::dtype::Representative;
 use crate::allowed::offers::{After, Chosen, Place, RefusalSource, Verdict, offer};
 use crate::allowed::table::{DtypeLine, Outcome, lines};
-use crate::allowed::{Context, Outer, Shape};
+use crate::allowed::{Context, Outer, Rule, Shape};
 use crate::catalog;
 
 use super::sample::Frames;
@@ -138,7 +138,10 @@ fn a_named_rule_refuses_each_combination_polars_panics_on_and_says_what_the_elem
             .refusal()
             .unwrap_or_else(|| panic!("{entry} on {class} is refused: {verdict:?}"));
         assert!(
-            matches!(refusal.source(), RefusalSource::Rule(_)),
+            matches!(
+                refusal.source(),
+                RefusalSource::Rule(Rule::ElementDtypeIsImplemented)
+            ),
             "{entry} on {class} is refused by a rule: {refusal}"
         );
         let element = class.element().expect("a list or an array").class().name();
@@ -165,7 +168,10 @@ fn no_combination_the_rule_does_not_name_is_refused_by_it_or_panics_in_the_table
         ] {
             let by_a_rule = matches!(
                 verdict(entry, class),
-                Verdict::Refused(refusal) if matches!(refusal.source(), RefusalSource::Rule(_))
+                Verdict::Refused(refusal) if matches!(
+                    refusal.source(),
+                    RefusalSource::Rule(Rule::ElementDtypeIsImplemented)
+                )
             );
             assert_eq!(
                 by_a_rule,

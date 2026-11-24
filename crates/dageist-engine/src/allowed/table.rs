@@ -733,9 +733,10 @@ pub(super) const fn is_a_list(class: Representative) -> bool {
 /// elements with the value they are given. A test that runs Polars on every class holds this list
 /// to the methods that need it: a method that is not here judges a list or an array as the class
 /// that stands for it does, and one that is here is measured on [`CORE_NESTED`] as well.
-pub(super) const SENSITIVE: [&str; 22] = [
+pub(super) const SENSITIVE: [&str; 23] = [
     "Expr.add",
     "Expr.and_",
+    "Expr.cast",
     "Expr.diff",
     "Expr.eq",
     "Expr.eq_missing",

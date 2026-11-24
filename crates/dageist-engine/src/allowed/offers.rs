@@ -403,7 +403,6 @@ pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
     ending: Ending,
-    judged: bool,
 }
 
 impl Allowance {
@@ -436,14 +435,6 @@ impl Allowance {
     #[must_use]
     pub const fn result(&self) -> Option<&ResultDtype> {
         self.result.as_ref()
-    }
-
-    /// Whether the tables judge the call: where they hold no lines for the class of a value it
-    /// follows or is given, the entry may stand, and nothing is said of what it gives or of
-    /// whether it may end where it stands.
-    #[must_use]
-    pub const fn is_judged(&self) -> bool {
-        self.judged
     }
 
     /// Whether the chain gives one value after the entry.
@@ -546,8 +537,6 @@ fn read_as_of(id: &str, class: Option<Representative>) -> Option<Option<Represen
 struct Fit {
     result: Option<ResultDtype>,
     shape: Shape,
-    /// Whether the tables judge the call.
-    judged: bool,
 }
 
 impl Fit {
@@ -555,16 +544,6 @@ impl Fit {
         Self {
             result: produces.map(|produces| produces.result.clone()),
             shape: produces.map_or(Shape::Many, |produces| produces.shape),
-            judged: true,
-        }
-    }
-
-    /// What a call gives where the tables do not judge it: nothing is known of it.
-    const fn not_judged() -> Self {
-        Self {
-            result: None,
-            shape: Shape::Many,
-            judged: false,
         }
     }
 }
@@ -590,10 +569,21 @@ fn on_receiver(
         None => Refusal::structure(format!("the tables hold nothing for {id}")),
     };
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| {
-        // The line of the class that stands for one the tables hold none for, or nothing said of
-        // a class they do not judge: the call is not refused.
+        // The line of the class that stands for one the tables hold none for. A method whose
+        // answer depends on the element is refused after a class it is not measured on: Polars is
+        // not asked of it, and may panic.
         match tables.dtype(id, parameter, receiver, argument) {
-            Looked::NotJudged => Ok(Fit::not_judged()),
+            Looked::NotJudged => {
+                let unmeasured = [receiver, argument]
+                    .into_iter()
+                    .flatten()
+                    .find(|class| read_as(id, *class).is_none())
+                    .map_or_else(String::new, |class| class.to_string());
+                Err(Refusal::rule_because(
+                    Rule::ElementDtypeIsMeasured,
+                    &format!("{id} is not measured on {unmeasured}"),
+                ))
+            }
             Looked::Missing => Err(missing()),
             Looked::Line(Outcome::Refused(reason)) => Err(Refusal::polars(&reason)),
             Looked::Line(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
@@ -625,8 +615,6 @@ fn on_receiver(
     if let Some(alone) = alone {
         fit = Some(alone?);
     }
-    let judged = given_fits.iter().all(|found| found.judged)
-        && fit.as_ref().is_none_or(|alone| alone.judged);
     if let Some(first) = given_fits.first() {
         let same_result = given_fits.iter().all(|found| found.result == first.result);
         let same_shape = given_fits.iter().all(|found| found.shape == first.shape);
@@ -637,7 +625,6 @@ fn on_receiver(
                 None
             },
             shape: if same_shape { first.shape } else { Shape::Many },
-            judged,
         });
     }
     for parameter in required {
@@ -668,11 +655,10 @@ fn on_receiver(
                 None
             },
             shape: if same_shape { first.shape } else { Shape::Many },
-            judged,
         });
     }
     match fit {
-        Some(fit) => Ok(Fit { judged, ..fit }),
+        Some(fit) => Ok(fit),
         // The option table says what the call gives.
         None if !stood_in_for.is_empty() => Ok(Fit::of(None)),
         None => Err(missing()),
@@ -1069,7 +1055,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = function_gives.unwrap_or((None, Shape::Many));
-    let mut judged = true;
     if let (
         After::Value {
             dtype,
@@ -1080,7 +1065,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
-        judged = fit.judged;
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
         match read_options(entry, Some(dtype), chosen.options) {
@@ -1298,7 +1282,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         result,
         shape,
         ending,
-        judged,
     })
 }
 

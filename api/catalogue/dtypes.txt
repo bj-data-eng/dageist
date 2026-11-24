@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 75596 combinations: 25790 allowed; 18460 refused when Polars resolved the schema, 31346 when it ran the rows, 0 when it ran the empty table.
+# 75605 combinations: 25799 allowed; 18460 refused when Polars resolved the schema, 31346 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -5759,7 +5759,12 @@ Expr.bottom_k | k | UInt8 | UInt16 | allowed UInt8 counted
 Expr.bottom_k | k | UInt8 | UInt32 | allowed UInt8 counted
 Expr.bottom_k | k | UInt8 | UInt64 | allowed UInt8 counted
 Expr.bottom_k | k | UInt8 | UInt8 | allowed UInt8 counted
+Expr.cast | - | Array(Boolean, 2) | - | allowed Array(Boolean, 2) many
+Expr.cast | - | Array(Date, 2) | - | allowed Array(Date, 2) many
+Expr.cast | - | Array(Datetime(us), 2) | - | allowed Array(Datetime(us), 2) many
+Expr.cast | - | Array(Float64, 2) | - | allowed Array(Float64, 2) many
 Expr.cast | - | Array(Int64, 2) | - | allowed Array(Int64, 2) many
+Expr.cast | - | Array(String, 2) | - | allowed Array(String, 2) many
 Expr.cast | - | Boolean | - | allowed Boolean many
 Expr.cast | - | Date | - | allowed Date many
 Expr.cast | - | Datetime(us) | - | allowed Datetime(us) many
@@ -5774,6 +5779,10 @@ Expr.cast | - | Int16 | - | allowed Int16 many
 Expr.cast | - | Int32 | - | allowed Int32 many
 Expr.cast | - | Int64 | - | allowed Int64 many
 Expr.cast | - | Int8 | - | allowed Int8 many
+Expr.cast | - | List(Boolean) | - | allowed List(Boolean) many
+Expr.cast | - | List(Date) | - | allowed List(Date) many
+Expr.cast | - | List(Datetime(us)) | - | allowed List(Datetime(us)) many
+Expr.cast | - | List(Float64) | - | allowed List(Float64) many
 Expr.cast | - | List(Int64) | - | allowed List(Int64) many
 Expr.cast | - | List(String) | - | allowed List(String) many
 Expr.cast | - | Null | - | allowed Null many

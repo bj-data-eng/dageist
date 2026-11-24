@@ -51,7 +51,8 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
     match rule {
         Rule::ConditionPredicateIsBoolean => Some(Rule::DurationIsValid),
         Rule::DurationIsValid => Some(Rule::ElementDtypeIsImplemented),
-        Rule::ElementDtypeIsImplemented => Some(Rule::ElementOnlyInPivotAggregate),
+        Rule::ElementDtypeIsImplemented => Some(Rule::ElementDtypeIsMeasured),
+        Rule::ElementDtypeIsMeasured => Some(Rule::ElementOnlyInPivotAggregate),
         Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
         Rule::FilterPredicateIsBoolean => Some(Rule::FoldedFunctionIsNoJoinKey),
         Rule::FoldedFunctionIsNoJoinKey => Some(Rule::JoinKeyNamesAreNotRepeated),
