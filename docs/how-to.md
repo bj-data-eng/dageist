@@ -741,9 +741,10 @@ Polars by hand, and decide which it is:
   the data or the arguments decide (the rules `values-meet-in-count` and `window-input-is-not-counted`,
   or `it cannot end here` for a count), and Polars allows the step because the count is the table's
   rows, or one value, as `head(10)` of three rows or `mode` of a column with one most common value is.
-  The target settles it by itself: it runs the case again on twelve rows, on four rows that tie, and
-  with the number that decides each count made 2, and counts the case as stricter by design where Polars
-  refuses one of them for lengths. A sort key of one value that Polars drops is asked by the probe above,
+  The target settles it by itself: it reduces the step to the one item that holds the refused place, runs
+  that item again on twelve rows, on four rows that tie, and with the number that decides its count made 2,
+  and counts the case as stricter by design where Polars refuses one of them for lengths. An item with
+  counts in more than one place settles nothing, so report it. A sort key of one value that Polars drops is asked by the probe above,
   where the part alone is refused for lengths, and a part dropped whose count is by chance is asked of
   the part apart from the case. Keep such a case as `regressions/by-design-<what it shows>.case`, which
   the normal run replays and expects to say so. A count that stays the rows with any rows, as the values
