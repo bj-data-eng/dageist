@@ -42,9 +42,14 @@ fn frame() -> DataFrame {
     )
     .cast(&DataType::Array(Box::new(DataType::Int64), 2))
     .expect("lists of two cast to arrays of two");
+    // A struct of one field, which Polars casts to the dtype of the field.
+    let structs = StructChunked::from_series("st".into(), 7, [ints("x")].iter())
+        .expect("a struct of one field")
+        .into_series();
     DataFrame::new(
         7,
         vec![
+            structs.into(),
             lists.into(),
             arrays.into(),
             ints("a").into(),
@@ -2174,9 +2179,10 @@ fn a_range_is_not_cut_by_a_length_below_nothing_as_polars_refuses_it() {
 fn a_repeat_of_a_list_or_an_array_is_taken_as_polars_takes_it() {
     // Python Polars 2.1.0: `repeat(l.first(), 3)` of a column of lists gives three lists, and so do
     // arrays. The tables made one value of a dtype by casting a number to it, which no list, array
-    // or struct takes, and refused them with a reason that is not true of the value.
+    // or struct takes, and refused them with a reason that is not true of the value. A struct is
+    // measured with the first value of a column of two fields, and a column of one field is taken too.
     let mut found = Vec::new();
-    for column in ["l", "arr"] {
+    for column in ["l", "arr", "st"] {
         let value = on_column(column, vec![call("Expr.first", json!({}))]);
         let report = select_of(vec![repeat(vec![("value", value), ("n", whole(3))])]);
         let (polars, walk) = (polars_says(&report), walk_says(&report));
@@ -2187,4 +2193,162 @@ fn a_repeat_of_a_list_or_an_array_is_taken_as_polars_takes_it() {
         }
     }
     assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+#[test]
+fn a_repeat_of_a_struct_is_refused_as_another_dtype_where_polars_casts_a_struct_of_one_field() {
+    // Stricter by design: Polars casts a struct of one field to the dtype of the field, so
+    // `repeat(st.first(), 3, dtype=Int64)` of such a column gives three whole numbers. The tables
+    // measure a cast of a struct of two fields, which no dtype takes, and so refuse every struct
+    // cast to a dtype: the editor does not know how many fields a column's struct has.
+    let value = on_column("st", vec![call("Expr.first", json!({}))]);
+    let report = select_of(vec![repeat(vec![
+        ("value", value),
+        ("n", whole(3)),
+        ("dtype", json!({ "dtype": "Int64" })),
+    ])]);
+    assert!(polars_says(&report).accepts(), "{:?}", polars_says(&report));
+    assert!(!walk_says(&report).accepts(), "the walk takes it");
+}
+
+// ---------------------------------------------------------------------------
+// A length below nothing after any chain that starts at a range
+
+/// A link that goes on from a range, and what it is for in the sweep.
+fn chains_from_a_range() -> Vec<(&'static str, Value)> {
+    vec![
+        ("cum_sum", call("Expr.cum_sum", json!({}))),
+        ("reverse", call("Expr.reverse", json!({}))),
+        ("sort", call("Expr.sort", json!({}))),
+        ("shift", call("Expr.shift", json!({ "n": whole(1) }))),
+        ("unique", call("Expr.unique", json!({}))),
+        ("diff", call("Expr.diff", json!({}))),
+        (
+            "gather_every",
+            call("Expr.gather_every", json!({ "n": { "integer": 2 } })),
+        ),
+        ("sum", call("Expr.sum", json!({}))),
+        ("first", call("Expr.first", json!({}))),
+    ]
+}
+
+/// The links that Python Polars 2.1.0 and the engine of steps fold a cut into where it is by
+/// `head`, `limit` or a slice's length: the first values and the methods that give a value for each
+/// value they follow. With its optimizations off Polars refuses them as it does every other chain.
+fn chains_a_cut_is_folded_into() -> Vec<(&'static str, Value)> {
+    vec![
+        ("head", call("Expr.head", json!({ "n": whole(5) }))),
+        ("abs", call("Expr.abs", json!({}))),
+        ("neg", call("Expr.neg", json!({}))),
+        ("add", call("Expr.add", json!({ "other": whole(1) }))),
+    ]
+}
+
+fn below_nothing_cuts() -> Vec<(&'static str, Value)> {
+    vec![
+        ("head", call("Expr.head", json!({ "n": whole(-2) }))),
+        ("tail", call("Expr.tail", json!({ "n": whole(-2) }))),
+        ("limit", call("Expr.limit", json!({ "n": whole(-2) }))),
+        (
+            "slice with a length",
+            call(
+                "Expr.slice",
+                json!({ "offset": whole(2), "length": whole(-1) }),
+            ),
+        ),
+    ]
+}
+
+fn ranges_to_cut() -> Vec<(&'static str, Value)> {
+    vec![
+        (
+            "int_range",
+            int_range(vec![("start", whole(0)), ("end", whole(10))]),
+        ),
+        (
+            "repeat",
+            repeat(vec![("value", whole(7)), ("n", whole(10))]),
+        ),
+        (
+            "linear_space",
+            linear_space(vec![
+                ("start", whole(0)),
+                ("end", whole(1)),
+                ("num_samples", whole(10)),
+            ]),
+        ),
+    ]
+}
+
+#[test]
+fn a_range_is_not_cut_by_a_length_below_nothing_after_any_chain_the_engine_of_steps_refuses() {
+    // Python Polars 2.1.0 and the engine of steps: the length is cast to an unsigned number where the
+    // cut runs, so a number below nothing is refused wherever it is not folded away. Every chain
+    // here refuses it in both engines: an aggregate, an ordering, a shift, a difference, a filter
+    // and the values that differ.
+    let filter = call(
+        "Expr.filter",
+        json!({ "predicates": many(vec![on_start(
+            &int_range(vec![("start", whole(0)), ("end", whole(10))]),
+            vec![call("Expr.gt", json!({ "other": whole(3) }))],
+        )]) }),
+    );
+    let mut firsts = chains_from_a_range();
+    firsts.push(("filter", filter));
+    let mut found = Vec::new();
+    for (range, start) in ranges_to_cut() {
+        for (first_name, first) in &firsts {
+            for (cut_name, cut) in below_nothing_cuts() {
+                let report = select_of(vec![on_start(&start, vec![first.clone(), cut])]);
+                let (polars, walk) = (polars_says(&report), walk_says(&report));
+                if polars.accepts() || walk.accepts() {
+                    found.push(format!(
+                        "{cut_name} after {first_name} of {range}: Polars says {polars:?}, the walk says {walk:?}"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "{} cases:\n{}",
+        found.len(),
+        found.join("\n")
+    );
+}
+
+#[test]
+fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_cut_into() {
+    // Stricter by design: after the first values or a method that gives a value for each value it
+    // follows, Python Polars 2.1.0 and the engine of steps fold a cut by `head`, `limit` or the
+    // length of a slice into the range and run `int_range(0, 10).abs().head(-2)`, where they refuse
+    // `tail`. With the optimizations off Polars refuses every one of them: its answer is the
+    // optimizer's, and the engines differ on it, so the editor refuses a cut below nothing after
+    // every chain that starts at a range.
+    let mut found = Vec::new();
+    for (range, start) in ranges_to_cut() {
+        for (first_name, first) in chains_a_cut_is_folded_into() {
+            for (cut_name, cut) in below_nothing_cuts() {
+                let report = select_of(vec![on_start(&start, vec![first.clone(), cut])]);
+                let folded = cut_name != "tail";
+                if polars_says(&report).accepts() != folded {
+                    found.push(format!(
+                        "{cut_name} after {first_name} of {range}: the engine of steps says {:?}, which changes this exception",
+                        polars_says(&report)
+                    ));
+                }
+                if walk_says(&report).accepts() {
+                    found.push(format!(
+                        "{cut_name} after {first_name} of {range}: the walk takes it"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "{} cases:\n{}",
+        found.len(),
+        found.join("\n")
+    );
 }
