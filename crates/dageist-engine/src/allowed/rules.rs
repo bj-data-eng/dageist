@@ -132,7 +132,7 @@ impl Rule {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",

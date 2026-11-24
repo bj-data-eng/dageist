@@ -8,7 +8,7 @@
 //! from a run.
 
 use dageist_engine::allowed::{
-    After, Context, Count, Ending, Outer, RefusalSource, Representative, Rule, Shape, Stage,
+    After, Count, Ending, RefusalSource, Representative, Rule, Shape, Stage,
 };
 use dageist_engine::document::{Document, Inputs, Segment, Walk, WalkedExpression};
 use polars::prelude::*;
@@ -200,9 +200,15 @@ fn a_method_that_takes_some_of_the_values_gives_a_count_the_arguments_state() {
     for (name, calls, count) in cases {
         let walk = select_of(vec![on("a", calls)]);
         let expression = item(&walk, 0);
+        // The places of the values and the number of the distinct ones are whole numbers of 32 bits.
+        let dtype = if matches!(name, "arg_unique" | "unique_counts") {
+            Representative::UInt32
+        } else {
+            Representative::Int64
+        };
         assert_eq!(
             last_after(expression),
-            after(Representative::Int64, Shape::Counted),
+            after(dtype, Shape::Counted),
             "{name}"
         );
         assert_eq!(expression.count(), Some(count), "{name}");
@@ -516,11 +522,18 @@ fn the_values_of_a_condition_are_as_many_as_one_another() {
         )
     };
     let counted_predicate = on("f", vec![head(2)]);
-    // The values are one value each, so the condition gives as many values as the predicate.
+    let flag = |on: bool| {
+        chain(
+            call("polars.lit", json!({ "value": { "flag": on } })),
+            Vec::new(),
+        )
+    };
+    // The values are one value each, of a dtype, so the condition gives as many values as the
+    // predicate.
     let walk = select_of(vec![condition(
         counted_predicate.clone(),
-        whole(1),
-        whole(0),
+        flag(true),
+        flag(false),
     )]);
     assert_eq!(walk.refusal(), None);
     assert_eq!(item(&walk, 0).count(), Some(Count::AtMost(2)));
