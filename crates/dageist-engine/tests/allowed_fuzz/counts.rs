@@ -258,6 +258,7 @@ mod tests {
             "by-design-a-count-typed-as-one-as-a-sort-key.case",
             "by-design-a-count-typed-as-one-beside-the-rows.case",
             "by-design-a-count-by-chance-in-a-sort-key-that-is-one-value.case",
+            "by-design-an-every-nth-value-from-a-place-by-chance.case",
         ] {
             let case = kept(name);
             let settled = settle(&case, &refusal(&case)).unwrap_or_else(|| panic!("{name}"));

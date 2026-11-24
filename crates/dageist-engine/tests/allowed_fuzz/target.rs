@@ -1244,4 +1244,22 @@ mod tests {
             "{tally:?}"
         );
     }
+
+    #[test]
+    fn a_gather_beyond_the_rows_is_a_case_the_tables_do_not_cover() {
+        // `select(g.gather(b))`: the tables measured a gather that gives a null for a place beyond
+        // the rows, and Polars refuses the place that the rows of a table give it when they run.
+        // The case is excused, and no disagreement.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/uncovered-a-gather-beyond-the-rows.case");
+        let text: &'static str = Box::leak(
+            std::fs::read_to_string(path)
+                .expect("a kept case")
+                .into_boxed_str(),
+        );
+        let (outcome, tally) = evaluated_and_tallied(text);
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
+        assert_eq!(counted(&tally, "excused by a limit"), Some(1), "{tally:?}");
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
 }
