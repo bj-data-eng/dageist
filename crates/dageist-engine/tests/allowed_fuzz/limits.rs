@@ -461,9 +461,10 @@ pub enum Limit {
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
     /// follows the quantile, cut after the quantile it is allowed, or with a column of the
-    /// literal's own dtype, which a filter's rule asks for. The cut control leaves a gap: a
-    /// refusal of a call after the quantile that Polars would give the case once the quantile is
-    /// no longer refused is not seen, for what follows the quantile is not asked of the column.
+    /// literal's own dtype for each quantile, which a filter's rule asks for. The cut control
+    /// leaves a gap: a refusal of a call after the quantile that Polars would give the case once
+    /// the quantile is no longer refused is not seen, for what follows the quantile is not asked
+    /// of the column.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -2822,20 +2823,21 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    call_with_columns_cut_for(call, is_it, column, &|_| false)
+    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| false)
 }
 
-/// As [`call_with_columns_for`], and each chain made so is cut after its first call that
-/// `cut_after` accepts: what follows is no part of what the column stands in for.
+/// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, and
+/// each chain made so is cut after its first call that `cut_after` accepts: what follows is no
+/// part of what the column stands in for.
 fn call_with_columns_cut_for(
     call: &Call,
     is_it: &dyn Fn(&Expression) -> bool,
-    column: &str,
+    column_of: &dyn Fn(&Expression) -> String,
     cut_after: &dyn Fn(&Call) -> bool,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
-        column: &'a str,
+        column_of: &'a dyn Fn(&Expression) -> String,
         cut_after: &'a dyn Fn(&Call) -> bool,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
@@ -2864,7 +2866,10 @@ fn call_with_columns_cut_for(
             Start::Call(
                 Call::new(
                     catalog::entry("polars.col")?,
-                    vec![("name", Value::Columns(vec![replacing.column.to_owned()]))],
+                    vec![(
+                        "name",
+                        Value::Columns(vec![(replacing.column_of)(expression)]),
+                    )],
                 )
                 .ok()?,
             )
@@ -2895,7 +2900,7 @@ fn call_with_columns_cut_for(
         call,
         &Replacing {
             is_it,
-            column,
+            column_of,
             cut_after,
         },
     )
@@ -2969,28 +2974,29 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
 /// join's keys read the column both tables hold, and other places the column `k`. The cut control
 /// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
-/// column of the literal's own dtype is that of the first quantile that starts from a literal, for
-/// every one in the case: where the quantiles start from literals of other dtypes, a control made
-/// with the first one's column is refused for the others, and the excuse is not given, so the
-/// choice fails closed.
+/// column of the literal's own dtype is chosen for each quantile from its own literal, a `Boolean`
+/// one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case start
+/// from, and so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
-    let own = std::cell::Cell::new(None);
+    let numbers = if joins { "u" } else { "k" };
+    // Whether some quantile starts from a literal that has a column of its own dtype.
+    let owned = std::cell::Cell::new(false);
     let recording = |expression: &Expression| {
         let found = is_an_approximate_quantile_of_literals(expression);
         if found
-            && own.get().is_none()
             && let Start::Call(start) = expression.start()
+            && column_of_the_dtype_of(start).is_some()
         {
-            own.set(column_of_the_dtype_of(start));
+            owned.set(true);
         }
         found
     };
-    let control = |column: &str, cut_after: &dyn Fn(&Call) -> bool| {
+    let control = |column_of: &dyn Fn(&Expression) -> String, cut_after: &dyn Fn(&Call) -> bool| {
         let rebuilt = Step::new(
             step.id().clone(),
-            call_with_columns_cut_for(step.call(), &recording, column, cut_after)?,
+            call_with_columns_cut_for(step.call(), &recording, column_of, cut_after)?,
         )
         .ok()?;
         let control = Case {
@@ -3003,18 +3009,21 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     };
     let never = |_: &Call| false;
     let after_the_quantile = |link: &Call| is(link, "Expr.approx_quantile");
-    let numbers = if joins { "u" } else { "k" };
-    let mut refused = control(numbers, &never)?;
+    let numeric = |_: &Expression| numbers.to_owned();
+    // Each quantile's own column: the one of the dtype its literal has, and the numbers where it
+    // has none, whatever the other quantiles of the case start from.
+    let own = |expression: &Expression| match expression.start() {
+        Start::Call(start) => column_of_the_dtype_of(start).unwrap_or(numbers).to_owned(),
+        Start::Input(_) | Start::Hole => numbers.to_owned(),
+    };
+    let mut refused = control(&numeric, &never)?;
     if refused {
-        refused = control(numbers, &after_the_quantile)?;
+        refused = control(&numeric, &after_the_quantile)?;
     }
-    if refused
-        && !joins
-        && let Some(own) = own.get()
-    {
-        refused = control(own, &never)?;
+    if refused && !joins && owned.get() {
+        refused = control(&own, &never)?;
         if refused {
-            refused = control(own, &after_the_quantile)?;
+            refused = control(&own, &after_the_quantile)?;
         }
     }
     Some(refused)
