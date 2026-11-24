@@ -21,4 +21,4 @@ encoding = "structured"
 limits = { bytes = 65536, nodes = 0, depth = 0, text_units = 0, operations = 0 }
 requirements = { features = [], capabilities = ["property", "replay", "case-capture", "reduction"] }
 min_evaluated = 1
-max_generation_rejections = 100000
+max_generation_rejections = 1000000

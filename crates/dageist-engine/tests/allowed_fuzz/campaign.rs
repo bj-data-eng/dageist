@@ -464,9 +464,24 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
 
 /// How many cases the run of the property checked something in, or the panic that says why it
 /// could not be run.
-fn evaluated_by(result: Result<PropertyReport>, _findings: usize) -> u64 {
+///
+/// A run ends as insufficient coverage after every case was run, where too few checked something
+/// or too many were drawn again, which a campaign focused on few methods does. What it found is
+/// what it is run for, so where it found something the run is no failure, and the counts, which
+/// the run does not give then, are not known: the campaign tells what it found, and what it
+/// could not count.
+fn evaluated_by(result: Result<PropertyReport>, findings: usize) -> u64 {
     match result {
         Ok(report) => report.counts.evaluated(),
+        Err(error)
+            if error.kind() == dageist_fuzz::FuzzErrorKind::InsufficientCoverage
+                && findings > 0 =>
+        {
+            eprintln!(
+                "the coverage the target declares was not met, and the cases are not counted: {error:?}"
+            );
+            0
+        }
         Err(error) => panic!("the property could not be run: {error:?}"),
     }
 }

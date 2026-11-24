@@ -596,7 +596,9 @@ setting that is no whole number (the seed and the number of cases too), a number
 0, a deadline of 0, a count above the cases before the start or above the number of cases,
 and a start that makes more cases than a campaign counts are refused, with the variable
 named. A timed campaign removes a `timeout.env` that an earlier run left in the kept directory
-when it starts, so one that is there after a timed run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
+when it starts, so one that is there after a timed run is that run's. A campaign that draws more
+than a million cases again, as one focused on very few methods does, ends as insufficient coverage, which it says, and still tells
+what it found. A relative `DAGEIST_FUZZ_KEEP` is
 from the root of the repository, which is where these commands are run, and not from the
 engine's directory that the tests run in.
 
