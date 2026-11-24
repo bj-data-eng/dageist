@@ -51,29 +51,29 @@ describe('the methods the engine offers after a timestamp', () => {
     families.flatMap((family) => family.offers).find((offer) => offer.name === name);
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
-    // The methods of each family: window one, conversion three, cumulative, rounding and the
-    // search of text five, order six, maths and pieces of text seven, checks and nulls eight, logic
-    // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows nineteen,
-    // aggregate twenty-six, and temporal forty-three.
+    // The methods of each family: window one, conversion four, cumulative, rounding and the
+    // search of text five, maths and pieces of text seven, checks eight, nulls nine, order and logic
+    // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows twenty-five,
+    // temporal forty-three, and aggregate fifty-two.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
-      ['conversion', 3],
+      ['conversion', 4],
       ['cumulative', 5],
       ['rounding', 5],
       ['search', 5],
-      ['order', 6],
       ['maths', 7],
       ['pieces', 7],
       ['checks', 8],
-      ['nulls', 8],
+      ['nulls', 9],
+      ['order', 10],
       ['logic', 10],
       ['arithmetic', 11],
       ['trigonometry', 15],
       ['text', 15],
       ['compare', 16],
-      ['rows', 19],
-      ['aggregate', 26],
+      ['rows', 25],
       ['temporal', 43],
+      ['aggregate', 52],
     ]);
     expect(families[0]?.title).toBe('Window');
   });
@@ -83,6 +83,9 @@ describe('the methods the engine offers after a timestamp', () => {
       families.find((family) => family.key === 'rows')?.offers.map((offer) => offer.name),
     ).toEqual([
       'arg_unique',
+      'arr.first',
+      'arr.last',
+      'arr.unique',
       'bottom_k',
       'diff',
       'filter',
@@ -92,6 +95,9 @@ describe('the methods the engine offers after a timestamp', () => {
       'head',
       'last',
       'limit',
+      'list.first',
+      'list.last',
+      'list.unique',
       'mode',
       'pct_change',
       'rle_id',

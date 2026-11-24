@@ -477,7 +477,7 @@ describe('a report that is not what the host sends', () => {
   it('is refused where a rule, a context or a dtype resolution is not one the engine has', () => {
     const source = ['steps', 1, 'walk', 'refusal', 'refusal', 'source'];
     expect(refusal(replaced(refused, source, { by: 'rule', rule: 'no-such-rule' })).problem).toBe(
-      'must be one of "pivot-aggregate-gives-one-value", "condition-predicate-is-boolean", "duration-is-valid", "element-only-in-pivot-aggregate", "filter-predicate-is-boolean", "folded-function-is-no-join-key", "join-key-names-are-not-repeated", "key-is-elementwise", "moments-share-a-zone", "parameter-takes-one-value", "pattern-is-valid", "range-is-valid", "replacement-values-match-in-number", "time-zone-is-valid", "values-meet-in-count", "window-input-is-not-counted", "window-input-is-not-widened", not "no-such-rule"',
+      'must be one of "pivot-aggregate-gives-one-value", "condition-predicate-is-boolean", "duration-is-valid", "element-dtype-is-implemented", "element-only-in-pivot-aggregate", "filter-predicate-is-boolean", "folded-function-is-no-join-key", "join-key-names-are-not-repeated", "key-is-elementwise", "moments-share-a-zone", "parameter-takes-one-value", "pattern-is-valid", "range-is-valid", "replacement-values-match-in-number", "time-zone-is-valid", "values-meet-in-count", "window-input-is-not-counted", "window-input-is-not-widened", not "no-such-rule"',
     );
     expect(
       refusal(

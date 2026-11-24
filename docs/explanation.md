@@ -277,6 +277,15 @@ identifier that saved steps keep. An entry records:
 - whether it works on a lazy frame;
 - the function that builds it in Polars from filled-in arguments.
 
+The dtypes an entry accepts are named by groups of them, in the order the language file lists them:
+every dtype, the numeric and the integer dtypes, the temporal ones and each of `Datetime`, `Date`,
+`Time` and `Duration`, `String`, `Boolean`, and `List` and `Array` of any element dtype. A group says
+what Polars takes of some dtype in it, and a test that runs the method on a column of each group
+holds an entry to it, with a column of lists and one of arrays: a method that claims every dtype
+must take a list and an array, and the ordering comparisons, `pct_change`, `replace` and
+`replace_strict`, which Polars refuses lists for, name the groups they take instead. Which members
+of a group, and which element dtypes, a call takes is the tables' to say.
+
 Those build functions are the start of the path from a saved document of steps
 to a Polars plan. The arguments for an entry are checked against its
 parameters, their kinds, shapes and choice words before it is built. Result

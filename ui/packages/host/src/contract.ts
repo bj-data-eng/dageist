@@ -469,6 +469,7 @@ export const RULE_NAMES = [
   'pivot-aggregate-gives-one-value',
   'condition-predicate-is-boolean',
   'duration-is-valid',
+  'element-dtype-is-implemented',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
   'folded-function-is-no-join-key',
