@@ -10315,6 +10315,11 @@ mod tests {
     /// `when(true).then(lit("a").join().replace_all(pattern, "_")).otherwise(h)`, or the replacement
     /// as a plain chain, `start` being the chain's own start.
     fn branch_replacing(start: Call, in_a_branch: bool) -> Case {
+        branch_replacing_after(start, "Expr.str.join", in_a_branch)
+    }
+
+    /// As [`branch_replacing`], with the call `before` the replacement the one that is named.
+    fn branch_replacing_after(start: Call, before: &str, in_a_branch: bool) -> Case {
         let replace = call(
             "Expr.str.replace_all",
             vec![
@@ -10328,7 +10333,7 @@ mod tests {
                 ),
             ],
         );
-        let replaced = chain_of(start, vec![call("Expr.str.join", Vec::new()), replace]);
+        let replaced = chain_of(start, vec![call(before, Vec::new()), replace]);
         if !in_a_branch {
             return select(vec![replaced]);
         }
@@ -10370,6 +10375,41 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_excused_for_a_running_value_of_a_literal_replaced_in_a_branch() {
+        // `when(..).then(lit("1d").cum_min().str.replace(..))`: the running minimum of a literal
+        // is read as one value too, which the literal is the cause of.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-replacement-of-a-literal-aggregate-in-a-branch--a-running-value.case"
+            ),
+            vec![Limit::AReplacementOfALiteralAggregateInABranch]
+        );
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        for running in ["Expr.cum_min", "Expr.cum_max"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_replacing_after(text.clone(), running, true),
+                    None,
+                    Stage::Rows,
+                    NULL_PATTERN
+                ),
+                vec![Limit::AReplacementOfALiteralAggregateInABranch],
+                "{running}"
+            );
+        }
+        // A call that gives each value of a literal as it is, with nothing running, is neither.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing_after(text, "Expr.reverse", true),
+                None,
+                Stage::Rows,
+                NULL_PATTERN
+            ),
+            vec![]
+        );
     }
 
     #[test]
