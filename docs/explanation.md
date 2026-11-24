@@ -1746,7 +1746,10 @@ what surrounds it, after the limits, in these ways:
   with its receiver and every argument a column of the dtype that reaches it, which Polars
   and the tables both gave, or that Polars gave an argument where the tables made no claim of
   it, as of a condition with no `otherwise`, so that nothing an argument holds, as a comparison the tables
-  allow without knowing the dtype of a number, is refused before the call is. A pivot's aggregate
+  allow without knowing the dtype of a number, is refused before the call is. Where an argument
+  has no dtype that Polars gave, as a part Polars refuses first, no column can stand for it, and
+  the call is asked a last time with each such argument left out, at its default, where it has
+  one. A pivot's aggregate
   reads no column to stand in, but its `element` holds the values of the column `a` that the
   pivot takes the values of, so the call stands on `element` in the same pivot where the dtype
   the tables say reaches it is the dtype of `a`; Polars is not asked of the dtype there, for what

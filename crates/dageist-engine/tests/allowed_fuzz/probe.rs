@@ -804,7 +804,8 @@ fn takes_the_values_of_a(case: &Case) -> bool {
 /// asked first, and the limit for a literal is asked only of the literals that
 /// are why. A literal the call is given that is not, because Polars allows the
 /// call with a column of its dtype as well, is a column in the probe too: it is
-/// asked as written first, and then so. `None` when there is nothing to ask,
+/// asked as written first, and then so. And with each argument whose dtype Polars did not give,
+/// which no column can stand for, left at its default. `None` when there is nothing to ask,
 /// Polars allows the probe, or it refuses it for another reason or not at the call.
 pub fn settle_on_a_value(
     case: &Case,
@@ -873,6 +874,15 @@ pub fn settle_on_a_value(
             call_on_columns(refused_call, &refused.place, predicted, observed)
     {
         attempts.push((columns, [vec![class], argument_classes].concat()));
+    }
+    // And with every argument whose dtype is not known, which no column can stand for, left out so
+    // that the call takes its default: where the call has one, nothing in the argument is refused
+    // before the call is.
+    if !found.in_the_aggregate
+        && let Some(without) =
+            call_without_unknowns(refused_call, &refused.place, predicted, observed)
+    {
+        attempts.push((without, vec![class]));
     }
     attempts.into_iter().find_map(|(link_call, classes)| {
         let part = Expression::new(Start::Call(name.clone()), vec![link_call]).ok()?;
@@ -1058,6 +1068,34 @@ fn call_on_columns(
         .map(|given| Some((given.parameter(), columns_in(given.value(), &mut next)?)))
         .collect::<Option<Vec<_>>>()?;
     Some((self::call(call.entry().id().as_str(), given)?, classes))
+}
+
+/// `call`, which is at `at`, without the parameters that hold an expression whose dtype Polars did
+/// not give, so that it takes the default of each, and nothing else changed. `None` where no
+/// parameter is left out, or the call cannot go without one.
+fn call_without_unknowns(
+    call: &Call,
+    at: &Place,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Call> {
+    let unknown: Vec<&str> = placed_operands(call, at)
+        .into_iter()
+        .filter(|(_, place, operand)| {
+            dtype_polars_gave(place, operand.links().len(), predicted, observed).is_none()
+        })
+        .map(|(parameter, _, _)| parameter)
+        .collect();
+    if unknown.is_empty() {
+        return None;
+    }
+    let given = call
+        .arguments()
+        .iter()
+        .filter(|given| !unknown.contains(&given.parameter()))
+        .map(|given| (given.parameter(), given.value().clone()))
+        .collect();
+    self::call(call.entry().id().as_str(), given)
 }
 
 /// The parameters of a join that hold its keys.
