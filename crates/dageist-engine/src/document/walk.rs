@@ -948,6 +948,18 @@ fn takes_an_operand(entry: &Entry) -> bool {
         })
 }
 
+/// Whether the argument `name` of `entry` meets the value the method follows, as an operand, a value
+/// that fills it or the collection it is looked up in does, and not as a key that groups or orders
+/// it.
+fn meets_the_receiver(entry: &Entry, name: &str) -> bool {
+    entry.id().as_str() == "Expr.is_in"
+        || entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == name)
+            .is_some_and(|parameter| parameter.role() != Role::Plain)
+}
+
 /// Whether the values of a condition that are arrays are not all of one width that is known: Polars
 /// gives a list for them, where the tables, which write one width, give an array.
 fn arrays_of_other_widths(values: &[Valued], widths: &[Option<usize>]) -> bool {
@@ -2534,21 +2546,28 @@ impl Walker<'_> {
             }
             Verdict::Allowed(allowance) => allowance,
         };
-        // Arrays that meet and give an array are of one width, which is known: Polars refuses a sum
-        // of arrays of two widths and gives a list where it fills one with the other.
-        if matches!(
+        // Arrays that meet and give an array, or that one is looked up in, are of one width, which
+        // is known: Polars refuses a sum of arrays of two widths or to look one up in the other,
+        // and gives a list where it fills one with the other. What an array is partitioned or
+        // sorted by does not meet it.
+        if (matches!(
             allowance.result().and_then(allowed::ResultDtype::class),
             Some(Representative::Array(_))
-        ) && matches!(
-            &cur,
-            Cur::Value {
-                dtype: Some(Representative::Array(_)),
-                ..
-            }
-        ) {
+        ) || entry.id().as_str() == "Expr.is_in")
+            && matches!(
+                &cur,
+                Cur::Value {
+                    dtype: Some(Representative::Array(_)),
+                    ..
+                }
+            )
+        {
             let met: Vec<Option<usize>> = arguments
                 .iter()
-                .filter(|(_, operand)| matches!(operand.dtype, Some(Representative::Array(_))))
+                .filter(|(name, operand)| {
+                    matches!(operand.dtype, Some(Representative::Array(_)))
+                        && meets_the_receiver(entry, name)
+                })
                 .map(|(_, operand)| operand.width)
                 .collect();
             if !met.is_empty()

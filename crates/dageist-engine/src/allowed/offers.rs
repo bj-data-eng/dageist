@@ -1318,8 +1318,8 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
     )
 }
 
-/// The refusal of the rule that arrays that meet and give an array are of one width, which is
-/// known, where they are not.
+/// The refusal of the rule that arrays that meet and give an array, or that one is looked up in,
+/// are of one width, which is known, where they are not.
 ///
 /// # Errors
 /// Always: the caller asks it where it found arrays of other widths or of a width it does not know.

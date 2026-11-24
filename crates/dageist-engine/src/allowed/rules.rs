@@ -152,7 +152,7 @@ impl Rule {
             }
             Self::ConditionPredicateIsBoolean => "a condition's predicate must be Boolean",
             Self::ArraysMeetAtOneWidth => {
-                "arrays that meet, as the operands of a method or the values of a condition, and give an array must be of one width, which must be known: Polars refuses to add arrays of two widths, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another"
+                "arrays that meet, as the operands of a method or the values of a condition, and give an array, or that one is looked up in, must be of one width, which must be known: Polars refuses to add arrays of two widths or to look one up in the other, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another"
             }
             Self::ElementDtypeIsMeasured => {
                 "a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on"
