@@ -292,8 +292,9 @@ struct Operand {
     /// How many values it gives where its shape is [`Shape::Counted`], as far as the arguments
     /// fix it.
     count: Count,
-    /// Whether it is one value that a method took of one value, or one that meets such a value: the
-    /// first none or one of it, which no row of a group takes as the value of the group.
+    /// Where it is one value that a method took of one value, or one that meets such a value (the
+    /// first none or one of it, which no row of a group takes as the value of the group): which a
+    /// window refuses and which a parameter read as one value refuses.
     taken: Taken,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
@@ -343,7 +344,8 @@ enum Cur {
         dtype: Option<Representative>,
         shape: Shape,
         count: Count,
-        /// Whether it is one value that a method took of one value, or one that meets such a value.
+        /// Where it is one value that a method took of one value, or one that meets such a value:
+        /// which a window refuses and which a parameter read as one value refuses.
         taken: Taken,
     },
     Condition {
@@ -352,7 +354,8 @@ enum Cur {
         /// What the predicates and values met so far give together: one value meets each of them,
         /// and the others are as many as one another.
         meeting: (Shape, Count),
-        /// Whether a predicate or a value so far is one that a method took of one value.
+        /// Where a predicate or a value so far is one that a method took of one value: which a
+        /// window refuses and which a parameter read as one value refuses.
         taken: Taken,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
