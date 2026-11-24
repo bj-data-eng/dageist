@@ -11,10 +11,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use dageist_fuzz::Result;
+use dageist_fuzz::{CaseOutcome, FailureClass, FailureKey, PropertyId, Result};
 
 use super::campaign::{Evaluator, InProcess, Observation, Settings, run};
-use super::target::AllowedTarget;
+use super::target::{ALLOWANCE, AllowedTarget};
 
 /// The variable that names the directory the child works in, and so asks for a campaign.
 const CHILD: &str = "DAGEIST_FUZZ_TIMEOUT_TEST";
@@ -47,6 +47,11 @@ struct Scripted<'a> {
     log: PathBuf,
     block: Option<Vec<u8>>,
     panics: Option<Vec<u8>>,
+    /// The case that ends as a disagreement, which a reduction then replays.
+    disagrees: Option<Vec<u8>>,
+    /// Whether the replays of a reduction block for ever, once the case that disagrees has.
+    hangs_in_reduction: bool,
+    disagreed: std::cell::Cell<bool>,
 }
 
 impl Evaluator for Scripted<'_> {
@@ -65,10 +70,30 @@ impl Evaluator for Scripted<'_> {
                 std::thread::sleep(Duration::from_secs(3600));
             }
         }
+        if self.hangs_in_reduction
+            && self.disagreed.get()
+            && self.disagrees.as_deref() != Some(canonical)
+        {
+            writeln!(log, "{}\t?", hex(canonical)).expect("the log is written");
+            loop {
+                std::thread::sleep(Duration::from_secs(3600));
+            }
+        }
         if self.panics.as_deref() == Some(canonical) {
             let _ = std::thread::spawn(|| panic!("a thread of Polars panics")).join();
         }
-        let observation = self.evaluation.observe(canonical, within)?;
+        let mut observation = self.evaluation.observe(canonical, within)?;
+        if self.disagrees.as_deref() == Some(canonical) {
+            self.disagreed.set(true);
+            observation.outcome = CaseOutcome::failure(
+                FailureKey::new(
+                    PropertyId::new(ALLOWANCE)?,
+                    FailureClass::PropertyViolation,
+                    Some("scripted".to_owned()),
+                )?,
+                "a scripted disagreement",
+            )?;
+        }
         let counts =
             observation.outcome.is_evaluated() || observation.outcome.failure_key().is_some();
         writeln!(log, "{}\t{}", hex(canonical), u8::from(counts)).expect("the log is written");
@@ -98,6 +123,9 @@ fn a_campaign_for_a_parent_to_watch() {
             log: directory.join("log"),
             block: wanted("block"),
             panics: wanted("panics"),
+            disagrees: wanted("disagrees"),
+            hangs_in_reduction: directory.join("hangs_in_reduction").exists(),
+            disagreed: std::cell::Cell::new(false),
         };
         // A replay of the case that blocks is timed as a campaign is.
         if let Some(case) = scripted
@@ -156,6 +184,14 @@ fn run_child(directory: &Path, settings: &[(&str, String)]) -> Ran {
             "--nocapture",
             "--test-threads=1",
         ])
+        // Nothing of the settings the tests run under reaches the campaign, but what they give.
+        .env_remove("DAGEIST_FUZZ_START")
+        .env_remove("DAGEIST_FUZZ_COUNTED")
+        .env_remove("DAGEIST_FUZZ_DEADLINE_MS")
+        .env_remove("DAGEIST_FUZZ_KEEP")
+        .env_remove("DAGEIST_FUZZ_SEED")
+        .env_remove("DAGEIST_FUZZ_CASES")
+        .env_remove("DAGEIST_FUZZ_FOCUS")
         .env(CHILD, directory)
         .envs(settings.iter().map(|(name, value)| (*name, value)))
         .stdin(Stdio::null())
@@ -332,5 +368,134 @@ fn a_replay_of_a_case_that_does_not_end_ends_with_the_status_of_a_timeout() {
         stopped.said.contains("did not end in 3000 ms"),
         "{}",
         stopped.said
+    );
+}
+
+/// Two cases in a row that do not end, the second the first one a resumed run evaluates, are
+/// gone on from one after the other, and the three runs make the cases of the whole run, in
+/// order, and end where it did.
+#[test]
+fn a_run_that_hangs_at_its_first_case_after_a_resume_says_how_many_cases_it_counted() {
+    let whole = run_child(&fresh("timeout-chain-whole"), &[]);
+    assert_eq!(whole.status, Some(0), "{}", whole.said);
+    let cases = whole.log.len();
+    let first = (4..cases - 1)
+        .find(|at| whole.counted[*at] && whole.counted[*at + 1])
+        .expect("two counted cases in a row");
+    let (deadline, mut logs) = (("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned()), Vec::new());
+
+    let one = fresh("timeout-chain-one");
+    std::fs::write(one.join("block"), hex(&whole.log[first])).unwrap();
+    let hung = run_child(&one, &[deadline.clone()]);
+    assert_eq!(hung.status, Some(TIMEOUT_STATUS), "{}", hung.said);
+    logs.extend(hung.log.clone());
+    let env = String::from_utf8(file_of(&one.join("kept"), "timeout.env").unwrap()).unwrap();
+    let (start, counted) = (
+        setting(&env, "DAGEIST_FUZZ_START").unwrap(),
+        setting(&env, "DAGEIST_FUZZ_COUNTED").unwrap(),
+    );
+    assert_eq!(start, first as u64 + 2, "{env}");
+
+    // The first case it evaluates is the one that hangs.
+    let two = fresh("timeout-chain-two");
+    std::fs::write(two.join("block"), hex(&whole.log[first + 1])).unwrap();
+    let hung_again = run_child(
+        &two,
+        &[
+            deadline,
+            ("DAGEIST_FUZZ_START", start.to_string()),
+            ("DAGEIST_FUZZ_COUNTED", counted.to_string()),
+        ],
+    );
+    assert_eq!(
+        hung_again.status,
+        Some(TIMEOUT_STATUS),
+        "{}",
+        hung_again.said
+    );
+    logs.extend(hung_again.log.clone());
+    let env = String::from_utf8(file_of(&two.join("kept"), "timeout.env").unwrap()).unwrap();
+    let (start, counted_again) = (
+        setting(&env, "DAGEIST_FUZZ_START").unwrap(),
+        setting(&env, "DAGEIST_FUZZ_COUNTED").unwrap(),
+    );
+    assert_eq!(counted_again, counted + 1, "{env}");
+
+    let rest = run_child(
+        &fresh("timeout-chain-rest"),
+        &[
+            ("DAGEIST_FUZZ_START", start.to_string()),
+            ("DAGEIST_FUZZ_COUNTED", counted_again.to_string()),
+        ],
+    );
+    assert_eq!(rest.status, Some(0), "{}", rest.said);
+    logs.extend(rest.log.clone());
+    assert_eq!(
+        logs.len(),
+        cases,
+        "the runs together end where the whole run did"
+    );
+    assert!(
+        logs == whole.log,
+        "the runs together make the cases of the whole run"
+    );
+}
+
+/// A replay of a reduction that does not end ends the campaign too, with the case that
+/// disagreed in what it found, kept as it was, and the replay named for what it is.
+#[test]
+fn a_replay_of_a_reduction_that_does_not_end_is_kept_as_one_and_counts_the_case_once() {
+    let whole = run_child(&fresh("timeout-reduction-whole"), &[]);
+    let cases = whole.log.len();
+    let at = (4..cases)
+        .find(|at| whole.counted[*at])
+        .expect("a counted case");
+    let number = at as u64 + 1;
+    let directory = fresh("timeout-reduction");
+    std::fs::write(directory.join("disagrees"), hex(&whole.log[at])).unwrap();
+    std::fs::write(directory.join("hangs_in_reduction"), "").unwrap();
+    let stopped = run_child(
+        &directory,
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned())],
+    );
+    assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
+    let kept = directory.join("kept");
+    let names: Vec<String> = std::fs::read_dir(&kept)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    let has = |suffix: String| names.iter().any(|name| name.ends_with(&suffix));
+    assert!(
+        has(format!("-{number}-reduction-timeout.case")),
+        "{names:?}"
+    );
+    assert!(!has(format!("-{number}-timeout.case")), "{names:?}");
+    let unreduced = names
+        .iter()
+        .find(|name| name.ends_with(&format!("-{number}-unreduced.case")))
+        .unwrap_or_else(|| panic!("the case that disagreed is kept: {names:?}"));
+    assert_eq!(file_of(&kept, unreduced).unwrap(), whole.log[at]);
+    assert!(
+        stopped.said.contains("a scripted disagreement"),
+        "{}",
+        stopped.said
+    );
+    assert!(
+        stopped
+            .said
+            .contains(&format!("reduction of the case {number}")),
+        "{}",
+        stopped.said
+    );
+    // The case that disagreed counts, once.
+    let env = String::from_utf8(file_of(&kept, "timeout.env").unwrap()).unwrap();
+    let before = whole.counted[..at]
+        .iter()
+        .filter(|counted| **counted)
+        .count() as u64;
+    assert_eq!(
+        setting(&env, "DAGEIST_FUZZ_COUNTED"),
+        Some(before + 1),
+        "{env}"
     );
 }
