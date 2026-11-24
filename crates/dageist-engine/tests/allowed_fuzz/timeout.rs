@@ -25,8 +25,8 @@ const TIMEOUT_STATUS: i32 = 75;
 const SEED: u64 = 7;
 const CASES: u32 = 25;
 
-/// How long a parent gives its child to end, which is well above what a timer of
-/// half a second needs and well below a hang.
+/// How long a parent gives its child to end, which is well above the few seconds that the
+/// timers of these tests need, and well below a hang.
 const PARENT_WAIT: Duration = Duration::from_secs(40);
 
 fn hex(bytes: &[u8]) -> String {
@@ -383,6 +383,11 @@ fn a_replay_of_a_case_that_does_not_end_ends_with_the_status_of_a_timeout() {
         "{}",
         stopped.said
     );
+    assert!(
+        stopped.said.contains("the replay of"),
+        "a replay is not a case of a campaign: {}",
+        stopped.said
+    );
 }
 
 /// Two cases in a row that do not end, the second the first one a resumed run evaluates, are
@@ -534,14 +539,23 @@ fn the_report_of_a_case_that_does_not_end_is_shown_without_nocapture() {
     );
 }
 
-/// A `timeout.env` that an earlier run left is not left for a run that ends well to be found
-/// as if it were that run's.
+/// A `timeout.env` that an earlier run left is not left for a timed run that ends well to be
+/// found as if it were that run's, and an untimed run, which the fixed seed of the engine's
+/// tests is, leaves it for the run that goes on from it.
 #[test]
-fn a_campaign_that_ends_well_leaves_no_timeout_env_of_an_earlier_run() {
-    let directory = fresh("timeout-stale");
-    std::fs::create_dir_all(directory.join("kept")).unwrap();
-    std::fs::write(directory.join("kept/timeout.env"), "DAGEIST_FUZZ_START=3\n").unwrap();
-    let whole = run_child(&directory, &[]);
-    assert_eq!(whole.status, Some(0), "{}", whole.said);
-    assert!(!directory.join("kept/timeout.env").exists());
+fn only_a_timed_campaign_removes_a_timeout_env_of_an_earlier_run() {
+    let stale = |name: &str| {
+        let directory = fresh(name);
+        std::fs::create_dir_all(directory.join("kept")).unwrap();
+        std::fs::write(directory.join("kept/timeout.env"), "DAGEIST_FUZZ_START=3\n").unwrap();
+        directory
+    };
+    let timed = stale("timeout-stale-timed");
+    let ended = run_child(&timed, &[("DAGEIST_FUZZ_DEADLINE_MS", "15000".to_owned())]);
+    assert_eq!(ended.status, Some(0), "{}", ended.said);
+    assert!(!timed.join("kept/timeout.env").exists());
+    let untimed = stale("timeout-stale-untimed");
+    let ended = run_child(&untimed, &[]);
+    assert_eq!(ended.status, Some(0), "{}", ended.said);
+    assert!(untimed.join("kept/timeout.env").exists());
 }

@@ -557,8 +557,17 @@ mod tests {
         };
         assert!(settings(1, None, 5).check().is_ok());
         assert!(settings(10, Some(9), 20).check().is_ok());
-        assert!(settings(10, None, 5).check().is_ok());
+        assert!(settings(10, None, 20).check().is_ok());
         let refused = |settings: Settings| settings.check().expect_err("refused");
+        // A start past the cases of the campaign makes none, whether or not a count is given.
+        let past = refused(settings(10, None, 5));
+        assert!(past.contains("DAGEIST_FUZZ_START"), "{past}");
+        assert!(!past.contains("DAGEIST_FUZZ_COUNTED"), "{past}");
+        let past = refused(settings(30, Some(6), 5));
+        assert!(
+            past.contains("DAGEIST_FUZZ_START") && past.contains("DAGEIST_FUZZ_COUNTED"),
+            "{past}"
+        );
         assert!(refused(settings(0, None, 5)).contains("DAGEIST_FUZZ_START"));
         assert!(refused(settings(10, Some(10), 5)).contains("DAGEIST_FUZZ_COUNTED"));
         // A start beyond what a count holds, and one that the cases make overflow.
