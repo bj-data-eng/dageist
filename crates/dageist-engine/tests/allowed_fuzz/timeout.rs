@@ -223,7 +223,7 @@ fn a_case_that_does_not_end_stops_the_campaign_with_a_status_and_the_run_from_th
     std::fs::write(directory.join("block"), hex(&whole.log[hangs])).unwrap();
     let stopped = run_child(
         &directory,
-        &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned())],
     );
     assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
     assert!(
@@ -297,7 +297,7 @@ fn a_case_that_does_not_end_after_no_panic_keeps_no_likely_cause() {
     std::fs::write(directory.join("block"), hex(&whole.log[5])).unwrap();
     let stopped = run_child(
         &directory,
-        &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned())],
     );
     assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
     assert!(
@@ -325,11 +325,11 @@ fn a_replay_of_a_case_that_does_not_end_ends_with_the_status_of_a_timeout() {
     std::fs::write(directory.join("replay"), "").unwrap();
     let stopped = run_child(
         &directory,
-        &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned())],
     );
     assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
     assert!(
-        stopped.said.contains("did not end in 500 ms"),
+        stopped.said.contains("did not end in 3000 ms"),
         "{}",
         stopped.said
     );
