@@ -1405,7 +1405,10 @@ impl Walker<'_> {
                                 dtype: class,
                                 shape: allowance.shape(),
                                 count: Count::NotKnown,
-                                taken: false,
+                                // A function that makes a value of what it is given gives one that
+                                // was taken where one of them is.
+                                taken: allowance.shape() == Shape::One
+                                    && start_arguments.iter().any(|(_, operand)| operand.taken),
                             }
                         };
                     }
@@ -2415,16 +2418,35 @@ fn taken_after(
     if shape != Shape::One {
         return false;
     }
+    let operands = arguments
+        .iter()
+        .any(|(name, operand)| operand.taken && carries_taken(link.entry(), name, operand));
     if is_counting(link) {
         return true;
     }
+    // An aggregate reduces what it follows, and keeps what it is given to read, as a statistic its share.
     if is_one_value(link) {
-        return false;
+        return operands;
     }
-    receiver_taken
-        || arguments
-            .iter()
-            .any(|(name, operand)| operand.taken && meets_receiver(link.entry(), name, operand))
+    receiver_taken || operands
+}
+
+/// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
+/// what the call gives one that was taken. It does wherever the call reads the value, as a part of
+/// a moment, a bound, a fill, a statistic's share or a strict replacement's default, and whether or
+/// not Polars meets it with each of the values the call follows. It does not where the call only
+/// looks up in it or by it: the keys of a sort order the values and are no part of them, what a
+/// replacement lists is a table of values it looks up, and a column of the dtype of the values that
+/// `is_in` is given is their set, whole, which is not read value by value as a list is. The share
+/// of a quantile is read once, before the groups, where an approximate quantile reads it in each.
+fn carries_taken(entry: &Entry, name: &str, operand: &Operand) -> bool {
+    match (entry.id().as_str(), name) {
+        ("Expr.sort_by", "by" | "more_by")
+        | ("Expr.replace" | "Expr.replace_strict", "old" | "new")
+        | ("Expr.quantile", "quantile") => false,
+        ("Expr.is_in", "other") => is_met_by_its_dtype(entry, name, operand),
+        _ => true,
+    }
 }
 
 /// What two values that a call meets give together: one value is met by each of the other, and

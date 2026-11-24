@@ -589,9 +589,16 @@ out from that one value: `sum().head(2)` is the one value, and so are `tail(5)`,
 `mode`, but `head(0)`, `slice(1)`, `top_k(0)`, `gather_every(1, 1)` and a difference that drops the first value
 give none, which is a count of no values and not one value, and a select refuses it beside a column. The one
 value that such a method took is the value of no row of a group, so a window refuses it, where `sum()` and
-`sum().first()` are the value of every row of theirs. The value stays taken where a method meets it, as an operand, a bound, a fill
-or the value or the predicate of a condition, and is not taken again where an aggregate of it is. A `filter` of one value is a count, for its condition
-meets the one value with each of its own.
+`sum().first()` are the value of every row of theirs. The value stays taken wherever a call reads it: as
+an operand, a bound, a fill, a power, a part of a moment or of a length of time, the share of an approximate
+quantile, the default of a strict replacement, or the value or the predicate of a condition. It is not taken
+again once an aggregate of it is, and the call of a method that takes some of the values is taken whatever it
+is given. A few parameters do not carry it, for the call only looks up in it or by it: the keys of a sort,
+which order the values and are no part of them; what a replacement lists, a table of values it looks up; the
+values `is_in` is given as a column of their own dtype, which is their set, whole; and the share of the exact
+quantile, which Polars reads once, before the groups. A test asks Polars and the walk of every expression
+parameter of the catalogue, with such a value given to it, so a parameter is not left to a case that came to
+mind. A `filter` of one value is a count, for its condition meets the one value with each of its own.
 
 The values a call meets must be as many as one another, or one, which is met by each of the others: the rows are
 no count, and two counts that are fixed and differ are not the same. The rule `values-meet-in-count` says so,
