@@ -179,7 +179,7 @@ describe('the calls the engine offers at the start of an expression', () => {
     const families = prepareOffers(catalogue, atStart, ['function', 'condition']);
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['condition', 7],
-      ['start', 8],
+      ['start', 14],
     ]);
     const start = families.find((family) => family.key === 'start')?.offers ?? [];
     // `element` stands only in a pivot's aggregate, by a rule the engine holds.

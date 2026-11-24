@@ -7853,6 +7853,133 @@
       ]
     },
     {
+      "id": "polars.date_range",
+      "applies": "function",
+      "family": "start",
+      "name": "date_range",
+      "hint": "the dates from a start to an end, an interval apart",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "start",
+          "shown": "start",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "end",
+          "shown": "end",
+          "label": "to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "interval",
+          "shown": "interval",
+          "label": "every",
+          "kind": {
+            "kind": "duration"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "1d"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "1d",
+            "shown": "1d"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "closed",
+          "shown": "closed",
+          "label": "ends included",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "both",
+                "shown": "both"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "none",
+                "shown": "none"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "both"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "both"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        }
+      ]
+    },
+    {
       "id": "polars.datetime",
       "applies": "function",
       "family": "start",
@@ -8074,6 +8201,185 @@
           },
           "position": null,
           "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.datetime_range",
+      "applies": "function",
+      "family": "start",
+      "name": "datetime_range",
+      "hint": "the moments from a start to an end, an interval apart",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "start",
+          "shown": "start",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "end",
+          "shown": "end",
+          "label": "to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "interval",
+          "shown": "interval",
+          "label": "every",
+          "kind": {
+            "kind": "duration"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "1d"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "1d",
+            "shown": "1d"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "closed",
+          "shown": "closed",
+          "label": "ends included",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "both",
+                "shown": "both"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "none",
+                "shown": "none"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "both"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "both"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_zone",
+          "shown": "time_zone",
+          "label": "in",
+          "kind": {
+            "kind": "timeZone",
+            "none": {
+              "shown": "None",
+              "hint": "moments of no time zone, or of the zone of the bounds"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
         }
       ]
     },
@@ -8337,6 +8643,239 @@
       ]
     },
     {
+      "id": "polars.int_range",
+      "applies": "function",
+      "family": "start",
+      "name": "int_range",
+      "hint": "whole numbers from a start up to, not including, an end",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "start",
+          "shown": "start",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "end",
+          "shown": "end",
+          "label": "up to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "step",
+          "shown": "step",
+          "label": "step",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "dtype",
+          "shown": "dtype",
+          "label": "as dtype",
+          "kind": {
+            "kind": "dtype"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "other"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        }
+      ]
+    },
+    {
+      "id": "polars.linear_space",
+      "applies": "function",
+      "family": "start",
+      "name": "linear_space",
+      "hint": "a number of values evenly spaced from a start to an end",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "start",
+          "shown": "start",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "end",
+          "shown": "end",
+          "label": "to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "num_samples",
+          "shown": "num_samples",
+          "label": "how many",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "closed",
+          "shown": "closed",
+          "label": "ends included",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "both",
+                "shown": "both"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "none",
+                "shown": "none"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "both"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "both"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        }
+      ]
+    },
+    {
       "id": "polars.lit",
       "applies": "function",
       "family": "start",
@@ -8400,6 +8939,89 @@
           },
           "position": null,
           "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.repeat",
+      "applies": "function",
+      "family": "start",
+      "name": "repeat",
+      "hint": "one value repeated a number of times",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "value",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "times",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "dtype",
+          "shown": "dtype",
+          "label": "as dtype",
+          "kind": {
+            "kind": "dtype"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
         }
       ]
     },
@@ -8479,6 +9101,133 @@
           "defaultSetting": null,
           "position": null,
           "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.time_range",
+      "applies": "function",
+      "family": "start",
+      "name": "time_range",
+      "hint": "the times of day from a start to an end, an interval apart",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "start",
+          "shown": "start",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "end",
+          "shown": "end",
+          "label": "to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "interval",
+          "shown": "interval",
+          "label": "every",
+          "kind": {
+            "kind": "duration"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "1h"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "1h",
+            "shown": "1h"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "closed",
+          "shown": "closed",
+          "label": "ends included",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "both",
+                "shown": "both"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "none",
+                "shown": "none"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "both"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "both"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
         }
       ]
     },
