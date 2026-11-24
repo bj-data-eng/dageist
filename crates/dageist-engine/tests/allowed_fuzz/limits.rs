@@ -5824,6 +5824,55 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_a_bitwise_call_given_a_null_of_whole_numbers() {
+        // `element().n_unique().or_(null).cast(Null)`: a bitwise call of whole numbers given the
+        // null literal is a null in each row, which a cast to the dtype Null takes, where the
+        // tables measured the count's values, which it cannot.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-cast-of-a-bitwise-call-given-a-null.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        let cast = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(cast_to(Representative::Null, Vec::new()));
+            excused_by(&pivot(chain_of(call("polars.element", Vec::new()), all)))
+        };
+        let or_null = || {
+            call(
+                "Expr.or_",
+                vec![(
+                    "others",
+                    Value::Many(vec![Value::Expression(chain(null(), &[]))]),
+                )],
+            )
+        };
+        // The call that gives no null is no cause of the failed conversion: another call of
+        // whole numbers is not asked.
+        assert!(!cast(vec![call("Expr.sum", Vec::new())]).contains(&Limit::AGroupAggregate));
+        // A bitwise call after the count that is given another value is not a null.
+        let given_a_count = call(
+            "Expr.or_",
+            vec![(
+                "others",
+                Value::Many(vec![Value::Expression(chain(
+                    column("a"),
+                    &["Expr.n_unique"],
+                ))]),
+            )],
+        );
+        assert!(
+            !cast(vec![call("Expr.n_unique", Vec::new()), given_a_count])
+                .contains(&Limit::AGroupAggregate)
+        );
+        assert!(
+            cast(vec![call("Expr.n_unique", Vec::new()), or_null()])
+                .contains(&Limit::AGroupAggregate)
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_a_date_written_as_digits_and_for_no_other_format() {
         // `element().dt.to_string("%Y").skew()`: the year of a date written alone reads as a
         // number, where the tables measured the sample's text, which no number reads.
