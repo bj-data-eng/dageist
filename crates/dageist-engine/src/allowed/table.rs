@@ -13,7 +13,7 @@ use std::sync::LazyLock;
 use crate::catalog::{self, Applies};
 
 use super::context::Context;
-use super::dtype::{Inner, Representative, ResultDtype};
+use super::dtype::{Inner, Representative, ResultDtype, dtype_name};
 use super::rules::Rule;
 
 /// The committed dtype table.
@@ -833,6 +833,23 @@ pub(super) fn restored(
     asked: &[Option<Representative>],
     read: &[Option<Representative>],
 ) -> Outcome {
+    if let Outcome::Refused(reason) = outcome {
+        // Polars' words name the dtype of the class that was read, which is not the one asked.
+        let mut text = reason.text.clone();
+        for (asked, read) in asked.iter().zip(read) {
+            if let (Some(asked), Some(read)) = (asked, read)
+                && asked != read
+            {
+                text = text
+                    .replace(&read.dtype().to_string(), &asked.dtype().to_string())
+                    .replace(&dtype_name(&read.dtype()), &dtype_name(&asked.dtype()));
+            }
+        }
+        return Outcome::Refused(Reason {
+            stage: reason.stage,
+            text,
+        });
+    }
     let Outcome::Allowed(Some(produces)) = outcome else {
         return outcome.clone();
     };
