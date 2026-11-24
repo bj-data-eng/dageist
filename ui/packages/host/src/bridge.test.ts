@@ -6,7 +6,8 @@ import nodeFixture from '../fixtures/node-inputs.json';
 import offersFixture from '../fixtures/offers-value.json';
 import optionsFixture from '../fixtures/options.json';
 import typedFixture from '../fixtures/typed-expression.json';
-import reportFixture from '../fixtures/step-report.json';
+import documentFixture from '../fixtures/node-document.json';
+import editedFixture from '../fixtures/edit-edited.json';
 import startsFixture from '../fixtures/step-starts.json';
 import rowsFixture from '../fixtures/step-rows.json';
 import blockFixture from '../fixtures/table-block-window.json';
@@ -54,17 +55,17 @@ afterEach(() => {
 
 describe('the host that calls the bridge', () => {
   it('posts the arguments of a command as JSON to its path and decodes the answer', async () => {
-    bridgeAnswers(() => jsonResponse(reportFixture));
+    bridgeAnswers(() => jsonResponse(documentFixture));
 
-    const run = await bridgeHost().runDocument('{"version":1,"steps":[]}');
+    const state = await bridgeHost().nodeDocument();
 
-    expect(run.status).toBe('run');
+    expect(state.revision).toBe(1);
     expect(sent).toEqual([
       {
-        path: '/bridge/run_document',
+        path: '/bridge/node_document',
         method: 'POST',
         contentType: 'application/json',
-        body: { document: '{"version":1,"steps":[]}' },
+        body: {},
       },
     ]);
   });
@@ -155,12 +156,30 @@ describe('the host that calls the bridge', () => {
 
   it('names the arguments of the rows and the sample commands as the host does', async () => {
     bridgeAnswers(() => jsonResponse(rowsFixture));
-    await bridgeHost().rowsAfterStep('{}', 'days_open', 7);
+    await bridgeHost().rowsAfterStep(1, 'days_open', 7);
     bridgeAnswers(() => jsonResponse(windowFixture));
     const table = await bridgeHost().openSampleWindow(10);
 
     expect(table).toEqual(windowFixture);
     expect(sent[0]).toMatchObject({ path: '/bridge/open_sample_window', body: { keys: 10 } });
+  });
+
+  it('posts an edit with the revision it was made against and decodes what it came to', async () => {
+    bridgeAnswers(() => jsonResponse(editedFixture));
+
+    const answer = await bridgeHost().editDocument(1, {
+      kind: 'removeStep',
+      step: { stepIndex: 0, stepId: 'sort', path: [] },
+    });
+
+    expect(answer.status).toBe('edited');
+    expect(sent[0]).toMatchObject({
+      path: '/bridge/edit_document',
+      body: {
+        revision: 1,
+        edit: { kind: 'removeStep', step: { stepIndex: 0, stepId: 'sort', path: [] } },
+      },
+    });
   });
 
   it('asks for a block with the rows and the columns and decodes the frame it is answered with', async () => {
@@ -193,7 +212,7 @@ describe('the host that calls the bridge', () => {
       jsonResponse({ kind: 'limit', message: 'a preview holds at most 1000 rows' }, 422),
     );
 
-    await expect(bridgeHost().rowsAfterStep('{}', 'a', 5000)).rejects.toThrow(
+    await expect(bridgeHost().rowsAfterStep(1, 'a', 5000)).rejects.toThrow(
       'rows_after_step: a preview holds at most 1000 rows',
     );
   });

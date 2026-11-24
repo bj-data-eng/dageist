@@ -142,9 +142,8 @@ export const SETTING_KINDS = [
 
 /**
  * What a parameter holds, in the one shape every kind of parameter is drawn from. The engine
- * decides every setting it reports: what a parameter holds when it is not given, what it is set
- * to when it is first added, and what a new step starts with. A number or text comes with the
- * words the engine shows it as. Mirrors `SettingView` in crates/dageist-tauri/src/catalogue.rs.
+ * decides every setting it reports, such as what a parameter holds when it is not given. A number
+ * or text comes with the words the engine shows it as. Mirrors `SettingView` in crates/dageist-tauri/src/catalogue.rs.
  */
 export type SettingView =
   /** Still to be given. */
@@ -202,8 +201,6 @@ export interface ParameterView {
    * given, Polars decides or the default is not a value.
    */
   readonly defaultSetting: SettingView | null;
-  /** What the parameter is set to when it is first added, which differs from its default. */
-  readonly start: SettingView;
   /**
    * Where the expression the parameter holds stands, when a named position
    * holds it; the engine's tables are asked at that place.
@@ -366,6 +363,18 @@ export interface PlaceView {
   /** Where the step is in the document, counted from zero. */
   readonly stepIndex: number | null;
   readonly stepId: string | null;
+  readonly path: readonly SegmentView[];
+}
+
+/**
+ * A place an edit is asked at: the step by its position and its identifier, which the host checks
+ * against each other, then the way down through its arguments. An edit works inside a step, so
+ * neither is absent. Mirrors `EditPlace` in crates/dageist-tauri/src/report.rs.
+ */
+export interface EditPlace {
+  /** Where the step is in the document, counted from zero. */
+  readonly stepIndex: number;
+  readonly stepId: string;
   readonly path: readonly SegmentView[];
 }
 
@@ -625,32 +634,332 @@ export interface StepReportView {
   readonly atDefault: readonly PlaceView[];
 }
 
-/** Why text is not a document the engine reads. */
-export type ReadProblemView =
-  /** The text is not JSON by RFC 8259, or nests too deep. Lines and columns count from 1. */
-  | {
-      readonly kind: 'syntax';
-      readonly line: number;
-      readonly column: number;
-      readonly reason: string;
-    }
-  /** The JSON is not a document, here, for this reason. */
-  | { readonly kind: 'refused'; readonly place: PlaceView; readonly reason: string };
-
 /**
- * What running a document came to: its steps reported one by one, or the
- * reason it could not be read. Mirrors `RunView` in
+ * What running a document came to: its steps reported one by one. Mirrors `RunView` in
  * crates/dageist-tauri/src/report.rs.
  */
-export type RunView =
+export interface RunView {
+  /** The columns of the table the steps start from. */
+  readonly source: readonly FieldView[];
+  /** One report for each step, in the document's order. */
+  readonly steps: readonly StepReportView[];
+}
+
+/** One call of the document: the entry of the catalogue it uses, and the arguments it was given. */
+export interface CallView {
+  /** The identifier the catalogue gives the entry, such as `Expr.shift`. */
+  readonly entry: string;
+  /** The arguments, each by Python's name for its parameter, in the order they were given. */
+  readonly arguments: readonly GivenView[];
+}
+
+/** The argument given for one parameter of a call. */
+export interface GivenView {
+  readonly parameter: string;
+  readonly value: ArgumentView;
+}
+
+/** Where an expression starts. */
+export type StartView =
+  /** A call of a function that makes an expression, or `polars.when`. */
+  | { readonly kind: 'call'; readonly call: CallView }
+  /** A connected value or list, by name. */
+  | { readonly kind: 'input'; readonly name: string }
+  /** Nothing picked yet. */
+  | { readonly kind: 'hole' };
+
+/** One entry of pairs. */
+export interface PairsEntryView {
+  readonly key: ArgumentView;
+  readonly value: ArgumentView;
+}
+
+/**
+ * What an argument is, as the document holds it. A number is not sent as a number but as the
+ * words the engine shows it as, so that the view draws it and formats nothing. Mirrors
+ * `ArgumentView` in crates/dageist-tauri/src/document.rs.
+ */
+export type ArgumentView =
+  /** A chain: where it starts, then the links after it. */
   | {
-      readonly status: 'run';
-      /** The columns of the table the steps start from. */
-      readonly source: readonly FieldView[];
-      /** One report for each step, in the document's order. */
-      readonly steps: readonly StepReportView[];
+      readonly kind: 'expression';
+      readonly start: StartView;
+      readonly links: readonly CallView[];
     }
-  | { readonly status: 'unreadable'; readonly problem: ReadProblemView };
+  | { readonly kind: 'columns'; readonly names: readonly string[] }
+  | { readonly kind: 'integer'; readonly shown: string }
+  | { readonly kind: 'float'; readonly shown: string }
+  | { readonly kind: 'string'; readonly value: string }
+  /** True, false, or unset, which leaves the choice to Polars. */
+  | { readonly kind: 'flag'; readonly value: boolean | null }
+  | { readonly kind: 'choice'; readonly word: string }
+  | { readonly kind: 'dtype'; readonly name: string }
+  | { readonly kind: 'duration'; readonly text: string }
+  | { readonly kind: 'pattern'; readonly text: string }
+  | { readonly kind: 'timeZone'; readonly zone: string | null }
+  | { readonly kind: 'table'; readonly name: string }
+  | { readonly kind: 'path'; readonly text: string }
+  | { readonly kind: 'pairs'; readonly entries: readonly PairsEntryView[] }
+  | { readonly kind: 'many'; readonly items: readonly ArgumentView[] };
+
+/** One step of the document: its name, and the call it makes. */
+export interface DocumentStepView {
+  readonly id: string;
+  readonly call: CallView;
+}
+
+/** The steps of a document, in the order they run. */
+export interface DocumentView {
+  readonly steps: readonly DocumentStepView[];
+}
+
+/**
+ * What a window needs to draw the node's steps: the document the host holds, the revision it is
+ * at, and what running it reported. Mirrors `DocumentStateView` in
+ * crates/dageist-tauri/src/document.rs.
+ */
+export interface DocumentStateView {
+  /** Goes up by one with each edit, from the milliseconds since the Unix epoch when the host started. An edit carries the revision it was made against. */
+  readonly revision: number;
+  readonly document: DocumentView;
+  readonly run: RunView;
+}
+
+/** What a value is, by the engine's word for it. Mirrors `ValueKind` in the engine. */
+export const VALUE_KINDS = [
+  'expression',
+  'columns',
+  'integer',
+  'float',
+  'string',
+  'flag',
+  'choice',
+  'dtype',
+  'duration',
+  'pattern',
+  'timeZone',
+  'table',
+  'path',
+  'pairs',
+  'list',
+] as const;
+
+/** What an argument is, in the words of a refusal. */
+export type ValueKindView = (typeof VALUE_KINDS)[number];
+
+/** The kinds of thing a place can name, other than an argument. Mirrors `Thing` in the engine. */
+export const THING_KINDS = [
+  'step',
+  'call',
+  'parameter',
+  'item',
+  'key',
+  'entryValue',
+  'start',
+  'link',
+  'expressionWithoutCall',
+  'value',
+] as const;
+
+/** What a place names, for a refusal that says what was there. */
+export type ThingView =
+  | {
+      readonly kind: Exclude<(typeof THING_KINDS)[number], 'value'>;
+    }
+  /** An argument of this kind. */
+  | { readonly kind: 'value'; readonly of: ValueKindView };
+
+/** What an edit needs the place to name. Mirrors `Wanted` in the engine. */
+export const WANTED = [
+  'call',
+  'argument',
+  'parameter',
+  'item',
+  'entryPart',
+  'link',
+  'expression',
+  'list',
+  'pairs',
+  'partOfStep',
+] as const;
+
+/** What an edit needs the place it is made at to name. */
+export type WantedView = (typeof WANTED)[number];
+
+/** The kinds of reason the engine has for refusing an edit. Mirrors `EditProblem` in the engine. */
+export const PROBLEM_KINDS = [
+  'noStep',
+  'stepChanged',
+  'nothing',
+  'doesNotFit',
+  'wrongPlace',
+  'notPerItem',
+  'noDefault',
+  'outOfRange',
+  'unknownEntry',
+  'noStart',
+  'cannotAdd',
+  'needsValue',
+  'refused',
+] as const;
+
+/** Why the engine refused an edit. */
+export type ProblemView =
+  /** The place names a step the document does not have. */
+  | { readonly kind: 'noStep'; readonly steps: number }
+  /** The place names a step by an identifier the step at its number does not have. */
+  | { readonly kind: 'stepChanged'; readonly found: string }
+  /** Nothing is at the place. */
+  | { readonly kind: 'nothing' }
+  /** What is there has no such part. */
+  | { readonly kind: 'doesNotFit'; readonly found: ThingView }
+  /** The place names another kind of thing than the edit needs. */
+  | { readonly kind: 'wrongPlace'; readonly needs: WantedView; readonly found: ThingView }
+  /** The parameter holds no value for each item of another. */
+  | { readonly kind: 'notPerItem' }
+  /** The parameter has no default for the items it has no value for. */
+  | { readonly kind: 'noDefault' }
+  /** A position past the end. */
+  | { readonly kind: 'outOfRange'; readonly index: number; readonly len: number }
+  /** An entry the catalogue lacks. */
+  | { readonly kind: 'unknownEntry'; readonly entry: string }
+  /** An entry that starts no step. */
+  | { readonly kind: 'noStart'; readonly entry: string }
+  /** An option that Polars refuses every other word of, for this reason. */
+  | { readonly kind: 'cannotAdd'; readonly reason: string }
+  /** An option that starts with nothing a document holds: it needs its value. */
+  | { readonly kind: 'needsValue'; readonly parameter: string }
+  /** The model refuses the result, for this reason. */
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/**
+ * What an edit came to. Mirrors `EditAnswerView` in crates/dageist-tauri/src/document.rs.
+ */
+export type EditAnswerView =
+  /** The edit was made: the document as it is now, at its new revision. */
+  | ({ readonly status: 'edited' } & DocumentStateView)
+  /** The engine refused the edit, here, for this reason. The document is as it was. */
+  | {
+      readonly status: 'refused';
+      /** The revision the document stays at. */
+      readonly revision: number;
+      readonly place: PlaceView;
+      readonly problem: ProblemView;
+      /** The engine's words for the refusal. */
+      readonly message: string;
+    };
+
+/** A number or text that an expression is made of, as an edit sends it. */
+export type LiteralRequest =
+  | { readonly kind: 'integer'; readonly value: number }
+  | { readonly kind: 'float'; readonly value: number }
+  | { readonly kind: 'text'; readonly value: string };
+
+/** An expression of one word, which an edit puts where an expression stands. */
+export type ExpressionRequest =
+  | { readonly kind: 'hole' }
+  | { readonly kind: 'field'; readonly name: string }
+  | { readonly kind: 'input'; readonly name: string }
+  | { readonly kind: 'literal'; readonly literal: LiteralRequest };
+
+/** What an expression starts from, for an edit that changes only that. */
+export type StartRequest =
+  | { readonly kind: 'hole' }
+  | { readonly kind: 'input'; readonly name: string }
+  | { readonly kind: 'field'; readonly name: string };
+
+/**
+ * An argument an edit gives a parameter. Its kind is the kind of the parameter it is for, as the
+ * catalogue gives it; the model refuses an argument of another kind.
+ */
+export type ValueRequest =
+  | { readonly kind: 'expression'; readonly expression: ExpressionRequest }
+  | { readonly kind: 'columns'; readonly names: readonly string[] }
+  | { readonly kind: 'integer'; readonly value: number }
+  | { readonly kind: 'float'; readonly value: number }
+  | { readonly kind: 'string'; readonly value: string }
+  | { readonly kind: 'flag'; readonly value: boolean | null }
+  | { readonly kind: 'choice'; readonly word: string }
+  | { readonly kind: 'dtype'; readonly name: string }
+  | { readonly kind: 'duration'; readonly text: string }
+  | { readonly kind: 'pattern'; readonly text: string }
+  | { readonly kind: 'timeZone'; readonly zone: string | null }
+  | { readonly kind: 'table'; readonly name: string }
+  | { readonly kind: 'path'; readonly text: string }
+  | {
+      readonly kind: 'pairs';
+      readonly entries: ReadonlyArray<{ readonly key: ValueRequest; readonly value: ValueRequest }>;
+    }
+  | { readonly kind: 'many'; readonly items: readonly ValueRequest[] };
+
+/** The table a new step starts on, and the tables it can bring in. */
+export interface FrameRequest {
+  readonly columns: readonly string[];
+  readonly tables: readonly string[];
+}
+
+/**
+ * One edit of the document, which the engine makes. The places are those the report gives. Mirrors
+ * `EditRequest` in crates/dageist-tauri/src/document.rs.
+ */
+export type EditRequest =
+  | {
+      readonly kind: 'addStep';
+      readonly at: number;
+      readonly entry: string;
+      readonly frame: FrameRequest;
+    }
+  | {
+      readonly kind: 'swapStep';
+      readonly step: EditPlace;
+      readonly entry: string;
+      readonly frame: FrameRequest;
+    }
+  | { readonly kind: 'removeStep'; readonly step: EditPlace }
+  | { readonly kind: 'moveStep'; readonly step: EditPlace; readonly to: number }
+  | { readonly kind: 'setArgument'; readonly place: EditPlace; readonly value: ValueRequest }
+  | { readonly kind: 'clearArgument'; readonly place: EditPlace }
+  | { readonly kind: 'addOption'; readonly call: EditPlace; readonly parameter: string }
+  | {
+      readonly kind: 'setForItem';
+      readonly call: EditPlace;
+      readonly parameter: string;
+      readonly item: number;
+      readonly value: ValueRequest;
+    }
+  | {
+      readonly kind: 'insertItem';
+      readonly list: EditPlace;
+      readonly at: number;
+      readonly item: ValueRequest;
+    }
+  | { readonly kind: 'removeItem'; readonly item: EditPlace }
+  | { readonly kind: 'insertTest'; readonly list: EditPlace; readonly at: number }
+  | {
+      readonly kind: 'insertEntry';
+      readonly pairs: EditPlace;
+      readonly at: number;
+      readonly key: ValueRequest;
+      readonly value: ValueRequest;
+    }
+  | { readonly kind: 'removeEntry'; readonly entry: EditPlace }
+  | { readonly kind: 'setStart'; readonly expression: EditPlace; readonly start: StartRequest }
+  | { readonly kind: 'startWith'; readonly expression: EditPlace; readonly entry: string }
+  | {
+      readonly kind: 'insertLink';
+      readonly expression: EditPlace;
+      readonly at: number;
+      readonly entry: string;
+      readonly standing: PlaceRequest | null;
+    }
+  | {
+      readonly kind: 'swapLink';
+      readonly link: EditPlace;
+      readonly entry: string;
+      readonly standing: PlaceRequest | null;
+    }
+  | { readonly kind: 'removeLink'; readonly link: EditPlace }
+  | { readonly kind: 'moveLink'; readonly link: EditPlace; readonly to: number };
 
 /**
  * Where a call would stand, as a request names it: the positions that hold
@@ -839,24 +1148,15 @@ export interface StepStartsRequest {
   readonly tables: readonly string[];
 }
 
-/** One argument a new step starts with. */
-export interface StartArgumentView {
-  /** The parameter, by Python's name. */
-  readonly parameter: string;
-  readonly setting: SettingView;
-}
-
-/** What a new step of an entry starts with. Mirrors `StepStartView` in crates/dageist-tauri/src/offers.rs. */
+/** An entry of the list that starts a step. Mirrors `StepStartView` in crates/dageist-tauri/src/offers.rs. */
 export interface StepStartView {
   /** The identifier the catalogue gives the entry. */
   readonly entry: string;
-  /** The parameters the step starts with. Any other holds its default. */
-  readonly arguments: readonly StartArgumentView[];
 }
 
-/** What every step of the list starts with. Mirrors `StepStartsView` in crates/dageist-tauri/src/offers.rs. */
+/** Which steps of the list can be added to a table. Mirrors `StepStartsView` in crates/dageist-tauri/src/offers.rs. */
 export interface StepStartsView {
-  /** One for each step, ordered by identifier. */
+  /** One for each step that can, ordered by identifier. */
   readonly starts: readonly StepStartView[];
 }
 
@@ -874,8 +1174,8 @@ export const ERROR_KINDS = [
   'refused',
   /** More was asked for than the window of a command holds. */
   'limit',
-  /** The text sent is not a document the engine reads. */
-  'unreadable',
+  /** The document is at another revision than the one the request was made for. */
+  'stale',
   /** The request names an entry or a parameter the catalogue lacks, or a way down to an expression that starts at no position of a step. */
   'unknownName',
   /** Anything else. */
@@ -897,17 +1197,22 @@ export interface Host {
   /** Reports what the node is connected to: the table its steps start from and every other input. */
   readonly nodeInputs: () => Promise<NodeView>;
   /**
-   * Runs the step document `document`, written as JSON, on the node and
-   * reports each of its steps. Text that is not a document is reported as
-   * such, not rejected.
+   * Reports the document the host holds for the node, the revision it is at, and what running it
+   * reported.
    */
-  readonly runDocument: (document: string) => Promise<RunView>;
+  readonly nodeDocument: () => Promise<DocumentStateView>;
   /**
-   * Gives the rows after the step `step` of `document`, at most `limit` of
-   * them, as text. It rejects when the document cannot be read, the step is
-   * not in it or was refused, or `limit` is over what a preview may hold.
+   * Makes `edit` on the node's document, which must be at `revision`, and reports the edited
+   * document at its new revision, or why the engine refused the edit. It rejects with `stale`
+   * when the document is at another revision.
    */
-  readonly rowsAfterStep: (document: string, step: string, limit: number) => Promise<RowsView>;
+  readonly editDocument: (revision: number, edit: EditRequest) => Promise<EditAnswerView>;
+  /**
+   * Gives the rows after the step `step` of the document at `revision`, at most `limit` of them,
+   * as text. It rejects with `stale` when the document is at another revision, when the step is
+   * not in it or was refused, or when `limit` is over what a preview may hold.
+   */
+  readonly rowsAfterStep: (revision: number, step: string, limit: number) => Promise<RowsView>;
   /**
    * Asks which calls may stand at `place`: every entry that stands in an
    * expression, offered or refused, with whether the chain may end there.

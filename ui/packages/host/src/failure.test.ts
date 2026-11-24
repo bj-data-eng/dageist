@@ -6,7 +6,7 @@ import { tauriHost } from './tauri';
 // The host rejects a failed command with its kind beside its message. The view decides on the
 // kind, so both hosts hand it over the same way, whatever carries the failure.
 
-const KINDS = ['noSuchStep', 'notRun', 'refused', 'limit', 'unreadable', 'failed'] as const;
+const KINDS = ['noSuchStep', 'notRun', 'refused', 'limit', 'stale', 'failed'] as const;
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -53,7 +53,7 @@ describe.each(KINDS)('a command that fails with the kind %s', (kind) => {
   it('rejects through the bridge with that kind and the message, under its name', async () => {
     bridgeAnswers(() => jsonResponse({ kind, message: 'the reason' }, 422));
 
-    const error = await rejection(bridgeHost().rowsAfterStep('{}', 'a', 5));
+    const error = await rejection(bridgeHost().rowsAfterStep(1, 'a', 5));
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
@@ -66,7 +66,7 @@ describe.each(KINDS)('a command that fails with the kind %s', (kind) => {
     tauriRejects({ kind, message: 'the reason' });
     const host = tauriHost();
 
-    const error = await rejection(host?.rowsAfterStep('{}', 'a', 5) ?? Promise.resolve());
+    const error = await rejection(host?.rowsAfterStep(1, 'a', 5) ?? Promise.resolve());
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
@@ -80,7 +80,7 @@ describe('a failure whose kind is not one the contract names', () => {
   it('is a failed command through the bridge, and says what was wrong with it', async () => {
     bridgeAnswers(() => jsonResponse({ kind: 'exploded', message: 'the reason' }, 422));
 
-    const error = await rejection(bridgeHost().rowsAfterStep('{}', 'a', 5));
+    const error = await rejection(bridgeHost().rowsAfterStep(1, 'a', 5));
 
     expect(error).toMatchObject({ kind: 'failed' });
     expect(String(error instanceof Error ? error.message : error)).toContain('exploded');
@@ -89,7 +89,7 @@ describe('a failure whose kind is not one the contract names', () => {
   it('is a failed command through Tauri, and says what was wrong with it', async () => {
     tauriRejects({ kind: 'exploded', message: 'the reason' });
 
-    const error = await rejection(tauriHost()?.rowsAfterStep('{}', 'a', 5) ?? Promise.resolve());
+    const error = await rejection(tauriHost()?.rowsAfterStep(1, 'a', 5) ?? Promise.resolve());
 
     expect(error).toMatchObject({ kind: 'failed' });
     expect(String(error instanceof Error ? error.message : error)).toContain('exploded');
@@ -100,7 +100,7 @@ describe('a failure that Tauri words itself', () => {
   it('is a failed command that keeps its text', async () => {
     tauriRejects('invalid args `limit` for command `rows_after_step`');
 
-    const error = await rejection(tauriHost()?.rowsAfterStep('{}', 'a', 5) ?? Promise.resolve());
+    const error = await rejection(tauriHost()?.rowsAfterStep(1, 'a', 5) ?? Promise.resolve());
 
     expect(error).toMatchObject({
       kind: 'failed',

@@ -1,88 +1,74 @@
 /**
- * @file Values and the conditions made of them. A value is a field, a
- * connected input, something typed, or a chain of its own, written where it
- * stands. A comparison is a field, a comparison and a value as three words.
- * A condition is always a list of them on lines beneath its word, where all
- * must hold or any may, with a group as lines set in again. One comparison
- * is a list of one.
+ * @file Values and the conditions made of them. A value is a field, a connected input, something
+ * typed, or a chain of its own, written where it stands. A comparison is a field, a comparison and
+ * a value as three words. A condition is a list of them on lines beneath its word, all of which
+ * must hold; one comparison is a list of one. What is drawn is what the document holds, and each
+ * pick is sent as an edit.
  */
 
 import { useCallback, useContext, useState } from 'react';
 
-import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
+import type { Look, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
-import type { ArgumentRequest, LiteralView, PositionView } from '@dageist/host';
+import type {
+  ArgumentRequest,
+  ArgumentView,
+  LiteralView,
+  PositionView,
+  ValueRequest,
+} from '@dageist/host';
 
 import type { FitSlot } from './ask';
 import { useCandidateFits, useOffers, useReadTyped } from './ask';
+import { ChainBlocks } from './Chain';
+import { useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
-import { comparisonEntryId, wrongId } from './model/document';
-import { ChainBlocks } from './Chain';
 import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
-import { PositionsContext, useListState, usePositions } from './positions';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
+import { PositionsContext, useListState, usePositions } from './positions';
+import type { ExpressionView, Path, TestView } from './model/doc';
+import {
+  expressionOf,
+  isWithin,
+  itemSegment,
+  linkSegment,
+  parameterSegment,
+  pathKey,
+  shapeOf,
+  testOf,
+  under,
+} from './model/doc';
 import type { Frame } from './model/frame';
 import { findColumn } from './model/frame';
-import { NO_POSITIONS, startRequest } from './model/place';
-import { nextId } from './model/ids';
 import { findInput, inputLines } from './model/inputs';
-import { literalValue } from './model/literal';
-import type {
-  ChainCondition,
-  Comparison,
-  Condition,
-  Group,
-  LiteralValue,
-  Test,
-  Value,
-} from './model/source';
-import { IS_IN } from './model/source';
-import type { Catalogue } from './model/catalogue';
-import { comparisonChoices, comparisonOption } from './model/catalogue';
-import { emptyTest } from './model/conditions';
+import { comparisonOption, comparisonOptions } from './model/catalogue';
+import { NO_POSITIONS, placeRequest, startRequest } from './model/place';
+import {
+  HOLE,
+  fieldArgument,
+  inputArgument,
+  listArgument,
+  literalExpression,
+} from './model/requests';
 
-/** A value that is still to be picked. */
-const UNSET_VALUE: Value = { kind: 'unset' };
-
-/** Returns how a typed value is shown as a block: in the words the engine gave it, text between quotation marks the block draws. */
-function literalBlock(value: LiteralValue): { label: string; look: Look } {
-  if (value.value === null) return { label: 'None', look: 'none' };
-  return { label: value.shown, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
-}
-
-/** Returns a condition written as a chain, with nothing picked yet. */
-function emptyChainCondition(): ChainCondition {
-  return {
-    kind: 'chain',
-    id: nextId('chain'),
-    chain: { source: { kind: 'column', column: '' }, methods: [] },
-  };
-}
-
-/** Returns the row that offers a condition written as a chain of its own. */
-function chainOffer(onAdd: (condition: ChainCondition) => void): Offer {
-  return offer(
-    '…',
-    'function',
-    'a chain of its own, ending in a comparison',
-    () => {
-      onAdd(emptyChainCondition());
-    },
-    { id: 'chain', look: 'dots', act: true },
-  );
+/** Returns whether the engine's report puts what is wrong with the step in or at `path`. */
+export function useIsWrongAt(): (path: Path) => boolean {
+  const at = usePreparedStep()?.problemAt ?? null;
+  return (path) => at !== null && isWithin(at, path);
 }
 
 /** What a value slot shows and reports. */
 export interface ValueSlotProps {
-  readonly value: Value;
+  /** What the document holds, or `null` where it holds nothing there yet. */
+  readonly expression: ExpressionView | null;
+  /** The way to the value in the step, or `null` for one that is not in the document yet. */
+  readonly path: Path | null;
   readonly frame: Frame;
   /** What the value is for, for assistive technology. */
   readonly label: string;
-  /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
-  readonly lists: boolean;
   /**
    * The positions that hold an expression picked here, which is where the engine's tables are
    * asked what may start it; `null` where no named position does.
@@ -94,56 +80,50 @@ export interface ValueSlotProps {
   readonly openId?: string | undefined;
   /** Takes the value away from where it stands, when it is one of several; otherwise it can only be unset. */
   readonly onRemove?: (() => void) | undefined;
-  readonly onChange: (value: Value) => void;
+  /** Says what the person picked for it. */
+  readonly onSet: (request: ValueRequest) => void;
+}
+
+/** Returns how a typed value is shown as a block: in the words the engine gave it, text between quotation marks the block draws. */
+function literalBlock(shown: string, text: boolean): { label: string; look: Look } {
+  return { label: shown, look: text ? 'quoted' : 'plain' };
 }
 
 /**
- * Draws a value as a word in the colour of what it is, which opens the list
- * it is picked from: a chain of its own, something typed, a connected input,
- * or a field. The list never offers the values a field holds: a column can
- * hold millions of them. A chain is written where the value stands.
+ * Draws a value as a word in the colour of what it is, which opens the list it is picked from: a
+ * chain of its own, something typed, a connected input, or a field. The list never offers the
+ * values a field holds: a column can hold millions of them. A chain is written where the value
+ * stands.
  */
 export function ValueSlot({
-  value,
+  expression,
+  path,
   frame,
   label,
-  lists,
   positions,
   argument,
   openId,
   onRemove,
-  onChange,
+  onSet,
 }: ValueSlotProps): React.JSX.Element {
   const catalogue = useCatalogue();
   const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
+  const edits = useStepEdits();
   const list = useListState();
+  const shape = expression === null ? ({ kind: 'unset' } as const) : shapeOf(expression);
   // What may stand here, as the engine says of the place: the functions that may start an
   // expression, and which of the fields, inputs and values typed in fit.
   const startKnown = positions !== null && positions.length > 0;
-  const startOffers = useOffers(list.open && startKnown && !lists ? startRequest(positions) : null);
+  const startOffers = useOffers(list.open && startKnown ? startRequest(positions) : null);
   const slot: FitSlot | null =
-    lists || (!startKnown && argument === null)
-      ? null
-      : { start: startKnown ? positions : null, argument };
+    !startKnown && argument === null ? null : { start: startKnown ? positions : null, argument };
   const fits = useCandidateFits(slot, list.open, frame, node);
   const readings = useReadTyped(
-    list.open && !lists ? { text: list.typed, typed: { kind: 'expression' }, slot } : null,
+    list.open ? { text: list.typed, typed: { kind: 'expression' }, slot } : null,
   );
   const offers = (typed: string): OfferGroup[] => {
-    const connected = node.inputs
-      .flatMap((input) => (input.kind === (lists ? 'list' : 'value') ? [input] : []))
-      .filter((input) => matches(typed, input.name))
-      .map((input) =>
-        offer(input.name, 'input', lists ? `list of ${input.dtype}` : input.dtype, () => {
-          onChange({ kind: 'input', name: input.name });
-        }),
-      );
-    // The values of `is_in` are lists, which the engine has no entry to judge yet, so they are offered
-    // as they are connected.
-    if (lists) return [counted('Inputs', connected)];
-
     const rows = {
       frame,
       node,
@@ -152,13 +132,13 @@ export function ValueSlot({
       readings,
       inputs: ['value', 'list'] as const,
       onLiteral: (picked: LiteralView) => {
-        onChange(literalValue(picked));
+        onSet(literalExpression(picked));
       },
       onInput: (name: string) => {
-        onChange({ kind: 'input', name });
+        onSet(inputArgument(name));
       },
-      onField: (column: string) => {
-        onChange({ kind: 'column', column });
+      onField: (name: string) => {
+        onSet(fieldArgument(name));
       },
     };
     // A chain of its own starts from a field, which the engine says may stand here or not.
@@ -168,131 +148,70 @@ export function ValueSlot({
       'function',
       'a chain of its own',
       () => {
-        const id = nextId('chain');
-        onChange({
-          kind: 'chain',
-          id,
-          chain: { source: { kind: 'column', column: '' }, methods: [] },
-        });
-        fresh.mark(id);
+        onSet(HOLE);
+        if (openId !== undefined) fresh.mark(openId);
       },
       { id: 'chain', look: 'dots', act: true, reason: chainRefusal },
-    );
-    const written = valueGroup(rows);
-    const none = offer(
-      'None',
-      'value',
-      'no value',
-      () => {
-        onChange({ kind: 'literal', value: null });
-      },
-      { id: 'none', look: 'none' },
     );
     // The groups go from the shortest to the longest, so a long one never hides a short one.
     return [
       titled(null, typed === '' ? [chain] : []),
-      titled('Value', [...written.offers, none]),
+      valueGroup({ ...rows, readings }),
       inputGroup(rows),
       fieldGroup(rows),
-      ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-        const made = nextId('chain');
-        if (id === 'polars.when') {
-          const arm = {
-            id: nextId('arm'),
-            condition: emptyTest(catalogue),
-            returns: UNSET_VALUE,
-          };
-          onChange({
-            kind: 'chain',
-            id: made,
-            chain: {
-              source: { kind: 'when', arms: [arm], otherwise: UNSET_VALUE },
-              methods: [],
-            },
-          });
-          fresh.mark(arm.condition.id);
-        } else {
-          onChange({
-            kind: 'chain',
-            id: made,
-            chain: { source: { kind: 'element' }, methods: [] },
-          });
-          // Its first method is the next thing to pick.
-          fresh.mark(`${made}:method`);
-        }
-      }),
+      // A function starts the expression that is in the document, so it has a place to start at.
+      ...(path === null
+        ? []
+        : startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+            void edits.startWith(path, id);
+          })),
     ];
   };
 
-  if (value.kind === 'chain') {
+  if (expression !== null && path !== null && (shape.kind === 'column' || shape.kind === 'chain')) {
     // A chain is written where it stands. Its start takes the whole chain away.
     return (
       <PositionsContext.Provider value={positions ?? NO_POSITIONS}>
         <ChainBlocks
-          chainId={value.id}
-          chain={value.chain}
+          expression={expression}
+          path={path}
           frame={frame}
           onRemove={
             onRemove ??
             (() => {
-              onChange({ kind: 'unset' });
+              onSet(HOLE);
             })
           }
-          onChange={(chain) => {
-            onChange({ kind: 'chain', id: value.id, chain });
-          }}
         />
       </PositionsContext.Provider>
     );
   }
 
   let shown: { label: string; tone: Tone; look: Look; wrong: boolean; lines: string[] };
-  if (value.kind === 'input') {
-    const input = findInput(node, value.name);
+  if (shape.kind === 'input') {
+    const input = findInput(node, shape.name);
     shown = {
-      label: value.name === '' ? 'list' : value.name,
-      tone: value.name === '' ? 'value' : 'input',
-      look: value.name === '' ? 'none' : 'plain',
-      wrong: value.name !== '' && input === null,
+      label: shape.name,
+      tone: 'input',
+      look: 'plain',
+      wrong: input === null,
       lines: input === null ? [] : inputLines(input),
     };
-  } else if (value.kind === 'column') {
-    const column = findColumn(frame, value.column);
+  } else if (shape.kind === 'column') {
+    const column = findColumn(frame, shape.name);
     shown = {
-      label: value.column,
+      label: shape.name,
       tone: 'column',
       look: 'plain',
       wrong: column === null,
       lines: fieldHint(column),
     };
-  } else if (value.kind === 'unset' || value.kind === 'leftOut') {
-    // Nothing is picked yet, so the slot says what goes there, in the colour of what is missing.
-    shown = {
-      label: 'value',
-      tone: 'value',
-      look: 'none',
-      wrong: value.kind === 'unset',
-      lines: [],
-    };
+  } else if (shape.kind === 'literal') {
+    shown = { ...literalBlock(shape.shown, shape.text), tone: 'value', wrong: false, lines: [] };
   } else {
-    shown = { ...literalBlock(value), tone: 'value', wrong: false, lines: [] };
+    // Nothing is picked yet, so the slot says what goes there, in the colour of what is missing.
+    shown = { label: 'value', tone: 'value', look: 'none', wrong: true, lines: [] };
   }
-  // A field can be carried on from: adding a method after it makes it the start of a chain.
-  const carryOn =
-    value.kind === 'column' && !lists
-      ? {
-          label: `Add a method after ${value.column}`,
-          onPress: (): void => {
-            const id = nextId('chain');
-            onChange({
-              kind: 'chain',
-              id,
-              chain: { source: { kind: 'column', column: value.column }, methods: [] },
-            });
-            fresh.mark(`${id}:method`);
-          },
-        }
-      : null;
   return (
     <Piece
       remove={
@@ -303,7 +222,7 @@ export function ValueSlot({
               onPress: onRemove,
             }
       }
-      add={carryOn}
+      add={null}
     >
       <Hint lines={shown.lines} code={false}>
         <Slot
@@ -314,7 +233,7 @@ export function ValueSlot({
           openNow={openId !== undefined && fresh.id === openId}
           names
           describedAs={label}
-          placeholder={lists ? 'Search the lists' : 'Type a value, or search'}
+          placeholder="Type a value, or search"
           offers={offers}
           onOpenChange={list.onOpenChange}
           onType={list.onType}
@@ -326,59 +245,48 @@ export function ValueSlot({
 
 /** What a comparison shows and reports. */
 interface TestBlocksProps {
-  readonly test: Test;
+  readonly test: TestView;
+  /** The way to the expression that is the test. */
+  readonly path: Path;
   readonly frame: Frame;
-  readonly onChange: (test: Test) => void;
 }
 
 /** Draws a comparison as three blocks: a field, a comparison and a value. */
-function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
+function TestBlocks({ test, path, frame }: TestBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
   const catalogue = useCatalogue();
-  const node = useNode();
   const prepared = usePreparedStep();
+  const edits = useStepEdits();
+  const step = useStepAt();
   const fieldHint = useFieldHint();
   const positions = usePositions();
-  const column = findColumn(frame, test.column);
-  const unset = test.column === '';
+  const wrongAt = useIsWrongAt();
+  const column = test.column === null ? null : findColumn(frame, test.column);
+  const linkPath = under(path, linkSegment(0));
+  const valuePath = under(linkPath, parameterSegment('other'));
   // The value is the argument of the method the comparison is written as, which follows the
   // field: the engine says what fits it.
-  const comparisonId = comparisonEntryId(test.comparison);
   const argument: ArgumentRequest | null =
-    comparisonId === null || column === null || positions.length === 0
+    column === null || positions.length === 0
       ? null
       : {
-          entry: comparisonId,
+          entry: test.comparison.entry,
           parameter: 'other',
           place: { positions, after: { kind: 'value', dtype: column.dtype, shape: 'many' } },
         };
-  const wrongSign = prepared?.wrong.has(wrongId({ kind: 'test', testId: test.id })) ?? false;
+  const standing = prepared?.chains.get(pathKey(path))?.places[0] ?? null;
 
   // What each comparison is written as and means is the engine's, as the catalogue lists it.
-  const comparisons = comparisonChoices(catalogue);
-  const held = comparisonOption(catalogue, test.comparison);
-  const compare = (comparison: Comparison): void => {
-    const wasList = test.comparison === IS_IN;
-    if (comparison === IS_IN && !wasList) {
-      // Membership needs a list, so start from the first connected one.
-      const list = node.inputs.find((input) => input.kind === 'list');
-      onChange({ ...test, comparison, value: { kind: 'input', name: list?.name ?? '' } });
-    } else if (comparison !== IS_IN && wasList) {
-      onChange({ ...test, comparison, value: { kind: 'unset' } });
-    } else {
-      onChange({ ...test, comparison });
-    }
-  };
-
+  const held = comparisonOption(catalogue, test.comparison.entry);
   return (
     <>
       <Hint lines={fieldHint(column)} code={false}>
         <Slot
-          label={unset ? 'field' : test.column}
-          tone={unset ? 'value' : 'column'}
-          look={unset ? 'none' : 'plain'}
-          wrong={column === null}
-          openNow={fresh.id === test.id}
+          label={test.column ?? 'field'}
+          tone={test.column === null ? 'value' : 'column'}
+          look={test.column === null ? 'none' : 'plain'}
+          wrong={test.column === null || column === null || wrongAt(under(path, { kind: 'start' }))}
+          openNow={fresh.id === `${step.id}:${pathKey(path)}`}
           describedAs="The field that is compared"
           placeholder="Search the fields"
           offers={(typed) => [
@@ -388,7 +296,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
                 frame,
                 typed,
                 anyField((name) => {
-                  onChange({ ...test, column: name });
+                  void edits.setStart(path, { kind: 'field', name });
                 }),
               ),
             ),
@@ -399,14 +307,14 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         label={held.sign}
         tone="compare"
         look="compare"
-        wrong={wrongSign}
+        wrong={wrongAt(linkPath)}
         names
         describedAs={`Comparison: ${held.hint}`}
         placeholder="Search the comparisons"
         offers={(typed) => [
           titled(
             'Comparison',
-            comparisons
+            comparisonOptions(catalogue)
               .filter((option) => matches(typed, option.entry, option.sign, option.hint))
               .map((option) =>
                 offer(
@@ -414,7 +322,11 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
                   'compare',
                   option.hint,
                   () => {
-                    compare(option.entry);
+                    void edits.swapLink(
+                      linkPath,
+                      option.entry,
+                      standing === null ? null : placeRequest(standing),
+                    );
                   },
                   { id: option.entry, look: 'compare' },
                 ),
@@ -423,325 +335,99 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         ]}
       />
       <ValueSlot
-        value={test.value}
+        expression={expressionOf(test.other)}
+        path={valuePath}
         frame={frame}
-        label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
-        lists={test.comparison === IS_IN}
+        label={
+          test.column === null
+            ? 'The value it is compared with'
+            : `Value compared with ${test.column}`
+        }
         positions={positions.length === 0 ? null : positions}
         argument={argument}
-        onChange={(value) => {
-          onChange({ ...test, value });
+        onSet={(request) => {
+          void edits.setArgument(valuePath, request);
         }}
       />
     </>
   );
 }
 
-/**
- * Returns `group` without the item called `id`. A group left with one item
- * is that item, and a group left with none is nothing, so it goes too.
- */
-function withoutItem(group: Group, id: string): Condition | null {
-  const items = group.items.filter((item) => item.id !== id);
-  if (items.length === 0) return null;
-  const [only] = items;
-  return items.length === 1 && only !== undefined ? only : { ...group, items };
-}
-
-/** Returns the word that joins the lines of a group: `and` where all must hold, `or` where any may. */
-function joiner(group: Group): string {
-  return group.every ? 'and' : 'or';
-}
-
-interface GroupWordProps {
-  readonly group: Group;
-  /** The colour of the word: that of the step it stands in, or a function's on a line. */
-  readonly tone: Tone;
-  readonly onChange: (group: Group) => void;
-}
-
-/** Draws the word that heads a group, which says whether all of its lines must hold or any may. */
-function GroupWord({ group, tone, onChange }: GroupWordProps): React.JSX.Element {
-  const choose = (every: boolean): (() => void) => {
-    return () => {
-      onChange({ ...group, every });
-    };
-  };
-  return (
-    <Slot
-      label={group.every ? 'all of' : 'any of'}
-      tone={tone}
-      look="plain"
-      names
-      describedAs="How the lines below are taken together"
-      placeholder="Search"
-      offers={(typed) => [
-        titled(
-          'The lines below',
-          [
-            offer('all of', 'function', 'every line must hold', choose(true)),
-            offer('any of', 'function', 'one line is enough', choose(false)),
-          ].filter((row) => matches(typed, row.label, row.note)),
-        ),
-      ]}
-    />
-  );
-}
-
-interface GroupLinesProps {
-  readonly group: Group;
+/** What the lines of a condition show and report. */
+interface ConditionProps {
+  /** The way to the list of conditions in the step. */
+  readonly path: Path;
+  /** What the document holds for the list, or `undefined` where it is not given. */
+  readonly argument: ArgumentView | undefined;
   readonly frame: Frame;
-  /**
-   * Whether the group is a line of another list. Such a group gives way when
-   * lines are removed: left with one line it becomes that line, and left with
-   * none it goes. A condition's own group stays a group down to its last
-   * line, and with none left the condition is empty.
-   */
-  readonly nested: boolean;
-  /** Reports the group as it is now, the one item it has come down to, or `null` when none is left. */
-  readonly onChange: (condition: Condition | null) => void;
+  /** The positions that hold the condition: a filter's predicates, or a `when`'s. */
+  readonly positions: readonly PositionView[];
+  /** The colour of the word that heads the list: that of the step, or a function's under a `when`. */
+  readonly tone: Tone;
 }
 
-/**
- * Offers what a line added to `group` can be: a comparison, a group of the
- * other kind with lines of its own, or a chain. `onAdd` is given the line and the id of
- * the comparison in it that is filled in first.
- */
-function lineOffers(
-  catalogue: Catalogue,
-  group: Group,
-  typed: string,
-  onAdd: (item: Condition, first: string) => void,
-): OfferGroup[] {
+/** What goes where a line is added: a comparison, or a chain. */
+function lineOffers(typed: string, onTest: () => void, onChain: () => void): OfferGroup[] {
   return [
     titled(
       'Add a line',
       [
-        offer(
-          'field == value',
-          'value',
-          'a comparison',
-          () => {
-            const test = emptyTest(catalogue);
-            onAdd(test, test.id);
-          },
-          { look: 'none', act: true },
-        ),
-        offer(
-          group.every ? 'any of' : 'all of',
-          'function',
-          'a group with lines of its own',
-          () => {
-            const test = emptyTest(catalogue);
-            onAdd(
-              { kind: 'group', id: nextId('group'), every: !group.every, items: [test] },
-              test.id,
-            );
-          },
-          { act: true },
-        ),
-        chainOffer((chain) => {
-          onAdd(chain, chain.id);
+        offer('field == value', 'value', 'a comparison', onTest, { look: 'none', act: true }),
+        offer('…', 'function', 'a chain of its own, ending in a comparison', onChain, {
+          id: 'chain',
+          look: 'dots',
+          act: true,
         }),
       ].filter((row) => matches(typed, row.label, row.note)),
     ),
   ];
 }
 
-/** Where a line is about to be added: its place in the group and the piece its list opens from. */
-interface LineInsertion {
-  readonly at: number;
-  readonly anchor: HTMLElement;
-}
-
 /**
- * Draws the lines of a group: a comparison, a chain, or the word of a group
- * with lines of its own set in beneath it, on each. The word that names a
- * line, a comparison's sign or a group's word, ends its list with adding a
- * line after it and taking the line away.
+ * Draws a condition where it stands: the word `all of`, which heads the lines set in beneath it, each a
+ * comparison or a chain of its own. The word's list ends with adding a line and with taking the
+ * whole condition away, and removing its last line leaves a condition with nothing in it, which is
+ * an empty slot that offers how to start one again.
  */
-function GroupLines({ group, frame, nested, onChange }: GroupLinesProps): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const catalogue = useCatalogue();
-  const [insertion, setInsertion] = useState<LineInsertion | null>(null);
-  const closeList = useCallback(() => {
-    setInsertion(null);
-  }, []);
-  const withItem = (next: Condition, id: string): void => {
-    onChange({ ...group, items: group.items.map((item) => (item.id === id ? next : item)) });
-  };
-  const insert = (at: number, item: Condition, first: string): void => {
-    const items = [...group.items];
-    items.splice(at, 0, item);
-    onChange({ ...group, items });
-    fresh.mark(first);
-  };
-  return (
-    <>
-      {group.items.map((item, index) => {
-        const without = (): void => {
-          onChange(
-            nested
-              ? withoutItem(group, item.id)
-              : { ...group, items: group.items.filter((other) => other.id !== item.id) },
-          );
-        };
-        const remove = { label: 'Remove this line', onPress: without };
-        const add = {
-          label: `Add a line after this one, joined by ${joiner(group)}`,
-          onPress: (anchor: HTMLElement): void => {
-            setInsertion({ at: index + 1, anchor });
-          },
-        };
-        if (item.kind === 'chain') {
-          // A chain is a line of its own, and its start takes the line away.
-          return (
-            <Line key={item.id}>
-              <ChainBlocks
-                chainId={item.id}
-                chain={item.chain}
-                frame={frame}
-                onRemove={without}
-                onChange={(chain) => {
-                  withItem({ ...item, chain }, item.id);
-                }}
-              />
-            </Line>
-          );
-        }
-        return (
-          <Line key={item.id}>
-            {item.kind === 'test' ? (
-              <Piece remove={remove} add={add}>
-                <TestBlocks
-                  test={item}
-                  frame={frame}
-                  onChange={(test) => {
-                    withItem(test, item.id);
-                  }}
-                />
-              </Piece>
-            ) : (
-              // A group is its word, and its lines set in beneath it.
-              <>
-                <Piece remove={remove} add={add}>
-                  <GroupWord
-                    group={item}
-                    tone="function"
-                    onChange={(inner) => {
-                      withItem(inner, item.id);
-                    }}
-                  />
-                </Piece>
-                <Lines>
-                  <GroupLines
-                    group={item}
-                    frame={frame}
-                    nested
-                    onChange={(inner) => {
-                      // A group with no line left goes, as a line that is removed does.
-                      if (inner === null) without();
-                      else withItem(inner, item.id);
-                    }}
-                  />
-                </Lines>
-              </>
-            )}
-          </Line>
-        );
-      })}
-      {insertion !== null && (
-        <Popover anchor={insertion.anchor} onDismiss={closeList}>
-          <OfferList
-            placeholder="Search"
-            groups={(typed) =>
-              lineOffers(catalogue, group, typed, (item, first) => {
-                insert(insertion.at, item, first);
-              })
-            }
-            keepOpen={false}
-            wide={false}
-            onDone={closeList}
-          />
-        </Popover>
-      )}
-    </>
-  );
-}
-
-/** What a condition shows and reports. */
-export interface ConditionBlocksProps {
-  readonly condition: Condition;
-  readonly frame: Frame;
-  /** The positions that hold the condition: a filter's predicates, or a `when`'s. */
-  readonly positions: readonly PositionView[];
-  /** The colour of the group that heads the list: that of the step, or a function's under a `when`. */
-  readonly tone: Tone;
-  readonly onChange: (condition: Condition) => void;
-}
-
-/**
- * Draws a condition where it stands. One that holds something is the word
- * that says whether all of its lines must hold or any may, and the lines set
- * in beneath it. The word's list ends with adding a line and with taking the
- * whole condition away, and removing its last line takes it away too. A
- * condition that is a chain of its own is one line. A condition with nothing
- * in it is an empty slot, which offers how to start one again: as a list of
- * comparisons, or as a chain.
- */
-export function ConditionBlocks(props: ConditionBlocksProps): React.JSX.Element {
-  return (
-    <PositionsContext.Provider value={props.positions}>
-      <ConditionContent {...props} />
-    </PositionsContext.Provider>
-  );
-}
-
-function ConditionContent({
-  condition,
+export function ConditionBlocks({
+  path,
+  argument,
   frame,
+  positions,
   tone,
-  onChange,
-}: ConditionBlocksProps): React.JSX.Element {
-  const fresh = useContext(FreshContext);
+}: ConditionProps): React.JSX.Element {
   const catalogue = useCatalogue();
-  const [adding, setAdding] = useState<HTMLElement | null>(null);
+  const edits = useStepEdits();
+  const fresh = useContext(FreshContext);
+  const step = useStepAt();
+  const [adding, setAdding] = useState<{ at: number; anchor: HTMLElement } | null>(null);
   const closeList = useCallback(() => {
     setAdding(null);
   }, []);
-  if (condition.kind === 'chain') {
-    return (
-      <Lines>
-        <Line>
-          <ChainBlocks
-            chainId={condition.id}
-            chain={condition.chain}
-            frame={frame}
-            onRemove={() => {
-              onChange({ kind: 'group', id: nextId('group'), every: true, items: [] });
-            }}
-            onChange={(chain) => {
-              onChange({ ...condition, chain });
-            }}
-          />
-        </Line>
-      </Lines>
-    );
-  }
-  const group: Group =
-    condition.kind === 'group'
-      ? condition
-      : { kind: 'group', id: `${condition.id}:list`, every: true, items: [condition] };
+  const comparisons = catalogue.comparisons;
+  const items = argument?.kind === 'many' ? argument.items : [];
 
-  if (group.items.length === 0) {
-    const start = (every: boolean): (() => void) => {
-      return () => {
-        const test = emptyTest(catalogue);
-        onChange({ ...group, every, items: [test] });
-        fresh.mark(test.id);
-      };
-    };
-    return (
+  /** Puts a new test at `at`, in the list as it is: given, or about to be. */
+  const addTest = (at: number): void => {
+    fresh.mark(`${step.id}:${pathKey(under(path, itemSegment(at)))}`);
+    if (argument === undefined) {
+      // The list is not in the document yet, so it is made first, and the test goes into it.
+      void edits.together((make) => [
+        make.setArgument(path, listArgument([])),
+        make.insertTest(path, at),
+      ]);
+    } else {
+      void edits.insertTest(path, at);
+    }
+  };
+  const addChain = (at: number): void => {
+    fresh.mark(`${step.id}:${pathKey(under(path, itemSegment(at)))}`);
+    if (argument === undefined) void edits.setArgument(path, listArgument([HOLE]));
+    else void edits.insertItem(path, at, HOLE);
+  };
+
+  const body =
+    items.length === 0 ? (
       <Slot
         label="condition"
         tone="value"
@@ -753,63 +439,115 @@ function ConditionContent({
           titled(
             'A list of comparisons',
             [
-              offer('all of', 'function', 'every line must hold', start(true), { act: true }),
-              offer('any of', 'function', 'one line is enough', start(false), { act: true }),
+              offer(
+                'all of',
+                'function',
+                'every line must hold',
+                () => {
+                  addTest(0);
+                },
+                { act: true },
+              ),
             ].filter((row) => matches(typed, row.label, row.note)),
           ),
           titled(
             'A chain',
             [
-              chainOffer((chain) => {
-                onChange(chain);
-                fresh.mark(chain.id);
-              }),
+              offer(
+                '…',
+                'function',
+                'a chain of its own, ending in a comparison',
+                () => {
+                  addChain(0);
+                },
+                { id: 'chain', look: 'dots', act: true },
+              ),
             ].filter((row) => matches(typed, row.label, row.note)),
           ),
         ]}
       />
-    );
-  }
-
-  return (
-    <>
-      <Piece
-        remove={{
-          label: 'Remove the condition',
-          onPress: () => {
-            onChange({ ...group, items: [] });
-          },
-        }}
-        add={{ label: `Add a line to ${group.every ? 'all of' : 'any of'}`, onPress: setAdding }}
-      >
-        <GroupWord group={group} tone={tone} onChange={onChange} />
-      </Piece>
-      <Lines>
-        <GroupLines
-          group={group}
-          frame={frame}
-          nested={false}
-          onChange={(next) => {
-            if (next !== null) onChange(next);
+    ) : (
+      <>
+        <Piece
+          remove={{
+            label: 'Remove the condition',
+            onPress: () => {
+              void edits.setArgument(path, listArgument([]));
+            },
           }}
-        />
-      </Lines>
-      {adding !== null && (
-        <Popover anchor={adding} onDismiss={closeList}>
-          <OfferList
-            placeholder="Search"
-            groups={(typed) =>
-              lineOffers(catalogue, group, typed, (item, first) => {
-                onChange({ ...group, items: [item, ...group.items] });
-                fresh.mark(first);
-              })
+          add={{
+            label: 'Add a line to all of',
+            onPress: (anchor: HTMLElement) => {
+              setAdding({ at: 0, anchor });
+            },
+          }}
+        >
+          <span data-tone={tone} className="dg-block dg-fixed">
+            all of
+          </span>
+        </Piece>
+        <Lines>
+          {items.map((item, at) => {
+            const itemPath = under(path, itemSegment(at));
+            const expression = expressionOf(item);
+            const test = expression === null ? null : testOf(expression, comparisons);
+            const remove = {
+              label: 'Remove this line',
+              onPress: () => {
+                void edits.removeItem(itemPath);
+              },
+            };
+            const add = {
+              label: 'Add a line after this one, joined by and',
+              onPress: (anchor: HTMLElement) => {
+                setAdding({ at: at + 1, anchor });
+              },
+            };
+            if (expression === null) return null;
+            if (test === null) {
+              // A chain is a line of its own, and its start takes the line away.
+              return (
+                <Line key={at}>
+                  <ChainBlocks
+                    expression={expression}
+                    path={itemPath}
+                    frame={frame}
+                    onRemove={remove.onPress}
+                  />
+                </Line>
+              );
             }
-            keepOpen={false}
-            wide={false}
-            onDone={closeList}
-          />
-        </Popover>
-      )}
-    </>
-  );
+            return (
+              <Line key={at}>
+                <Piece remove={remove} add={add}>
+                  <TestBlocks test={test} path={itemPath} frame={frame} />
+                </Piece>
+              </Line>
+            );
+          })}
+        </Lines>
+        {adding !== null && (
+          <Popover anchor={adding.anchor} onDismiss={closeList}>
+            <OfferList
+              placeholder="Search"
+              groups={(typed) =>
+                lineOffers(
+                  typed,
+                  () => {
+                    addTest(adding.at);
+                  },
+                  () => {
+                    addChain(adding.at);
+                  },
+                )
+              }
+              keepOpen={false}
+              wide={false}
+              onDone={closeList}
+            />
+          </Popover>
+        )}
+      </>
+    );
+  return <PositionsContext.Provider value={positions}>{body}</PositionsContext.Provider>;
 }

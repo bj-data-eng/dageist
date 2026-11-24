@@ -1,274 +1,64 @@
 {
   "starts": [
     {
-      "entry": "LazyFrame.drop",
-      "arguments": [
-        {
-          "parameter": "columns",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          }
-        }
-      ]
+      "entry": "LazyFrame.drop"
     },
     {
-      "entry": "LazyFrame.drop_nans",
-      "arguments": []
+      "entry": "LazyFrame.drop_nans"
     },
     {
-      "entry": "LazyFrame.drop_nulls",
-      "arguments": []
+      "entry": "LazyFrame.drop_nulls"
     },
     {
-      "entry": "LazyFrame.fill_nan",
-      "arguments": [
-        {
-          "parameter": "value",
-          "setting": {
-            "kind": "unset"
-          }
-        }
-      ]
+      "entry": "LazyFrame.fill_nan"
     },
     {
-      "entry": "LazyFrame.filter",
-      "arguments": [
-        {
-          "parameter": "predicates",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "comparison",
-                "entry": "Expr.eq",
-                "field": {
-                  "kind": "unset"
-                },
-                "other": {
-                  "kind": "unset"
-                }
-              }
-            ]
-          }
-        }
-      ]
+      "entry": "LazyFrame.filter"
     },
     {
-      "entry": "LazyFrame.first",
-      "arguments": []
+      "entry": "LazyFrame.first"
     },
     {
-      "entry": "LazyFrame.gather_every",
-      "arguments": [
-        {
-          "parameter": "n",
-          "setting": {
-            "kind": "unset"
-          }
-        }
-      ]
+      "entry": "LazyFrame.gather_every"
     },
     {
-      "entry": "LazyFrame.head",
-      "arguments": []
+      "entry": "LazyFrame.head"
     },
     {
-      "entry": "LazyFrame.join",
-      "arguments": [
-        {
-          "parameter": "other",
-          "setting": {
-            "kind": "word",
-            "value": "step_names"
-          }
-        },
-        {
-          "parameter": "left_on",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          }
-        },
-        {
-          "parameter": "right_on",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          }
-        },
-        {
-          "parameter": "how",
-          "setting": {
-            "kind": "word",
-            "value": "left"
-          }
-        }
-      ]
+      "entry": "LazyFrame.join"
     },
     {
-      "entry": "LazyFrame.last",
-      "arguments": []
+      "entry": "LazyFrame.last"
     },
     {
-      "entry": "LazyFrame.limit",
-      "arguments": []
+      "entry": "LazyFrame.limit"
     },
     {
-      "entry": "LazyFrame.pivot",
-      "arguments": [
-        {
-          "parameter": "on",
-          "setting": {
-            "kind": "unset"
-          }
-        },
-        {
-          "parameter": "on_columns",
-          "setting": {
-            "kind": "word",
-            "value": "step_names"
-          }
-        },
-        {
-          "parameter": "index",
-          "setting": {
-            "kind": "unset"
-          }
-        },
-        {
-          "parameter": "values",
-          "setting": {
-            "kind": "unset"
-          }
-        },
-        {
-          "parameter": "aggregate_function",
-          "setting": {
-            "kind": "element",
-            "method": "first"
-          }
-        }
-      ]
+      "entry": "LazyFrame.pivot"
     },
     {
-      "entry": "LazyFrame.rename",
-      "arguments": [
-        {
-          "parameter": "mapping",
-          "setting": {
-            "kind": "pairs",
-            "entries": []
-          }
-        }
-      ]
+      "entry": "LazyFrame.rename"
     },
     {
-      "entry": "LazyFrame.reverse",
-      "arguments": []
+      "entry": "LazyFrame.reverse"
     },
     {
-      "entry": "LazyFrame.select",
-      "arguments": [
-        {
-          "parameter": "exprs",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "field",
-                "column": "dcn"
-              },
-              {
-                "kind": "field",
-                "column": "timestamp"
-              },
-              {
-                "kind": "field",
-                "column": "step_to"
-              },
-              {
-                "kind": "field",
-                "column": "owner"
-              },
-              {
-                "kind": "field",
-                "column": "row_days"
-              }
-            ]
-          }
-        }
-      ]
+      "entry": "LazyFrame.select"
     },
     {
-      "entry": "LazyFrame.slice",
-      "arguments": [
-        {
-          "parameter": "offset",
-          "setting": {
-            "kind": "unset"
-          }
-        }
-      ]
+      "entry": "LazyFrame.slice"
     },
     {
-      "entry": "LazyFrame.sort",
-      "arguments": [
-        {
-          "parameter": "by",
-          "setting": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          }
-        }
-      ]
+      "entry": "LazyFrame.sort"
     },
     {
-      "entry": "LazyFrame.tail",
-      "arguments": []
+      "entry": "LazyFrame.tail"
     },
     {
-      "entry": "LazyFrame.with_columns",
-      "arguments": [
-        {
-          "parameter": "named_exprs",
-          "setting": {
-            "kind": "pairs",
-            "entries": [
-              {
-                "key": {
-                  "kind": "text",
-                  "value": "new_column",
-                  "shown": "new_column"
-                },
-                "value": {
-                  "kind": "unset"
-                }
-              }
-            ]
-          }
-        }
-      ]
+      "entry": "LazyFrame.with_columns"
     },
     {
-      "entry": "LazyFrame.with_row_index",
-      "arguments": []
+      "entry": "LazyFrame.with_row_index"
     }
   ]
 }

@@ -20,7 +20,7 @@
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
   "valueShapes": ["one", "many"],
   "changes": ["added", "replaced"],
-  "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "unreadable", "unknownName", "failed"],
+  "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "stale", "unknownName", "failed"],
   "applies": ["expression", "frame", "function", "condition"],
   "valueTypes": ["integer", "float", "string", "date", "any"],
   "settings": [
@@ -35,5 +35,61 @@
     "comparison",
     "list",
     "pairs"
+  ],
+  "valueKinds": [
+    "expression",
+    "columns",
+    "integer",
+    "float",
+    "string",
+    "flag",
+    "choice",
+    "dtype",
+    "duration",
+    "pattern",
+    "timeZone",
+    "table",
+    "path",
+    "pairs",
+    "list"
+  ],
+  "wanted": [
+    "call",
+    "argument",
+    "parameter",
+    "item",
+    "entryPart",
+    "link",
+    "expression",
+    "list",
+    "pairs",
+    "partOfStep"
+  ],
+  "thingKinds": [
+    "step",
+    "call",
+    "parameter",
+    "item",
+    "key",
+    "entryValue",
+    "start",
+    "link",
+    "expressionWithoutCall",
+    "value"
+  ],
+  "problemKinds": [
+    "noStep",
+    "stepChanged",
+    "nothing",
+    "doesNotFit",
+    "wrongPlace",
+    "notPerItem",
+    "noDefault",
+    "outOfRange",
+    "unknownEntry",
+    "noStart",
+    "cannotAdd",
+    "needsValue",
+    "refused"
   ]
 }

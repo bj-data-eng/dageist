@@ -1,13 +1,14 @@
 /**
- * @file A chain: what it starts from, then its methods, each behind a caret,
- * written out as a line of code. A chain starts from a field or from the
- * function `when`, which is set out on lines of its own: its condition, then
- * the values it gives after the words `then` and `otherwise`, and the chain's
- * methods carrying on from it on a last line. The word that names a thing,
- * a method's name or the chain's start, opens the list it is swapped from
- * and ends that list with adding a method after it and taking it away. A
- * method's name also drags it to another place in the chain. Taking away
- * what a chain starts from takes the whole chain away.
+ * @file A chain: what it starts from, then its methods, each behind a caret, written out as a line
+ * of code. A chain starts from a field, a connected input, or a function such as `when`, which is
+ * set out on lines of its own: its condition, then the values it gives after the words `then` and
+ * `otherwise`, and the chain's methods carrying on from it on a last line. The word that names a
+ * thing, a method's name or the chain's start, opens the list it is swapped from and ends that
+ * list with adding a method after it and taking it away. A method's name also drags it to another
+ * place in the chain. Taking away what a chain starts from takes the whole chain away.
+ *
+ * What is drawn is the expression the document holds, and every pick is sent as an edit at the place
+ * of what was picked, which the engine makes.
  */
 
 import type { Plugins } from '@dnd-kit/abstract';
@@ -17,50 +18,62 @@ import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 import type { Look, OfferGroup, Tone } from '@dageist/design';
-import type { LiteralView, OfferPlaceView } from '@dageist/host';
+import type {
+  ArgumentView,
+  CallView,
+  LiteralView,
+  OfferPlaceView,
+  ValueRequest,
+} from '@dageist/host';
 import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/design';
 
 import { useCandidateFits, useOffers, useOptions, useReadTyped } from './ask';
 import type { FitSlot } from './ask';
+import { useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
+import { usePreparedStep } from './engine';
 import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
-import { OptionRows, optionOffers } from './Parameters';
+import { OptionRows, freshKey, optionOffers, useOptionToggle } from './Parameters';
 import { useListState, usePositions } from './positions';
-import { ConditionBlocks, ValueSlot } from './Values';
+import { ConditionBlocks, ValueSlot, useIsWrongAt } from './Values';
 import { matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import type { Catalogue, ConditionWord } from './model/catalogue';
 import {
+  argumentRule,
   conditionEntry,
   conditionId,
   elementEntry,
-  methodEntry,
   methodId,
+  methodNameOf,
+  methodOptionParameters,
   positionOfParameter,
 } from './model/catalogue';
-import { wrongId } from './model/document';
-import type { ArgumentRule, Method, MethodName } from './model/expr';
+import type { ExpressionView } from './model/doc';
 import {
-  argumentRule,
-  methodOptionParameters,
-  slotOptions,
-  startingArgument,
-  swappedArgument,
-} from './model/expr';
-import type { Dtype, Frame } from './model/frame';
+  START_SEGMENT,
+  expressionOf,
+  fieldNameOf,
+  givenOf,
+  isElement,
+  itemSegment,
+  linkSegment,
+  parameterSegment,
+  pathKey,
+  shapeOf,
+  under,
+  whenOf,
+} from './model/doc';
+import type { Path } from './model/doc';
+import type { Frame } from './model/frame';
 import { assertNever, findColumn } from './model/frame';
 import { findInput, inputLines } from './model/inputs';
-import { nextId } from './model/ids';
-import { chosenOptions } from './model/offers';
 import type { PreparedOffer } from './model/offers';
+import { chosenOptions } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
-import { NO_OPTIONS, carriedOptions } from './model/settings';
-import { emptyTest } from './model/conditions';
-import { literalValue } from './model/literal';
-import type { Arm, Chain, Source, Value } from './model/source';
 import type { ChainDtypes } from './model/report';
-import { usePreparedStep } from './engine';
+import { fieldArgument, inputArgument, listArgument, literalExpression } from './model/requests';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -83,15 +96,6 @@ export function dragSettingsFor(styleNonce: string | null): DragSettings {
   };
 }
 
-/** Returns `items` with the one at `from` moved to the place `to`. */
-export function moved<T>(items: readonly T[], from: number, to: number): readonly T[] {
-  const next = [...items];
-  const [item] = next.splice(from, 1);
-  if (item === undefined) return items;
-  next.splice(to, 0, item);
-  return next;
-}
-
 /** The drag-and-drop settings the editor's chains share. */
 export const DragSettingsContext = createContext<DragSettings>({});
 
@@ -107,95 +111,97 @@ const PART_SENSORS = [
   }),
 ];
 
-/** No word of the editor is the matter. */
-const NO_WRONG: ReadonlySet<string> = new Set();
-
-function withMethods(chain: Chain, methods: readonly Method[]): Chain {
-  return { source: chain.source, methods };
+/** Returns the place a call would stand at as the engine's request for it, or `null` where it is not known. */
+function standingOf(
+  place: OfferPlaceView | null | undefined,
+): ReturnType<typeof placeRequest> | null {
+  return place === undefined || place === null ? null : placeRequest(place);
 }
 
-function withMethodMoved(chain: Chain, from: number, to: number): Chain {
-  const methods = [...chain.methods];
-  const [method] = methods.splice(from, 1);
-  if (method === undefined) return chain;
-  methods.splice(to, 0, method);
-  return withMethods(chain, methods);
-}
-
-/** Returns a condition with nothing picked yet, and the value it gives. */
-function emptyArm(catalogue: Catalogue): Arm {
-  return { id: nextId('arm'), condition: emptyTest(catalogue), returns: { kind: 'unset' } };
+/** Returns how an argument that is an expression, or that is not given, is shown as a word. */
+function shownArgument(
+  expression: ExpressionView | null,
+  given: boolean,
+  label: string,
+): { label: string; tone: Tone; look: Look; wrong: boolean } {
+  if (expression === null) {
+    // An argument that is not given holds what Polars gives it, which is complete as it is.
+    return { label, tone: 'value', look: 'none', wrong: given };
+  }
+  const shape = shapeOf(expression);
+  switch (shape.kind) {
+    case 'unset':
+      return { label, tone: 'value', look: 'none', wrong: true };
+    case 'column':
+      return { label: shape.name, tone: 'column', look: 'plain', wrong: false };
+    case 'input':
+      return { label: shape.name, tone: 'input', look: 'plain', wrong: false };
+    case 'literal':
+      return {
+        label: shape.shown,
+        tone: 'value',
+        look: shape.text ? 'quoted' : 'plain',
+        wrong: false,
+      };
+    case 'chain':
+      return { label: '…', tone: 'function', look: 'plain', wrong: false };
+    default:
+      return assertNever(shape);
+  }
 }
 
 interface ArgumentSlotProps {
-  readonly method: Method;
+  readonly call: CallView;
   /** What the catalogue says the method's argument is. */
-  readonly rule: ArgumentRule;
-  /** The identifier the catalogue gives the method. */
-  readonly entryId: string;
+  readonly rule: NonNullable<ReturnType<typeof argumentRule>>;
+  /** The way to the call. */
+  readonly callPath: Path;
   /** Where the method stands, as the engine reported it, or `null` where it did not. */
   readonly place: OfferPlaceView | null;
   readonly frame: Frame;
   /** Whether the engine refused the method. */
   readonly wrong: boolean;
-  readonly onCommit: (argument: Value) => void;
-}
-
-/** Returns how an argument is shown as a word. */
-function shownArgument(
-  argument: Value,
-  rule: ArgumentRule,
-): { label: string; tone: Tone; look: Look } {
-  switch (argument.kind) {
-    case 'unset':
-    case 'leftOut':
-      return { label: rule.parameter.shown, tone: 'value', look: 'none' };
-    case 'column':
-      return { label: argument.column, tone: 'column', look: 'plain' };
-    case 'input':
-      return { label: argument.name, tone: 'input', look: 'plain' };
-    case 'chain':
-      return { label: '…', tone: 'function', look: 'plain' };
-    case 'literal': {
-      // A number or text is shown in the words the engine gave it.
-      if (argument.value === null) return { label: 'None', tone: 'value', look: 'none' };
-      return {
-        label: argument.shown,
-        tone: 'value',
-        look: typeof argument.value === 'number' ? 'plain' : 'quoted',
-      };
-    }
-    default:
-      return assertNever(argument);
-  }
 }
 
 /**
- * Draws an argument that takes an expression: a field, an input, or a value
- * typed in. It opens the list it is picked from, which offers what fits the
- * method's parameter, as the engine says it does. Every method's argument of
- * this kind is drawn here.
+ * Draws an argument that takes an expression: a field, an input, or a value typed in. It opens the
+ * list it is picked from, which offers what fits the method's parameter, as the engine says it
+ * does. Every method's argument of this kind is drawn here.
  */
 function ArgumentSlot({
-  method,
+  call,
   rule,
-  entryId,
+  callPath,
   place,
   frame,
   wrong,
-  onCommit,
 }: ArgumentSlotProps): React.JSX.Element {
   const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
   const outer = usePositions();
   const list = useListState();
-  const argument: Value = method.argument ?? { kind: 'unset' };
-  const column = argument.kind === 'column' ? findColumn(frame, argument.column) : null;
-  const shown = shownArgument(argument, rule);
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const { parameter } = rule;
+  const parameterPath = under(callPath, parameterSegment(parameter.name));
+  const given = givenOf(call, parameter.name);
+  const many = parameter.shape.shape === 'many';
+  // The expression the argument is: a list of them holds the one the editor draws first.
+  const held = many ? (given?.kind === 'many' ? given.items[0] : undefined) : given;
+  const expression = expressionOf(held);
+  const argumentPath = many ? under(parameterPath, itemSegment(0)) : parameterPath;
+  const shown = shownArgument(expression, given !== undefined, parameter.shown);
+  const column =
+    expression === null
+      ? null
+      : (() => {
+          const shape = shapeOf(expression);
+          return shape.kind === 'column' ? findColumn(frame, shape.name) : null;
+        })();
   // The argument stands in the context of the chain, and is the argument of the method where
   // the engine has reported where the method stands.
-  const start = within(outer, rule.parameter.position);
+  const start = within(outer, parameter.position);
   const slot: FitSlot | null =
     start.length === 0 && place === null
       ? null
@@ -204,12 +210,22 @@ function ArgumentSlot({
           argument:
             place === null
               ? null
-              : { entry: entryId, parameter: rule.parameter.name, place: placeRequest(place) },
+              : { entry: call.entry, parameter: parameter.name, place: placeRequest(place) },
         };
   const fits = useCandidateFits(slot, list.open, frame, node);
   const readings = useReadTyped(
     list.open ? { text: list.typed, typed: { kind: 'expression' }, slot } : null,
   );
+  /** Puts what was picked where the argument is, or makes the argument if it was not given. */
+  const set = (request: ValueRequest): void => {
+    if (given === undefined) {
+      void edits.setArgument(parameterPath, many ? listArgument([request]) : request);
+    } else if (many && given.kind === 'many' && given.items.length === 0) {
+      void edits.insertItem(parameterPath, 0, request);
+    } else {
+      void edits.setArgument(argumentPath, request);
+    }
+  };
   const offers = (typed: string): OfferGroup[] => {
     const rows = {
       frame,
@@ -219,13 +235,13 @@ function ArgumentSlot({
       readings,
       inputs: ['value', 'list'] as const,
       onLiteral: (picked: LiteralView) => {
-        onCommit(literalValue(picked));
+        set(literalExpression(picked));
       },
       onInput: (name: string) => {
-        onCommit({ kind: 'input', name });
+        set(inputArgument(name));
       },
       onField: (name: string) => {
-        onCommit({ kind: 'column', column: name });
+        set(fieldArgument(name));
       },
     };
     return [valueGroup(rows), inputGroup(rows), fieldGroup(rows)];
@@ -236,9 +252,9 @@ function ArgumentSlot({
         label={shown.label}
         tone={shown.tone}
         look={shown.look}
-        wrong={wrong || argument.kind === 'unset'}
-        openNow={fresh.id === method.id}
-        describedAs={`${rule.shown}: ${rule.parameter.label}`}
+        wrong={wrong || shown.wrong}
+        openNow={fresh.id === freshKey(step.id, callPath)}
+        describedAs={`${rule.shown}: ${parameter.label}`}
         placeholder="Type a value, or search the fields"
         offers={offers}
         onOpenChange={list.onOpenChange}
@@ -248,90 +264,73 @@ function ArgumentSlot({
   );
 }
 
-/** Returns the dtype a method of `chain` is handed: what stands before the method at `index`, or the start for the first. */
-function dtypeBefore(dtypes: ChainDtypes | undefined, index: number): Dtype | null {
+/** Returns the dtype a method of a chain is handed: what stands before the method at `index`, or the start for the first. */
+function dtypeBefore(dtypes: ChainDtypes | undefined, index: number): string | null {
   if (dtypes === undefined) return null;
-  return index === 0 ? dtypes.source : (dtypes.methods[index - 1] ?? null);
+  return index === 0 ? dtypes.source : (dtypes.links[index - 1] ?? null);
 }
 
 interface MethodLinkProps {
-  /** The chain the method belongs to; it can only be dragged within it. */
-  readonly chainId: string;
+  /** The way to the call of the method in the step. */
+  readonly path: Path;
+  /** Where the method is among the links of its expression. */
   readonly index: number;
-  readonly method: Method;
-  readonly chain: Chain;
+  readonly call: CallView;
   /** The dtypes after the chain's start and each of its methods, when the engine has reported them. */
   readonly dtypes: ChainDtypes | undefined;
-  /** The words of the editor that are the matter, as `wrongId` names them. */
-  readonly wrong: ReadonlySet<string>;
   readonly frame: Frame;
-  readonly onChange: (chain: Chain) => void;
   /** Opens the list of methods to put one after this one. */
   readonly onAddAfter: (piece: HTMLElement) => void;
+  /** The group the method may be dragged within. */
+  readonly group: string;
 }
 
 /** Draws one method of a chain as a piece behind its caret. */
 function MethodLink({
-  chainId,
+  path,
   index,
-  method,
-  chain,
+  call,
   dtypes,
-  wrong: wrongWords,
   frame,
-  onChange,
   onAddAfter,
+  group,
 }: MethodLinkProps): React.JSX.Element {
   const catalogue = useCatalogue();
-  const fresh = useContext(FreshContext);
-  const entry = methodEntry(catalogue, method.name);
-  const rule = argumentRule(catalogue, method.name);
+  const edits = useStepEdits();
+  const wrongAt = useIsWrongAt();
+  const toggle = useOptionToggle(path);
+  const entry = catalogue.entries.get(call.entry) ?? null;
+  const rule = argumentRule(entry);
   // What the catalogue calls the method; a method it lacks keeps its Polars name.
-  const shown = entry?.name ?? method.name;
+  const shown = entry?.name ?? methodNameOf(call.entry) ?? call.entry;
   const input = dtypeBefore(dtypes, index);
-  const output = dtypes?.methods[index] ?? null;
+  const output = dtypes?.links[index] ?? null;
   // Where the method stands, as the engine reported it: what may follow what comes before it.
   const place = dtypes?.places[index] ?? null;
-  const wrong = wrongWords.has(wrongId({ kind: 'method', methodId: method.id }));
+  const wrong = wrongAt(path);
   const list = useListState();
   const offered = useOffers(list.open && place !== null ? placeRequest(place) : null);
   const optionsAsked = useOptions(
     list.open && entry !== null
-      ? { entry: entry.id, chosen: chosenOptions(entry, method.options) }
+      ? {
+          entry: entry.id,
+          chosen: chosenOptions(entry, call.arguments),
+        }
       : null,
   );
   const { ref, handleRef, isDragSource } = useSortable({
-    id: method.id,
+    id: pathKey(path),
     index,
-    group: chainId,
-    type: `part:${chainId}`,
-    accept: `part:${chainId}`,
+    group,
+    type: `part:${group}`,
+    accept: `part:${group}`,
     sensors: PART_SENSORS,
   });
-  const replace = (next: Method): void => {
-    onChange(
-      withMethods(
-        chain,
-        chain.methods.map((existing) => (existing.id === method.id ? next : existing)),
-      ),
-    );
+  const swap = (picked: PreparedOffer): void => {
+    void edits.swapLink(path, picked.id, standingOf(place));
   };
-  const swap = (name: MethodName, picked: PreparedOffer): void => {
-    const next = methodEntry(catalogue, name);
-    replace({
-      id: method.id,
-      name,
-      argument: swappedArgument(catalogue, method.argument, name, picked.argument, picked.leftOut),
-      // What is set carries over to a method that takes the same parameter.
-      options: slotOptions(
-        catalogue,
-        name,
-        picked.slots,
-        next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
-      ),
-    });
-  };
-  const parameters = methodOptionParameters(catalogue, method.name);
+  const parameters = methodOptionParameters(entry);
+  const given = new Set(call.arguments.map((held) => held.parameter));
   return (
     <span ref={ref} className="dg-link">
       <Seam />
@@ -340,12 +339,7 @@ function MethodLink({
         remove={{
           label: `Remove ${shown}`,
           onPress: () => {
-            onChange(
-              withMethods(
-                chain,
-                chain.methods.filter((existing) => existing.id !== method.id),
-              ),
-            );
+            void edits.removeLink(path);
           },
         }}
         add={{ label: `Add a method after ${shown}`, onPress: onAddAfter }}
@@ -369,19 +363,10 @@ function MethodLink({
               // The parameters the method can be given, then the methods it can be swapped for.
               ...(parameters.length === 0
                 ? []
-                : [
-                    optionOffers(
-                      parameters,
-                      method.options,
-                      typed,
-                      (options, added) => {
-                        replace({ ...method, options });
-                        if (added !== null) fresh.mark(`${method.id}:${added}`);
-                      },
-                      optionsAsked,
-                    ),
-                  ]),
-              ...methodGroups(catalogue, offered, place !== null, typed, swap),
+                : [optionOffers(parameters, given, typed, toggle, optionsAsked)]),
+              ...methodGroups(catalogue, offered, place !== null, typed, (_name, picked) => {
+                swap(picked);
+              }),
             ]}
             onOpenChange={list.onOpenChange}
             onType={list.onType}
@@ -390,41 +375,35 @@ function MethodLink({
         </Hint>
         {rule !== null && (
           <ArgumentSlot
-            method={method}
+            call={call}
             rule={rule}
-            entryId={entry?.id ?? methodId(method.name)}
+            callPath={path}
             place={place}
             frame={frame}
             wrong={wrong}
-            onCommit={(argument) => {
-              replace({ ...method, argument });
-            }}
           />
         )}
         <OptionRows
-          ownerId={method.id}
           entry={entry}
+          call={call}
+          callPath={path}
           parameters={parameters}
-          options={method.options}
           around={{
             frame,
             items: () => [],
             method: entry === null ? undefined : { entry: entry.id, place },
           }}
           layout="inline"
-          onChange={(options) => {
-            replace({ ...method, options });
-          }}
         />
         {entry === null && (
-          <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${methodId(method.name)}`}</span>
+          <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${methodId(shown)}`}</span>
         )}
       </Piece>
     </span>
   );
 }
 
-/** Where a method is about to be added: its place in the chain and the piece its list opens from. */
+/** Where a method is about to be added: its place among the links and the piece its list opens from. */
 interface Insertion {
   readonly at: number;
   readonly anchor: HTMLElement;
@@ -432,27 +411,38 @@ interface Insertion {
 
 /** What a chain shows and reports. */
 export interface ChainBlocksProps {
-  /** Identifies the chain; its methods can only be dragged within it. */
-  readonly chainId: string;
-  readonly chain: Chain;
+  /** The expression the document holds. */
+  readonly expression: ExpressionView;
+  /** The way to the expression in the step. */
+  readonly path: Path;
   /** The columns the chain's fields are picked from. */
   readonly frame: Frame;
   /** Takes the whole chain away, leaving its place for something else. */
   readonly onRemove: () => void;
-  readonly onChange: (chain: Chain) => void;
+}
+
+/** Returns the word a condition's entry is shown by, with its hint, and whether the catalogue lacks it. */
+function wordOfCondition(
+  catalogue: Catalogue,
+  which: ConditionWord,
+): { text: string; hint: string; lacking: boolean } {
+  const found = conditionEntry(catalogue, which);
+  return {
+    text: found?.name ?? which,
+    hint: found?.hint ?? 'not in the catalogue',
+    lacking: found === null,
+  };
 }
 
 /**
- * Draws `chain` as what it starts from and its methods. The parts sit
- * directly in their row, so a long chain breaks before a caret and never
- * drops to a new line as a whole.
+ * Draws `expression` as what it starts from and its methods. The parts sit directly in their row,
+ * so a long chain breaks before a caret and never drops to a new line as a whole.
  */
 export function ChainBlocks({
-  chainId,
-  chain,
+  expression,
+  path,
   frame,
   onRemove,
-  onChange,
 }: ChainBlocksProps): React.JSX.Element {
   const settings = useContext(DragSettingsContext);
   const catalogue = useCatalogue();
@@ -460,65 +450,38 @@ export function ChainBlocks({
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
   const prepared = usePreparedStep();
-  const dtypes = prepared?.chains.get(chainId);
-  const wrongWords = prepared?.wrong ?? NO_WRONG;
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const wrongAt = useIsWrongAt();
   const positions = usePositions();
+  const dtypes = prepared?.chains.get(pathKey(path));
   const [insertion, setInsertion] = useState<Insertion | null>(null);
   // A chain made by carrying a field on opens its list of methods as soon as it is shown.
-  const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
+  const [opensMethods, setOpensMethods] = useState(
+    () => fresh.id === `${freshKey(step.id, path)}:method`,
+  );
   const closeList = useCallback(() => {
     setInsertion(null);
     setOpensMethods(false);
   }, []);
-  const { source } = chain;
-  const withSource = (next: Source): void => {
-    onChange({ source: next, methods: chain.methods });
-  };
-  const insert = (at: number, name: MethodName, picked: PreparedOffer): void => {
-    const method = {
-      id: nextId('method'),
-      name,
-      argument: startingArgument(catalogue, name, picked.argument, picked.leftOut),
-      options: slotOptions(catalogue, name, picked.slots, NO_OPTIONS),
-    };
-    const methods = [...chain.methods];
-    methods.splice(at, 0, method);
-    onChange(withMethods(chain, methods));
-    fresh.mark(method.id);
-  };
-  const addAt = (at: number): ((anchor: HTMLElement) => void) => {
-    return (anchor) => {
-      setOpensMethods(false);
-      setInsertion({ at, anchor });
-    };
-  };
-  const startsWrong = wrongWords.has(wrongId({ kind: 'start', chainId }));
-  // The words of a condition come from the catalogue; one it lacks keeps its Polars name and says so.
-  const word = (which: ConditionWord): { text: string; hint: string; lacking: boolean } => {
-    const found = conditionEntry(catalogue, which);
-    return {
-      text: found?.name ?? which,
-      hint: found?.hint ?? 'not in the catalogue',
-      lacking: found === null,
-    };
-  };
-  const [whenWord, thenWord, otherwiseWord] = [word('when'), word('then'), word('otherwise')];
-  const lacking = (['when', 'then', 'otherwise'] as const)
-    .filter((which) => conditionEntry(catalogue, which) === null)
-    .map((which) => conditionId(which));
-  // A chain is taken away by the word it starts from.
-  const removeChain = { label: 'Remove this chain', onPress: onRemove };
-  const column = source.kind === 'column' ? findColumn(frame, source.column) : null;
-  // What the chain starts from, when that is a field or a connected input.
-  const startName =
-    source.kind === 'column' ? source.column : source.kind === 'input' ? source.name : '';
-  const unset = (source.kind === 'column' || source.kind === 'input') && startName === '';
-  const startInput = source.kind === 'input' ? findInput(node, source.name) : null;
+  const { start, links } = expression;
+  const when = whenOf(expression);
+  // The links of a condition come first, and the methods after them.
+  const before = when?.before ?? 0;
+  const methods = links.slice(before);
+  const startPath = under(path, START_SEGMENT);
+  const startsWrong = wrongAt(startPath);
+  const startCall = start.kind === 'call' ? start.call : null;
+  const name = startCall === null ? null : fieldNameOf(startCall);
+  const startName = name ?? (start.kind === 'input' ? start.name : '');
+  const unset = start.kind === 'hole';
+  const startInput = start.kind === 'input' ? findInput(node, start.name) : null;
+  const column = name === null ? null : findColumn(frame, name);
   // The word the chain starts from, which that first list of methods opens against.
-  const [start, setStart] = useState<HTMLElement | null>(null);
+  const [startWord, setStartWord] = useState<HTMLElement | null>(null);
   const adding: Insertion | null =
     insertion ??
-    (opensMethods && start !== null ? { at: chain.methods.length, anchor: start } : null);
+    (opensMethods && startWord !== null ? { at: links.length, anchor: startWord } : null);
   // What may stand where a method would be added, as the engine says of the place it reported.
   const addPlace = adding === null ? null : (dtypes?.places[adding.at] ?? null);
   const inserting = useOffers(addPlace === null ? null : placeRequest(addPlace));
@@ -532,226 +495,281 @@ export function ChainBlocks({
     frame,
     node,
   );
+  const addAt = (at: number): ((anchor: HTMLElement) => void) => {
+    return (anchor) => {
+      setOpensMethods(false);
+      setInsertion({ at, anchor });
+    };
+  };
+  const insert = (at: number, picked: PreparedOffer): void => {
+    fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
+    void edits.insertLink(path, at, picked.id, standingOf(dtypes?.places[at]));
+  };
+  // A chain is taken away by the word it starts from.
+  const removeChain = { label: 'Remove this chain', onPress: onRemove };
+  const startOffer = (typed: string): OfferGroup[] => {
+    const rows = {
+      frame,
+      node,
+      typed,
+      fits: startFits,
+      inputs: ['value', 'list'] as const,
+      onInput: (picked: string) => {
+        void edits.setStart(path, { kind: 'input', name: picked });
+      },
+      onField: (picked: string) => {
+        void edits.setStart(path, { kind: 'field', name: picked });
+      },
+    };
+    return [
+      ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+        if (id === 'polars.when') {
+          fresh.mark(
+            freshKey(step.id, under(startPath, parameterSegment('predicates'), itemSegment(0))),
+          );
+        } else {
+          fresh.mark(`${freshKey(step.id, path)}:method`);
+        }
+        void edits.startWith(path, id);
+      }),
+      inputGroup(rows),
+      fieldGroup(rows),
+    ];
+  };
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
-  const methods = (
+  const group = `chain:${step.id}:${pathKey(path)}`;
+  const methodsDrawn = (
     <DragDropProvider
       {...settings}
       onDragEnd={(event) => {
         const dragged = event.operation.source;
         if (event.canceled || !isSortable(dragged)) return;
         if (dragged.index !== dragged.initialIndex) {
-          onChange(withMethodMoved(chain, dragged.initialIndex, dragged.index));
+          void edits.moveLink(under(path, linkSegment(dragged.initialIndex)), dragged.index);
         }
       }}
     >
-      {chain.methods.map((method, index) => (
-        <MethodLink
-          key={method.id}
-          chainId={chainId}
-          index={index}
-          method={method}
-          chain={chain}
-          dtypes={dtypes}
-          wrong={wrongWords}
-          frame={frame}
-          onChange={onChange}
-          onAddAfter={addAt(index + 1)}
-        />
-      ))}
+      {methods.map((call, at) => {
+        const index = before + at;
+        return (
+          <MethodLink
+            key={index}
+            path={under(path, linkSegment(index))}
+            index={index}
+            call={call}
+            dtypes={dtypes}
+            frame={frame}
+            group={group}
+            onAddAfter={addAt(index + 1)}
+          />
+        );
+      })}
     </DragDropProvider>
   );
   // What a condition holds stands in a position inside the expression: its predicates in one, its
   // values in another.
-  const given = (
-    value: Value,
-    label: string,
-    which: 'then' | 'otherwise',
-    onValue: (next: Value) => void,
-  ): React.JSX.Element => (
-    <ValueSlot
-      value={value}
-      frame={frame}
-      label={label}
-      lists={false}
-      positions={within(
-        positions,
-        positionOfParameter(conditionEntry(catalogue, which), 'statement'),
-      )}
-      argument={null}
-      onChange={onValue}
-    />
-  );
-  const [arm] = source.kind === 'when' ? source.arms : [];
+  const given = (link: number, label: string, which: 'then' | 'otherwise'): React.JSX.Element => {
+    const call = links[link];
+    const valuePath = under(path, linkSegment(link), parameterSegment('statement'));
+    return (
+      <ValueSlot
+        expression={expressionOf(call === undefined ? undefined : givenOf(call, 'statement'))}
+        path={valuePath}
+        frame={frame}
+        label={label}
+        positions={within(
+          positions,
+          positionOfParameter(conditionEntry(catalogue, which), 'statement'),
+        )}
+        argument={null}
+        onSet={(request) => {
+          void edits.setArgument(valuePath, request);
+        }}
+      />
+    );
+  };
   // The word `element` comes from the catalogue; one it lacks keeps its Polars name and says so.
   const elementStart = elementEntry(catalogue);
   const elementWord = elementStart?.name ?? 'element';
   const elementHint = elementStart?.hint ?? 'not in the catalogue';
+  const [whenWord, thenWord, otherwiseWord] = [
+    wordOfCondition(catalogue, 'when'),
+    wordOfCondition(catalogue, 'then'),
+    wordOfCondition(catalogue, 'otherwise'),
+  ];
+  const lacking = (['when', 'then', 'otherwise'] as const)
+    .filter((which) => conditionEntry(catalogue, which) === null)
+    .map((which) => conditionId(which));
+  const startSlot = (
+    label: string,
+    tone: Tone,
+    look: Look,
+    lines: string[],
+    describedAs: string,
+  ): React.JSX.Element => (
+    <Piece
+      remove={removeChain}
+      add={{
+        label: unset ? 'Add a method after the field' : `Add a method after ${label}`,
+        onPress: addAt(before),
+      }}
+    >
+      <Hint lines={lines} code={false}>
+        <Slot
+          label={label}
+          tone={tone}
+          look={look}
+          wrong={startsWrong}
+          names
+          openNow={fresh.id === freshKey(step.id, path)}
+          buttonRef={setStartWord}
+          describedAs={describedAs}
+          placeholder="Search the fields and functions"
+          offers={startOffer}
+          onOpenChange={startList.onOpenChange}
+          onType={startList.onType}
+        />
+      </Hint>
+    </Piece>
+  );
 
-  return (
-    <>
-      {source.kind === 'element' && (
-        <>
+  let body: React.JSX.Element;
+  if (when !== null) {
+    // A when is set out on lines: its condition, what it gives, and the chain carrying on.
+    body = (
+      <Lines>
+        <Line>
           <Piece
             remove={removeChain}
-            add={{ label: `Add a method after ${elementWord}`, onPress: addAt(0) }}
+            add={{ label: `Add a method after ${whenWord.text}`, onPress: addAt(before) }}
           >
-            <Hint lines={[`${elementWord} · ${elementHint}`]} code={false}>
+            <Hint lines={[`${whenWord.text} · ${whenWord.hint}`]} code={false}>
               <Slot
-                label={elementWord}
+                label={whenWord.text}
                 tone="function"
                 look="plain"
-                wrong={startsWrong || elementStart === null}
                 names
-                buttonRef={setStart}
+                buttonRef={setStartWord}
                 describedAs="The function the chain starts from"
                 placeholder="Search the functions"
                 offers={(typed) => [
                   titled(
                     'Functions',
-                    matches(typed, elementWord, elementHint)
-                      ? [offer(elementWord, 'function', elementHint, () => undefined)]
+                    matches(typed, whenWord.text, whenWord.hint)
+                      ? [offer(whenWord.text, 'function', whenWord.hint, () => undefined)]
                       : [],
                   ),
                 ]}
               />
             </Hint>
           </Piece>
-          {methods}
-        </>
-      )}
-      {(source.kind === 'column' || source.kind === 'input') && (
-        <>
-          <Piece
-            remove={removeChain}
-            add={{
-              label: unset ? 'Add a method after the field' : `Add a method after ${startName}`,
-              onPress: addAt(0),
-            }}
-          >
-            <Hint
-              lines={startInput === null ? fieldHint(column) : inputLines(startInput)}
-              code={false}
-            >
-              <Slot
-                label={unset ? 'field' : startName}
-                tone={unset ? 'value' : source.kind === 'input' ? 'input' : 'column'}
-                look={unset ? 'none' : 'plain'}
-                wrong={startsWrong}
-                names
-                openNow={fresh.id === chainId}
-                buttonRef={setStart}
-                describedAs="What the chain starts from"
-                placeholder="Search the fields and functions"
-                offers={(typed) => {
-                  const rows = {
-                    frame,
-                    node,
-                    typed,
-                    fits: startFits,
-                    inputs: ['value', 'list'] as const,
-                    onInput: (name: string) => {
-                      withSource({ kind: 'input', name });
-                    },
-                    onField: (name: string) => {
-                      withSource({ kind: 'column', column: name });
-                    },
-                  };
-                  return [
-                    ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-                      if (id === 'polars.when') {
-                        const made = emptyArm(catalogue);
-                        withSource({ kind: 'when', arms: [made], otherwise: { kind: 'unset' } });
-                        fresh.mark(made.condition.id);
-                      } else {
-                        withSource({ kind: 'element' });
-                        fresh.mark(`${chainId}:method`);
-                      }
-                    }),
-                    inputGroup(rows),
-                    fieldGroup(rows),
-                  ];
-                }}
-                onOpenChange={startList.onOpenChange}
-                onType={startList.onType}
-              />
-            </Hint>
-          </Piece>
-          {methods}
-        </>
-      )}
-      {source.kind === 'when' && arm !== undefined && (
-        // A when is set out on lines: its condition, what it gives, and the chain carrying on.
-        <Lines>
-          <Line>
-            <Piece
-              remove={removeChain}
-              add={{ label: `Add a method after ${whenWord.text}`, onPress: addAt(0) }}
-            >
-              <Hint lines={[`${whenWord.text} · ${whenWord.hint}`]} code={false}>
-                <Slot
-                  label={whenWord.text}
-                  tone="function"
-                  look="plain"
-                  names
-                  describedAs="The function the chain starts from"
-                  placeholder="Search the functions"
-                  offers={(typed) => [
-                    titled(
-                      'Functions',
-                      matches(typed, whenWord.text, whenWord.hint)
-                        ? [offer(whenWord.text, 'function', whenWord.hint, () => undefined)]
-                        : [],
-                    ),
-                  ]}
-                />
-              </Hint>
-            </Piece>
-            <ConditionBlocks
-              condition={arm.condition}
-              frame={frame}
-              positions={within(
-                positions,
-                positionOfParameter(conditionEntry(catalogue, 'when'), 'predicates'),
-              )}
-              tone="function"
-              onChange={(condition) => {
-                withSource({ ...source, arms: [{ ...arm, condition }] });
-              }}
-            />
-          </Line>
-          <Line>
-            <Word title={thenWord.hint}>{thenWord.text}</Word>
-            {given(arm.returns, 'The value where the condition holds', 'then', (returns) => {
-              withSource({ ...source, arms: [{ ...arm, returns }] });
-            })}
-          </Line>
-          <Line>
-            <Word title={otherwiseWord.hint}>{otherwiseWord.text}</Word>
-            {given(
-              source.otherwise,
-              'The value where the condition does not hold',
-              'otherwise',
-              (otherwise) => {
-                withSource({ ...source, otherwise });
-              },
+          <ConditionBlocks
+            path={under(startPath, parameterSegment('predicates'))}
+            argument={when.predicates}
+            frame={frame}
+            positions={within(
+              positions,
+              positionOfParameter(conditionEntry(catalogue, 'when'), 'predicates'),
             )}
+            tone="function"
+          />
+        </Line>
+        <Line>
+          <Word title={thenWord.hint}>{thenWord.text}</Word>
+          {given(0, 'The value where the condition holds', 'then')}
+        </Line>
+        <Line>
+          <Word title={otherwiseWord.hint}>{otherwiseWord.text}</Word>
+          {given(1, 'The value where the condition does not hold', 'otherwise')}
+        </Line>
+        {lacking.length > 0 && (
+          <Line>
+            <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${lacking.join(', ')}`}</span>
           </Line>
-          {lacking.length > 0 && (
-            <Line>
-              <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${lacking.join(', ')}`}</span>
-            </Line>
-          )}
-          {chain.methods.length > 0 && <Line>{methods}</Line>}
-        </Lines>
-      )}
+        )}
+        {methods.length > 0 && <Line>{methodsDrawn}</Line>}
+      </Lines>
+    );
+  } else if (startCall !== null && isElement(startCall)) {
+    body = (
+      <>
+        <Piece
+          remove={removeChain}
+          add={{ label: `Add a method after ${elementWord}`, onPress: addAt(0) }}
+        >
+          <Hint lines={[`${elementWord} · ${elementHint}`]} code={false}>
+            <Slot
+              label={elementWord}
+              tone="function"
+              look="plain"
+              wrong={startsWrong || elementStart === null}
+              names
+              buttonRef={setStartWord}
+              describedAs="The function the chain starts from"
+              placeholder="Search the functions"
+              offers={(typed) => [
+                titled(
+                  'Functions',
+                  matches(typed, elementWord, elementHint)
+                    ? [offer(elementWord, 'function', elementHint, () => undefined)]
+                    : [],
+                ),
+              ]}
+            />
+          </Hint>
+        </Piece>
+        {methodsDrawn}
+      </>
+    );
+  } else if (startCall !== null && name === null) {
+    // A function the editor has no word of its own for is drawn as its name, with what it was given.
+    const entry = catalogue.entries.get(startCall.entry) ?? null;
+    body = (
+      <>
+        {startSlot(
+          entry?.name ?? startCall.entry,
+          'function',
+          'plain',
+          [`${entry?.name ?? startCall.entry} · ${entry?.hint ?? 'not in the catalogue'}`],
+          'The function the chain starts from',
+        )}
+        <OptionRows
+          entry={entry}
+          call={startCall}
+          callPath={startPath}
+          parameters={entry?.parameters ?? []}
+          around={{ frame, items: () => [] }}
+          layout="inline"
+        />
+        {methodsDrawn}
+      </>
+    );
+  } else {
+    body = (
+      <>
+        {startSlot(
+          unset ? 'field' : startName,
+          unset ? 'value' : start.kind === 'input' ? 'input' : 'column',
+          unset ? 'none' : 'plain',
+          startInput === null ? fieldHint(column) : inputLines(startInput),
+          'What the chain starts from',
+        )}
+        {methodsDrawn}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {body}
       {adding !== null && (
         <Popover anchor={adding.anchor} onDismiss={closeList}>
           <OfferList
             placeholder="Search the methods"
             groups={(typed) =>
-              methodGroups(catalogue, inserting, addPlace !== null, typed, (name, picked) => {
-                insert(adding.at, name, picked);
+              methodGroups(catalogue, inserting, addPlace !== null, typed, (_name, picked) => {
+                insert(adding.at, picked);
               })
             }
             keepOpen={false}
@@ -762,4 +780,10 @@ export function ChainBlocks({
       )}
     </>
   );
+}
+
+/** Returns the argument of a call as an expression, which the `when` layout draws, or `null`. */
+export function argumentExpression(call: CallView, parameter: string): ExpressionView | null {
+  const held: ArgumentView | undefined = givenOf(call, parameter);
+  return expressionOf(held);
 }

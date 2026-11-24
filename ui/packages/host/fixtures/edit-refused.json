@@ -1,0 +1,14 @@
+{
+  "status": "refused",
+  "revision": 1,
+  "place": {
+    "stepIndex": 7,
+    "stepId": "nowhere",
+    "path": []
+  },
+  "problem": {
+    "kind": "noStep",
+    "steps": 2
+  },
+  "message": "step \"nowhere\": there is no such step: the document has 2"
+}

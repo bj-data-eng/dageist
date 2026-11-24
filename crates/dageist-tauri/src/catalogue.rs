@@ -266,9 +266,6 @@ struct ParameterView {
     /// What the parameter holds when it is not given, as a setting, or `None`
     /// where it must be given, Polars decides or the default is not a value.
     default_setting: Option<SettingView>,
-    /// What the parameter is set to when it is first added, which differs from
-    /// its default.
-    start: SettingView,
     /// Where the expression the parameter holds stands, when a named position
     /// holds it. The tables of allowed combinations are asked at that place.
     position: Option<PositionView>,
@@ -483,7 +480,6 @@ fn parameter_view(
         shape: shape_view(parameter.shape()),
         default: default_view(parameter.default()),
         default_setting: parameter.default_setting().as_ref().map(setting_view),
-        start: setting_view(&parameter.start_setting()),
         position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
         offered: parameter.offered(),
     })
@@ -653,7 +649,6 @@ mod tests {
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
                         "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
-                        "start": { "kind": "unset" },
                         "position": null,
                         "offered": true
                     },
@@ -665,7 +660,6 @@ mod tests {
                         "shape": { "shape": "one" },
                         "default": { "kind": "none" },
                         "defaultSetting": null,
-                        "start": { "kind": "unset" },
                         "position": null,
                         "offered": true
                     }
@@ -690,7 +684,6 @@ mod tests {
                 "shape": { "shape": "one" },
                 "default": { "kind": "text", "value": "inner" },
                 "defaultSetting": { "kind": "word", "value": "inner" },
-                "start": { "kind": "word", "value": "left" },
                 "position": null,
                 "offered": true
             })
@@ -711,7 +704,6 @@ mod tests {
                 "shape": { "shape": "perItem", "of": "by" },
                 "default": { "kind": "flag", "value": false },
                 "defaultSetting": { "kind": "flag", "value": false },
-                "start": { "kind": "flag", "value": true },
                 "position": null,
                 "offered": true
             })
@@ -940,7 +932,7 @@ mod tests {
     }
 
     #[test]
-    fn a_parameter_carries_what_it_holds_by_default_and_what_it_is_first_set_to() {
+    fn a_parameter_carries_what_it_holds_by_default() {
         let view = view();
         let setting = |id: &str, name: &str, which: &str| parameter(&view, id, name)[which].clone();
         // Worked out from Python Polars' signatures: `join(how="inner", suffix="_right",
@@ -964,27 +956,12 @@ mod tests {
         // Where Polars decides, or the parameter must be given, there is none.
         assert!(setting("LazyFrame.join", "coalesce", "defaultSetting").is_null());
         assert!(setting("LazyFrame.join", "other", "defaultSetting").is_null());
-        // A first setting differs from the default: the first other word, the opposite flag,
-        // a list with one item to give, pairs with none, and otherwise nothing yet.
-        assert_eq!(
-            setting("LazyFrame.join", "how", "start"),
-            json!({ "kind": "word", "value": "left" })
-        );
-        assert_eq!(
-            setting("LazyFrame.sort", "descending", "start"),
-            json!({ "kind": "flag", "value": true })
-        );
-        assert_eq!(
-            setting("LazyFrame.join", "left_on", "start"),
-            json!({ "kind": "list", "items": [{ "kind": "unset" }] })
-        );
-        assert_eq!(
-            setting("LazyFrame.rename", "mapping", "start"),
-            json!({ "kind": "pairs", "entries": [] })
-        );
-        assert_eq!(
-            setting("Expr.shift", "n", "start"),
-            json!({ "kind": "unset" })
+        // What a new part is first set to is the engine's to say when it is added, so no parameter
+        // carries it.
+        assert!(
+            parameter(&view, "LazyFrame.join", "how")
+                .get("start")
+                .is_none()
         );
     }
 

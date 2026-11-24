@@ -10,8 +10,6 @@
 import type { CatalogueView, EntryView, ParameterView, PositionView } from '@dageist/host';
 
 import { assertNever } from './frame';
-import type { Comparison } from './source';
-import { IS_IN, asComparison } from './source';
 
 /** The catalogue as the editor reads it. */
 export interface Catalogue {
@@ -45,19 +43,13 @@ export function methodNameOf(id: string): string | null {
 
 /** One comparison a test can make, as the engine words it. */
 export interface ComparisonOption {
-  /** The comparison a test holds. */
-  readonly entry: Comparison;
+  /** The entry that compares, such as `Expr.eq`. */
+  readonly entry: string;
   /** The sign the engine writes it with, such as `≥`. */
   readonly sign: string;
   /** What it means, in the entry's own words, such as `at least`. */
   readonly hint: string;
 }
-
-/**
- * The comparison that tests membership in a list. The engine has no entry for it yet, so it has no
- * sign or meaning of its own to give: it is shown as its own name until it has.
- */
-const MEMBERSHIP: ComparisonOption = { entry: IS_IN, sign: IS_IN, hint: 'one of a list' };
 
 /**
  * Returns the comparisons the engine lists, in the order it lists them, each with its sign and what
@@ -66,27 +58,22 @@ const MEMBERSHIP: ComparisonOption = { entry: IS_IN, sign: IS_IN, hint: 'one of 
 export function comparisonOptions(catalogue: Catalogue): readonly ComparisonOption[] {
   return catalogue.view.comparisons.flatMap(({ entry, sign }) => {
     const found = catalogue.entries.get(entry);
-    const comparison = asComparison(entry, catalogue.comparisons);
-    return found === undefined || comparison === null
-      ? []
-      : [{ entry: comparison, sign, hint: found.hint }];
+    return found === undefined ? [] : [{ entry, sign, hint: found.hint }];
   });
 }
 
-/** Returns the comparisons a test can be changed to: those the engine lists, then membership in a list. */
-export function comparisonChoices(catalogue: Catalogue): readonly ComparisonOption[] {
-  return [...comparisonOptions(catalogue), MEMBERSHIP];
-}
-
 /**
- * Returns the option a test that holds `comparison` shows: its sign and what it means.
- *
- * @throws {Error} When the catalogue does not list it, which a test never holds.
+ * Returns the option a test that compares with `entry` shows: its sign and what it means, or the
+ * entry's own name for one the engine does not list as a comparison.
  */
-export function comparisonOption(catalogue: Catalogue, comparison: Comparison): ComparisonOption {
-  const found = comparisonChoices(catalogue).find((option) => option.entry === comparison);
-  if (found === undefined) throw new Error(`The catalogue lists no comparison ${comparison}.`);
-  return found;
+export function comparisonOption(catalogue: Catalogue, entry: string): ComparisonOption {
+  return (
+    comparisonOptions(catalogue).find((option) => option.entry === entry) ?? {
+      entry,
+      sign: entry,
+      hint: catalogue.entries.get(entry)?.hint ?? 'not in the catalogue',
+    }
+  );
 }
 
 /** The identifier the catalogue gives the step verb `verb`, such as `LazyFrame.filter`. */
@@ -153,4 +140,87 @@ export const ELEMENT_ID = 'polars.element';
 /** Returns the catalogue entry of `element`, or `null` when there is none. */
 export function elementEntry(catalogue: Catalogue): EntryView | null {
   return catalogue.entries.get(ELEMENT_ID) ?? null;
+}
+
+/** What a method's argument is: its catalogue parameter and the name the method is shown by. */
+export interface ArgumentRule {
+  readonly name: string;
+  /** The name the catalogue shows the method by. */
+  readonly shown: string;
+  readonly parameter: ParameterView;
+}
+
+/**
+ * Returns the rule of the argument of the method `entry`, or `null` when its first parameter is not
+ * an expression.
+ */
+export function argumentRule(entry: EntryView | null): ArgumentRule | null {
+  const argument = entry === null ? null : argumentOf(entry);
+  if (entry === null || argument === null) return null;
+  return { name: entry.id, shown: entry.name, ...argument };
+}
+
+/** Returns the parameters of `entry` that can be added to a call as options: those the engine offers, but `covered`. */
+export function optionParameters(
+  entry: EntryView,
+  covered: readonly string[],
+): readonly ParameterView[] {
+  return entry.parameters.filter(
+    (parameter) => parameter.offered && !covered.includes(parameter.name),
+  );
+}
+
+/**
+ * Returns the parameters of the method `entry` that can be added to it: all but the argument that is
+ * drawn where the method is.
+ */
+export function methodOptionParameters(entry: EntryView | null): readonly ParameterView[] {
+  if (entry === null) return [];
+  const argument = argumentOf(entry);
+  return optionParameters(entry, argument === null ? [] : [argument.parameter.name]);
+}
+
+/** The step verbs, by their Polars names. */
+export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
+
+/** Every verb the editor offers, in the order it is offered. */
+export const VERBS: readonly Verb[] = [
+  'with_columns',
+  'filter',
+  'sort',
+  'select',
+  'rename',
+  'join',
+  'pivot',
+];
+
+/** The parameters each step's own structure draws, which are not offered as options. */
+const COVERED: Readonly<Record<Verb, readonly string[]>> = {
+  // A column and what it holds are the step's own structure.
+  with_columns: ['exprs', 'named_exprs'],
+  filter: ['predicates'],
+  // The fields to order by are one list, so a second one for more fields is not offered.
+  sort: ['by', 'more_by'],
+  // The fields to keep are one list, so another expression is not offered by name.
+  select: ['exprs'],
+  rename: ['mapping'],
+  // The keys of the two tables are one list each, so `on` for a shared key is not offered.
+  join: ['other', 'on', 'left_on', 'right_on'],
+  pivot: ['on', 'index', 'values', 'aggregate_function'],
+};
+
+/** Returns the verb a step of the entry `entry` is, or `null` for a step the editor draws by its parameters alone. */
+export function verbOf(entry: string): Verb | null {
+  return VERBS.find((verb) => verbId(verb) === entry) ?? null;
+}
+
+/** Returns the parameters of the step `entry` that can be added to it as options. */
+export function stepOptionParameters(
+  catalogue: Catalogue,
+  entry: string,
+): readonly ParameterView[] {
+  const found = catalogue.entries.get(entry);
+  if (found === undefined) return [];
+  const verb = verbOf(entry);
+  return optionParameters(found, verb === null ? [] : COVERED[verb]);
 }

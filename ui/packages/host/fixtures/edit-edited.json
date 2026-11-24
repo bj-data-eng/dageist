@@ -1,0 +1,610 @@
+{
+  "status": "edited",
+  "revision": 2,
+  "document": {
+    "steps": [
+      {
+        "id": "sort",
+        "call": {
+          "entry": "LazyFrame.sort",
+          "arguments": [
+            {
+              "parameter": "by",
+              "value": {
+                "kind": "many",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "start": {
+                      "kind": "call",
+                      "call": {
+                        "entry": "polars.col",
+                        "arguments": [
+                          {
+                            "parameter": "name",
+                            "value": {
+                              "kind": "columns",
+                              "names": ["dcn"]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "links": []
+                  }
+                ]
+              }
+            },
+            {
+              "parameter": "descending",
+              "value": {
+                "kind": "many",
+                "items": [
+                  {
+                    "kind": "flag",
+                    "value": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "head",
+        "call": {
+          "entry": "LazyFrame.head",
+          "arguments": []
+        }
+      },
+      {
+        "id": "earlier",
+        "call": {
+          "entry": "LazyFrame.with_columns",
+          "arguments": [
+            {
+              "parameter": "named_exprs",
+              "value": {
+                "kind": "pairs",
+                "entries": [
+                  {
+                    "key": {
+                      "kind": "columns",
+                      "names": ["earlier"]
+                    },
+                    "value": {
+                      "kind": "expression",
+                      "start": {
+                        "kind": "call",
+                        "call": {
+                          "entry": "polars.col",
+                          "arguments": [
+                            {
+                              "parameter": "name",
+                              "value": {
+                                "kind": "columns",
+                                "names": ["timestamp"]
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "links": [
+                        {
+                          "entry": "Expr.shift",
+                          "arguments": [
+                            {
+                              "parameter": "n",
+                              "value": {
+                                "kind": "expression",
+                                "start": {
+                                  "kind": "call",
+                                  "call": {
+                                    "entry": "polars.lit",
+                                    "arguments": [
+                                      {
+                                        "parameter": "value",
+                                        "value": {
+                                          "kind": "integer",
+                                          "shown": "1"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                "links": []
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "run": {
+    "source": [
+      {
+        "name": "dcn",
+        "dtype": "String"
+      },
+      {
+        "name": "timestamp",
+        "dtype": "Datetime(us)"
+      },
+      {
+        "name": "step_to",
+        "dtype": "String"
+      },
+      {
+        "name": "owner",
+        "dtype": "String"
+      },
+      {
+        "name": "row_days",
+        "dtype": "Int64"
+      }
+    ],
+    "steps": [
+      {
+        "id": "sort",
+        "summary": "by dcn",
+        "lazy": true,
+        "outcome": {
+          "status": "valid",
+          "columns": [
+            {
+              "name": "dcn",
+              "dtype": "String"
+            },
+            {
+              "name": "timestamp",
+              "dtype": "Datetime(us)"
+            },
+            {
+              "name": "step_to",
+              "dtype": "String"
+            },
+            {
+              "name": "owner",
+              "dtype": "String"
+            },
+            {
+              "name": "row_days",
+              "dtype": "Int64"
+            }
+          ],
+          "changes": []
+        },
+        "count": {
+          "kind": "counted",
+          "received": 7,
+          "kept": 7,
+          "first": []
+        },
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "sort",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "start": {
+              "kind": "dtype",
+              "dtype": "String"
+            },
+            "links": []
+          }
+        ],
+        "walk": {
+          "expressions": [
+            {
+              "place": {
+                "stepIndex": 0,
+                "stepId": "sort",
+                "path": [
+                  {
+                    "kind": "parameter",
+                    "name": "by"
+                  },
+                  {
+                    "kind": "item",
+                    "index": 0
+                  }
+                ]
+              },
+              "context": {
+                "outer": "sort",
+                "nested": null
+              },
+              "calls": [
+                {
+                  "follows": {
+                    "kind": "start"
+                  },
+                  "verdict": {
+                    "kind": "allowed",
+                    "result": "String",
+                    "shape": "many",
+                    "ending": {
+                      "kind": "allowed"
+                    }
+                  }
+                }
+              ],
+              "places": [
+                {
+                  "context": {
+                    "outer": "sort",
+                    "nested": null
+                  },
+                  "after": {
+                    "kind": "value",
+                    "dtype": "String",
+                    "shape": "many"
+                  }
+                }
+              ],
+              "ending": {
+                "kind": "allowed"
+              }
+            }
+          ],
+          "refusal": null,
+          "notKnown": null
+        },
+        "atDefault": [
+          {
+            "stepIndex": 0,
+            "stepId": "sort",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "descending"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "head",
+        "summary": "",
+        "lazy": true,
+        "outcome": {
+          "status": "valid",
+          "columns": [
+            {
+              "name": "dcn",
+              "dtype": "String"
+            },
+            {
+              "name": "timestamp",
+              "dtype": "Datetime(us)"
+            },
+            {
+              "name": "step_to",
+              "dtype": "String"
+            },
+            {
+              "name": "owner",
+              "dtype": "String"
+            },
+            {
+              "name": "row_days",
+              "dtype": "Int64"
+            }
+          ],
+          "changes": []
+        },
+        "count": {
+          "kind": "counted",
+          "received": 7,
+          "kept": 5,
+          "first": []
+        },
+        "expressions": [],
+        "walk": {
+          "expressions": [],
+          "refusal": null,
+          "notKnown": null
+        },
+        "atDefault": []
+      },
+      {
+        "id": "earlier",
+        "summary": "earlier",
+        "lazy": true,
+        "outcome": {
+          "status": "valid",
+          "columns": [
+            {
+              "name": "dcn",
+              "dtype": "String"
+            },
+            {
+              "name": "timestamp",
+              "dtype": "Datetime(us)"
+            },
+            {
+              "name": "step_to",
+              "dtype": "String"
+            },
+            {
+              "name": "owner",
+              "dtype": "String"
+            },
+            {
+              "name": "row_days",
+              "dtype": "Int64"
+            },
+            {
+              "name": "earlier",
+              "dtype": "Datetime(us)"
+            }
+          ],
+          "changes": [
+            {
+              "name": "earlier",
+              "change": "added"
+            }
+          ]
+        },
+        "count": {
+          "kind": "counted",
+          "received": 5,
+          "kept": 5,
+          "first": [
+            {
+              "name": "earlier",
+              "values": {
+                "shown": [
+                  null,
+                  "2026-03-05 07:50:00",
+                  "2026-03-02 09:15:00",
+                  "2026-03-09 11:05:00"
+                ],
+                "more": 1
+              }
+            }
+          ]
+        },
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 2,
+              "stepId": "earlier",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "n"
+                }
+              ]
+            },
+            "start": {
+              "kind": "dtype",
+              "dtype": "Int32"
+            },
+            "links": []
+          },
+          {
+            "place": {
+              "stepIndex": 2,
+              "stepId": "earlier",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "start": {
+              "kind": "dtype",
+              "dtype": "Datetime(us)"
+            },
+            "links": [
+              {
+                "kind": "dtype",
+                "dtype": "Datetime(us)"
+              }
+            ]
+          }
+        ],
+        "walk": {
+          "expressions": [
+            {
+              "place": {
+                "stepIndex": 2,
+                "stepId": "earlier",
+                "path": [
+                  {
+                    "kind": "parameter",
+                    "name": "named_exprs"
+                  },
+                  {
+                    "kind": "value",
+                    "index": 0
+                  },
+                  {
+                    "kind": "link",
+                    "index": 0
+                  },
+                  {
+                    "kind": "parameter",
+                    "name": "n"
+                  }
+                ]
+              },
+              "context": {
+                "outer": "select",
+                "nested": null
+              },
+              "calls": [
+                {
+                  "follows": {
+                    "kind": "start"
+                  },
+                  "verdict": {
+                    "kind": "allowed",
+                    "result": "Int32",
+                    "shape": "one",
+                    "ending": {
+                      "kind": "allowed"
+                    }
+                  }
+                }
+              ],
+              "places": [
+                {
+                  "context": {
+                    "outer": "select",
+                    "nested": null
+                  },
+                  "after": {
+                    "kind": "value",
+                    "dtype": "Int32",
+                    "shape": "one"
+                  }
+                }
+              ],
+              "ending": null
+            },
+            {
+              "place": {
+                "stepIndex": 2,
+                "stepId": "earlier",
+                "path": [
+                  {
+                    "kind": "parameter",
+                    "name": "named_exprs"
+                  },
+                  {
+                    "kind": "value",
+                    "index": 0
+                  }
+                ]
+              },
+              "context": {
+                "outer": "select",
+                "nested": null
+              },
+              "calls": [
+                {
+                  "follows": {
+                    "kind": "start"
+                  },
+                  "verdict": {
+                    "kind": "allowed",
+                    "result": "Datetime(us)",
+                    "shape": "many",
+                    "ending": {
+                      "kind": "allowed"
+                    }
+                  }
+                },
+                {
+                  "follows": {
+                    "kind": "value",
+                    "dtype": "Datetime(us)",
+                    "shape": "many"
+                  },
+                  "verdict": {
+                    "kind": "allowed",
+                    "result": "Datetime(us)",
+                    "shape": "many",
+                    "ending": {
+                      "kind": "allowed"
+                    }
+                  }
+                }
+              ],
+              "places": [
+                {
+                  "context": {
+                    "outer": "select",
+                    "nested": null
+                  },
+                  "after": {
+                    "kind": "value",
+                    "dtype": "Datetime(us)",
+                    "shape": "many"
+                  }
+                },
+                {
+                  "context": {
+                    "outer": "select",
+                    "nested": null
+                  },
+                  "after": {
+                    "kind": "value",
+                    "dtype": "Datetime(us)",
+                    "shape": "many"
+                  }
+                }
+              ],
+              "ending": {
+                "kind": "allowed"
+              }
+            }
+          ],
+          "refusal": null,
+          "notKnown": null
+        },
+        "atDefault": [
+          {
+            "stepIndex": 2,
+            "stepId": "earlier",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "n"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

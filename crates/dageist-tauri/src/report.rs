@@ -17,9 +17,9 @@ use dageist_engine::allowed::{
 };
 use dageist_engine::catalog::Laziness;
 use dageist_engine::document::{
-    Change, ColumnChange, ColumnDescription, ColumnValues, ExpressionDtypes, FirstValues, Outcome,
-    Place, ReadError, Report, Resolution, RunCause, Segment, StepReport, StepRows, Walk,
-    WalkRefusal, WalkedExpression,
+    Change, ColumnChange, ColumnDescription, ColumnValues, EmptyStepId, ExpressionDtypes,
+    FirstValues, Outcome, Place, Report, Resolution, RunCause, Segment, StepId, StepReport,
+    StepRows, Walk, WalkRefusal, WalkedExpression,
 };
 use serde::{Deserialize, Serialize};
 
@@ -141,9 +141,9 @@ fn count_view(rows: &StepRows) -> CountView {
 }
 
 /// One step of the way from a step to the thing inside it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-enum SegmentView {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum SegmentView {
     /// The argument for a parameter, by Python's name for it.
     Parameter { name: String },
     /// An item of a list.
@@ -179,7 +179,40 @@ pub struct PlaceView {
     path: Vec<SegmentView>,
 }
 
-fn place_view(place: &Place) -> PlaceView {
+/// A place an edit is asked at: a step by its number and its identifier, then the way down
+/// through its arguments, as the report gives a place. An edit works inside a step, so a request
+/// that names no step, or names one without its identifier, is not a request.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct EditPlace {
+    step_index: usize,
+    step_id: String,
+    path: Vec<SegmentView>,
+}
+
+impl EditPlace {
+    /// The place this view names.
+    ///
+    /// # Errors
+    ///
+    /// When it names a step by an empty identifier.
+    pub(crate) fn place(&self) -> Result<Place, EmptyStepId> {
+        let id = StepId::new(&self.step_id)?;
+        let place = Place::of_step(self.step_index, Some(id));
+        Ok(self.path.iter().fold(place, |place, segment| {
+            place.then(match segment {
+                SegmentView::Parameter { name } => Segment::Parameter(name.clone()),
+                SegmentView::Item { index } => Segment::Item(*index),
+                SegmentView::Key { index } => Segment::Key(*index),
+                SegmentView::Value { index } => Segment::Value(*index),
+                SegmentView::Start => Segment::Start,
+                SegmentView::Link { index } => Segment::Link(*index),
+            })
+        }))
+    }
+}
+
+pub(crate) fn place_view(place: &Place) -> PlaceView {
     PlaceView {
         step_index: place.step_index(),
         step_id: place.step_id().map(|id| id.as_str().to_owned()),
@@ -630,61 +663,19 @@ fn step_report_view(step: &StepReport) -> StepReportView {
     }
 }
 
-/// Why text is not a document the engine reads.
+/// What running a document came to: its steps reported one by one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum ReadProblemView {
-    /// The text is not JSON by RFC 8259, or nests too deep.
-    Syntax {
-        line: usize,
-        column: usize,
-        reason: String,
-    },
-    /// The JSON is not a document, here, for this reason.
-    Refused { place: PlaceView, reason: String },
-}
-
-fn read_problem_view(error: &ReadError) -> ReadProblemView {
-    match error {
-        ReadError::Syntax(syntax) => ReadProblemView::Syntax {
-            line: syntax.line(),
-            column: syntax.column(),
-            reason: syntax.problem().to_string(),
-        },
-        ReadError::Refused(refusal) => ReadProblemView::Refused {
-            place: place_view(refusal.place()),
-            reason: refusal.cause().to_string(),
-        },
-    }
-}
-
-/// What running a document came to: its steps reported one by one, or the
-/// reason it could not be read.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "status", rename_all = "camelCase")]
-pub enum RunView {
-    /// The document was read and its steps run.
-    Run {
-        /// The columns of the table the steps start from.
-        source: Vec<FieldView>,
-        /// One report for each step, in the document's order.
-        steps: Vec<StepReportView>,
-    },
-    /// The text is not a document the engine reads.
-    Unreadable { problem: ReadProblemView },
+pub struct RunView {
+    /// The columns of the table the steps start from.
+    source: Vec<FieldView>,
+    /// One report for each step, in the document's order.
+    steps: Vec<StepReportView>,
 }
 
 impl RunView {
-    /// The view of a document that could not be read.
-    pub fn unreadable(error: &ReadError) -> Self {
-        Self::Unreadable {
-            problem: read_problem_view(error),
-        }
-    }
-
     /// The view of what running a document reported.
     pub fn of_report(report: &Report) -> Self {
-        Self::Run {
+        Self {
             source: FieldView::of_columns(&ColumnDescription::of_schema(report.source())),
             steps: report.steps().iter().map(step_report_view).collect(),
         }

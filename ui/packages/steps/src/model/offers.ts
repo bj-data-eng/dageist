@@ -13,6 +13,7 @@ import type {
   EndingView,
   EntryView,
   FitsView,
+  GivenView,
   LiteralView,
   OffersView,
   OptionsView,
@@ -22,7 +23,6 @@ import type {
 
 import type { Catalogue } from './catalogue';
 import { editorLimit } from './limits';
-import type { Options } from './settings';
 
 /** Returns the first line of `reason`, which is what Polars says before it prints more. */
 export function shortReason(reason: string): string {
@@ -249,19 +249,18 @@ export function prepareOptions(view: OptionsView): ReadonlyMap<string, PreparedO
 }
 
 /**
- * Returns the options of `entry` that `options` sets to a word the engine's
- * option table knows: a flag, or a choice. The others are not words of that
- * table, and the table is asked only of these.
+ * Returns the options of `entry` that `given` sets to a word the engine's option table knows: a
+ * flag, or a choice. The others are not words of that table, and the table is asked only of these.
  */
-export function chosenOptions(entry: EntryView, options: Options): ChosenOption[] {
+export function chosenOptions(entry: EntryView, given: readonly GivenView[]): ChosenOption[] {
   return entry.parameters.flatMap((parameter) => {
-    const setting = Object.hasOwn(options, parameter.name) ? options[parameter.name] : undefined;
-    if (setting === undefined) return [];
-    if (parameter.kind.kind === 'flag' && setting.kind === 'flag') {
-      return [{ parameter: parameter.name, word: String(setting.value) }];
+    const held = given.find((candidate) => candidate.parameter === parameter.name)?.value;
+    if (held === undefined) return [];
+    if (parameter.kind.kind === 'flag' && held.kind === 'flag' && held.value !== null) {
+      return [{ parameter: parameter.name, word: String(held.value) }];
     }
-    if (parameter.kind.kind === 'choice' && setting.kind === 'word') {
-      return [{ parameter: parameter.name, word: setting.value }];
+    if (parameter.kind.kind === 'choice' && held.kind === 'choice') {
+      return [{ parameter: parameter.name, word: held.word }];
     }
     return [];
   });

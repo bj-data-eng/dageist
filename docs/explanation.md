@@ -214,8 +214,8 @@ Three rules keep this workable as the application grows:
   being worked on.
 - **Rust stays the authority.** A feature holds interface state, such as what
   is selected or which menu is open. Values and validation come from the host.
-  The step editor holds its steps and writes them as a step document; the
-  engine runs the document and reports the columns, the dtypes and the
+  The host holds the step editor's document and the engine makes every edit of
+  it; the engine runs the document and reports the columns, the dtypes and the
   refusals, the rows after a step as text, and the short summary of each step,
   and the view shows them.
 
@@ -810,46 +810,85 @@ column's name and chain and a filter's conditions keep the lines the
 storyboard settled, which lay out an expression list one item to a line. A
 pivot takes its output columns from a connected table, its `on_columns`.
 
-The editor sends its steps to the engine as a step document and shows what the
-engine reports of them, in
-[ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
-Translating the steps into a document and preparing the report for display are
-plain TypeScript with no React, tested against the snapshots the host writes.
+The host holds the node's step document and its revision, and the editor draws
+it and changes it only by sending the engine's edits through the host, in
+[ui/packages/steps/src/](../ui/packages/steps/src/editor.tsx). A window asks for
+the document, which comes with the report of running it, and says what the
+person did as an edit made against the revision it drew. One command takes every
+edit, tagged by its kind, so that the check of the revision, the run of the edited
+document and the answer are written once and not for each of the engine's
+nineteen edits. The host refuses an edit made against another revision, so a place
+taken from an earlier document never lands on a step that has since taken its
+identifier; the window then asks for the document again and the person does it
+again against what is there. An edit the engine refuses is an answer, not a
+failure: the place, a kind of problem from a closed list the editor can decide on,
+and the engine's words. The editor never builds or changes a document, and keeps no
+copy of the rules for one; a new step, link, option or test starts as the engine
+starts it. What the engine says the document is arrives as a tree of calls whose
+numbers are the words the engine shows them as, which `ui/packages/host` decodes
+and refuses where it has the wrong shape.
+
+An edit is made against the revision of the document the person saw when they did it,
+not the newest one the window holds, because the places in it are built from what was
+drawn: against a newer document they would land on a step the person never saw, and the
+host answers it as stale. An action that is several edits, such as a join's table and then
+its right keys, is one action: its edits are sent in order, each against the revision the
+one before gave, and it stops at the first that is refused or stale, so no later edit goes
+against a document it was not made for. The queue, the revisions and the loading of the
+document are plain TypeScript in
+[ui/packages/steps/src/editSession.ts](../ui/packages/steps/src/editSession.ts), tested
+with a stand-in for the host. The document the host gives on being asked is the window's
+whatever its revision, since a host that has been restarted is at a lower one; only an
+answer that a later request has overtaken is dropped. Another window learns of an edit
+from a message on the `document` topic that names the revision, and asks for the document
+again; which step is chosen travels on a topic of its own. What is not yet an edit stays in
+the window as a draft: an option, an item of a list or an entry of a pair that has no value
+is not in the document until it has one, and the document never holds a part that is only
+half made. A draft belongs to the parameter it would give a value to, and stays through
+changes elsewhere in the document until that step or call is gone, the document gives the
+parameter, or the person gives it its value.
+
+A revision belongs to one lifetime of a host. It goes up by one with each edit, and a
+host starts at the milliseconds since the Unix epoch when it started, so a page that
+outlives its host, as one open across a restart does, holds a revision a later host is not
+at as long as edits are slower than a millisecond and the clock does not step back, and its
+next edit is stale, not made on a document it never saw. The window asks for the
+document when it gains focus or becomes visible, and after an action fails, so it draws the
+new host's document before the person acts, and takes it whatever its revision is.
+
+The functions that remain in
+[ui/packages/steps/src/model/](../ui/packages/steps/src/model/doc.ts) read the
+document's shapes, such as which step is a sort, which expression is a test or a
+`when`, and prepare the report for display; they are plain TypeScript with no React,
+tested against the snapshots the host writes.
 What the editor shows of a run it reads off the report and works out none of it:
 the columns a step added or replaced, the rows a filter keeps of those it was
 given, the first values of a column a step added, and for each connected input
 what supplies it and the value or values it holds. The view only lays the
 engine's text out as a line, with a dash for a null and an ellipsis where more
 values follow.
+
 Where an expression is still to be picked, a value, the field or input a chain
-starts from, a method's argument or a comparison's field, the editor writes a
-hole, which the document reads as an expression that starts from nothing. The
-engine walks the step up to the hole, so it reports the places before it, and
-does not build it: the step is incomplete at the hole's place, and the steps
-after it are not run, naming it. The editor reads the place back into what is to
-be picked and the word that is the matter. The steps after an incomplete step have no walk, so their chains have no lists of
-methods until the step before is finished. A new add-column step holds a hole, so
-its chain starts from nothing and has no methods to list until a field is picked,
-and a new pivot is held back until its three fields are picked, so its aggregate
-has no lists of methods until then. A step is held back from the
-document, with the reason, only where what is missing is not an expression to
-pick, such as an empty name, a field of a pivot or a table, or where the catalogue
-has no entry for it yet, such as a comparison with `is_in` or a condition of
-which any line is enough; the steps after it are not run, as they are not after
-a step the engine refuses. The
-document keeps the editor's step identifiers, so the editor's starting steps
-are the engine's claim-timing sample and translate to the same document. A
-run is asked for after a short wait for the next edit, with one request out at
-a time, and the answer to a request that a newer edit has replaced is dropped,
-so what is shown is never older than the last answer that was wanted. A
+starts from, a method's argument or a comparison's field, the document holds a
+hole, which it reads as an expression that starts from nothing. The engine walks
+the step up to the hole, so it reports the places before it, and does not build
+it: the step is incomplete at the hole's place, and the steps after it are not
+run, naming it. The steps after an incomplete step have no walk, so their chains
+have no lists of methods until the step before is finished. A new add-column step
+holds a hole, so its chain starts from nothing and has no methods to list until a
+field is picked. What the engine cannot hold yet is not offered: a comparison with
+`is_in`, a condition of which any line is enough, nested groups of conditions, a
+literal `None` and a `when` of more than one case have no place in the editor
+until the catalogue has them.
+
+The report is the host's of the very document, so a place in it is a place in the
+document the editor draws, and a report is never shown for a document that is not
+the one drawn. A window asks for the rows after a step with the revision it drew,
+and the answer to a request that a newer document has replaced is dropped. A
 request that failed because the host was not there, as a bridge that is not yet
-running, is asked again after two seconds while it is still the newest; an
-answer of the engine's, such as a refusal, is the same each time and is not. A report is shown only for the
-steps that are still what it reported of: a step an edit has changed, and the
-steps after it, wait for the engine. A `when` of more than one case is held
-back too, as a further case is a `when` after `otherwise`. A refusal
-carries the place of the engine's document it is at, which the translation maps
-back to the word of the editor it marks.
+running, is asked again after two seconds while it is still the newest; an answer
+of the engine's, such as a refusal, is the same each time and is not. A refusal
+carries the place it is at, which the editor maps back to the word it marks.
 
 The editor's lists offer what the engine allows and nothing of their own. A list
 asks the engine only while it is open, through a scheduler of its own that sends
@@ -872,16 +911,16 @@ and never shows what was answered for another place. Five commands answer:
 - `option_offers` says what the flags and choices of an entry may be set to
   beside those already chosen, and the word each starts with when it is added,
   so that an option is added with a word Polars allows, or not at all.
-- `step_starts` says what each step of the list starts with on a table: the
-  list of steps asks it while it is open, and a step is added or changed to
-  with what the engine says, so it cannot be picked until the engine has said.
-  A filter starts with a comparison for equality of a field and a value still
-  to be given, which the editor draws as a test.
+- `step_starts` says which steps of the list can be added to a table: the
+  list of steps asks it while it is open, so a step cannot be picked until the
+  engine has said. What a new step holds, a filter's comparison for equality of
+  a field and a value still to be given among it, is the engine's to say when the
+  step is added as an edit.
 
 What a parameter holds when it is not given, what it is first set to and
 whether an option is at its default are rules about Polars, so the engine
-decides them and the editor applies them. The catalogue carries each
-parameter's default and its first setting, and a step report names the
+decides them and the editor shows what it says. The catalogue carries each
+parameter's default, and a step report names the
 arguments of the step, and of the calls inside its expressions, that are what
 their parameter holds when it is not given, which the editor shows as "same as
 the default". Polars calls a method the same with a parameter left out or

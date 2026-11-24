@@ -9,7 +9,10 @@ use tauri::test::{INVOKE_KEY, MockRuntime, mock_builder, mock_context, noop_asse
 use tauri::webview::InvokeRequest;
 use tauri::{WebviewWindow, WebviewWindowBuilder};
 
+use dageist_engine::document::Document;
+
 use super::{node_view, rows_view, run_view};
+use crate::document::{Documents, document_state_view};
 
 /// Set to rewrite the snapshots instead of checking them.
 const REFRESH: &str = "DAGEIST_REFRESH_STEP_REPORTS";
@@ -17,11 +20,13 @@ const REFRESH: &str = "DAGEIST_REFRESH_STEP_REPORTS";
 /// The command that refreshes the snapshots.
 const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri node::tests::the_snapshots_are_what_the_commands_return";
 
-fn window() -> WebviewWindow<MockRuntime> {
+fn window(documents: Documents) -> WebviewWindow<MockRuntime> {
     let app = mock_builder()
+        .manage(documents)
         .invoke_handler(tauri::generate_handler![
             super::node_inputs,
-            super::run_document,
+            super::node_document,
+            super::edit_document,
             super::rows_after_step,
         ])
         .build(mock_context(noop_assets()))
@@ -31,9 +36,34 @@ fn window() -> WebviewWindow<MockRuntime> {
         .expect("the mock window builds")
 }
 
-/// Calls `command` as the view's IPC does, and gives the JSON it answers with
-/// or the JSON it rejects with.
+/// The document written as `text`.
+pub(crate) fn read(text: &str) -> Document {
+    Document::read(text).expect("a document")
+}
+
+/// The documents of a node whose steps are written as `text`.
+pub(crate) fn documents_of(text: &str) -> Documents {
+    Documents::of(Document::read(text).expect("a document"))
+}
+
+/// Calls `command` as the view's IPC does on a node whose steps are the sample's, and gives the
+/// JSON it answers with or the JSON it rejects with.
 fn invoke(command: &str, arguments: Value) -> Result<Value, Value> {
+    invoke_on(documents_of(steps_text()), command, arguments)
+}
+
+/// What running the document written as `text` reports, as `node_document` answers it.
+fn run_text(text: impl AsRef<str>) -> Value {
+    invoke_on(documents_of(text.as_ref()), "node_document", json!({})).expect("a state")["run"]
+        .clone()
+}
+
+/// Calls `command` on a node that holds `documents`.
+pub(crate) fn invoke_on(
+    documents: Documents,
+    command: &str,
+    arguments: Value,
+) -> Result<Value, Value> {
     let request = InvokeRequest {
         cmd: command.into(),
         callback: CallbackFn(0),
@@ -43,14 +73,14 @@ fn invoke(command: &str, arguments: Value) -> Result<Value, Value> {
         headers: tauri::http::HeaderMap::default(),
         invoke_key: INVOKE_KEY.to_owned(),
     };
-    match tauri::test::get_ipc_response(&window(), request)? {
+    match tauri::test::get_ipc_response(&window(documents), request)? {
         InvokeResponseBody::Json(text) => Ok(serde_json::from_str(&text).expect("JSON")),
         other => panic!("expected JSON, got {other:?}"),
     }
 }
 
 /// A view as the JSON it serializes to.
-fn json(view: &impl serde::Serialize) -> Value {
+pub(crate) fn json(view: &impl serde::Serialize) -> Value {
     serde_json::to_value(view).expect("a view serializes")
 }
 
@@ -64,10 +94,14 @@ fn vocabulary() -> Value {
         panic!("a vocabulary is an object");
     };
     words.extend(catalogue);
+    let Value::Object(edits) = crate::document::tests::vocabulary() else {
+        panic!("a vocabulary is an object");
+    };
+    words.extend(edits);
     Value::Object(words.clone())
 }
 
-fn steps_text() -> &'static str {
+pub(crate) fn steps_text() -> &'static str {
     ClaimTiming::STEPS_JSON
 }
 
@@ -258,7 +292,7 @@ fn failing_text() -> String {
 
 #[test]
 fn the_run_command_reports_the_columns_a_step_added_or_replaced() {
-    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let answer = run_text(steps_text());
     let steps = &answer["steps"];
     // `resolved_day` is the fifth step, and adds the one column.
     assert_eq!(
@@ -282,7 +316,7 @@ fn the_run_command_reports_the_columns_a_step_added_or_replaced() {
         ])
     );
     // A column the step writes is replaced, even as the text it was.
-    let written = invoke("run_document", json!({ "document": filter_text() })).expect("a report");
+    let written = run_text(filter_text());
     assert_eq!(
         written["steps"][1]["outcome"]["changes"],
         json!([change("owner", "replaced"), change("slow", "added")])
@@ -291,7 +325,7 @@ fn the_run_command_reports_the_columns_a_step_added_or_replaced() {
 
 #[test]
 fn the_run_command_reports_the_rows_each_step_kept_with_the_first_values_it_added() {
-    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let answer = run_text(steps_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["count"], counted(7, 7, json!([])));
     // After the sort A-1001 has four rows. The step before the first in a claim has none.
@@ -331,7 +365,7 @@ fn the_run_command_reports_the_rows_each_step_kept_with_the_first_values_it_adde
 
 #[test]
 fn a_filter_keeps_the_rows_that_pass_of_the_rows_it_received() {
-    let answer = invoke("run_document", json!({ "document": filter_text() })).expect("a report");
+    let answer = run_text(filter_text());
     // Four of the seven rows have more than one day; the step after is given those four.
     assert_eq!(answer["steps"][0]["count"], counted(7, 4, json!([])));
     assert_eq!(
@@ -353,7 +387,7 @@ fn a_filter_keeps_the_rows_that_pass_of_the_rows_it_received() {
 
 #[test]
 fn a_step_that_is_refused_is_not_counted_and_nor_are_the_steps_after_it() {
-    let answer = invoke("run_document", json!({ "document": refused_text() })).expect("a report");
+    let answer = run_text(refused_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["count"], counted(7, 7, json!([])));
     assert_eq!(steps[1]["count"], json!({ "kind": "notCounted" }));
@@ -362,7 +396,7 @@ fn a_step_that_is_refused_is_not_counted_and_nor_are_the_steps_after_it() {
 
 #[test]
 fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_not_counted() {
-    let answer = invoke("run_document", json!({ "document": failing_text() })).expect("a report");
+    let answer = run_text(failing_text());
     let steps = &answer["steps"];
     // The step is valid by its schema.
     assert_eq!(steps[0]["outcome"]["status"], "valid");
@@ -380,8 +414,7 @@ fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_n
 
 #[test]
 fn the_run_command_reports_each_step_with_its_columns_and_laziness() {
-    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
-    assert_eq!(answer["status"], "run");
+    let answer = run_text(steps_text());
     assert_eq!(answer["source"], claim_columns());
     let steps = answer["steps"].as_array().expect("steps");
     let ids: Vec<&str> = steps
@@ -426,7 +459,7 @@ fn the_run_command_reports_each_step_with_its_columns_and_laziness() {
 
 #[test]
 fn the_run_command_reports_the_dtype_after_each_link_and_where_the_expression_is() {
-    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let answer = run_text(steps_text());
     // `resolved_day` is the fifth step: the timestamp column, then its date.
     let step = &answer["steps"][4];
     assert_eq!(
@@ -448,7 +481,7 @@ fn the_run_command_reports_the_dtype_after_each_link_and_where_the_expression_is
 
 #[test]
 fn the_run_command_reports_what_the_tables_say_of_each_call() {
-    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let answer = run_text(steps_text());
     let walked = &answer["steps"][4]["walk"]["expressions"][0];
     // A computed column is a select item. The date of a timestamp follows a
     // value of every row, and is allowed there and gives a date.
@@ -468,7 +501,7 @@ fn the_run_command_reports_what_the_tables_say_of_each_call() {
 
 #[test]
 fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
-    let answer = invoke("run_document", json!({ "document": refused_text() })).expect("a report");
+    let answer = run_text(refused_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["outcome"]["status"], "valid");
     let refused = &steps[1]["outcome"];
@@ -507,8 +540,7 @@ fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
 
 #[test]
 fn a_step_with_something_still_to_be_picked_is_incomplete_at_it_and_the_next_is_not_run() {
-    let answer =
-        invoke("run_document", json!({ "document": incomplete_text() })).expect("a report");
+    let answer = run_text(incomplete_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["outcome"]["status"], "valid");
     // The shift's argument `n`, whose start is the hole, in the first link of the pair's value.
@@ -557,9 +589,10 @@ fn a_step_with_something_still_to_be_picked_is_incomplete_at_it_and_the_next_is_
 #[test]
 fn the_rows_of_an_incomplete_step_are_refused_and_those_after_it_are_not_run() {
     let rows = |step: &str| {
-        invoke(
+        invoke_on(
+            documents_of(&incomplete_text()),
             "rows_after_step",
-            json!({ "document": incomplete_text(), "step": step, "limit": 2 }),
+            json!({ "revision": 1, "step": step, "limit": 2 }),
         )
         .expect_err("no rows")
     };
@@ -570,35 +603,10 @@ fn the_rows_of_an_incomplete_step_are_refused_and_those_after_it_are_not_run() {
 }
 
 #[test]
-fn a_text_that_is_not_a_document_is_reported_with_its_place_not_as_a_failure() {
-    let unreadable = invoke(
-        "run_document",
-        json!({ "document": r#"{"version":2,"steps":[]}"# }),
-    )
-    .expect("an answer");
-    assert_eq!(
-        unreadable,
-        json!({
-            "status": "unreadable",
-            "problem": {
-                "kind": "refused",
-                "place": { "stepIndex": null, "stepId": null, "path": [] },
-                "reason": "version 2 is not one this engine reads; it reads version 1"
-            }
-        })
-    );
-    let syntax =
-        invoke("run_document", json!({ "document": "{\n\"version\":" })).expect("an answer");
-    assert_eq!(syntax["status"], "unreadable");
-    assert_eq!(syntax["problem"]["kind"], "syntax");
-    assert_eq!(syntax["problem"]["line"], 2);
-}
-
-#[test]
 fn the_rows_command_gives_cells_as_text_and_a_null_as_null() {
     let answer = invoke(
         "rows_after_step",
-        json!({ "document": steps_text(), "step": "days_open", "limit": 2 }),
+        json!({ "revision": 1, "step": "days_open", "limit": 2 }),
     )
     .expect("rows");
     let columns = answer["columns"].as_array().expect("columns");
@@ -622,7 +630,7 @@ fn the_rows_command_gives_cells_as_text_and_a_null_as_null() {
 /// The cause a step is refused with, when it is the only step of the document.
 fn cause_of(step: Value) -> Value {
     let text = json!({ "version": 1, "steps": [step] }).to_string();
-    let answer = invoke("run_document", json!({ "document": text })).expect("a report");
+    let answer = run_text(&text);
     assert_eq!(
         answer["steps"][0]["outcome"]["status"], "refused",
         "{answer}"
@@ -671,9 +679,15 @@ fn a_step_is_refused_for_what_is_not_connected_or_not_allowed_where_it_stands() 
     );
 }
 
-/// What `rows_after_step` rejects with, as the JSON the view receives.
+/// What `rows_after_step` rejects with, as the JSON the view receives, on a node whose steps are
+/// written as `text`.
+fn rejection_on(text: &str, arguments: Value) -> Value {
+    invoke_on(documents_of(text), "rows_after_step", arguments).expect_err("a rejection")
+}
+
+/// What `rows_after_step` rejects with on the sample's steps.
 fn rejection(arguments: Value) -> Value {
-    invoke("rows_after_step", arguments).expect_err("a rejection")
+    rejection_on(steps_text(), arguments)
 }
 
 /// The kind and the message of a rejection.
@@ -690,7 +704,7 @@ fn kind_and_message(rejection: &Value) -> (String, String) {
 #[test]
 fn a_preview_over_the_window_is_rejected_as_a_limit() {
     let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": steps_text(), "step": "sort", "limit": 1_001 }),
+        json!({ "revision": 1, "step": "sort", "limit": 1_001 }),
     ));
     assert_eq!(kind, "limit");
     assert_eq!(message, "a preview holds at most 1000 rows");
@@ -699,7 +713,7 @@ fn a_preview_over_the_window_is_rejected_as_a_limit() {
 #[test]
 fn a_step_the_document_lacks_is_rejected_as_no_such_step() {
     let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": steps_text(), "step": "nowhere", "limit": 1 }),
+        json!({ "revision": 1, "step": "nowhere", "limit": 1 }),
     ));
     assert_eq!(kind, "noSuchStep");
     assert!(
@@ -707,31 +721,23 @@ fn a_step_the_document_lacks_is_rejected_as_no_such_step() {
         "{message}"
     );
     // An identifier with no characters names no step either.
-    let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": steps_text(), "step": "", "limit": 1 }),
-    ));
+    let (kind, message) =
+        kind_and_message(&rejection(json!({ "revision": 1, "step": "", "limit": 1 })));
     assert_eq!(kind, "noSuchStep");
     assert!(message.starts_with("naming the step"), "{message}");
 }
 
 #[test]
-fn a_text_that_is_not_a_document_is_rejected_as_unreadable() {
-    let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": "[]", "step": "sort", "limit": 1 }),
-    ));
-    assert_eq!(kind, "unreadable");
-    assert!(message.starts_with("reading the document"), "{message}");
-}
-
-#[test]
 fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
-    let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": refused_text(), "step": "total", "limit": 1 }),
+    let (kind, message) = kind_and_message(&rejection_on(
+        &refused_text(),
+        json!({ "revision": 1, "step": "total", "limit": 1 }),
     ));
     assert_eq!(kind, "refused");
     assert!(message.starts_with("previewing the rows"), "{message}");
-    let (kind, message) = kind_and_message(&rejection(
-        json!({ "document": refused_text(), "step": "after", "limit": 1 }),
+    let (kind, message) = kind_and_message(&rejection_on(
+        &refused_text(),
+        json!({ "revision": 1, "step": "after", "limit": 1 }),
     ));
     assert_eq!(kind, "notRun");
     assert!(message.starts_with("previewing the rows"), "{message}");
@@ -739,7 +745,7 @@ fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
 
 #[test]
 fn a_run_reports_the_summary_of_each_step() {
-    let run = json(&run_view(steps_text()).expect("a report"));
+    let run = json(&run_view(&read(steps_text())).expect("a report"));
     let steps = run["steps"].as_array().expect("steps");
     let said = |id: &str| {
         steps
@@ -759,7 +765,7 @@ fn a_run_reports_the_summary_of_each_step() {
 
 #[test]
 fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
-    let run = json(&run_view(steps_text()).expect("a report"));
+    let run = json(&run_view(&read(steps_text())).expect("a report"));
     let steps = run["steps"].as_array().expect("steps");
     // The sample gives `shift` its default of 1 as its first argument, which is the only
     // argument of its steps that equals what Polars holds when it is not given.
@@ -783,34 +789,24 @@ fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
 }
 
 #[test]
-fn text_that_is_not_a_document_is_reported_as_unreadable() {
-    let run = json(&run_view(r#"{"version":2,"steps":[]}"#).expect("an answer"));
-    assert_eq!(run["status"], "unreadable");
-}
-
-#[test]
 fn the_snapshots_are_what_the_commands_return() {
-    let snapshots: [(&str, Value); 9] = [
+    let snapshots: [(&str, Value); 8] = [
         ("node-inputs.json", json(&node_view().expect("the node"))),
         (
-            "step-document.json",
-            serde_json::from_str(steps_text()).expect("the sample steps are JSON"),
+            "node-document.json",
+            json(&document_state_view(&documents_of(steps_text())).expect("a state")),
         ),
         (
             "step-report.json",
-            json(&run_view(steps_text()).expect("a report")),
+            json(&run_view(&read(steps_text())).expect("a report")),
         ),
         (
             "step-report-refused.json",
-            json(&run_view(&refused_text()).expect("a report")),
+            json(&run_view(&read(&refused_text())).expect("a report")),
         ),
         (
             "step-report-incomplete.json",
-            json(&run_view(&incomplete_text()).expect("a report")),
-        ),
-        (
-            "step-report-unreadable.json",
-            json(&run_view(r#"{"version":2,"steps":[]}"#).expect("an answer")),
+            json(&run_view(&read(&incomplete_text())).expect("a report")),
         ),
         (
             "step-report-variants.json",
@@ -819,7 +815,7 @@ fn the_snapshots_are_what_the_commands_return() {
         ("vocabulary.json", vocabulary()),
         (
             "step-rows.json",
-            json(&rows_view(steps_text(), "days_open", 7).expect("rows")),
+            json(&rows_view(&documents_of(steps_text()), 1, "days_open", 7).expect("rows")),
         ),
     ];
     for (file, returned) in &snapshots {

@@ -200,7 +200,7 @@ pub(crate) fn variants() -> RunView {
         },
     );
     rows_stage.lazy = false;
-    RunView::Run {
+    RunView {
         source: Vec::new(),
         steps: vec![
             variants,

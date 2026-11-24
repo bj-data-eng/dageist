@@ -1,17 +1,17 @@
 /**
- * @file Prepares what the engine reports of a run for display, and nothing
- * else: for each step of the editor the columns it is given and the columns
- * it gives, which of them it added, the dtype after the start of each chain
- * and after each method, whether the step stays lazy, and what is the matter
- * with it, on which word. Everything here is read off the report or off what
- * the translation noted; no rule about a dtype, a column or a value is worked
- * out in the view.
+ * @file Prepares what the engine reports of a run for display, and nothing else: for each step of
+ * the document the columns it is given and the columns it gives, which of them it added, the dtype
+ * after the start of each chain and after each method, whether the step stays lazy, and what is the
+ * matter with it, and where. The report and the document come from the host together, so the places
+ * in the report are places in the document the editor draws. Everything here is read off the report;
+ * no rule about a dtype, a column or a value is worked out in the view.
  */
 
 import type {
   CauseView,
   ColumnChangeView,
   CountView,
+  DocumentStepView,
   ErrorKind,
   OfferPlaceView,
   PlaceView,
@@ -22,40 +22,39 @@ import type {
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
-import type { Mark, SentStep, Translation } from './document';
-import { placeKey, segmentWord, wrongId } from './document';
+import type { Path } from './doc';
+import { pathKey } from './doc';
 import type { Frame } from './frame';
 import type { Outcome } from './latest';
-import { isRecord } from './shape';
-import type { Step } from './steps';
 import { valuesLine } from './values';
 
 /**
- * The dtype after the start of a chain and after each of its methods, and
- * where each method stands; `null` where the engine gives none.
+ * The dtype after the start of an expression and after each of its links, and where each link
+ * stands; `null` where the engine gives none.
  */
 export interface ChainDtypes {
+  /** The dtype after the start. */
   readonly source: string | null;
-  readonly methods: ReadonlyArray<string | null>;
+  /** The dtype after each link, in order. */
+  readonly links: ReadonlyArray<string | null>;
   /**
-   * The place of each method of the chain, then the place a method added at the
-   * end would have, as the engine's walk reports them: what each follows. `null`
-   * where the engine could not say. What may stand at a place is asked of the
-   * engine at it.
+   * The place of each link of the expression, then the place a link added at the end would have, as
+   * the engine's walk reports them: what each follows. `null` where the engine could not say. What
+   * may stand at a place is asked of the engine at it.
    */
   readonly places: ReadonlyArray<OfferPlaceView | null>;
 }
 
-/** What a step of the editor is, as far as anyone knows. */
+/** What a step is, as far as anyone knows. */
 export type StepStatus =
   /** The engine accepts it. */
   | 'valid'
-  /** It cannot be run: the engine refused it, or it cannot be written as a document yet. */
+  /** The engine refused it. */
   | 'refused'
+  /** It holds something still to be picked, so the engine walked it up to there and did not build it. */
+  | 'incomplete'
   /** A step before it cannot be run, so it was not. */
-  | 'notRun'
-  /** It is in the document, and the engine has not reported on it. */
-  | 'unknown';
+  | 'notRun';
 
 /** How many rows a step kept of those it was given, on the working window. */
 export interface RowsKept {
@@ -71,32 +70,27 @@ export interface PreparedStep {
   readonly before: Frame;
   /** The columns the step gives; those it is given when it cannot be run. */
   readonly after: Frame;
-  /**
-   * What the step works on in a few words, as the engine wrote it, or `null` where the engine
-   * has not written it of the step as it is: it is not in the document, or an edit has changed
-   * it since.
-   */
-  readonly summary: string | null;
+  /** What the step works on in a few words, as the engine wrote it. */
+  readonly summary: string;
   /** The columns the step added or replaced, as the engine reports them. */
   readonly changes: readonly ColumnChangeView[];
   /** How many rows the step kept of those it received, or `null` where the engine did not count them. */
   readonly rows: RowsKept | null;
   /** The first values of each column the step changed, by the column's name, each as one line of text. */
   readonly first: ReadonlyMap<string, string>;
-  /** Whether the step stays in a lazy plan, and `null` where the engine has not said. */
-  readonly lazy: boolean | null;
+  /** Whether the step stays in a lazy plan. */
+  readonly lazy: boolean;
   /** Why the engine could not run the step on the sample rows, in words, though it accepts the step, or `null`. */
   readonly rowsProblem: string | null;
   /** What is the matter with the step, in words, or `null`. */
   readonly problem: string | null;
-  /** The words of the editor that are the matter, as `wrongId` names them. */
-  readonly wrong: ReadonlySet<string>;
-  /** The dtypes of each chain of the step, by the chain's identifier. */
+  /** Where in the step the matter is, as a way from the step, or `null` where it is the whole step. */
+  readonly problemAt: Path | null;
+  /** The dtypes of each expression of the step, by the key of the way to it. */
   readonly chains: ReadonlyMap<string, ChainDtypes>;
   /**
-   * The parameters of the step and of its methods that are set to what Polars holds when they
-   * are not given, as the engine says, by `atDefaultKey`. None where the engine has not
-   * reported on the step as it is.
+   * The ways to the arguments of the step and of the calls inside it that are set to what Polars
+   * holds when they are not given, as the engine says, by key.
    */
   readonly atDefault: ReadonlySet<string>;
 }
@@ -105,86 +99,49 @@ export interface PreparedStep {
 export interface PreparedRun {
   /** The columns of the table the steps start from. */
   readonly source: Frame;
-  /** One for each step of the editor, in its order. */
+  /** One for each step of the document, in its order. */
   readonly steps: readonly PreparedStep[];
 }
-
-const NO_WORDS: ReadonlySet<string> = new Set();
-
-/** Returns what an option of the step or method `ownerId` named `parameter` is kept under in `atDefault`. */
-export function atDefaultKey(ownerId: string, parameter: string): string {
-  return `${ownerId}:${parameter}`;
-}
-const NO_CHAINS: ReadonlyMap<string, ChainDtypes> = new Map();
-const NO_FIRST: ReadonlyMap<string, string> = new Map();
 
 /** Returns the dtype a resolution gives, or `null` when it gives none. */
 function dtypeOf(resolution: ResolutionView | undefined): string | null {
   return resolution?.kind === 'dtype' ? resolution.dtype : null;
 }
 
+/** Returns the way a place names, from its step. */
+function wayOf(place: PlaceView): Path {
+  return place.path;
+}
+
 /**
- * Returns how the engine's expressions fall on the chains of the editor: the dtypes it built them
- * to, where it built them, and the places its walk reported for their links, which a step it
- * could not build, as one with a hole, still has.
+ * Returns what the engine reports of each expression of a step by the key of its way: the dtypes
+ * built, and the places its walk reported for the links, which a step it could not build, as one
+ * with a hole, still has.
  */
-function chainDtypes(report: StepReportView, sent: SentStep): ReadonlyMap<string, ChainDtypes> {
+function chainsOf(report: StepReportView): ReadonlyMap<string, ChainDtypes> {
   const found = new Map<string, ChainDtypes>();
-  for (const [key, owner] of sent.chains) {
-    const expression = report.expressions.find(
-      (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
-    );
-    // A join's `on` is walked twice, as a left key and as a right key, so the walk holds two
-    // expressions at its place, the left then the right; `find` reads the left.
-    const walked = report.walk.expressions.find(
-      (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
-    );
-    if (expression === undefined && walked === undefined) continue;
-    const { whenLinks, methodIds } = owner;
-    // A chain that starts from `when` has a dtype once its `otherwise` is there.
-    const source = whenLinks === 0 ? expression?.start : expression?.links[whenLinks - 1];
-    // The walk says where each link stands, from the first after the start; the methods are
-    // those after the links of a condition, and one more place follows them.
-    const places = walked?.places.slice(whenLinks) ?? [];
-    found.set(owner.chainId, {
-      source: dtypeOf(source),
-      methods: methodIds.map((_id, index) => dtypeOf(expression?.links[whenLinks + index])),
-      places: Array.from({ length: methodIds.length + 1 }, (_none, index) => places[index] ?? null),
+  for (const expression of report.expressions) {
+    found.set(pathKey(wayOf(expression.place)), {
+      source: dtypeOf(expression.start),
+      links: expression.links.map(dtypeOf),
+      places: [],
+    });
+  }
+  // A join's `on` is walked twice, as a left key and as a right key, so the walk holds two
+  // expressions at its place, the left then the right; the first is read.
+  const walked = new Set<string>();
+  for (const expression of report.walk.expressions) {
+    const key = pathKey(wayOf(expression.place));
+    if (walked.has(key)) continue;
+    walked.add(key);
+    const held = found.get(key);
+    found.set(key, {
+      source: held?.source ?? null,
+      links: held?.links ?? [],
+      places: expression.places,
     });
   }
   return found;
-}
-
-/** Returns the word of the editor a place of a step is, or `null` when no word is it. */
-function markAt(sent: SentStep, place: PlaceView): Mark | null {
-  const words = place.path.map(segmentWord);
-  // The longest place that stands for a word: a place deeper than one is in that word.
-  for (let length = words.length; length >= 0; length -= 1) {
-    const found = sent.marks.get(placeKey(words.slice(0, length)));
-    if (found !== undefined) return found;
-  }
-  return null;
-}
-
-/**
- * Returns which parameters of the step, and of the methods of its chains, the engine says are at
- * their default. A place that names a parameter of a call is read as the parameter of the step
- * where nothing comes before it, and of the method that the place before it marks.
- */
-function atDefaultOf(report: StepReportView, sent: SentStep, step: Step): ReadonlySet<string> {
-  const keys = new Set<string>();
-  for (const place of report.atDefault) {
-    const last = place.path.at(-1);
-    if (last?.kind !== 'parameter') continue;
-    const owner = place.path.slice(0, -1);
-    if (owner.length === 0) {
-      keys.add(atDefaultKey(step.id, last.name));
-      continue;
-    }
-    const mark = sent.marks.get(placeKey(owner.map(segmentWord)));
-    if (mark?.kind === 'method') keys.add(atDefaultKey(mark.methodId, last.name));
-  }
-  return keys;
 }
 
 /** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
@@ -214,7 +171,7 @@ function causeWords(cause: CauseView): string {
 function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first' | 'rowsProblem'> {
   switch (count.kind) {
     case 'notCounted':
-      return { rows: null, first: NO_FIRST, rowsProblem: null };
+      return { rows: null, first: new Map(), rowsProblem: null };
     case 'counted':
       return {
         rows: { received: count.received, kept: count.kept },
@@ -224,7 +181,7 @@ function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first' | 'rowsP
     case 'failed':
       return {
         rows: null,
-        first: NO_FIRST,
+        first: new Map(),
         rowsProblem: `Could not be run on the sample rows: ${firstParagraph(count.reason)}`,
       };
     default:
@@ -233,194 +190,96 @@ function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first' | 'rowsP
 }
 
 /** What is said of a step that has to wait for the step called `blockedBy`. */
-function waitingWords(steps: readonly Step[], blockedBy: string): string {
+function waitingWords(
+  steps: readonly DocumentStepView[],
+  blockedBy: string,
+  incomplete: boolean,
+): string {
   const at = steps.findIndex((step) => step.id === blockedBy);
-  return at < 0
-    ? 'Not run: a step before it cannot be run.'
-    : `Not run: step ${String(at + 1)} cannot be run yet.`;
+  const which = at < 0 ? 'a step before it' : `step ${String(at + 1)}`;
+  return incomplete
+    ? `Not run: ${which} still has something to be picked.`
+    : `Not run: ${which} was refused.`;
 }
 
-/** What the engine reported, and the document it was asked about. */
-export interface Answered {
-  /** The document's JSON text. */
-  readonly document: string;
-  readonly run: RunView;
-}
-
-/** Returns a step's report: what the engine said of it, found by the step's identifier. */
-function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
-  return run?.status === 'run'
-    ? new Map(run.steps.map((report) => [report.id, report]))
-    : new Map();
-}
-
-/** Returns each step of the document `text` as the JSON text `JSON.stringify` writes it. */
-function stepTexts(text: string): readonly string[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    // A text that is not JSON has no steps to compare with.
-    return [];
-  }
-  return isRecord(parsed) && Array.isArray(parsed.steps)
-    ? parsed.steps.map((step: unknown) => JSON.stringify(step))
-    : [];
-}
+/** What is said of a step with something still to be picked. */
+const STILL_TO_PICK = 'Something in this step is still to be picked.';
 
 /**
- * Prepares what the engine reported of the document `answered` for the editor's
- * `steps`, for display. `translation` is the document the steps are now: a
- * report is shown only for the steps that are still what it reported of. A step
- * that an edit has changed, and every step after it, whose columns may differ
- * now, is shown as waiting for the engine, with the columns the last step that
- * still corresponds gives. `answered` is `null` where the engine has not
- * reported; `source` is the columns of the table the steps start from.
- *
- * A text the engine could not read is not a report of steps. The first step
- * in the document is then the one refused, with the engine's reason, and the
- * steps after it are not run.
+ * Prepares what the engine reported of the document whose steps are `steps`, for display. The
+ * report is the host's of the very document, so each step's report is found by its place in the
+ * list.
  */
-export function prepareRun(
-  steps: readonly Step[],
-  translation: Translation,
-  answered: Answered | null,
-  source: Frame,
-): PreparedRun {
-  const run = answered?.run ?? null;
-  const reports = reportsById(run);
-  const unreadable =
-    run?.status === 'unreadable' && answered?.document === translation.text ? run.problem : null;
-  const answeredTexts = answered === null ? [] : stepTexts(answered.document);
-  let corresponds = true;
-  let sentSoFar = 0;
-  // The steps the engine said are incomplete, which the steps after them wait for.
-  const incomplete = new Set<string>();
+export function prepareRun(steps: readonly DocumentStepView[], run: RunView): PreparedRun {
+  const source: Frame = run.source;
   let before = source;
+  const incomplete = new Set<string>();
   const prepared: PreparedStep[] = [];
-  for (const [index, step] of steps.entries()) {
-    const found = translation.steps[index];
-    const make = (
-      status: StepStatus,
-      problem: string | null,
-      rest: Partial<PreparedStep> = {},
-    ): PreparedStep => ({
-      id: step.id,
-      status,
+  for (const [index, report] of run.steps.entries()) {
+    const base = {
+      id: report.id,
       before,
-      after: before,
-      summary: null,
-      changes: [],
-      rows: null,
-      first: NO_FIRST,
-      rowsProblem: null,
-      lazy: null,
-      problem,
-      wrong: NO_WORDS,
-      chains: NO_CHAINS,
-      atDefault: NO_WORDS,
-      ...rest,
-    });
+      summary: report.summary,
+      lazy: report.lazy,
+      chains: chainsOf(report),
+      atDefault: new Set(report.atDefault.map((place) => pathKey(wayOf(place)))),
+      ...countOf(report.count),
+    };
+    const { outcome } = report;
     let result: PreparedStep;
-    if (found === undefined) {
-      result = make('unknown', null);
-    } else if (found.kind === 'held') {
-      result = make('refused', found.problem.message, { wrong: new Set(found.problem.wrong) });
-    } else if (found.kind === 'waiting') {
-      result = make('notRun', waitingWords(steps, found.blockedBy));
-    } else if (unreadable !== null) {
-      // The reader names the step it stopped at; with no step, the first of the document.
-      const stoppedAt = unreadable.kind === 'refused' ? (unreadable.place.stepIndex ?? 0) : 0;
-      if (sentSoFar < stoppedAt) {
-        result = make('unknown', null);
-      } else if (sentSoFar === stoppedAt) {
-        result = make('refused', unreadable.reason);
-      } else {
-        result = make('notRun', 'Not run: a step before it cannot be read.');
-      }
-    } else {
-      // What was reported is of this step only while it and every step before it are as they were.
-      corresponds = corresponds && answeredTexts[sentSoFar] === found.canonical;
-      const report = corresponds ? reports.get(step.id) : undefined;
-      result =
-        report === undefined
-          ? make('unknown', null)
-          : fromReport(step, found, report, before, steps, incomplete);
-      if (report?.outcome.status === 'incomplete') incomplete.add(step.id);
+    switch (outcome.status) {
+      case 'valid':
+        result = {
+          ...base,
+          status: 'valid',
+          after: outcome.columns,
+          changes: outcome.changes,
+          problem: null,
+          problemAt: null,
+        };
+        break;
+      case 'refused':
+        result = {
+          ...base,
+          status: 'refused',
+          after: before,
+          changes: [],
+          problem: causeWords(outcome.cause),
+          problemAt: wayOf(outcome.place),
+        };
+        break;
+      case 'incomplete':
+        incomplete.add(report.id);
+        result = {
+          ...base,
+          status: 'incomplete',
+          after: before,
+          changes: [],
+          problem: STILL_TO_PICK,
+          problemAt: wayOf(outcome.place),
+        };
+        break;
+      case 'notRun':
+        result = {
+          ...base,
+          status: 'notRun',
+          after: before,
+          changes: [],
+          problem: waitingWords(
+            steps.slice(0, index),
+            outcome.blockedBy,
+            incomplete.has(outcome.blockedBy),
+          ),
+          problemAt: null,
+        };
+        break;
+      default:
+        return outcome satisfies never;
     }
-    if (found?.kind === 'sent') sentSoFar += 1;
     prepared.push(result);
     before = result.after;
   }
   return { source, steps: prepared };
-}
-
-/** Prepares one step from what the engine reported of it. */
-function fromReport(
-  step: Step,
-  sent: SentStep,
-  report: StepReportView,
-  before: Frame,
-  steps: readonly Step[],
-  incomplete: ReadonlySet<string>,
-): PreparedStep {
-  const base = {
-    id: step.id,
-    before,
-    summary: report.summary,
-    lazy: report.lazy,
-    chains: chainDtypes(report, sent),
-    atDefault: atDefaultOf(report, sent, step),
-    ...countOf(report.count),
-  };
-  const { outcome } = report;
-  switch (outcome.status) {
-    case 'valid':
-      return {
-        ...base,
-        status: 'valid',
-        after: outcome.columns,
-        changes: outcome.changes,
-        problem: null,
-        wrong: NO_WORDS,
-      };
-    case 'refused': {
-      const found = markAt(sent, outcome.place);
-      return {
-        ...base,
-        status: 'refused',
-        after: before,
-        changes: [],
-        problem: causeWords(outcome.cause),
-        wrong: found === null ? NO_WORDS : new Set([wrongId(found)]),
-      };
-    }
-    case 'incomplete': {
-      // The place of the hole says what the editor has not got yet, and on which word.
-      const hole = sent.holes.get(placeKey(outcome.place.path.map(segmentWord)));
-      return {
-        ...base,
-        status: 'refused',
-        after: before,
-        changes: [],
-        problem: hole?.message ?? 'Something in this step is still to be picked.',
-        wrong: hole === undefined ? NO_WORDS : new Set(hole.wrong),
-      };
-    }
-    case 'notRun':
-      return {
-        ...base,
-        status: 'notRun',
-        after: before,
-        changes: [],
-        problem: incomplete.has(outcome.blockedBy)
-          ? waitingWords(steps, outcome.blockedBy)
-          : 'Not run: a step before it was refused.',
-        wrong: NO_WORDS,
-      };
-    default:
-      return outcome satisfies never;
-  }
 }
 
 /** What the rows of a step show: the rows, or why there are none. */
@@ -447,8 +306,8 @@ export function rowsFailure(kind: ErrorKind, message: string, step: PreparedStep
       return step?.problem ?? 'This step was refused.';
     case 'limit':
       return 'There are more rows than a preview holds.';
-    case 'unreadable':
-      return 'The steps cannot be read yet.';
+    case 'stale':
+      return 'The steps changed; this will be asked again.';
     case 'unknownName':
     case 'failed':
       return message;
