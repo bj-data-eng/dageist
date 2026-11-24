@@ -386,7 +386,7 @@ fn a_run_that_hangs_at_its_first_case_after_a_resume_says_how_many_cases_it_coun
 
     let one = fresh("timeout-chain-one");
     std::fs::write(one.join("block"), hex(&whole.log[first])).unwrap();
-    let hung = run_child(&one, &[deadline.clone()]);
+    let hung = run_child(&one, std::slice::from_ref(&deadline));
     assert_eq!(hung.status, Some(TIMEOUT_STATUS), "{}", hung.said);
     logs.extend(hung.log.clone());
     let env = String::from_utf8(file_of(&one.join("kept"), "timeout.env").unwrap()).unwrap();
