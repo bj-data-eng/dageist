@@ -96,7 +96,8 @@ pub enum Limit {
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
     ///   made by a fill with a text literal after the call that counts, or of the numbers of a
-    ///   group cast or filled to text by the call before it, which read as the numbers, or of what
+    ///   group cast or filled to text by the first call, which a fill, a reverse, a sort, a drop
+    ///   of the nulls or one value picked may follow, and which read as the numbers, or of what
     ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -2967,7 +2968,11 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// follows it; and again with a column of the literal's own dtype, which a filter reads as a
 /// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
 /// join's keys read the column both tables hold, and other places the column `k`. The cut control
-/// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen.
+/// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
+/// column of the literal's own dtype is that of the first quantile that starts from a literal, for
+/// every one in the case: where the quantiles start from literals of other dtypes, a control made
+/// with the first one's column is refused for the others, and the excuse is not given, so the
+/// choice fails closed.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
@@ -5529,8 +5534,6 @@ mod tests {
                 );
             }
         }
-        // The text is the cast's only where it follows the values: another call between them, or
-        // before the cast, or another cast, is the sample's.
         // Calls that keep the text of the numbers, and take none away, may stand between the cast
         // and the conversion: a fill forward, a reverse, one of them picked.
         assert_eq!(
@@ -5596,6 +5599,9 @@ mod tests {
             refused_by_the_tables_at(&filled_dates, at_the_call(1), text),
             vec![]
         );
+        // The text is the cast's only where it follows the values and what stands between keeps each
+        // of them: a call before the cast, one between that changes the text, or another cast is
+        // the sample's.
         let numbers = Representative::Int8;
         let reversed = chain_after(
             numbers,
