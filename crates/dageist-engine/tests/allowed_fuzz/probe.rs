@@ -3169,6 +3169,42 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_of_a_filter_is_not_settled_as_the_predicate_of_a_condition_is() {
+        // `filter(a.dt.replace(day=g).is_null(), when(f).then(f).otherwise(f))`: the refusal asked
+        // about is the first predicate of the filter, which is no predicate of a condition and
+        // which Polars does not drop. The case where the values of the condition differ is refused
+        // for it, and allowed with it made `true`, which is not that Polars skips it.
+        let col = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.filter","arguments":{{"predicates":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.dt.replace","arguments":{{"day":{}}}}},{{"entry":"Expr.is_null","arguments":{{}}}}]}}}},{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{{"entry":"When.then","arguments":{{"statement":{}}}}},{{"entry":"Then.otherwise","arguments":{{"statement":{}}}}}]}}}}]}}}}}}}}]}}"#,
+            col("g"),
+            col("f"),
+            col("f"),
+            col("f"),
+        );
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0));
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "`round` operation not supported for dtype `bool` (expected: date/datetime)"
+                .to_owned(),
+            argument_unknown: false,
+        };
+        assert_eq!(settle_by_values_that_differ(&case, &refused), None);
+    }
+
+    #[test]
     fn a_predicate_is_not_settled_where_the_values_made_to_differ_are_not_refused_for_its_reason() {
         let case = kept("stricter-a-predicate-that-is-dropped.case");
         let refused = refusal(&case);
