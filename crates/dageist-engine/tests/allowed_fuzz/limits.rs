@@ -311,9 +311,12 @@ pub enum Limit {
     /// and so may a table with no rows, where the sum of nothing is a value for a root or a
     /// logarithm to give an infinity. Polars refusing the rows, the empty table's too, with a
     /// failed conversion that has no place, in a case with a strict `cast`, a test of closeness,
-    /// a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype
-    /// and no default: the case run again with each cast made not strict, each test a comparison,
-    /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
+    /// a fill by a value or of NaN, a difference where the failed conversion is of an unsigned
+    /// number to a signed one (it converts them to the dtype of its result, so a subtraction that
+    /// wraps to a number beyond it is refused), a count of characters, or a strict replacement
+    /// given a dtype and no default: the case run again with each cast made not strict, each test
+    /// a comparison, each fill and each such difference a fill forward, each count the whole
+    /// number 1 and each replacement not asked for
     /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
     /// when it works out the schema, so the refusal may be the schema's, and then it names the
     /// scalar the literal is, and the strict cast it is given to where it says where. A date made of
@@ -2198,6 +2201,18 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
     })
 }
 
+/// Whether the call is a difference, which converts unsigned numbers to the signed dtype of its
+/// result, strictly.
+fn is_a_difference(call: &Call) -> bool {
+    is(call, "Expr.diff")
+}
+
+/// Whether the reason is the failed conversion of an unsigned number to a signed dtype, as a
+/// difference makes where a subtraction wrapped to a number beyond it.
+fn is_an_unsigned_conversion_to_a_signed_one(reason: &str) -> bool {
+    reason.starts_with("conversion from `u") && reason.contains("` to `i")
+}
+
 /// Whether the call converts strictly, so that it refuses a value its dtype cannot hold: a `cast`
 /// that is neither told to wrap numbers that overflow nor to give a null where a value does not
 /// convert, a test of closeness and a fill by a value or of NaN, which convert what they meet to
@@ -2284,9 +2299,13 @@ fn without_counts(call: &Call) -> Option<Call> {
 /// The case with no strict cast: each gives a null where a value does not convert, a test of
 /// closeness is the comparison of what it compares and a fill by a value a fill forward, which
 /// convert nothing, a count of characters is the whole number 1, which converts without a failure,
-/// and a replacement is not asked for a dtype, which converts nothing.
-fn case_without_strict_casts(case: &Case) -> Option<Case> {
+/// and a replacement is not asked for a dtype, which converts nothing. Where `differences`, each
+/// difference is a fill forward too, which converts nothing.
+fn case_without_strict_casts(case: &Case, differences: bool) -> Option<Case> {
     case_changed(case, &|call| {
+        if differences && is_a_difference(call) {
+            return Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok();
+        }
         if !is_a_strict_cast(call) {
             return None;
         }
@@ -2315,8 +2334,11 @@ fn case_without_strict_casts(case: &Case) -> Option<Case> {
 /// Whether Polars refuses the case for a failed conversion still when no cast is strict: the
 /// cast is then no cause of it. Which of two failures of a plan Polars names depends on which
 /// thread gets there first, so the case is run again.
-fn refused_for_a_failed_conversion_without_strict_casts(case: &Case) -> Option<bool> {
-    changed(case_without_strict_casts(case), case).map(|control| {
+fn refused_for_a_failed_conversion_without_strict_casts(
+    case: &Case,
+    differences: bool,
+) -> Option<bool> {
+    changed(case_without_strict_casts(case, differences), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control).refusal.is_some_and(|refusal| {
                 unplaced(&refusal) && is_a_failed_conversion(&refusal.reason)
@@ -4877,10 +4899,17 @@ fn applies(
                         locate(case, place).call.is_some_and(is_a_strict_cast)
                     })))
                 && is_a_failed_conversion(&refusal.reason)
-                && held
-                    .iter()
-                    .any(|(_, held)| any_call(held, &is_a_strict_cast))
-                && refused_for_a_failed_conversion_without_strict_casts(case) == Some(false)
+                && {
+                    // A difference converts an unsigned number to a signed one, which the other
+                    // casts of the limit do not make of the failure.
+                    let differences = is_an_unsigned_conversion_to_a_signed_one(&refusal.reason);
+                    held.iter().any(|(_, held)| {
+                        any_call(held, &|call| {
+                            is_a_strict_cast(call) || (differences && is_a_difference(call))
+                        })
+                    }) && refused_for_a_failed_conversion_without_strict_casts(case, differences)
+                        == Some(false)
+                }
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -11874,7 +11903,7 @@ mod tests {
         // so it is no evidence that the call is not the cause, which is not a refusal either.
         let plain = select(vec![chain(column("a"), &["Expr.sqrt"])]);
         assert_eq!(
-            refused_for_a_failed_conversion_without_strict_casts(&plain),
+            refused_for_a_failed_conversion_without_strict_casts(&plain, false),
             None
         );
         assert_eq!(refused_for_lengths_without_drops(&plain), None);
