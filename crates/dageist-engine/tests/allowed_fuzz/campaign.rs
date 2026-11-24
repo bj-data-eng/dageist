@@ -384,13 +384,15 @@ fn keep<E: Evaluator>(
 
 /// What the run of the property is told: the number of cases, with the cases before the start that
 /// were not counted, how many cases it may draw again, and the seed.
-fn property_config(_target: &AllowedTarget, settings: &Settings) -> PropertyConfig {
+fn property_config(target: &AllowedTarget, settings: &Settings) -> PropertyConfig {
     let passed_over = settings.start - 1;
     let counted_before = settings.counted.unwrap_or(passed_over);
     PropertyConfig {
         cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
             .expect("the settings were checked"),
-        max_rejections: 1_000_000,
+        // The coverage the target declares allows as many, so the two cannot differ.
+        max_rejections: u32::try_from(target.descriptor().max_generation_rejections())
+            .expect("the target declares a bound that a run is told"),
         // Entropy is not the case: the owner's reduction works on the case.
         max_shrink_iterations: 0,
         seed: settings.seed,
