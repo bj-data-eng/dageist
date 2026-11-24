@@ -160,7 +160,8 @@ pub enum Limit {
     /// one. A comparison of a list with a `Boolean` is refused after none, one or
     /// two shifts of the sample and allowed after three. Nulls that Polars folds
     /// whatever the rows are, as those of a comparison with a null, are no matter
-    /// of the sample: a probe settles them.
+    /// of the sample: a probe settles them. A literal that holds a value is one value, where the
+    /// sample's columns hold three, so a shift that moves it away leaves a null.
     AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
@@ -1634,6 +1635,9 @@ fn rows_after(
         vec![Cell::Null]
     } else if let Some(made) = rows_made(frames, expression) {
         made
+    } else if starts_from_a_value_literal(expression) {
+        // A literal is one value, whatever the sample's rows are.
+        vec![Cell::Value]
     } else {
         (0..SAMPLE_ROWS)
             .map(|row| {
@@ -1761,6 +1765,17 @@ fn carried(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
             }
         })
         .collect()
+}
+
+/// Whether the chain starts from a literal that holds a value, a number, a text or a flag, and
+/// not a null.
+fn starts_from_a_value_literal(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+    if is(start, "polars.lit")
+        && matches!(
+            start.argument("value"),
+            Some(Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Flag(Some(_)))
+        ))
 }
 
 /// Whether `expression` is the null literal, which is one null that every row meets, filled for
