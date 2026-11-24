@@ -5548,6 +5548,91 @@ mod tests {
     }
 
     #[test]
+    fn the_text_of_numbers_in_a_pivot_is_excused_for_a_failed_conversion_of_text_and_no_other_reason()
+     {
+        // The gates for the text of a count and of the numbers of a group excuse the failed
+        // conversion of text, which reads as the numbers. The same chains refused for a conversion
+        // of another dtype, or for another objection, are no such text's.
+        let fill = || {
+            call(
+                "Expr.fill_null",
+                vec![(
+                    "value",
+                    Value::Expression(chain_of(text_of("1d"), Vec::new())),
+                )],
+            )
+        };
+        let counted = || {
+            pivot(chain_of(
+                call("polars.element", Vec::new()),
+                vec![
+                    call("Expr.count", Vec::new()),
+                    fill(),
+                    call("Expr.skew", Vec::new()),
+                ],
+            ))
+        };
+        let cast = || {
+            pivot_of(
+                Representative::Int8,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        cast_to(Representative::String, Vec::new()),
+                        call("Expr.skew", Vec::new()),
+                    ],
+                ),
+            )
+        };
+        let reasons = [
+            (
+                "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]",
+                vec![Limit::AGroupAggregate],
+            ),
+            (
+                "conversion from `str` to `i8` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]",
+                vec![Limit::AGroupAggregate],
+            ),
+            (
+                "conversion from `bool` to `f64` failed in column 'a' for 2 out of 3 values: [true, false]",
+                vec![],
+            ),
+            (
+                "conversion from `i64` to `f64` failed in column 'a' for 1 out of 3 values: [1]",
+                vec![],
+            ),
+            (
+                "invalid series dtype: expected `Boolean`, got `i8` for series with name `a`",
+                vec![],
+            ),
+            (
+                "the length of the values does not match that of the keys",
+                vec![],
+            ),
+        ];
+        for (reason, expected) in reasons {
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &counted(),
+                    at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                    reason
+                ),
+                expected,
+                "a count: {reason}"
+            );
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &cast(),
+                    at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                    reason
+                ),
+                expected,
+                "a cast: {reason}"
+            );
+        }
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_a_cast_of_what_a_column_of_nulls_is_compared_with() {
         // The values of a group of a column of the dtype Null are nulls, which a comparison leaves
         // null and a cast converts, where the tables measured the comparison of a column that holds
