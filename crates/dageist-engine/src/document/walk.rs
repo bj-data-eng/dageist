@@ -2428,6 +2428,33 @@ impl Walker<'_> {
             }
             Verdict::Allowed(allowance) => allowance,
         };
+        // Where the tables hold no lines for the class of a value the call follows or is given,
+        // the call stands and nothing is said of what it gives, or of what follows it.
+        if !allowance.is_judged() {
+            self.blind(format!(
+                "the tables do not judge {} of the dtypes it is given",
+                entry.id().as_str()
+            ));
+            *last_end = None;
+            let receiver = match &cur {
+                Cur::Value {
+                    shape,
+                    count,
+                    taken,
+                    ..
+                } => (*shape, *count, *taken),
+                _ => (Shape::Many, Count::NotKnown, Taken::default()),
+            };
+            return (
+                Cur::Value {
+                    dtype: None,
+                    shape: receiver.0,
+                    count: receiver.1,
+                    taken: receiver.2,
+                },
+                standing,
+            );
+        }
         // Polars refuses the rows of a replacement given values of other numbers than it takes,
         // which the shapes of the arguments say.
         if let Cur::Value { shape, .. } = &cur
@@ -2844,14 +2871,7 @@ fn meets_receiver(entry: &Entry, name: &str, operand: &Operand) -> bool {
 /// set, whole, so that it gives as many values as they.
 fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     if entry.id().as_str() == "Expr.is_in" && name == "other" {
-        return matches!(
-            operand.dtype,
-            Some(
-                Representative::ListOfInteger
-                    | Representative::ListOfString
-                    | Representative::Array
-            )
-        );
+        return operand.dtype.is_some_and(Representative::is_nested);
     }
     broadcasts(entry, name)
 }

@@ -87,7 +87,7 @@ fn dt_date_is_offered_after_a_datetime_and_refused_after_text_with_polars_reason
 #[test]
 fn cum_count_gives_a_uint32_whatever_it_counts() {
     // Polars documents `cum_count` as giving the row count so far in `UInt32`.
-    for dtype in Representative::ALL {
+    for dtype in Representative::MEASURED {
         let verdict = verdict("Expr.cum_count", &select_after(dtype), &[]);
         assert_eq!(result_of(&verdict), Some("UInt32"), "{dtype}: {verdict:?}");
         assert_eq!(

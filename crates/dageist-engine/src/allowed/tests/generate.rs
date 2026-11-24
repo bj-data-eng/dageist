@@ -10,7 +10,7 @@ use std::thread;
 use polars::prelude::{DataType, Expr, IntoLazy, LazyFrame};
 
 use crate::allowed::context::{Context, Nested, Outer};
-use crate::allowed::dtype::Representative;
+use crate::allowed::dtype::{Inner, Representative};
 use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
@@ -39,7 +39,7 @@ pub(super) struct Generated {
 
 /// Runs `work` on every item, on as many threads as the machine offers up to
 /// four, and gives the results in the order of the items.
-fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R + Sync) -> Vec<R> {
+pub(super) fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R + Sync) -> Vec<R> {
     let workers = thread::available_parallelism()
         .map_or(1, usize::from)
         .min(4);
@@ -220,13 +220,7 @@ fn argument_expression(
         // A null is the one value of the dtype Null, which no number casts to.
         null_of(&dtype.dtype())
     } else if (entry, parameter) == ("polars.repeat", "value")
-        && matches!(
-            dtype,
-            Representative::ListOfInteger
-                | Representative::ListOfString
-                | Representative::Array
-                | Representative::Struct
-        )
+        && (dtype.is_nested() || dtype == Representative::Struct)
     {
         // No number casts to a list, an array or a struct, and Polars repeats a value of each: the
         // first value of a column of the dtype is one value of it.
@@ -266,7 +260,7 @@ fn companions(
     let stands_in = |name: &'static str| argument_expression(entry, name, argument, scope);
     // The value that stands for what replaces the dtype of the receiver, or for its default.
     let value = || {
-        if receiver == Representative::Array && entry == "Expr.replace_strict" {
+        if matches!(receiver, Representative::Array(_)) && entry == "Expr.replace_strict" {
             expression(scope.partition())
         } else {
             own()
@@ -374,12 +368,12 @@ fn companions(
 // ---------------------------------------------------------------------------
 // The dtype table
 
-struct DtypeJob {
-    entry: &'static Entry,
-    parameter: Option<&'static str>,
+pub(super) struct DtypeJob {
+    pub(super) entry: &'static Entry,
+    pub(super) parameter: Option<&'static str>,
     /// The dtype of the value a method follows; none for a function that starts an expression.
-    receiver: Option<Representative>,
-    argument: Option<Representative>,
+    pub(super) receiver: Option<Representative>,
+    pub(super) argument: Option<Representative>,
 }
 
 /// Whether the entry is one the dtype table has lines for: a method, and a function that starts
@@ -393,6 +387,14 @@ fn has_dtype_lines(entry: &'static Entry) -> bool {
 }
 
 fn dtype_jobs() -> Vec<DtypeJob> {
+    dtype_jobs_over(|_| Representative::MEASURED.to_vec())
+}
+
+/// The jobs of the dtype table for the receivers, and the arguments, that `classes` gives for
+/// each entry.
+pub(super) fn dtype_jobs_over(
+    classes: impl Fn(&'static Entry) -> Vec<Representative>,
+) -> Vec<DtypeJob> {
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
@@ -400,7 +402,7 @@ fn dtype_jobs() -> Vec<DtypeJob> {
     {
         // A function has no receiver, and so one set of lines where a method has one for each.
         let receivers: Vec<Option<Representative>> = if entry.applies() == Applies::Expression {
-            Representative::ALL.into_iter().map(Some).collect()
+            classes(entry).into_iter().map(Some).collect()
         } else {
             vec![None]
         };
@@ -449,7 +451,7 @@ fn dtype_jobs() -> Vec<DtypeJob> {
                 entry.id().as_str()
             );
             for receiver in &receivers {
-                for argument in Representative::ALL {
+                for argument in classes(entry) {
                     jobs.push(DtypeJob {
                         entry,
                         parameter: Some(parameter.name()),
@@ -497,7 +499,7 @@ fn settled(entry: &Entry, options: &[(&str, &str)], outcome: Outcome) -> Outcome
     }
 }
 
-fn dtype_line(job: &DtypeJob) -> DtypeLine {
+pub(super) fn dtype_line(job: &DtypeJob) -> DtypeLine {
     // A function that starts an expression is measured on columns of the dtype of its argument,
     // beside a column of whole numbers.
     let receiver = job.receiver.unwrap_or(Representative::Int64);
@@ -535,7 +537,7 @@ fn dtype_line(job: &DtypeJob) -> DtypeLine {
     }
 }
 
-fn dtype_lines() -> Vec<DtypeLine> {
+pub(super) fn dtype_lines() -> Vec<DtypeLine> {
     in_parallel(&dtype_jobs(), dtype_line)
 }
 
@@ -573,16 +575,16 @@ impl DtypeIndex {
     fn list_candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
         let id = entry.id().as_str();
         let order = std::iter::once(Representative::Int64).chain(
-            Representative::ALL
+            Representative::MEASURED
                 .into_iter()
                 .filter(|dtype| *dtype != Representative::Int64),
         );
         order
             .filter_map(|receiver| {
                 [
-                    Representative::ListOfInteger,
-                    Representative::ListOfString,
-                    Representative::Array,
+                    Representative::List(Inner::Int64),
+                    Representative::List(Inner::String),
+                    Representative::Array(Inner::Int64),
                 ]
                 .into_iter()
                 .find_map(|argument| {
@@ -608,7 +610,7 @@ impl DtypeIndex {
     /// otherwise the first that does.
     fn candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
         let order = std::iter::once(Representative::Int64).chain(
-            Representative::ALL
+            Representative::MEASURED
                 .into_iter()
                 .filter(|dtype| *dtype != Representative::Int64),
         );
@@ -630,7 +632,7 @@ impl DtypeIndex {
             let mut arguments = Vec::new();
             for parameter in &required {
                 let tried = std::iter::once(receiver).chain(
-                    Representative::ALL
+                    Representative::MEASURED
                         .into_iter()
                         .filter(|dtype| *dtype != receiver),
                 );
@@ -662,10 +664,10 @@ impl DtypeIndex {
         // follow, for a context that needs one measures such a method where it gives one. They
         // come last, where the ones that fit best are still found first.
         if let [parameter] = required.as_slice() {
-            let booleans: Vec<Candidate> = Representative::ALL
+            let booleans: Vec<Candidate> = Representative::MEASURED
                 .into_iter()
                 .flat_map(|receiver| {
-                    Representative::ALL
+                    Representative::MEASURED
                         .into_iter()
                         .map(move |argument| (receiver, argument))
                 })
@@ -1098,7 +1100,7 @@ fn form_candidates_of(
         return index.list_candidates(entry);
     }
     let order = std::iter::once(Representative::Int64).chain(
-        Representative::ALL
+        Representative::MEASURED
             .into_iter()
             .filter(|dtype| *dtype != Representative::Int64),
     );
@@ -1526,7 +1528,7 @@ struct OptionParameter {
 
 /// The classes a document can hold as a dtype, which a parameter of a dtype takes as its words.
 fn dtype_classes() -> Vec<Representative> {
-    Representative::ALL
+    Representative::MEASURED
         .into_iter()
         .filter(|class| crate::document::Dtype::new(class.dtype()).is_ok())
         .collect()
@@ -1787,12 +1789,12 @@ fn option_lines(index: &DtypeIndex) -> Vec<OptionLine> {
         // takes expressions is measured on each dtype of its subject, as a count since 1970 is
         // read as a date for days and refused for a date in seconds.
         let candidates: Vec<Option<Candidate>> = if entry.applies() == Applies::Expression {
-            Representative::ALL
+            Representative::MEASURED
                 .into_iter()
                 .map(|receiver| Some(option_candidate(entry, receiver, index)))
                 .collect()
         } else if entry.applies() == Applies::Function {
-            Representative::ALL
+            Representative::MEASURED
                 .into_iter()
                 .map(|receiver| {
                     Some(Candidate {

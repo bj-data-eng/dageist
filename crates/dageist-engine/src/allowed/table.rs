@@ -723,10 +723,94 @@ pub(super) const LIST_FORM: (&str, &str) = ("other", "list");
 
 /// Whether a dtype is a list or an array, which `is_in` meets row by row.
 pub(super) const fn is_a_list(class: Representative) -> bool {
-    matches!(
-        class,
-        Representative::ListOfInteger | Representative::ListOfString | Representative::Array
-    )
+    class.is_nested()
+}
+
+/// How a class is read in the tables for an entry: the class whose lines say what the entry does
+/// of it, or none where the tables do not judge it.
+///
+/// The tables hold lines for every class the entry is measured on, which for an ordinary method
+/// is [`Representative::MEASURED`] and for a method of the `list` or the `arr` namespace every
+/// class. A list or an array of another element dtype has no lines of its own for an ordinary
+/// method, and is not judged: nothing is said of what the method does with it.
+pub(super) fn read_as(entry: &str, class: Representative) -> Option<Representative> {
+    (Representative::MEASURED.contains(&class) || !class.is_nested() || is_of_nested_dtypes(entry))
+        .then_some(class)
+}
+
+/// Whether the entry is a method of the `list` or the `arr` namespace, which the tables measure on
+/// every class: what it does depends on the element dtype.
+pub(super) fn is_of_nested_dtypes(entry: &str) -> bool {
+    entry.starts_with("Expr.list.") || entry.starts_with("Expr.arr.")
+}
+
+/// What a line of a table says, written for the class that was read in place of the one asked.
+///
+/// A result that is the class read is the class asked: a list of text that a method gives back is
+/// a list of `Float64` where the list that was asked is one.
+pub(super) fn restored(
+    outcome: &Outcome,
+    asked: &[Option<Representative>],
+    read: &[Option<Representative>],
+) -> Outcome {
+    let Outcome::Allowed(Some(produces)) = outcome else {
+        return outcome.clone();
+    };
+    for (asked, read) in asked.iter().zip(read) {
+        if let (Some(asked), Some(read)) = (asked, read)
+            && asked != read
+            && produces.result.name() == read.name()
+        {
+            return Outcome::Allowed(Some(Produces {
+                result: ResultDtype::from_name(asked.name()),
+                shape: produces.shape,
+            }));
+        }
+    }
+    outcome.clone()
+}
+
+/// What the dtype table says of a call, read for the classes it was asked of.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Looked {
+    /// The tables do not judge a class of the call: nothing is said of it.
+    NotJudged,
+    /// The tables hold no line for the call.
+    Missing,
+    /// The line, written for the classes asked.
+    Line(Outcome),
+}
+
+impl Tables {
+    /// What the dtype table says of `entry` with `parameter` given an argument of the class
+    /// `argument`, on a receiver of the class `receiver`: the line of the class that stands for
+    /// each where the tables hold none of its own, with a result written for the class asked.
+    pub(super) fn dtype(
+        &self,
+        entry: &'static str,
+        parameter: Option<&'static str>,
+        receiver: Option<Representative>,
+        argument: Option<Representative>,
+    ) -> Looked {
+        let read = |class: Option<Representative>| match class {
+            None => Some(None),
+            Some(class) => read_as(entry, class).map(Some),
+        };
+        let (Some(read_receiver), Some(read_argument)) = (read(receiver), read(argument)) else {
+            return Looked::NotJudged;
+        };
+        match self
+            .dtypes
+            .get(&(entry, parameter, read_receiver, read_argument))
+        {
+            None => Looked::Missing,
+            Some(outcome) => Looked::Line(restored(
+                outcome,
+                &[receiver, argument],
+                &[read_receiver, read_argument],
+            )),
+        }
+    }
 }
 
 /// The first expression parameter of a function that starts an expression, which what the

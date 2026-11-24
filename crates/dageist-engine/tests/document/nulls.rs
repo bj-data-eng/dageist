@@ -460,8 +460,11 @@ fn a_cast_gives_the_dtype_it_is_told_and_the_walk_follows_it() {
 
 #[test]
 fn a_cast_to_a_dtype_the_tables_do_not_cover_leaves_what_follows_not_known() {
-    // A list of floats is no representative dtype, so nothing is said of what a cast to it gives.
-    let cast = call("Expr.cast", json!({ "dtype": dtype("List(Float64)") }));
+    // A list of lists is no representative dtype, so nothing is said of what a cast to it gives.
+    let cast = call(
+        "Expr.cast",
+        json!({ "dtype": dtype("List(List(Float64))") }),
+    );
     let report = report_of(
         "LazyFrame.select",
         select(vec![field_then(

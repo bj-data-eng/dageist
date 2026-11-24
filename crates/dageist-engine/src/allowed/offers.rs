@@ -12,8 +12,8 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{
-    LIST_FORM, OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject,
-    is_a_list, is_method, subject_of,
+    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject,
+    is_a_list, is_method, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -394,6 +394,7 @@ pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
     ending: Ending,
+    judged: bool,
 }
 
 impl Allowance {
@@ -426,6 +427,14 @@ impl Allowance {
     #[must_use]
     pub const fn result(&self) -> Option<&ResultDtype> {
         self.result.as_ref()
+    }
+
+    /// Whether the tables judge the call: where they hold no lines for the class of a value it
+    /// follows or is given, the entry may stand, and nothing is said of what it gives or of
+    /// whether it may end where it stands.
+    #[must_use]
+    pub const fn is_judged(&self) -> bool {
+        self.judged
     }
 
     /// Whether the chain gives one value after the entry.
@@ -515,10 +524,21 @@ fn required_expressions(entry: &Entry) -> impl Iterator<Item = &'static str> {
         .map(catalog::Parameter::name)
 }
 
+/// The class whose lines of the tables are read for `class` in the entry `id`: none for a call
+/// that follows no value, and the outer none where the tables do not judge the class.
+fn read_as_of(id: &str, class: Option<Representative>) -> Option<Option<Representative>> {
+    match class {
+        None => Some(None),
+        Some(class) => read_as(id, class).map(Some),
+    }
+}
+
 /// What a method gives on the receiver it follows.
 struct Fit {
     result: Option<ResultDtype>,
     shape: Shape,
+    /// Whether the tables judge the call.
+    judged: bool,
 }
 
 impl Fit {
@@ -526,6 +546,16 @@ impl Fit {
         Self {
             result: produces.map(|produces| produces.result.clone()),
             shape: produces.map_or(Shape::Many, |produces| produces.shape),
+            judged: true,
+        }
+    }
+
+    /// What a call gives where the tables do not judge it: nothing is known of it.
+    const fn not_judged() -> Self {
+        Self {
+            result: None,
+            shape: Shape::Many,
+            judged: false,
         }
     }
 }
@@ -550,13 +580,15 @@ fn on_receiver(
         }
         None => Refusal::structure(format!("the tables hold nothing for {id}")),
     };
-    let line = |parameter: Option<&'static str>, argument: Option<Representative>| match tables
-        .dtypes
-        .get(&(id, parameter, receiver, argument))
-    {
-        None => Err(missing()),
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        Some(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
+    let line = |parameter: Option<&'static str>, argument: Option<Representative>| {
+        // The line of the class that stands for one the tables hold none for, or nothing said of
+        // a class they do not judge: the call is not refused.
+        match tables.dtype(id, parameter, receiver, argument) {
+            Looked::NotJudged => Ok(Fit::not_judged()),
+            Looked::Missing => Err(missing()),
+            Looked::Line(Outcome::Refused(reason)) => Err(Refusal::polars(&reason)),
+            Looked::Line(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
+        }
     };
     let mut fit = None;
     // What a chosen option is given in place of is not given, so the lines of the dtype table
@@ -584,6 +616,8 @@ fn on_receiver(
     if let Some(alone) = alone {
         fit = Some(alone?);
     }
+    let judged = given_fits.iter().all(|found| found.judged)
+        && fit.as_ref().is_none_or(|alone| alone.judged);
     if let Some(first) = given_fits.first() {
         let same_result = given_fits.iter().all(|found| found.result == first.result);
         let same_shape = given_fits.iter().all(|found| found.shape == first.shape);
@@ -594,6 +628,7 @@ fn on_receiver(
                 None
             },
             shape: if same_shape { first.shape } else { Shape::Many },
+            judged,
         });
     }
     for parameter in required {
@@ -602,7 +637,7 @@ fn on_receiver(
         }
         let mut refusal = None;
         let mut fitting: Vec<Fit> = Vec::new();
-        for argument in Representative::ALL {
+        for argument in Representative::MEASURED {
             match line(Some(parameter), Some(argument)) {
                 Ok(found) => fitting.push(found),
                 Err(error) => {
@@ -624,10 +659,11 @@ fn on_receiver(
                 None
             },
             shape: if same_shape { first.shape } else { Shape::Many },
+            judged,
         });
     }
     match fit {
-        Some(fit) => Ok(fit),
+        Some(fit) => Ok(Fit { judged, ..fit }),
         // The option table says what the call gives.
         None if !stood_in_for.is_empty() => Ok(Fit::of(None)),
         None => Err(missing()),
@@ -727,7 +763,10 @@ fn read_options(
             .iter()
             .any(|(chosen_name, chosen_word)| chosen_name == name && chosen_word == word)
     };
-    let mut gives: Vec<&Produces> = Vec::new();
+    let Some(read_receiver) = read_as_of(id, receiver) else {
+        return OptionsGive::Nothing;
+    };
+    let mut gives: Vec<Produces> = Vec::new();
     for ((line_id, line_receiver, line), outcome) in &tables.options {
         let bears = match changed.as_slice() {
             [] => false,
@@ -740,18 +779,19 @@ fn read_options(
             _ => line.len() > 1 && line.iter().all(is_chosen),
         };
         if *line_id == id
-            && *line_receiver == receiver
+            && *line_receiver == read_receiver
             && bears
-            && let Outcome::Allowed(Some(produces)) = outcome
+            && let Outcome::Allowed(Some(produces)) =
+                restored(outcome, &[receiver], &[read_receiver])
         {
             gives.push(produces);
         }
     }
-    let Some(first) = gives.first().copied() else {
+    let Some(first) = gives.first().cloned() else {
         return OptionsGive::Nothing;
     };
     if gives.iter().all(|produces| *produces == first) {
-        OptionsGive::Gives(first.clone())
+        OptionsGive::Gives(first)
     } else {
         OptionsGive::Unknown
     }
@@ -1006,6 +1046,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = function_gives.unwrap_or((None, Shape::Many));
+    let mut judged = true;
     if let (
         After::Value {
             dtype,
@@ -1016,6 +1057,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
+        judged = fit.judged;
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
         match read_options(entry, Some(dtype), chosen.options) {
@@ -1227,6 +1269,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         result,
         shape,
         ending,
+        judged,
     })
 }
 
@@ -1423,10 +1466,10 @@ pub fn argument_dtypes(
     Representative::ALL
         .into_iter()
         .filter_map(|argument| {
-            tables
-                .dtypes
-                .get(&(id, Some(parameter), Some(receiver), Some(argument)))
-                .map(|outcome| (argument, outcome.clone()))
+            match tables.dtype(id, Some(parameter), Some(receiver), Some(argument)) {
+                Looked::Line(outcome) => Some((argument, outcome)),
+                Looked::NotJudged | Looked::Missing => None,
+            }
         })
         .collect()
 }
@@ -1498,7 +1541,10 @@ fn check_conversions(entry: &Entry, chosen: &Chosen<'_>) -> Result<(), Refusal> 
             if lenient {
                 options.push(("strict", "false".to_owned()));
             }
-            let key = ("Expr.cast", Some(*class), options);
+            let Some(read_class) = read_as("Expr.cast", *class) else {
+                continue;
+            };
+            let key = ("Expr.cast", Some(read_class), options);
             if let Some(Outcome::Refused(reason)) = tables.options.get(&key) {
                 return Err(Refusal::polars(reason));
             }
@@ -1518,6 +1564,9 @@ fn alone_in_a_pair(
 ) -> Result<(), Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    let Some(receiver) = read_as_of(id, receiver) else {
+        return Ok(());
+    };
     let at_default = |(other, set): &(&str, String)| {
         entry
             .parameters()
@@ -1571,6 +1620,9 @@ fn check_options(
 ) -> Result<(), Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    let Some(receiver) = read_as_of(id, receiver) else {
+        return Ok(());
+    };
     let named: Vec<(&'static str, String)> = {
         let mut named = Vec::with_capacity(chosen.len());
         for (name, value) in chosen {

@@ -55,7 +55,7 @@ pub use candidates::{
 };
 pub use context::{Context, Nested, Outer, Position};
 pub use count::Count;
-pub use dtype::{Representative, ResultDtype, dtype_name};
+pub use dtype::{Inner, Representative, ResultDtype, dtype_name};
 pub use literal::Literal;
 pub(crate) use offers::same_for_any_number;
 pub use offers::{

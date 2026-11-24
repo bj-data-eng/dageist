@@ -8,7 +8,7 @@
 //! from a run.
 
 use dageist_engine::allowed::{
-    After, Count, Ending, RefusalSource, Representative, Rule, Shape, Stage,
+    After, Count, Ending, Inner, RefusalSource, Representative, Rule, Shape, Stage,
 };
 use dageist_engine::document::{Document, Inputs, Segment, Walk, WalkedExpression};
 use polars::prelude::*;
@@ -693,7 +693,7 @@ fn a_window_takes_no_count_unless_it_joins_the_values_of_a_group_or_explodes_the
     assert_eq!(joined.refusal(), None);
     assert_eq!(
         last_after(item(&joined, 0)),
-        after(Representative::ListOfInteger, Shape::Many)
+        after(Representative::List(Inner::Int64), Shape::Many)
     );
     let exploded = window(json!({
         "partition_by": many(vec![field("k")]),

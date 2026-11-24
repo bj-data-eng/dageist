@@ -294,7 +294,7 @@ fn dtype_value(class: Representative) -> Option<Value> {
 
 /// The classes a document can hold as a dtype, which a literal may be given.
 fn literal_classes() -> Vec<Representative> {
-    Representative::ALL
+    Representative::MEASURED
         .into_iter()
         .filter(|class| Dtype::new(class.dtype()).is_ok())
         .collect()
@@ -530,8 +530,8 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         return None;
     }
     let mut draw = Draw::new(bytes);
-    let receiver = draw.pick(&Representative::ALL);
-    let argument = draw.pick(&Representative::ALL);
+    let receiver = draw.pick(&Representative::MEASURED);
+    let argument = draw.pick(&Representative::MEASURED);
     let host = draw.weighted(&Host::ALL);
     // A campaign focused on steps draws one of them for most cases, and nothing more is drawn
     // for one that is focused on methods only.
