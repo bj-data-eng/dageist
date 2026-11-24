@@ -195,29 +195,45 @@ impl<E: Evaluator> CaseTarget for Observing<'_, E> {
             *self.tally.borrow_mut().entry(what).or_default() += count;
         }
         let failed = observation.outcome.failure_key().cloned();
-        if failed.is_some() || observation.outcome.is_evaluated() {
+        let counts = failed.is_some() || observation.outcome.is_evaluated();
+        let result = match failed {
+            None => Ok(observation.outcome),
+            Some(key) => {
+                // The disagreement is told of before it is reduced, since a replay in its
+                // reduction may be the case that does not end.
+                if let Some(watchdog) = self.watchdog {
+                    watchdog.reducing(number, &canonical, detail_of(&observation.outcome));
+                }
+                let finding = keep(
+                    self.target,
+                    self.evaluator,
+                    self.settings,
+                    self.watchdog,
+                    number,
+                    &canonical,
+                    &observation.outcome,
+                );
+                if let Some(watchdog) = self.watchdog {
+                    watchdog.reduced();
+                }
+                finding.and_then(|finding| {
+                    if let Some(watchdog) = self.watchdog {
+                        watchdog.found(finding.to_string());
+                    }
+                    self.findings.borrow_mut().push(finding);
+                    CaseOutcome::evaluated(vec![key.property().clone()])
+                })
+            }
+        };
+        // Counted only when the case is done with, so that a case that does not end while it
+        // is reduced is counted once, by the timer, as a case that did not end is.
+        if counts {
             self.counted.set(self.counted.get() + 1);
         }
         if let Some(watchdog) = self.watchdog {
             watchdog.counted(self.counted.get());
         }
-        let Some(key) = failed else {
-            return Ok(observation.outcome);
-        };
-        let finding = keep(
-            self.target,
-            self.evaluator,
-            self.settings,
-            self.watchdog,
-            number,
-            &canonical,
-            &observation.outcome,
-        )?;
-        if let Some(watchdog) = self.watchdog {
-            watchdog.found(finding.to_string());
-        }
-        self.findings.borrow_mut().push(finding);
-        CaseOutcome::evaluated(vec![key.property().clone()])
+        result
     }
 }
 
@@ -347,6 +363,9 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
             deadline,
         })
     });
+    if let Some(watchdog) = &watchdog {
+        watchdog.counted(counted_before);
+    }
     let observing = Observing {
         target: &target,
         evaluator,

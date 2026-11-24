@@ -38,11 +38,25 @@ struct Current {
     since: Instant,
 }
 
+/// A disagreement that is being reduced, as it was found.
+struct Reducing {
+    number: u64,
+    canonical: Vec<u8>,
+    detail: String,
+}
+
+/// The case in progress, and the last that ended, which a panic is put to when no case is.
+struct Timing {
+    current: Option<Current>,
+    last: Option<(u64, Vec<u8>)>,
+}
+
 struct Shared {
     context: Context,
-    current: Mutex<Option<Current>>,
+    timing: Mutex<Timing>,
     /// The last case in which a thread panicked: its number and its bytes.
     panicked: Mutex<Option<(u64, Vec<u8>)>>,
+    reducing: Mutex<Option<Reducing>>,
     /// What the campaign found so far, as it prints it.
     findings: Mutex<Vec<String>>,
     /// How many cases before the one in progress were counted.
@@ -67,7 +81,11 @@ impl Watchdog {
             (context.deadline / 4).clamp(Duration::from_millis(10), Duration::from_millis(200));
         let shared = Arc::new(Shared {
             context,
-            current: Mutex::new(None),
+            timing: Mutex::new(Timing {
+                current: None,
+                last: None,
+            }),
+            reducing: Mutex::new(None),
             panicked: Mutex::new(None),
             findings: Mutex::new(Vec::new()),
             counted: AtomicU64::new(0),
@@ -76,11 +94,28 @@ impl Watchdog {
         let noted = Arc::clone(&shared);
         let previous = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |information| {
-            if let Ok(current) = noted.current.try_lock()
-                && let Some(current) = current.as_ref()
-                && let Ok(mut panicked) = noted.panicked.try_lock()
-            {
-                *panicked = Some((current.number, current.canonical.clone()));
+            // A blocking lock could wait for a thread that is itself waiting on this one, so
+            // take it without blocking, and try again for a moment if the timer has it.
+            for _ in 0..100 {
+                if let Ok(timing) = noted.timing.try_lock() {
+                    let ran = timing
+                        .current
+                        .as_ref()
+                        .map(|current| (current.number, current.canonical.clone()))
+                        .or_else(|| timing.last.clone());
+                    drop(timing);
+                    if let Some(ran) = ran {
+                        for _ in 0..100 {
+                            if let Ok(mut panicked) = noted.panicked.try_lock() {
+                                *panicked = Some(ran);
+                                break;
+                            }
+                            std::thread::sleep(Duration::from_micros(100));
+                        }
+                    }
+                    break;
+                }
+                std::thread::sleep(Duration::from_micros(100));
             }
             previous(information);
         }));
@@ -90,7 +125,8 @@ impl Watchdog {
             .spawn(move || {
                 while !looking.stop.load(Ordering::Acquire) {
                     std::thread::sleep(poll);
-                    let late = locked(&looking.current)
+                    let late = locked(&looking.timing)
+                        .current
                         .as_ref()
                         .filter(|current| current.since.elapsed() >= looking.context.deadline)
                         .map(|current| (current.number, current.canonical.clone()));
@@ -108,7 +144,7 @@ impl Watchdog {
 
     /// The case `number`, written as `canonical`, begins.
     pub fn begin(&self, number: u64, canonical: &[u8]) {
-        *locked(&self.shared.current) = Some(Current {
+        locked(&self.shared.timing).current = Some(Current {
             number,
             canonical: canonical.to_vec(),
             since: Instant::now(),
@@ -117,7 +153,24 @@ impl Watchdog {
 
     /// The case in progress ends.
     pub fn end(&self) {
-        *locked(&self.shared.current) = None;
+        let mut timing = locked(&self.shared.timing);
+        if let Some(current) = timing.current.take() {
+            timing.last = Some((current.number, current.canonical));
+        }
+    }
+
+    /// The case `number`, written as `canonical`, disagreed in `detail`, and is being reduced.
+    pub fn reducing(&self, number: u64, canonical: &[u8], detail: String) {
+        *locked(&self.shared.reducing) = Some(Reducing {
+            number,
+            canonical: canonical.to_vec(),
+            detail,
+        });
+    }
+
+    /// The reduction ended, and what it came to is found.
+    pub fn reduced(&self) {
+        *locked(&self.shared.reducing) = None;
     }
 
     /// How many cases so far were counted towards the campaign's number of cases.
@@ -151,8 +204,23 @@ impl Drop for Watchdog {
 /// Keeps what is known, says it, and ends the process.
 fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
     let context = &shared.context;
+    let reducing = locked(&shared.reducing);
+    let reducing = reducing
+        .as_ref()
+        .filter(|reducing| reducing.number == number);
+    let (name, what) = if reducing.is_some() {
+        (
+            format!("{:016x}-{number}-reduction-timeout.case", context.seed),
+            format!("a replay in the reduction of the case {number}"),
+        )
+    } else {
+        (
+            format!("{:016x}-{number}-timeout.case", context.seed),
+            format!("the case {number}"),
+        )
+    };
     let mut said = format!(
-        "the case {number} did not end in {} ms\n",
+        "{what} did not end in {} ms\n",
         context.deadline.as_millis()
     );
     let keep = |name: String, bytes: &[u8]| -> String {
@@ -165,11 +233,8 @@ fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
             Err(error) => format!("not kept: {error}"),
         }
     };
-    let kept = keep(
-        format!("{:016x}-{number}-timeout.case", context.seed),
-        canonical,
-    );
-    said.push_str(&format!("the case {number} is {kept}\n"));
+    let kept = keep(name, canonical);
+    said.push_str(&format!("{what} is {kept}\n"));
     match locked(&shared.panicked).as_ref() {
         Some((earlier, bytes)) => {
             let kept = keep(
@@ -188,10 +253,23 @@ fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
         None => said.push_str("no thread panicked in any case before it\n"),
     }
     let findings = locked(&shared.findings);
-    said.push_str(&format!("findings so far: {}\n", findings.len()));
+    said.push_str(&format!(
+        "findings so far: {}\n",
+        findings.len() + usize::from(reducing.is_some())
+    ));
     for finding in findings.iter() {
         said.push_str(finding);
         said.push('\n');
+    }
+    if let Some(reducing) = reducing {
+        let kept = keep(
+            format!("{:016x}-{number}-unreduced.case", context.seed),
+            &reducing.canonical,
+        );
+        said.push_str(&format!(
+            "the case {number} disagrees, not reduced, {kept}: {}\n",
+            reducing.detail
+        ));
     }
     if let Some(directory) = &context.keep {
         let settings = format!(
