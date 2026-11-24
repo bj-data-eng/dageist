@@ -11109,6 +11109,53 @@ mod tests {
     }
 
     #[test]
+    fn a_part_of_a_length_of_time_that_the_rows_decide_is_excused_like_a_part_of_a_date() {
+        // `duration(days=a.not_())` of an unsigned `a`: the part is the bitwise complement of the
+        // rows, a number beyond the signed dtype that the length of time converts it to, where the
+        // tables measured values every dtype holds.
+        let not_held = "conversion from `u64` to `i64` failed in column 'a' for 1 out of 1 values: [18446744073709551614]";
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-length-of-time.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        let lasting = |days: Expression| {
+            select(vec![chain_of(
+                call("polars.duration", vec![("days", Value::Expression(days))]),
+                Vec::new(),
+            )])
+        };
+        assert_eq!(
+            refused_for_a_bound(
+                &lasting(chain(column("k"), &["Expr.not_"])),
+                None,
+                Stage::Rows,
+                not_held
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        // A part that is the number 1 already: the control is the case itself.
+        assert_eq!(
+            refused_for_a_bound(&lasting(whole(1)), None, Stage::Rows, not_held),
+            vec![]
+        );
+        // A length of time given no part has none to convert.
+        assert_eq!(
+            refused_for_a_bound(
+                &select(vec![chain_of(
+                    call("polars.duration", Vec::new()),
+                    Vec::new()
+                )]),
+                None,
+                Stage::Rows,
+                not_held
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_part_is_not_excused_where_the_number_1_is_refused_too_nor_at_a_place_nor_for_another_reason()
      {
         // Each part is already the number 1: the control is the case itself, which shows nothing.
