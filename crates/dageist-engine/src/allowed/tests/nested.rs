@@ -262,3 +262,41 @@ fn a_refusal_read_from_the_class_that_stands_for_a_list_names_the_dtype_that_was
         );
     }
 }
+
+#[test]
+fn a_method_that_depends_on_the_element_is_refused_by_a_rule_after_a_class_it_is_not_measured_on() {
+    use crate::allowed::offers::{After, Chosen, Place, RefusalSource, Verdict, offer};
+    use crate::allowed::table::{SENSITIVE, measured_classes};
+    use crate::allowed::{Context, Outer, Shape};
+    let mut allowed = Vec::new();
+    for id in SENSITIVE {
+        let entry = crate::catalog::entry(id).expect("an entry");
+        for class in Representative::ALL
+            .into_iter()
+            .filter(|class| class.is_nested() && !measured_classes(id).contains(class))
+        {
+            let place = Place::new(
+                Context::step(Outer::Select),
+                After::Value {
+                    dtype: class,
+                    shape: Shape::Many,
+                },
+            );
+            // Polars is not asked of what the tables do not measure, and may panic on it: the
+            // call is refused, and not allowed with nothing said of it.
+            let by_a_rule = matches!(
+                offer(entry, &place, &Chosen::default()),
+                Verdict::Refused(refusal) if matches!(refusal.source(), RefusalSource::Rule(_))
+            );
+            if !by_a_rule {
+                allowed.push(format!("{id} after {class}"));
+            }
+        }
+    }
+    assert!(
+        allowed.is_empty(),
+        "{} calls follow a class they are not measured on without a rule that refuses them: {:?}",
+        allowed.len(),
+        &allowed[..allowed.len().min(12)]
+    );
+}

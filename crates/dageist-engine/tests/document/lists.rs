@@ -21,7 +21,7 @@ use dageist_engine::allowed::{
 };
 use dageist_engine::catalog;
 use dageist_engine::document::{
-    Document, Inputs, Outcome, Report, Resolution, Segment, StepId, StepRows,
+    Document, Inputs, Outcome, Report, Resolution, RunCause, Segment, StepId, StepRows,
 };
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -888,4 +888,64 @@ fn the_walk_names_the_classes_of_the_columns_by_the_tables() {
     for beyond in BEYOND {
         assert_eq!(classes[beyond], None, "{beyond} is beyond one level");
     }
+}
+
+/// A call of a method whose answer depends on the element, after a list or an array that the tables
+/// are not measured on for it, is not run: Polars panics on some of them, as it does on `diff` of an
+/// array of `Null` and on arithmetic of a list of `Null` with a null or a `true`.
+#[test]
+fn a_call_the_tables_do_not_measure_is_refused_before_polars_is_asked() {
+    let flag = |value: Option<bool>| {
+        chain(
+            call("polars.lit", json!({ "value": { "flag": value } })),
+            vec![],
+        )
+    };
+    let mut reached = Vec::new();
+    let mut asked = 0;
+    for class in [
+        Representative::List(Inner::Null),
+        Representative::Array(Inner::Null),
+        Representative::List(Inner::Time),
+        Representative::Array(Inner::Duration),
+    ] {
+        let column = column_of(class);
+        let mut calls = vec![("diff".to_owned(), call("Expr.diff", json!({})))];
+        for method in ["add", "sub", "mul", "floordiv", "mod"] {
+            for (name, other) in [("null", flag(None)), ("true", flag(Some(true)))] {
+                calls.push((
+                    format!("{method} {name}"),
+                    call(&format!("Expr.{method}"), json!({ "other": other })),
+                ));
+            }
+        }
+        for (label, link) in calls {
+            asked += 1;
+            let held = chain(col_call(&column), vec![link]);
+            let document = Document::read(&document(vec![step(
+                "s",
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![held]) }),
+            )]))
+            .expect("a document");
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                document.run_on(&inputs(), &frame())
+            }));
+            let refused_before_polars = matches!(
+                &ran,
+                Ok(Ok(report)) if matches!(
+                    report.steps()[0].outcome(),
+                    Outcome::Refused(refusal) if matches!(refusal.cause(), RunCause::NotAllowed(_))
+                )
+            );
+            if !refused_before_polars {
+                reached.push(format!("{column} {label}"));
+            }
+        }
+    }
+    assert!(
+        reached.is_empty(),
+        "{} of {asked} calls are not refused before Polars is asked: {reached:?}",
+        reached.len()
+    );
 }
