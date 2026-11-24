@@ -291,14 +291,22 @@ function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
           const joined = findTable(node, picked);
           const first = joined?.columns[0]?.name;
           // The keys belonged to the old table, so start from the new table's first field: two
-          // edits, one after the other.
-          void edits.setArgument([parameterSegment('other')], { kind: 'table', name: picked });
-          if (first !== undefined) {
-            void edits.setArgument(
-              [parameterSegment('right_on')],
-              listArgument([fieldArgument(first)]),
-            );
-          }
+          // edits, the second made only if the first was.
+          void edits.together((make) => {
+            const picking = make.setArgument([parameterSegment('other')], {
+              kind: 'table',
+              name: picked,
+            });
+            return first === undefined
+              ? [picking]
+              : [
+                  picking,
+                  make.setArgument(
+                    [parameterSegment('right_on')],
+                    listArgument([fieldArgument(first)]),
+                  ),
+                ];
+          });
         }}
       />
       <Word>on</Word>

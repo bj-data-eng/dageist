@@ -27,34 +27,19 @@ import type {
   FrameRequest,
   Host,
   PlaceRequest,
-  ProblemView,
   StartRequest,
   ValueRequest,
 } from '@dageist/host';
-import { HostError } from '@dageist/host';
 
+import type { Action, Session, Sent } from './editSession';
+import { createSession } from './editSession';
 import type { Path, StepAt } from './model/doc';
 import { placeOf } from './model/doc';
 
 /** The topic the windows tell each other that the document changed on. */
 const TOPIC = 'document';
 
-/** What an edit came to, for the part of the editor that sent it. */
-export type Sent =
-  /** The edit was made, and this is the document it gave. */
-  | { readonly status: 'edited'; readonly state: DocumentStateView }
-  /** The engine refused it, for this kind of reason, which the editor may decide on. */
-  | {
-      readonly status: 'refused';
-      readonly problem: ProblemView;
-      readonly message: string;
-    }
-  /** The document had changed since the edit was made, and has been asked for again. */
-  | { readonly status: 'stale' }
-  /** The host could not be asked. */
-  | { readonly status: 'failed'; readonly reason: string };
-
-/** What the editor holds of the document, and how it sends an edit. */
+/** What the editor holds of the document, and how it sends an action. */
 export interface Editor {
   /** The document, its revision and its report, or `null` until the host has sent them. */
   readonly state: DocumentStateView | null;
@@ -64,104 +49,78 @@ export interface Editor {
   readonly notice: string | null;
   /** Forgets the notice. */
   readonly dismiss: () => void;
-  /** Sends an edit against the revision the document is at when its turn comes. */
-  readonly send: (edit: EditRequest) => Promise<Sent>;
+  /**
+   * Makes the edits of one action, the first against `drawn`, the revision of the document the
+   * person saw, and each after it against what the one before gave.
+   */
+  readonly act: (drawn: number | null, edits: Action) => Promise<Sent>;
 }
 
-/** Returns what an error says, in words. */
+/** What went wrong, in words. */
 function wordsOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const NOT_LOADED: Sent = { status: 'failed', reason: 'The steps are not loaded yet.' };
+
 /**
  * Holds the node's document for one window: asks the host for it, asks again when another window
- * says it changed it, and sends edits in order.
+ * says it changed it, and sends the person's actions in order.
  */
 export function useEditor(host: Host): Editor {
   const [state, setState] = useState<DocumentStateView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The revision the next edit is made against, which is the newest one this window has seen.
-  const revision = useRef<number | null>(null);
-  // The edits wait their turn here, so that each is made against what the one before it gave.
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const live = useRef(true);
-
-  const hold = useCallback((held: DocumentStateView): void => {
-    if (!live.current || (revision.current !== null && held.revision < revision.current)) return;
-    revision.current = held.revision;
-    setState(held);
-    setFailure(null);
-  }, []);
-
-  const load = useCallback(async (): Promise<void> => {
-    try {
-      hold(await host.nodeDocument());
-    } catch (error) {
-      if (live.current) setFailure(wordsOf(error));
-    }
-  }, [host, hold]);
+  const session = useRef<Session | null>(null);
 
   useEffect(() => {
-    live.current = true;
-    revision.current = null;
-    void load();
+    const made = createSession(
+      {
+        load: async () => host.nodeDocument(),
+        edit: async (revision, edit) => host.editDocument(revision, edit),
+      },
+      {
+        held: setState,
+        failure: setFailure,
+        notice: setNotice,
+        edited: (revision) => {
+          host.broadcast(TOPIC, { revision });
+        },
+      },
+    );
+    session.current = made;
+    void made.load();
     const stop = host.listen(TOPIC, (message) => {
       const said =
         typeof message === 'object' && message !== null && 'revision' in message
           ? message.revision
           : null;
-      if (typeof said === 'number' && said > (revision.current ?? 0)) void load();
+      if (typeof said === 'number') made.heard(said);
     });
     return () => {
-      live.current = false;
+      made.close();
+      session.current = null;
       stop();
     };
-  }, [host, load]);
+  }, [host]);
 
-  const send = useCallback(
-    (edit: EditRequest): Promise<Sent> => {
-      const run = async (): Promise<Sent> => {
-        const against = revision.current;
-        if (against === null) return { status: 'failed', reason: 'The steps are not loaded yet.' };
-        try {
-          const answer = await host.editDocument(against, edit);
-          if (answer.status === 'edited') {
-            hold(answer);
-            host.broadcast(TOPIC, { revision: answer.revision });
-            return { status: 'edited', state: answer };
-          }
-          // An option that starts with nothing is not a mistake: the editor asks for its value.
-          if (live.current && answer.problem.kind !== 'needsValue') setNotice(answer.message);
-          return { status: 'refused', problem: answer.problem, message: answer.message };
-        } catch (error) {
-          if (error instanceof HostError && error.kind === 'stale') {
-            if (live.current) {
-              setNotice(
-                'The steps were changed in another window, so this was not done. Try again.',
-              );
-            }
-            await load();
-            return { status: 'stale' };
-          }
-          if (live.current) setNotice(wordsOf(error));
-          return { status: 'failed', reason: wordsOf(error) };
-        }
-      };
-      const next = queue.current.then(run, run);
-      queue.current = next;
-      return next;
-    },
-    [host, hold, load],
-  );
+  const act = useCallback(async (drawn: number | null, edits: Action): Promise<Sent> => {
+    const open = session.current;
+    if (open === null) return NOT_LOADED;
+    try {
+      return await open.act(drawn, edits);
+    } catch (error) {
+      return { status: 'failed', reason: wordsOf(error) };
+    }
+  }, []);
 
   const dismiss = useCallback(() => {
     setNotice(null);
   }, []);
 
   return useMemo(
-    () => ({ state, failure, notice, dismiss, send }),
-    [state, failure, notice, dismiss, send],
+    () => ({ state, failure, notice, dismiss, act }),
+    [state, failure, notice, dismiss, act],
   );
 }
 
@@ -199,91 +158,156 @@ export interface ListEdits {
   readonly moveStep: (step: StepAt, to: number) => Promise<Sent>;
 }
 
-/** Returns the edits of the list of steps. */
+/**
+ * Returns the edits of the list of steps. Each is made against the revision of the document this
+ * render draws, which is the one the person acted on.
+ */
 export function useListEdits(): ListEdits {
-  const { send } = useEditorHandle();
+  const { act, state } = useEditorHandle();
+  const drawn = state?.revision ?? null;
   return useMemo(
     () => ({
-      addStep: async (at, entry, frame) => send({ kind: 'addStep', at, entry, frame }),
+      addStep: async (at, entry, frame) => act(drawn, [{ kind: 'addStep', at, entry, frame }]),
       swapStep: async (step, entry, frame) =>
-        send({ kind: 'swapStep', step: placeOf(step, []), entry, frame }),
-      removeStep: async (step) => send({ kind: 'removeStep', step: placeOf(step, []) }),
-      moveStep: async (step, to) => send({ kind: 'moveStep', step: placeOf(step, []), to }),
+        act(drawn, [{ kind: 'swapStep', step: placeOf(step, []), entry, frame }]),
+      removeStep: async (step) => act(drawn, [{ kind: 'removeStep', step: placeOf(step, []) }]),
+      moveStep: async (step, to) => act(drawn, [{ kind: 'moveStep', step: placeOf(step, []), to }]),
     }),
-    [send],
+    [act, drawn],
   );
 }
 
-/** The edits inside the step being drawn, which name a place by the way down from the step. */
-export interface StepEdits {
-  readonly setArgument: (path: Path, value: ValueRequest) => Promise<Sent>;
-  readonly clearArgument: (path: Path) => Promise<Sent>;
+/** The edits inside one step as the requests that make them; a place is the way down from the step. */
+export interface StepRequests {
+  readonly setArgument: (path: Path, value: ValueRequest) => EditRequest;
+  readonly clearArgument: (path: Path) => EditRequest;
   /** Adds the option `parameter` of the call at `path`, started as the engine starts it. */
-  readonly addOption: (path: Path, parameter: string) => Promise<Sent>;
+  readonly addOption: (path: Path, parameter: string) => EditRequest;
   /** Sets the value of `parameter` for the `item`th of the keys it follows. */
   readonly setForItem: (
     path: Path,
     parameter: string,
     item: number,
     value: ValueRequest,
-  ) => Promise<Sent>;
-  readonly insertItem: (path: Path, at: number, item: ValueRequest) => Promise<Sent>;
-  readonly removeItem: (path: Path) => Promise<Sent>;
+  ) => EditRequest;
+  readonly insertItem: (path: Path, at: number, item: ValueRequest) => EditRequest;
+  readonly removeItem: (path: Path) => EditRequest;
   /** Puts a new test, which the engine starts, into the list at `path`. */
-  readonly insertTest: (path: Path, at: number) => Promise<Sent>;
+  readonly insertTest: (path: Path, at: number) => EditRequest;
   readonly insertEntry: (
     path: Path,
     at: number,
     key: ValueRequest,
     value: ValueRequest,
-  ) => Promise<Sent>;
-  readonly removeEntry: (path: Path) => Promise<Sent>;
-  readonly setStart: (path: Path, start: StartRequest) => Promise<Sent>;
-  readonly startWith: (path: Path, entry: string) => Promise<Sent>;
+  ) => EditRequest;
+  readonly removeEntry: (path: Path) => EditRequest;
+  readonly setStart: (path: Path, start: StartRequest) => EditRequest;
+  readonly startWith: (path: Path, entry: string) => EditRequest;
   readonly insertLink: (
     path: Path,
     at: number,
     entry: string,
     standing: PlaceRequest | null,
-  ) => Promise<Sent>;
-  readonly swapLink: (path: Path, entry: string, standing: PlaceRequest | null) => Promise<Sent>;
-  readonly removeLink: (path: Path) => Promise<Sent>;
-  readonly moveLink: (path: Path, to: number) => Promise<Sent>;
+  ) => EditRequest;
+  readonly swapLink: (path: Path, entry: string, standing: PlaceRequest | null) => EditRequest;
+  readonly removeLink: (path: Path) => EditRequest;
+  readonly moveLink: (path: Path, to: number) => EditRequest;
 }
 
-/** Returns the edits of the step being drawn. */
-export function useStepEdits(): StepEdits {
-  const { send } = useEditorHandle();
-  const step = useStepAt();
-  const at = step;
-  return useMemo(
-    () => ({
-      setArgument: async (path, value) =>
-        send({ kind: 'setArgument', place: placeOf(at, path), value }),
-      clearArgument: async (path) => send({ kind: 'clearArgument', place: placeOf(at, path) }),
-      addOption: async (path, parameter) =>
-        send({ kind: 'addOption', call: placeOf(at, path), parameter }),
-      setForItem: async (path, parameter, item, value) =>
-        send({ kind: 'setForItem', call: placeOf(at, path), parameter, item, value }),
-      insertItem: async (path, index, item) =>
-        send({ kind: 'insertItem', list: placeOf(at, path), at: index, item }),
-      removeItem: async (path) => send({ kind: 'removeItem', item: placeOf(at, path) }),
-      insertTest: async (path, index) =>
-        send({ kind: 'insertTest', list: placeOf(at, path), at: index }),
-      insertEntry: async (path, index, key, value) =>
-        send({ kind: 'insertEntry', pairs: placeOf(at, path), at: index, key, value }),
-      removeEntry: async (path) => send({ kind: 'removeEntry', entry: placeOf(at, path) }),
-      setStart: async (path, start) =>
-        send({ kind: 'setStart', expression: placeOf(at, path), start }),
-      startWith: async (path, entry) =>
-        send({ kind: 'startWith', expression: placeOf(at, path), entry }),
-      insertLink: async (path, index, entry, standing) =>
-        send({ kind: 'insertLink', expression: placeOf(at, path), at: index, entry, standing }),
-      swapLink: async (path, entry, standing) =>
-        send({ kind: 'swapLink', link: placeOf(at, path), entry, standing }),
-      removeLink: async (path) => send({ kind: 'removeLink', link: placeOf(at, path) }),
-      moveLink: async (path, to) => send({ kind: 'moveLink', link: placeOf(at, path), to }),
+/** Returns the requests of the edits inside the step `at`. */
+function requestsOf(at: StepAt): StepRequests {
+  return {
+    setArgument: (path, value) => ({ kind: 'setArgument', place: placeOf(at, path), value }),
+    clearArgument: (path) => ({ kind: 'clearArgument', place: placeOf(at, path) }),
+    addOption: (path, parameter) => ({ kind: 'addOption', call: placeOf(at, path), parameter }),
+    setForItem: (path, parameter, item, value) => ({
+      kind: 'setForItem',
+      call: placeOf(at, path),
+      parameter,
+      item,
+      value,
     }),
-    [send, at],
-  );
+    insertItem: (path, index, item) => ({
+      kind: 'insertItem',
+      list: placeOf(at, path),
+      at: index,
+      item,
+    }),
+    removeItem: (path) => ({ kind: 'removeItem', item: placeOf(at, path) }),
+    insertTest: (path, index) => ({ kind: 'insertTest', list: placeOf(at, path), at: index }),
+    insertEntry: (path, index, key, value) => ({
+      kind: 'insertEntry',
+      pairs: placeOf(at, path),
+      at: index,
+      key,
+      value,
+    }),
+    removeEntry: (path) => ({ kind: 'removeEntry', entry: placeOf(at, path) }),
+    setStart: (path, start) => ({ kind: 'setStart', expression: placeOf(at, path), start }),
+    startWith: (path, entry) => ({ kind: 'startWith', expression: placeOf(at, path), entry }),
+    insertLink: (path, index, entry, standing) => ({
+      kind: 'insertLink',
+      expression: placeOf(at, path),
+      at: index,
+      entry,
+      standing,
+    }),
+    swapLink: (path, entry, standing) => ({
+      kind: 'swapLink',
+      link: placeOf(at, path),
+      entry,
+      standing,
+    }),
+    removeLink: (path) => ({ kind: 'removeLink', link: placeOf(at, path) }),
+    moveLink: (path, to) => ({ kind: 'moveLink', link: placeOf(at, path), to }),
+  };
+}
+
+/** The edits of the step being drawn, each one action of the person. */
+export type StepEdits = {
+  readonly [Name in keyof StepRequests]: StepRequests[Name] extends (
+    ...given: infer Given
+  ) => EditRequest
+    ? (...given: Given) => Promise<Sent>
+    : never;
+} & {
+  /**
+   * Makes several edits as one action, each against the revision the one before gave, and stops at
+   * the first that does not go through.
+   */
+  readonly together: (build: (requests: StepRequests) => Action) => Promise<Sent>;
+};
+
+/**
+ * Returns the edits of the step being drawn. Each is made against the revision of the document this
+ * render draws, which is the one the person acted on.
+ */
+export function useStepEdits(): StepEdits {
+  const { act, state } = useEditorHandle();
+  const step = useStepAt();
+  const drawn = state?.revision ?? null;
+  return useMemo(() => {
+    const make = requestsOf(step);
+    return {
+      setArgument: async (path, value) => act(drawn, [make.setArgument(path, value)]),
+      clearArgument: async (path) => act(drawn, [make.clearArgument(path)]),
+      addOption: async (path, parameter) => act(drawn, [make.addOption(path, parameter)]),
+      setForItem: async (path, parameter, item, value) =>
+        act(drawn, [make.setForItem(path, parameter, item, value)]),
+      insertItem: async (path, index, item) => act(drawn, [make.insertItem(path, index, item)]),
+      removeItem: async (path) => act(drawn, [make.removeItem(path)]),
+      insertTest: async (path, index) => act(drawn, [make.insertTest(path, index)]),
+      insertEntry: async (path, index, key, value) =>
+        act(drawn, [make.insertEntry(path, index, key, value)]),
+      removeEntry: async (path) => act(drawn, [make.removeEntry(path)]),
+      setStart: async (path, start) => act(drawn, [make.setStart(path, start)]),
+      startWith: async (path, entry) => act(drawn, [make.startWith(path, entry)]),
+      insertLink: async (path, index, entry, standing) =>
+        act(drawn, [make.insertLink(path, index, entry, standing)]),
+      swapLink: async (path, entry, standing) => act(drawn, [make.swapLink(path, entry, standing)]),
+      removeLink: async (path) => act(drawn, [make.removeLink(path)]),
+      moveLink: async (path, to) => act(drawn, [make.moveLink(path, to)]),
+      together: async (build) => act(drawn, build(make)),
+    };
+  }, [act, drawn, step]);
 }

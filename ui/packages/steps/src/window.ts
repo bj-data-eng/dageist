@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { DocumentStepView, Host } from '@dageist/host';
 
 import type { Drafts } from './drafts';
-import { useDraftStore } from './drafts';
+import { stillWanted, useDraftStore } from './drafts';
 import type { Editor } from './editor';
 import { useEditor } from './editor';
 import type { RowsState } from './engine';
@@ -51,12 +51,13 @@ export function useEditorWindow(host: Host, role: Role): EditorWindow {
   const revision = state?.revision ?? null;
   const lastIndex = useRef(0);
 
-  // What is half done belongs to the document it was begun on.
+  // What is half done stays until its place is gone from the document or it is given its value, so
+  // that a change another window makes elsewhere does not take away what the person has begun.
+  const { retain } = drafts;
+  const document = state?.document ?? null;
   useEffect(() => {
-    drafts.reset();
-    // The drafts are the editor's own, and changing the document is what ends them.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [revision]);
+    if (document !== null) retain((draft) => stillWanted(document, draft));
+  }, [document, retain]);
 
   // A chosen step that is gone is replaced by the step in its place, and none chosen is the first.
   useEffect(() => {

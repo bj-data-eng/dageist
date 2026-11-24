@@ -828,14 +828,26 @@ starts it. What the engine says the document is arrives as a tree of calls whose
 numbers are the words the engine shows them as, which `ui/packages/host` decodes
 and refuses where it has the wrong shape.
 
-A window sends its edits one after another, each against the revision the one before
-gave, so an action that is several edits, such as a join's table and then its right
-keys, is sent in order. Another window learns of an edit from a message on the
-`document` topic that names the revision, and asks for the document again; which
-step is chosen travels on a topic of its own. What is not yet an edit stays in the
-window as a draft: an option, an item of a list or an entry of a pair that has no
-value is not in the document until it has one, and the document never holds a part
-that is only half made. The functions that remain in
+An edit is made against the revision of the document the person saw when they did it,
+not the newest one the window holds, because the places in it are built from what was
+drawn: against a newer document they would land on a step the person never saw, and the
+host answers it as stale. An action that is several edits, such as a join's table and then
+its right keys, is one action: its edits are sent in order, each against the revision the
+one before gave, and it stops at the first that is refused or stale, so no later edit goes
+against a document it was not made for. The queue, the revisions and the loading of the
+document are plain TypeScript in
+[ui/packages/steps/src/editSession.ts](../ui/packages/steps/src/editSession.ts), tested
+with a stand-in for the host. The document the host gives on being asked is the window's
+whatever its revision, since a host that has been restarted is at a lower one; only an
+answer that a later request has overtaken is dropped. Another window learns of an edit
+from a message on the `document` topic that names the revision, and asks for the document
+again; which step is chosen travels on a topic of its own. What is not yet an edit stays in
+the window as a draft: an option, an item of a list or an entry of a pair that has no value
+is not in the document until it has one, and the document never holds a part that is only
+half made. A draft belongs to the parameter it would give a value to, and stays through
+changes elsewhere in the document until that step or call is gone, the document gives the
+parameter, or the person gives it its value.
+The functions that remain in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/doc.ts) read the
 document's shapes, such as which step is a sort, which expression is a test or a
 `when`, and prepare the report for display; they are plain TypeScript with no React,

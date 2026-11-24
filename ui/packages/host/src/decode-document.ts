@@ -33,7 +33,14 @@ import {
 } from './decode';
 import { readPlace, readRun } from './decode-run';
 
-const readArgument: Decode<ArgumentView> = (value, path) => readArgumentTagged(value, path);
+/** The reader of arguments by their kind, built the first time one is read. */
+let argumentReader: Decode<ArgumentView> | null = null;
+
+/** Reads an argument. An argument holds arguments, so this is a function and not a table. */
+function readArgument(value: unknown, path: string): ArgumentView {
+  argumentReader ??= readArgumentTagged();
+  return argumentReader(value, path);
+}
 
 const readCall: Decode<CallView> = readRecord(['entry', 'arguments'], (fields, path) => ({
   entry: readField(fields, path, 'entry', readString),
@@ -64,8 +71,8 @@ const readPairsEntry: Decode<PairsEntryView> = readRecord(['key', 'value'], (fie
   value: readField(fields, path, 'value', readArgument),
 }));
 
-/** Reads an argument by its kind. A function, because an argument holds arguments. */
-function readArgumentTagged(held: unknown, where: string): ArgumentView {
+/** Returns the reader of an argument by its kind. */
+function readArgumentTagged(): Decode<ArgumentView> {
   return readTagged<ArgumentView>('kind', {
     expression: {
       fields: ['start', 'links'],
@@ -170,7 +177,7 @@ function readArgumentTagged(held: unknown, where: string): ArgumentView {
         items: readField(fields, path, 'items', readList(readArgument)),
       }),
     },
-  })(held, where);
+  });
 }
 
 const readDocumentStep: Decode<DocumentStepView> = readRecord(['id', 'call'], (fields, path) => ({

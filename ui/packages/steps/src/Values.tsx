@@ -412,7 +412,10 @@ export function ConditionBlocks({
     fresh.mark(`${step.id}:${pathKey(under(path, itemSegment(at)))}`);
     if (argument === undefined) {
       // The list is not in the document yet, so it is made first, and the test goes into it.
-      void edits.setArgument(path, listArgument([])).then(() => edits.insertTest(path, at));
+      void edits.together((make) => [
+        make.setArgument(path, listArgument([])),
+        make.insertTest(path, at),
+      ]);
     } else {
       void edits.insertTest(path, at);
     }

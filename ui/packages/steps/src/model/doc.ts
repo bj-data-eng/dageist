@@ -109,6 +109,58 @@ export function stepNamed(
   return step === undefined ? null : { step, index };
 }
 
+/** What a way through a step reaches on its way: a call, or an argument. */
+type Reached =
+  | { readonly kind: 'call'; readonly call: CallView }
+  | { readonly kind: 'argument'; readonly argument: ArgumentView };
+
+/** Returns what `segment` reaches from `from`, or `null` where there is nothing of that kind. */
+function reach(from: Reached, segment: SegmentView): Reached | null {
+  if (from.kind === 'call') {
+    if (segment.kind !== 'parameter') return null;
+    const argument = givenOf(from.call, segment.name);
+    return argument === undefined ? null : { kind: 'argument', argument };
+  }
+  const { argument } = from;
+  switch (segment.kind) {
+    case 'item': {
+      const item = argument.kind === 'many' ? argument.items[segment.index] : undefined;
+      return item === undefined ? null : { kind: 'argument', argument: item };
+    }
+    case 'key':
+    case 'value': {
+      const entry = argument.kind === 'pairs' ? argument.entries[segment.index] : undefined;
+      if (entry === undefined) return null;
+      return { kind: 'argument', argument: segment.kind === 'key' ? entry.key : entry.value };
+    }
+    case 'start': {
+      const call = argument.kind === 'expression' ? startCall(argument.start) : null;
+      return call === null ? null : { kind: 'call', call };
+    }
+    case 'link': {
+      const link = argument.kind === 'expression' ? argument.links[segment.index] : undefined;
+      return link === undefined ? null : { kind: 'call', call: link };
+    }
+    case 'parameter':
+      return null;
+    default:
+      return segment satisfies never;
+  }
+}
+
+/**
+ * Returns the call that the way `path` from the call `from` reaches, or `null` where the document
+ * has nothing there or what is there is not a call. The empty way is `from` itself.
+ */
+export function callAt(from: CallView, path: Path): CallView | null {
+  let reached: Reached | null = { kind: 'call', call: from };
+  for (const segment of path) {
+    if (reached === null) return null;
+    reached = reach(reached, segment);
+  }
+  return reached?.kind === 'call' ? reached.call : null;
+}
+
 /** An expression, as the document holds it. */
 export type ExpressionView = Extract<ArgumentView, { readonly kind: 'expression' }>;
 

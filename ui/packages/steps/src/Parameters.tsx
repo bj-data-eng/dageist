@@ -839,7 +839,7 @@ function ManyDrawing({ parameter, argument, path, around }: ListProps): React.JS
             if (argument === undefined) void edits.setArgument(path, listArgument([HOLE]));
             else void edits.insertItem(path, items.length, HOLE);
           } else {
-            drafts.set(draftAt, { kind: 'item' });
+            drafts.set(draftAt, { kind: 'item', place: { step: step.id, path } });
           }
         }}
       />
@@ -865,7 +865,7 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
   const send = (key: ValueRequest | null, value: ValueRequest | null): void => {
     const held = value ?? (canBeLeftUnpicked(kind.value) ? HOLE : null);
     if (key === null || held === null) {
-      drafts.set(draftAt, { kind: 'entry', key, value });
+      drafts.set(draftAt, { kind: 'entry', key, value, place: { step: step.id, path } });
       return;
     }
     drafts.clear(draftAt);
@@ -965,7 +965,12 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
         describedAs={`Add one to ${parameter.shown}`}
         onPress={() => {
           fresh.mark(freshKey(step.id, under(path, keySegment(entries.length))));
-          drafts.set(draftAt, { kind: 'entry', key: null, value: null });
+          drafts.set(draftAt, {
+            kind: 'entry',
+            key: null,
+            value: null,
+            place: { step: step.id, path },
+          });
         }}
       />
     </>
@@ -1285,7 +1290,7 @@ export function useOptionToggle(
     fresh.mark(freshKey(step.id, path));
     void edits.addOption(callPath, parameter.name).then((sent) => {
       if (sent.status === 'refused' && sent.problem.kind === 'needsValue') {
-        drafts.set(draftAt, { kind: 'option' });
+        drafts.set(draftAt, { kind: 'option', place: { step: step.id, path } });
       }
     });
   };
