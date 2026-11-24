@@ -456,7 +456,7 @@ pub enum Limit {
     /// which has no place, in a case with a condition that holds in a value or in a later predicate
     /// a chain that starts from a literal, or from a function that makes a date, a time, a moment or
     /// a length of time and reads no column, and takes an approximate quantile: the case run again
-    /// with each such start a column is not refused for it.
+    /// with each such start a column is allowed.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -2850,10 +2850,10 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
-/// Whether Polars refuses the case for a null quantile still when the receiver of each
-/// approximate quantile that starts from literals alone is the column `k`: the literals are then
-/// no cause.
-fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
+/// Whether Polars refuses the case, for any reason, still when the receiver of each approximate
+/// quantile that starts from literals alone is the column `k`: the literals are then no cause, or
+/// not shown to be. `Some(false)` is a control that is allowed every time it runs.
+fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let rebuilt = Step::new(
         step.id().clone(),
@@ -2865,13 +2865,8 @@ fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
         argument: case.argument,
         document: Document::new(vec![rebuilt]).ok()?,
     };
-    changed(Some(control), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control)
-                .refusal
-                .is_some_and(|refusal| refusal.reason.contains(A_NULL_QUANTILE))
-        })
-    })
+    changed(Some(control), case)
+        .map(|control| (0..RUNS).any(|_| observe(&control).refusal.is_some()))
 }
 
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
@@ -4048,7 +4043,7 @@ fn applies(
                 && held.iter().any(|(_, held)| {
                     holds_in_a_branch(held, &is_an_approximate_quantile_of_literals)
                 })
-                && refused_for_a_null_quantile_with_columns(case) == Some(false)
+                && refused_with_columns_for_a_quantile(case) == Some(false)
         }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
             // The unit is the cause where Polars stops refusing the conversion once each cast is to
