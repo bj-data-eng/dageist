@@ -131,7 +131,7 @@ describe('an action made on the document a window drew', () => {
     expect(record.loads).toBe(1);
     expect(record.held).toEqual([2]);
     expect(record.notices).toEqual([
-      'The steps were changed in another window, so this was not done. Try again.',
+      'The steps changed since you did this, so it was not done. Try again.',
     ]);
   });
 
@@ -239,6 +239,15 @@ describe('an action that is several edits', () => {
     expect(sent).toEqual({ status: 'failed', reason: 'no network' });
     expect(record.asked).toHaveLength(1);
     expect(record.notices).toEqual(['no network']);
+  });
+
+  it('asks for the document again after the host could not be asked, since what was drawn may be old', async () => {
+    const { session, record } = sessionOver([new Error('no network')], [at(4)]);
+
+    await session.act(1, [REMOVE]);
+
+    expect(record.loads).toBe(1);
+    expect(record.held).toEqual([4]);
   });
 });
 
