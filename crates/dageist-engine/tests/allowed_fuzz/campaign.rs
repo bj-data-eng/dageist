@@ -22,6 +22,7 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::Focus;
 use super::target::{AllowedTarget, Tally, take_counts, tally_lines};
+use super::watchdog::{Context, Watchdog};
 
 /// What evaluating one case came to.
 pub struct Observation {
@@ -69,6 +70,14 @@ pub struct Settings {
     /// Where evidence is kept.
     pub keep: PathBuf,
     pub reduction: ReductionLimits,
+    /// How long a case may take before the campaign ends, if it is timed.
+    pub deadline: Option<Duration>,
+    /// The number of the first case that is evaluated, from 1: the cases before it are made
+    /// and passed over, so that the cases from it on are those of a run that began at 1.
+    pub start: u64,
+    /// How many of the cases before `start` were counted towards `cases` in that run, if
+    /// it is known, and all of them if it is not.
+    pub counted: Option<u64>,
 }
 
 impl Settings {
@@ -80,6 +89,9 @@ impl Settings {
             keep,
             reduction: ReductionLimits::new(400, Duration::from_secs(600), 1 << 24, 2)
                 .expect("limits of a reduction"),
+            deadline: None,
+            start: 1,
+            counted: None,
         }
     }
 }
@@ -138,8 +150,11 @@ struct Observing<'a, E> {
     target: &'a AllowedTarget,
     evaluator: &'a E,
     settings: &'a Settings,
-    /// How many cases were evaluated.
+    /// How many cases were made.
     cases: Cell<u64>,
+    /// How many of them were counted towards the campaign's number of cases.
+    counted: Cell<u64>,
+    watchdog: Option<&'a Watchdog>,
     tally: RefCell<Tally>,
     findings: RefCell<Vec<Finding>>,
 }
@@ -164,25 +179,58 @@ impl<E: Evaluator> CaseTarget for Observing<'_, E> {
     }
 
     fn evaluate(&self, case: &Case) -> Result<CaseOutcome> {
+        let number = self.cases.get() + 1;
+        self.cases.set(number);
+        if number < self.settings.start {
+            // Passed over: the runner is told the case was checked, as it was in the run that
+            // is gone on from, so that it makes the cases after it.
+            let property = self.target.descriptor().properties()[0].clone();
+            return CaseOutcome::evaluated(vec![property]);
+        }
         let canonical = self.target.encode(case)?;
-        let observation = self.evaluator.observe(&canonical, Duration::MAX)?;
+        let observation = timed(self.watchdog, number, &canonical, || {
+            self.evaluator.observe(&canonical, Duration::MAX)
+        })?;
         for (what, count) in observation.tally {
             *self.tally.borrow_mut().entry(what).or_default() += count;
         }
-        self.cases.set(self.cases.get() + 1);
-        let Some(key) = observation.outcome.failure_key() else {
+        let failed = observation.outcome.failure_key().cloned();
+        if failed.is_some() || observation.outcome.is_evaluated() {
+            self.counted.set(self.counted.get() + 1);
+        }
+        if let Some(watchdog) = self.watchdog {
+            watchdog.counted(self.counted.get());
+        }
+        let Some(key) = failed else {
             return Ok(observation.outcome);
         };
         let finding = keep(
             self.target,
             self.evaluator,
             self.settings,
-            self.cases.get(),
+            self.watchdog,
+            number,
             &canonical,
             &observation.outcome,
         )?;
+        if let Some(watchdog) = self.watchdog {
+            watchdog.found(finding.to_string());
+        }
         self.findings.borrow_mut().push(finding);
         CaseOutcome::evaluated(vec![key.property().clone()])
+    }
+}
+
+/// Runs `work` as the case `number` written as `canonical`, timed if there is a timer.
+fn timed<T>(
+    watchdog: Option<&Watchdog>,
+    number: u64,
+    canonical: &[u8],
+    work: impl FnOnce() -> T,
+) -> T {
+    match watchdog {
+        Some(watchdog) => watchdog.timing(number, canonical, work),
+        None => work(),
     }
 }
 
@@ -213,6 +261,7 @@ fn keep<E: Evaluator>(
     target: &AllowedTarget,
     evaluator: &E,
     settings: &Settings,
+    watchdog: Option<&Watchdog>,
     ordinal: u64,
     canonical: &[u8],
     first: &CaseOutcome,
@@ -225,7 +274,9 @@ fn keep<E: Evaluator>(
         settings.reduction,
         &AtomicBool::new(false),
         |input, budget| {
-            let observation = evaluator.observe(input, budget.remaining_time)?;
+            let observation = timed(watchdog, ordinal, input, || {
+                evaluator.observe(input, budget.remaining_time)
+            })?;
             Ok(ReductionEvaluation::new(
                 observation.outcome,
                 observation.output_bytes,
@@ -264,8 +315,12 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     // read, so a case that is made from entropy of up to this many bytes runs out of it about as
     // seldom as one did of 512 when each draw was one byte.
     let strategy = property::bytes(1024, target.descriptor().limits());
+    // The cases before `start` are made and counted again as they were, so the runner has that
+    // many more to make before it has the number of cases that are left.
+    let passed_over = settings.start.saturating_sub(1);
+    let counted_before = settings.counted.unwrap_or(passed_over).min(passed_over);
     let config = PropertyConfig {
-        cases: settings.cases,
+        cases: settings.cases + u32::try_from(passed_over - counted_before).expect("a case number"),
         max_rejections: 1_000_000,
         // Entropy is not the case: the owner's reduction works on the case.
         max_shrink_iterations: 0,
@@ -285,11 +340,20 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
             )
         })
     };
+    let watchdog = settings.deadline.map(|deadline| {
+        Watchdog::start(Context {
+            seed: settings.seed,
+            keep: Some(settings.keep.clone()),
+            deadline,
+        })
+    });
     let observing = Observing {
         target: &target,
         evaluator,
         settings,
         cases: Cell::new(0),
+        counted: Cell::new(counted_before),
+        watchdog: watchdog.as_ref(),
         tally: RefCell::new(Tally::new()),
         findings: RefCell::new(Vec::new()),
     };

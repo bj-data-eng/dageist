@@ -29,6 +29,7 @@ mod probe;
 mod reduce;
 mod target;
 mod timeout;
+mod watchdog;
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -45,6 +46,10 @@ use target::AllowedTarget;
 /// The seed and size of the run that goes with the engine's tests.
 const SEED: u64 = 0x00d4_6e15_7a11_0001;
 const CASES: u32 = 1000;
+
+/// How long a case of a campaign is given, in milliseconds, unless `DAGEIST_FUZZ_DEADLINE_MS`
+/// says another. A case that has not ended by then ends the campaign.
+const DEADLINE_MS: u64 = 15_000;
 
 /// Where kept evidence of a disagreement is written, unless a directory is
 /// named by `DAGEIST_FUZZ_KEEP`.
@@ -123,8 +128,15 @@ fn assert_no_findings(report: &Report) {
     }
 }
 
+/// How long a case of a campaign is given: `DAGEIST_FUZZ_DEADLINE_MS` milliseconds.
+fn env_deadline() -> std::time::Duration {
+    std::time::Duration::from_millis(env_number("DAGEIST_FUZZ_DEADLINE_MS", DEADLINE_MS))
+}
+
 /// A longer run: `DAGEIST_FUZZ_CASES` cases from `DAGEIST_FUZZ_SEED`, focused on the
-/// methods `DAGEIST_FUZZ_FOCUS` names, if it names any.
+/// methods `DAGEIST_FUZZ_FOCUS` names, if it names any, each given `DAGEIST_FUZZ_DEADLINE_MS`
+/// milliseconds. It goes on from the case `DAGEIST_FUZZ_START`, with `DAGEIST_FUZZ_COUNTED`
+/// of the cases before it counted, which is what a run that a case did not end says.
 #[test]
 #[ignore = "a campaign, run on request with DAGEIST_FUZZ_CASES, DAGEIST_FUZZ_SEED and DAGEIST_FUZZ_FOCUS"]
 fn a_campaign() {
@@ -138,10 +150,13 @@ fn a_campaign() {
     let started = Instant::now();
     let report = on_a_large_stack(|| {
         let target = AllowedTarget::new();
-        campaign::run(
-            &Settings::new(seed, cases, focus, keep_directory()),
-            &InProcess::new(&target),
-        )
+        let mut settings = Settings::new(seed, cases, focus, keep_directory());
+        settings.deadline = Some(env_deadline());
+        settings.start = env_number("DAGEIST_FUZZ_START", 1);
+        settings.counted = std::env::var("DAGEIST_FUZZ_COUNTED")
+            .ok()
+            .and_then(|text| text.trim().parse().ok());
+        campaign::run(&settings, &InProcess::new(&target))
     });
     eprintln!(
         "{cases} cases of seed {seed:#x}{focused} took {:.1?}\n{}",
@@ -151,18 +166,34 @@ fn a_campaign() {
     assert_no_findings(&report);
 }
 
-/// Replays the case in the file `DAGEIST_FUZZ_REPLAY` names.
+/// Runs `work` on the case written as `bytes`, which ends the process with the status of a
+/// campaign whose case did not end if it takes longer than `deadline`.
+fn replayed_in_time<T>(bytes: &[u8], deadline: std::time::Duration, work: impl FnOnce() -> T) -> T {
+    let watchdog = watchdog::Watchdog::start(watchdog::Context {
+        seed: 0,
+        keep: None,
+        deadline,
+    });
+    watchdog.timing(1, bytes, work)
+}
+
+/// Replays the case in the file `DAGEIST_FUZZ_REPLAY` names, as long as
+/// `DAGEIST_FUZZ_DEADLINE_MS` allows a case.
 #[test]
 #[ignore = "replays one kept case, named by DAGEIST_FUZZ_REPLAY"]
 fn replay_a_case() {
     let path = std::env::var_os("DAGEIST_FUZZ_REPLAY")
         .expect("DAGEIST_FUZZ_REPLAY names the file of a kept case");
     let bytes = std::fs::read(&path).expect("the file of the case is read");
-    let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
-        .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
-    let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
+    let (evaluation, described) = replayed_in_time(&bytes, env_deadline(), || {
+        let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
+            .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
+        let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
+        let described = on_a_large_stack(|| target::describe(&case));
+        (evaluation, described)
+    });
     println!("{}", String::from_utf8_lossy(&evaluation.canonical));
-    println!("{}", on_a_large_stack(|| target::describe(&case)));
+    println!("{described}");
     println!("{:?}", evaluation.outcome);
     assert_ne!(
         evaluation.outcome.kind(),

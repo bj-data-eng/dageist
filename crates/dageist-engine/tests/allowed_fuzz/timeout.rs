@@ -57,8 +57,10 @@ impl Evaluator for Scripted<'_> {
             .append(true)
             .open(&self.log)
             .expect("the log");
-        writeln!(log, "{}", hex(canonical)).expect("the log is written");
+        // Whether the case counts towards the campaign's number of cases is not known until
+        // it has been evaluated, which the case that blocks never is.
         if self.block.as_deref() == Some(canonical) {
+            writeln!(log, "{}\t?", hex(canonical)).expect("the log is written");
             loop {
                 std::thread::sleep(Duration::from_secs(3600));
             }
@@ -66,7 +68,11 @@ impl Evaluator for Scripted<'_> {
         if self.panics.as_deref() == Some(canonical) {
             let _ = std::thread::spawn(|| panic!("a thread of Polars panics")).join();
         }
-        self.evaluation.observe(canonical, within)
+        let observation = self.evaluation.observe(canonical, within)?;
+        let counts =
+            observation.outcome.is_evaluated() || observation.outcome.failure_key().is_some();
+        writeln!(log, "{}\t{}", hex(canonical), u8::from(counts)).expect("the log is written");
+        Ok(observation)
     }
 }
 
@@ -93,6 +99,18 @@ fn a_campaign_for_a_parent_to_watch() {
             block: wanted("block"),
             panics: wanted("panics"),
         };
+        // A replay of the case that blocks is timed as a campaign is.
+        if let Some(case) = scripted
+            .block
+            .clone()
+            .filter(|_| directory.join("replay").exists())
+        {
+            super::replayed_in_time(&case, super::env_deadline(), || {
+                scripted.observe(&case, Duration::MAX)
+            })
+            .expect("a replay that does not end does not return");
+            return;
+        }
         let report = run(&settings, &scripted);
         println!("the campaign ended after {} cases", report.evaluated);
     });
@@ -100,7 +118,17 @@ fn a_campaign_for_a_parent_to_watch() {
 
 /// What the child's campaign is given.
 fn child_settings(directory: &Path) -> Settings {
-    Settings::new(SEED, CASES, None, directory.join("kept"))
+    let number = |name: &str| {
+        std::env::var(name)
+            .ok()
+            .and_then(|text| text.parse::<u64>().ok())
+    };
+    let mut settings = Settings::new(SEED, CASES, None, directory.join("kept"));
+    std::fs::create_dir_all(&settings.keep).expect("a directory for kept evidence");
+    settings.deadline = number("DAGEIST_FUZZ_DEADLINE_MS").map(Duration::from_millis);
+    settings.start = number("DAGEIST_FUZZ_START").unwrap_or(1);
+    settings.counted = number("DAGEIST_FUZZ_COUNTED");
+    settings
 }
 
 /// What a child that was run came to.
@@ -110,6 +138,8 @@ struct Ran {
     said: String,
     /// The cases it was given, in order.
     log: Vec<Vec<u8>>,
+    /// Whether each counted towards the campaign's number of cases.
+    counted: Vec<bool>,
 }
 
 /// Runs the child in `directory`, with `settings` as variables, and waits for it to end for
@@ -144,13 +174,18 @@ fn run_child(directory: &Path, settings: &[(&str, String)]) -> Ran {
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    let log = file_of(directory, "log").map_or_else(Vec::new, |text| {
-        String::from_utf8_lossy(&text).lines().map(unhex).collect()
+    let lines: Vec<String> = file_of(directory, "log").map_or_else(Vec::new, |text| {
+        String::from_utf8_lossy(&text)
+            .lines()
+            .map(str::to_owned)
+            .collect()
     });
+    let field = |line: &String, at: usize| line.split('\t').nth(at).unwrap_or_default().to_owned();
     Ran {
         status,
         said: String::from_utf8_lossy(&std::fs::read(said).unwrap_or_default()).into_owned(),
-        log,
+        log: lines.iter().map(|line| unhex(&field(line, 0))).collect(),
+        counted: lines.iter().map(|line| field(line, 1) == "1").collect(),
     }
 }
 
@@ -175,47 +210,61 @@ fn a_case_that_does_not_end_stops_the_campaign_with_a_status_and_the_run_from_th
     let whole = run_child(&fresh("timeout-whole"), &[]);
     assert_eq!(whole.status, Some(0), "{}", whole.said);
     let cases = whole.log.len();
-    assert!(cases >= 10, "{cases}");
+    assert!(cases >= 12, "{cases}");
 
-    // The same cases, with a thread that panics in the fourth and a case that never ends in
-    // the ninth.
+    // The same cases, with a thread that panics in the fourth and a case that never ends,
+    // the first of those from the ninth on that counts, since a case that does not end counts.
+    let hangs = (8..cases)
+        .find(|at| whole.counted[*at])
+        .expect("a counted case");
+    let number = hangs as u64 + 1;
     let directory = fresh("timeout-stopped");
     std::fs::write(directory.join("panics"), hex(&whole.log[3])).unwrap();
-    std::fs::write(directory.join("block"), hex(&whole.log[8])).unwrap();
+    std::fs::write(directory.join("block"), hex(&whole.log[hangs])).unwrap();
     let stopped = run_child(
         &directory,
         &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
     );
     assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
-    assert_eq!(stopped.log, whole.log[..9], "it stopped at the ninth case");
+    assert!(
+        stopped.log == whole.log[..=hangs],
+        "it stopped at the case that hung"
+    );
     let kept = directory.join("kept");
-    let timed_out = std::fs::read_dir(&kept)
+    let files = std::fs::read_dir(&kept)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .collect::<Vec<_>>();
     let named = |what: &str| -> Vec<&PathBuf> {
-        timed_out
+        files
             .iter()
             .filter(|path| path.to_string_lossy().ends_with(what))
             .collect()
     };
-    let [timeout] = named("-9-timeout.case")[..] else {
-        panic!("the ninth case is kept as a timeout: {timed_out:?}");
+    let [timeout] = named(&format!("-{number}-timeout.case"))[..] else {
+        panic!("the case that hung is kept as a timeout: {files:?}");
     };
-    assert_eq!(std::fs::read(timeout).unwrap(), whole.log[8]);
+    assert_eq!(std::fs::read(timeout).unwrap(), whole.log[hangs]);
     let [panicked] = named("-4-panicked.case")[..] else {
-        panic!("the fourth case is kept as the likely cause: {timed_out:?}");
+        panic!("the fourth case is kept as the likely cause: {files:?}");
     };
     assert_eq!(std::fs::read(panicked).unwrap(), whole.log[3]);
     let env =
         String::from_utf8(file_of(&kept, "timeout.env").expect("the setting to go on")).unwrap();
-    assert_eq!(setting(&env, "DAGEIST_FUZZ_START"), Some(10), "{env}");
+    let start = number + 1;
+    assert_eq!(setting(&env, "DAGEIST_FUZZ_START"), Some(start), "{env}");
     assert!(
-        stopped.said.contains("DAGEIST_FUZZ_START=10"),
+        stopped
+            .said
+            .contains(&format!("DAGEIST_FUZZ_START={start}")),
         "{}",
         stopped.said
     );
-    assert!(stopped.said.contains("case 9"), "{}", stopped.said);
+    assert!(
+        stopped.said.contains(&format!("case {number}")),
+        "{}",
+        stopped.said
+    );
 
     // The run from the next case makes the cases the whole run made from there on, and ends
     // where it did.
@@ -223,10 +272,65 @@ fn a_case_that_does_not_end_stops_the_campaign_with_a_status_and_the_run_from_th
     let rest = run_child(
         &fresh("timeout-rest"),
         &[
-            ("DAGEIST_FUZZ_START", "10".to_owned()),
+            ("DAGEIST_FUZZ_START", start.to_string()),
             ("DAGEIST_FUZZ_COUNTED", counted.to_string()),
         ],
     );
     assert_eq!(rest.status, Some(0), "{}", rest.said);
-    assert_eq!(rest.log, whole.log[9..]);
+    assert_eq!(
+        rest.log.len(),
+        cases - hangs - 1,
+        "it ends where the whole run did"
+    );
+    assert!(
+        rest.log == whole.log[hangs + 1..],
+        "the cases from the next on are the same"
+    );
+}
+
+/// With no thread panicked before it, nothing is kept as the likely cause, and the campaign
+/// says so.
+#[test]
+fn a_case_that_does_not_end_after_no_panic_keeps_no_likely_cause() {
+    let whole = run_child(&fresh("timeout-quiet-whole"), &[]);
+    let directory = fresh("timeout-quiet");
+    std::fs::write(directory.join("block"), hex(&whole.log[5])).unwrap();
+    let stopped = run_child(
+        &directory,
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
+    );
+    assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
+    assert!(
+        stopped.said.contains("no thread panicked"),
+        "{}",
+        stopped.said
+    );
+    let kept: Vec<String> = std::fs::read_dir(directory.join("kept"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        kept.iter().all(|name| !name.ends_with("-panicked.case")),
+        "{kept:?}"
+    );
+}
+
+/// A replay of a case that does not end is timed as a campaign is, and ends the process with
+/// the same status.
+#[test]
+fn a_replay_of_a_case_that_does_not_end_ends_with_the_status_of_a_timeout() {
+    let whole = run_child(&fresh("timeout-replay-whole"), &[]);
+    let directory = fresh("timeout-replay");
+    std::fs::write(directory.join("block"), hex(&whole.log[0])).unwrap();
+    std::fs::write(directory.join("replay"), "").unwrap();
+    let stopped = run_child(
+        &directory,
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "500".to_owned())],
+    );
+    assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
+    assert!(
+        stopped.said.contains("did not end in 500 ms"),
+        "{}",
+        stopped.said
+    );
 }
