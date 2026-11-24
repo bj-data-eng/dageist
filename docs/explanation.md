@@ -1980,6 +1980,10 @@ two, which no control settles, so broad campaigns would not pass. They are of th
 - a count that is the rows, or one value, whatever the rows are, and so is no count by chance: the values that
   occur most, the values that differ and their first places, of a column whose values are all different or all
   alike, as the places that sort a column, a running count, a shift or a test for a null leave them;
+- counts in more than one place of one expression, or of one condition, which a control changes together, so that
+  Polars refusing it for lengths does not say which count was the refused one's (a first value beside a gathered
+  quantile, a `top_k` beside a `bottom_k`);
+- a count in a pivot's aggregate, whose groups hold one or two values, which no number of rows changes;
 - a count met by a part that Polars folds to a null, which the controls for a count do not remove;
 - a count that is a value that Polars broadcasts, as the predicate of a condition is, beside values of a count;
 - a range that Polars refuses by the values its bounds hold when the rows run, or when the table has none:
