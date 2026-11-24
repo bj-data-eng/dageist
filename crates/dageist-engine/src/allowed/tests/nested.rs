@@ -300,3 +300,38 @@ fn a_method_that_depends_on_the_element_is_refused_by_a_rule_after_a_class_it_is
         &allowed[..allowed.len().min(12)]
     );
 }
+
+#[test]
+fn a_fill_by_a_strategy_is_refused_after_a_class_it_is_not_measured_on() {
+    use crate::allowed::offers::{After, Chosen, Place, RefusalSource, Verdict, offer};
+    use crate::allowed::{Context, Outer, Shape};
+    // A fill takes a strategy in place of a value, so no line of the dtype table is asked of it.
+    let entry = crate::catalog::entry("Expr.fill_null").expect("an entry");
+    for class in [
+        Representative::List(Inner::Duration),
+        Representative::Array(Inner::Null),
+        Representative::List(Inner::Time),
+    ] {
+        let place = Place::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: class,
+                shape: Shape::Many,
+            },
+        );
+        for strategy in ["forward", "mean", "zero"] {
+            let verdict = offer(
+                entry,
+                &place,
+                &Chosen::default().with_options(&[("strategy", strategy)]),
+            );
+            assert!(
+                matches!(
+                    &verdict,
+                    Verdict::Refused(refusal) if matches!(refusal.source(), RefusalSource::Rule(_))
+                ),
+                "a fill by {strategy} after {class}: {verdict:?}"
+            );
+        }
+    }
+}
