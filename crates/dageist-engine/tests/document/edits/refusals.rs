@@ -407,3 +407,37 @@ fn a_link_is_not_moved_past_the_last_and_an_entry_is_not_put_past_the_end() {
         |problem| matches!(problem, EditProblem::OutOfRange { index: 2, len: 1 }),
     );
 }
+
+#[test]
+fn a_refusal_of_a_place_with_the_largest_index_can_be_shown() {
+    let document = document();
+    // Each segment that counts from one when it is shown, at the largest number there is.
+    let ways = [
+        Segment::Item(usize::MAX),
+        Segment::Key(usize::MAX),
+        Segment::Value(usize::MAX),
+        Segment::Link(usize::MAX),
+    ];
+    for way in ways {
+        let place = inside(1, "second", vec![parameter("columns"), way]);
+        let error = refused(document.set_argument(&place, Value::Integer(1)));
+        assert!(!error.to_string().is_empty(), "{error:?}");
+        assert!(matches!(
+            error.problem(),
+            EditProblem::DoesNotFit { .. } | EditProblem::Nothing
+        ));
+    }
+    let item = inside(
+        1,
+        "second",
+        vec![parameter("columns"), Segment::Item(usize::MAX)],
+    );
+    let error = refused(document.remove_item(&item));
+    assert!(matches!(error.problem(), EditProblem::Nothing));
+    assert!(error.to_string().contains("item"), "{error}");
+    // A step number that no document has, with no identifier to show it by.
+    let error =
+        refused(document.remove_step(&dageist_engine::document::Place::of_step(usize::MAX, None)));
+    assert!(matches!(error.problem(), EditProblem::NoStep { steps: 3 }));
+    assert!(error.to_string().contains("step number"), "{error}");
+}
