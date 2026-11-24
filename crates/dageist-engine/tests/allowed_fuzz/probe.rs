@@ -1560,7 +1560,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
             Some((argument.parameter(), value))
         })
         .collect();
-    let made_true = given
+    let made_false = given
         .and_then(|given| call(step.entry().id().as_str(), given))
         .and_then(|rebuilt| Step::new(case.document.steps()[0].id().clone(), rebuilt).ok())
         .and_then(|rebuilt| Document::new(vec![rebuilt]).ok())
@@ -1569,7 +1569,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
             argument: case.argument,
             document,
         });
-    made_true.is_some_and(|made_true| (0..RUNS).all(|_| observe(&made_true).refusal.is_none()))
+    made_false.is_some_and(|made_false| (0..RUNS).all(|_| observe(&made_false).refusal.is_none()))
 }
 
 /// `value` with the expression that `path` leads to, through the arguments of the calls of the
