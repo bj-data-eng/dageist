@@ -1962,3 +1962,229 @@ fn a_count_of_exactly_one_is_refused_beside_every_kind_of_place_that_polars_broa
     }
     assert!(found.is_empty(), "{}", found.join("\n"));
 }
+
+// ---------------------------------------------------------------------------
+// A condition of identical branches
+
+#[test]
+fn a_condition_of_identical_branches_drops_its_predicate_only_where_they_are_one_value() {
+    // Python Polars 2.1.0, in both engines: where both values of a condition are the same one
+    // value, the predicate is met by it, and the condition is as long as the predicate; where they
+    // are the same many values or the same count, a predicate that is not as many refuses it with
+    // "shapes of `self`, `mask` and `other` are not suitable for `zip_with`" or "zip node received
+    // non-equal length inputs".
+    let when = |predicate: Value, branch: Value| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![predicate]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": branch.clone() })),
+                call("Then.otherwise", json!({ "statement": branch })),
+            ],
+        )
+    };
+    let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
+    let sum = || on_column("a", vec![call("Expr.sum", json!({}))]);
+    let cases = [
+        ("a count in both", when(field("f"), four()), false),
+        (
+            "a count as the predicate",
+            when(
+                on_start(&four(), vec![call("Expr.gt", json!({ "other": whole(1) }))]),
+                field("a"),
+            ),
+            false,
+        ),
+        (
+            "the first four values in both",
+            when(field("f"), on_column("a", vec![head(4)])),
+            false,
+        ),
+        (
+            "the first two flags as the predicate",
+            when(on_column("f", vec![head(2)]), field("a")),
+            false,
+        ),
+        ("the rows in both", when(field("f"), field("a")), true),
+        ("a number in both", when(field("f"), whole(1)), true),
+        ("a sum in both", when(field("f"), sum()), true),
+    ];
+    let mut found = Vec::new();
+    for (name, condition, allowed) in cases {
+        let report = select_of(vec![condition]);
+        let (polars, walk) = (polars_says(&report), walk_says(&report));
+        if polars.accepts() != allowed || walk.accepts() != allowed {
+            found.push(format!(
+                "{name}: Polars says {polars:?}, the walk says {walk:?}, and it is {}",
+                if allowed { "allowed" } else { "refused" }
+            ));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+// ---------------------------------------------------------------------------
+// A range that is not asked for what no bound is known of
+
+#[test]
+fn a_range_of_times_is_not_asked_of_polars_where_its_bounds_are_not_read() {
+    // The walk runs on every edit, so it never makes a range it has not found the length of: bounds
+    // of dtypes that are not read, whole numbers that are unsigned, of 128 bits, and floats, make a
+    // range of 25 million nanoseconds a count that is not known, as one of `Int64` is.
+    let bound = |dtype: Option<&str>, number: Value| match dtype {
+        Some(dtype) => lit(json!({ "value": number, "dtype": { "dtype": dtype } })),
+        None => lit(json!({ "value": number })),
+    };
+    let cases = [
+        ("UInt64", Some("UInt64")),
+        ("UInt32", Some("UInt32")),
+        ("UInt16", Some("UInt16")),
+        ("Int128", Some("Int128")),
+        ("Float32", Some("Float32")),
+        ("Float64", Some("Float64")),
+        ("a float typed without a dtype", None),
+        ("Int64", Some("Int64")),
+    ];
+    let mut found = Vec::new();
+    for (name, dtype) in cases {
+        let number = |at: i64| match dtype {
+            Some("Float32" | "Float64") | None => json!({ "float": at as f64 }),
+            Some(_) => json!({ "integer": at }),
+        };
+        let end = if dtype == Some("UInt16") {
+            60_000
+        } else {
+            25_000_000
+        };
+        let start = time_range(vec![
+            ("start", bound(dtype, number(0))),
+            ("end", bound(dtype, number(end))),
+            ("interval", interval("1ns")),
+        ]);
+        let report = planned("LazyFrame.select", json!({ "exprs": many(vec![start]) }));
+        let counted = item(&report, 0).count();
+        // 60,000 values are made and counted; more than a million are not asked.
+        let expected = if dtype == Some("UInt16") {
+            Some(Count::Exactly(60_001))
+        } else {
+            Some(Count::NotKnown)
+        };
+        if counted != expected {
+            found.push(format!(
+                "{name}: the walk says {counted:?}, not {expected:?}"
+            ));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+// ---------------------------------------------------------------------------
+// A length below nothing after a range
+
+#[test]
+fn a_range_is_not_cut_by_a_length_below_nothing_as_polars_refuses_it() {
+    // Python Polars 2.1.0, in both engines: "unable to extract length from Scalar(... -2)" of the
+    // first, last and `limit` values and of a slice with a length, where the receiver is a range
+    // or a repeat. The same calls of a column run, and so do the places counted from the end.
+    let ranges = [
+        (
+            "int_range",
+            int_range(vec![("start", whole(0)), ("end", whole(10))]),
+        ),
+        (
+            "repeat",
+            repeat(vec![("value", whole(7)), ("n", whole(10))]),
+        ),
+        (
+            "linear_space",
+            linear_space(vec![
+                ("start", whole(0)),
+                ("end", whole(1)),
+                ("num_samples", whole(10)),
+            ]),
+        ),
+    ];
+    let cuts = [
+        ("head", call("Expr.head", json!({ "n": whole(-2) })), false),
+        ("tail", call("Expr.tail", json!({ "n": whole(-2) })), false),
+        (
+            "limit",
+            call("Expr.limit", json!({ "n": whole(-2) })),
+            false,
+        ),
+        (
+            "slice with a length",
+            call(
+                "Expr.slice",
+                json!({ "offset": whole(2), "length": whole(-1) }),
+            ),
+            false,
+        ),
+        (
+            "head of some",
+            call("Expr.head", json!({ "n": whole(2) })),
+            true,
+        ),
+        (
+            "slice from the end",
+            call("Expr.slice", json!({ "offset": whole(-2) })),
+            true,
+        ),
+        (
+            "slice from the end and a length",
+            call(
+                "Expr.slice",
+                json!({ "offset": whole(-2), "length": whole(3) }),
+            ),
+            true,
+        ),
+    ];
+    let mut found = Vec::new();
+    for (range, start) in &ranges {
+        for (cut, link, allowed) in &cuts {
+            let report = select_of(vec![on_start(start, vec![link.clone()])]);
+            let (polars, walk) = (polars_says(&report), walk_says(&report));
+            if polars.accepts() != *allowed || walk.accepts() != *allowed {
+                found.push(format!(
+                    "{cut} of {range}: Polars says {polars:?}, the walk says {walk:?}"
+                ));
+            }
+        }
+    }
+    for (cut, link, _) in &cuts[..4] {
+        // The same calls of a column of the table run, as the engine of steps runs them.
+        let report = select_of(vec![on_column("a", vec![link.clone()])]);
+        if !polars_says(&report).accepts() || !walk_says(&report).accepts() {
+            found.push(format!(
+                "{cut} of a column: Polars says {:?}, the walk says {:?}",
+                polars_says(&report),
+                walk_says(&report)
+            ));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+// ---------------------------------------------------------------------------
+// A repeat of a value of a dtype that a number does not cast to
+
+#[test]
+fn a_repeat_of_a_list_or_an_array_is_taken_as_polars_takes_it() {
+    // Python Polars 2.1.0: `repeat(l.first(), 3)` of a column of lists gives three lists, and so do
+    // arrays. The tables made one value of a dtype by casting a number to it, which no list, array
+    // or struct takes, and refused them with a reason that is not true of the value.
+    let mut found = Vec::new();
+    for column in ["l", "arr"] {
+        let value = on_column(column, vec![call("Expr.first", json!({}))]);
+        let report = select_of(vec![repeat(vec![("value", value), ("n", whole(3))])]);
+        let (polars, walk) = (polars_says(&report), walk_says(&report));
+        if !polars.accepts() || !walk.accepts() {
+            found.push(format!(
+                "{column}: Polars says {polars:?}, the walk says {walk:?}"
+            ));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
