@@ -589,9 +589,13 @@ before it checked nothing. A case that did not end counts as one that was checke
 passes them over without running them, so the cases from it on are those of a run that began
 at the first, and `DAGEIST_FUZZ_COUNTED` makes the run end where that run would have;
 without it every case before the start counts, which ends the run a little earlier. A
-setting that is no whole number, a deadline of 0, a count above the cases before the start,
+setting that is no whole number (the seed and the number of cases too), a number of cases of
+0, a deadline of 0, a count above the cases before the start or above the number of cases,
 and a start that makes more cases than a campaign counts are refused, with the variable
-named.
+named. A campaign removes a `timeout.env` that an earlier run left in the kept directory when
+it starts, so one that is there after a run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
+from the root of the repository, which is where these commands are run, and not from the
+engine's directory that the tests run in.
 
 A timeout that happens while a case that disagrees is being reduced is kept as
 `<seed>-<place>-reduction-timeout.case`, with the case that disagreed kept as it was,
@@ -605,7 +609,8 @@ directory:
 
 ```sh
 (
-  keep=${DAGEIST_FUZZ_KEEP:-$PWD/target/tmp/allowed-fuzz}
+  keep=${DAGEIST_FUZZ_KEEP:-target/tmp/allowed-fuzz}
+  case $keep in /*) ;; *) keep=$PWD/$keep ;; esac
   export DAGEIST_FUZZ_KEEP=$keep DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000
   rm -f "$keep/timeout.env"
   while :; do
