@@ -12,6 +12,7 @@ use dageist_fuzz::{
 };
 
 use super::case::Case;
+use super::counts;
 use super::generate::{Focus, generate};
 use super::limits::{excuses, strict};
 use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
@@ -131,6 +132,10 @@ pub fn tally_lines(tallied: &Tally) -> Vec<String> {
             "refused by a rule that is stricter than Polars",
             total("rule stricter"),
         ),
+        (
+            "refused where a count is the rows by chance",
+            total("stricter by design"),
+        ),
         ("disagreeing", total("disagreement:")),
     ];
     let mut lines: Vec<String> = tallied
@@ -234,6 +239,20 @@ fn stricter(settled: Option<Settled>, what: &str) -> Option<Result<CaseOutcome>>
     Some(CaseOutcome::expected_rejection(
         Vec::new(),
         one_line(&format!("{STRICTER_WHERE_UNEVALUATED}: {}", settled.said())),
+    ))
+}
+
+/// The outcome of a case where the tables refuse a count that Polars allows because the count is
+/// the table's rows, or one value, by chance, which the case on more rows shows.
+fn by_design(case: &Case, refused: &Refused, what: &str) -> Option<Result<CaseOutcome>> {
+    if strict() {
+        return None;
+    }
+    let settled = counts::settle(case, refused)?;
+    tally(format!("{}: {what}", counts::STRICTER_BY_DESIGN));
+    Some(CaseOutcome::expected_rejection(
+        Vec::new(),
+        one_line(&settled.said()),
     ))
 }
 
@@ -606,6 +625,10 @@ impl CaseTarget for AllowedTarget {
                     {
                         return outcome;
                     }
+                    // A count that is the table's rows, or one value, by chance.
+                    if let Some(outcome) = by_design(case, &refused, &why) {
+                        return outcome;
+                    }
                     return failure(
                         ALLOWANCE,
                         &format!("refused-but-allowed-{why}"),
@@ -638,6 +661,10 @@ impl CaseTarget for AllowedTarget {
                             && let Some(outcome) =
                                 stricter(probe_apart(case, &refused, &prediction, &observed), rule)
                         {
+                            return outcome;
+                        }
+                        // A count that is the table's rows, or one value, by chance.
+                        if let Some(outcome) = by_design(case, &refused, rule) {
                             return outcome;
                         }
                         return failure(
@@ -1171,5 +1198,50 @@ mod tests {
         }
         let difference = dtype_difference(&case, &wrong, &observed).expect("a difference");
         assert!(difference.contains("Polars gives"), "{difference}");
+    }
+    /// `sort(by=k / b.diff(drop))`: the rule refuses a division by a count of two beside rows of
+    /// three, and Polars refuses the key too, for it is not dropped: no call makes it one value.
+    const A_COUNT_POLARS_REFUSES: &str = r#"{"a":"Date","b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[{"entry":"Expr.diff","arguments":{"null_behavior":{"choice":"drop"}}}]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_count_that_is_one_value_by_chance_is_stricter_by_design() {
+        // `filter(b.drop_nulls().diff(drop) < 1)`: the count is one value on the sample's rows,
+        // which a filter's predicate takes, and Polars refuses it for lengths on more rows.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/by-design-a-count-of-one-by-chance-as-a-filter-predicate.case");
+        let text: &'static str = Box::leak(
+            std::fs::read_to_string(path)
+                .expect("a kept case")
+                .into_boxed_str(),
+        );
+        let (outcome, tally) = evaluated_and_tallied(text);
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
+        assert!(
+            outcome
+                .detail()
+                .is_some_and(|detail| detail.starts_with(counts::STRICTER_BY_DESIGN)),
+            "{outcome:?}"
+        );
+        assert_eq!(
+            counted(&tally, "refused where a count is the rows by chance"),
+            Some(1),
+            "{tally:?}"
+        );
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
+
+    #[test]
+    fn a_count_that_polars_refuses_too_is_agreement_and_no_design() {
+        // The same rule refusing a count that is not the rows, where Polars refuses it as well,
+        // is a refusal both make: nothing is excused, and nothing is stricter by design.
+        let (outcome, tally) = evaluated_and_tallied(A_COUNT_POLARS_REFUSES);
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::Evaluated);
+        assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+        assert_eq!(
+            counted(&tally, "refused where a count is the rows by chance").unwrap_or(0),
+            0,
+            "{tally:?}"
+        );
     }
 }

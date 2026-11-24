@@ -523,17 +523,20 @@ const A_COUNT_THAT_MAY_NOT_END: &str = "a count of values that the data or the a
 
 /// Whether the tables' reason is that a count of values may not end an expression, where Polars
 /// refused it for the lengths that did not match.
-fn is_a_count_that_may_not_end(tables: &str) -> bool {
+pub fn is_a_count_that_may_not_end(tables: &str) -> bool {
     tables.contains(A_COUNT_THAT_MAY_NOT_END) && tables.contains("may not end an expression")
 }
 
-/// Whether Polars refused for values of lengths that do not meet, in the words of its two engines.
-fn is_a_refusal_of_lengths(reason: &str) -> bool {
+/// Whether Polars refused for values of lengths that do not meet what they meet, in the words of
+/// its two engines, of a sort, and of the call that zips the values of a condition.
+pub fn is_a_refusal_of_lengths(reason: &str) -> bool {
     let reason = reason.to_ascii_lowercase();
     [
         "lengths don't match",
         "non-equal length",
         "different lengths",
+        "same length",
+        "shapes of `self`, `mask` and `other`",
     ]
     .iter()
     .any(|words| reason.contains(words))

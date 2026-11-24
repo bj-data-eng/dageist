@@ -353,7 +353,13 @@ pub struct Tables {
     /// dtype that the case's tables lack, named by
     /// [`stand_in_column`](super::frames::stand_in_column) in order.
     pub stand_ins: [Option<Representative>; MAX_STAND_INS],
+    /// Both tables hold [`MORE_ROWS`] times their three rows, so that what the three happen to
+    /// equal is no longer what they are.
+    pub more_rows: bool,
 }
+
+/// How many times the three rows a control with more rows is given.
+pub const MORE_ROWS: usize = 4;
 
 impl Tables {
     /// The tables with a column of each of `classes` standing in, or `None` for
@@ -369,6 +375,7 @@ impl Tables {
         Some(Self {
             other_as_left,
             stand_ins,
+            more_rows: false,
         })
     }
 
@@ -380,7 +387,12 @@ impl Tables {
             frames
         };
         let classes: Vec<Representative> = self.stand_ins.into_iter().flatten().collect();
-        frames.with_stand_ins(&classes)
+        let frames = frames.with_stand_ins(&classes);
+        if self.more_rows {
+            frames.repeated(MORE_ROWS)
+        } else {
+            frames
+        }
     }
 }
 

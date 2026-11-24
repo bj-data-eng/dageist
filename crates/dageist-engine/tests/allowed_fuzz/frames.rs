@@ -229,6 +229,28 @@ impl Frames {
         }
     }
 
+    /// The same tables with every row of the left and the other table made `times` times as many:
+    /// the three rows again, one after another, so a column keeps its dtype, its nulls and the
+    /// repeats of its values. A count that the data or the arguments decide, as the values that
+    /// differ are or the first values are, is then no longer the rows, which three rows may
+    /// leave it by chance.
+    pub fn repeated(self, times: usize) -> Self {
+        let again = |frame: &DataFrame| {
+            let mut stacked = frame.clone();
+            for _ in 1..times {
+                stacked
+                    .vstack_mut(frame)
+                    .expect("rows of the same columns stack");
+            }
+            stacked
+        };
+        Self {
+            rows: again(&self.rows),
+            other_rows: again(&self.other_rows),
+            ..self
+        }
+    }
+
     /// The same tables with the other table as the one a step starts from, for
     /// an expression that a join's `right_on` holds, which reads that table's
     /// columns.
@@ -315,5 +337,24 @@ mod tests {
             assert_eq!(column.dtype(), made, "{asked:?}");
             assert_eq!(column.null_count(), 3, "{asked:?}");
         }
+    }
+
+    #[test]
+    fn rows_made_more_keep_the_columns_their_dtypes_and_their_repeats() {
+        let frames = Frames::new(
+            Representative::Date,
+            Representative::Int8,
+            &[DataType::Int64],
+        )
+        .repeated(4);
+        for table in [&frames.rows, &frames.other_rows] {
+            assert_eq!(table.height(), 12);
+        }
+        assert_eq!(frames.empty.height(), 0);
+        let k = frames.rows.column("k").expect("a column");
+        assert_eq!(k.n_unique().expect("the values that differ"), 2);
+        let a = frames.rows.column("a").expect("a column");
+        assert_eq!(a.dtype(), &Representative::Date.dtype());
+        assert_eq!(a.null_count(), 4);
     }
 }

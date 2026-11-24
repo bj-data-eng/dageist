@@ -18,6 +18,7 @@
 
 mod campaign;
 mod case;
+mod counts;
 mod frames;
 mod generate;
 mod limits;
@@ -363,7 +364,7 @@ fn kept_cases_replay_as_settled() {
             assert!(
                 outcome
                     .detail()
-                    .is_some_and(|detail| detail.starts_with("stricter by design")),
+                    .is_some_and(|detail| detail.starts_with(counts::STRICTER_BY_DESIGN)),
                 "{name} is stricter by design where a count is the rows by chance: {}",
                 detail_of(outcome)
             );
