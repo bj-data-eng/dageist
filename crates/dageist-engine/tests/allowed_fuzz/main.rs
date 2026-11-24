@@ -128,9 +128,33 @@ fn assert_no_findings(report: &Report) {
     }
 }
 
+/// The whole number that `text` says `name` is, or why it is not one.
+fn whole_number(name: &str, text: &str) -> Result<u64, String> {
+    text.trim()
+        .replace('_', "")
+        .parse()
+        .map_err(|_| format!("{name} is {text:?}, which is not a whole number"))
+}
+
+/// The whole number `name` is set to, if it is set. A setting that is no number is refused
+/// rather than ignored.
+fn env_whole(name: &str) -> Option<u64> {
+    let text = match std::env::var(name) {
+        Ok(text) => text,
+        Err(std::env::VarError::NotPresent) => return None,
+        Err(std::env::VarError::NotUnicode(_)) => panic!("{name} is not text"),
+    };
+    Some(whole_number(name, &text).unwrap_or_else(|refusal| panic!("{refusal}")))
+}
+
 /// How long a case of a campaign is given: `DAGEIST_FUZZ_DEADLINE_MS` milliseconds.
 fn env_deadline() -> std::time::Duration {
-    std::time::Duration::from_millis(env_number("DAGEIST_FUZZ_DEADLINE_MS", DEADLINE_MS))
+    let milliseconds = env_whole("DAGEIST_FUZZ_DEADLINE_MS").unwrap_or(DEADLINE_MS);
+    assert!(
+        milliseconds > 0,
+        "DAGEIST_FUZZ_DEADLINE_MS is 0, and no case ends in no time"
+    );
+    std::time::Duration::from_millis(milliseconds)
 }
 
 /// A longer run: `DAGEIST_FUZZ_CASES` cases from `DAGEIST_FUZZ_SEED`, focused on the
@@ -152,10 +176,11 @@ fn a_campaign() {
         let target = AllowedTarget::new();
         let mut settings = Settings::new(seed, cases, focus, keep_directory());
         settings.deadline = Some(env_deadline());
-        settings.start = env_number("DAGEIST_FUZZ_START", 1);
-        settings.counted = std::env::var("DAGEIST_FUZZ_COUNTED")
-            .ok()
-            .and_then(|text| text.trim().parse().ok());
+        settings.start = env_whole("DAGEIST_FUZZ_START").unwrap_or(1);
+        settings.counted = env_whole("DAGEIST_FUZZ_COUNTED");
+        if let Err(refusal) = settings.check() {
+            panic!("{refusal}");
+        }
         campaign::run(&settings, &InProcess::new(&target))
     });
     eprintln!(
@@ -395,4 +420,15 @@ fn a_case_of_another_revision_or_not_written_canonically_is_refused() {
     let unknown = String::from_utf8_lossy(kept).replace("\"Int64\",\"b\"", "\"Int65\",\"b\"");
     assert!(target.decode(unknown.as_bytes()).is_err());
     let _: Case = target.decode(kept).unwrap();
+}
+
+#[test]
+fn a_setting_that_is_no_number_is_refused_and_says_which() {
+    assert_eq!(whole_number("DAGEIST_FUZZ_START", " 1_235 "), Ok(1235));
+    let refusal = whole_number("DAGEIST_FUZZ_COUNTED", "12 cases").unwrap_err();
+    assert!(
+        refusal.starts_with("DAGEIST_FUZZ_COUNTED is \"12 cases\""),
+        "{refusal}"
+    );
+    assert!(whole_number("DAGEIST_FUZZ_START", "-1").is_err());
 }

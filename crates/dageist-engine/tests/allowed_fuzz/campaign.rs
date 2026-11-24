@@ -81,6 +81,44 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Whether the settings make a campaign, and if they do not, what is wrong, in the words
+    /// of the variables they come from.
+    ///
+    /// # Errors
+    ///
+    /// Where the start is no case, the number counted before it is more than the cases before
+    /// it, or the cases a run makes before it has its number of them do not fit in a count.
+    pub fn check(&self) -> std::result::Result<(), String> {
+        if self.start == 0 {
+            return Err("DAGEIST_FUZZ_START is 0, and cases are numbered from 1".to_owned());
+        }
+        let passed_over = self.start - 1;
+        if let Some(counted) = self.counted
+            && counted > passed_over
+        {
+            return Err(format!(
+                "DAGEIST_FUZZ_COUNTED is {counted}, more than the {passed_over} cases before \
+                 DAGEIST_FUZZ_START={}",
+                self.start
+            ));
+        }
+        let uncounted = passed_over - self.counted.unwrap_or(passed_over);
+        let to_make = u64::from(self.cases) + uncounted;
+        if u32::try_from(to_make).is_err() {
+            return Err(format!(
+                "DAGEIST_FUZZ_START={} and DAGEIST_FUZZ_CASES={} make {to_make} cases, \
+                 more than a campaign counts, {}",
+                self.start,
+                self.cases,
+                u32::MAX
+            ));
+        }
+        if self.deadline.is_some_and(|deadline| deadline.is_zero()) {
+            return Err("DAGEIST_FUZZ_DEADLINE_MS is 0, and no case ends in no time".to_owned());
+        }
+        Ok(())
+    }
+
     pub fn new(seed: u64, cases: u32, focus: Option<Focus>, keep: PathBuf) -> Self {
         Self {
             seed,
@@ -333,10 +371,14 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     let strategy = property::bytes(1024, target.descriptor().limits());
     // The cases before `start` are made and counted again as they were, so the runner has that
     // many more to make before it has the number of cases that are left.
-    let passed_over = settings.start.saturating_sub(1);
-    let counted_before = settings.counted.unwrap_or(passed_over).min(passed_over);
+    if let Err(refusal) = settings.check() {
+        panic!("{refusal}");
+    }
+    let passed_over = settings.start - 1;
+    let counted_before = settings.counted.unwrap_or(passed_over);
     let config = PropertyConfig {
-        cases: settings.cases + u32::try_from(passed_over - counted_before).expect("a case number"),
+        cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
+            .expect("the settings were checked"),
         max_rejections: 1_000_000,
         // Entropy is not the case: the owner's reduction works on the case.
         max_shrink_iterations: 0,
@@ -486,5 +528,30 @@ mod tests {
         // The cases are the ones the seed makes, whatever failed before them.
         assert_eq!(failing.evaluated, clean.evaluated);
         assert_eq!(failing.tally, clean.tally);
+    }
+
+    #[test]
+    fn settings_that_make_no_campaign_are_refused_in_the_words_of_their_variables() {
+        let settings = |start: u64, counted: Option<u64>, cases: u32| {
+            let mut settings = settings("campaign-settings");
+            settings.cases = cases;
+            settings.start = start;
+            settings.counted = counted;
+            settings
+        };
+        assert!(settings(1, None, 5).check().is_ok());
+        assert!(settings(10, Some(9), 5).check().is_ok());
+        assert!(settings(10, None, 5).check().is_ok());
+        let refused = |settings: Settings| settings.check().expect_err("refused");
+        assert!(refused(settings(0, None, 5)).contains("DAGEIST_FUZZ_START"));
+        assert!(refused(settings(10, Some(10), 5)).contains("DAGEIST_FUZZ_COUNTED"));
+        // A start beyond what a count holds, and one that the cases make overflow.
+        assert!(
+            refused(settings(u64::from(u32::MAX) + 2, Some(0), 5)).contains("DAGEIST_FUZZ_START")
+        );
+        assert!(refused(settings(u64::from(u32::MAX), Some(0), 5)).contains("DAGEIST_FUZZ_CASES"));
+        let mut untimed = settings(1, None, 5);
+        untimed.deadline = Some(Duration::ZERO);
+        assert!(refused(untimed).contains("DAGEIST_FUZZ_DEADLINE_MS"));
     }
 }
