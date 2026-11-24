@@ -445,7 +445,7 @@ fn an_edit_the_engine_refuses_is_a_200_that_says_so_and_leaves_the_document() {
     let reply = call(
         &bridge,
         "edit_document",
-        &json!({ "revision": 1, "edit": { "kind": "removeStep", "step": step_place(1, "nobody") } }),
+        &json!({ "revision": 1, "edit": { "kind": "removeStep", "step": step_place(1, "absent") } }),
     );
 
     assert_eq!(reply.status, 200);
@@ -456,7 +456,7 @@ fn an_edit_the_engine_refuses_is_a_200_that_says_so_and_leaves_the_document() {
         answer["problem"],
         json!({ "kind": "stepChanged", "found": "step_index" })
     );
-    assert_eq!(answer["place"], step_place(1, "nobody"));
+    assert_eq!(answer["place"], step_place(1, "absent"));
     let held = call(&bridge, "node_document", &json!({}));
     assert_eq!(held.json(), fixture("node-document.json"));
 }
