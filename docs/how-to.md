@@ -526,7 +526,7 @@ alone, since a case that runs Polars is heavy:
 
 ```sh
 DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked -p dageist-engine \
-  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1
+  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A campaign draws its methods evenly, so the more methods the catalogue holds, the
@@ -552,7 +552,7 @@ makes a moment is refused, and the refusal names it. A campaign focused on the m
 ```sh
 DAGEIST_FUZZ_FOCUS=dt.,replace_strict DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 \
   cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
-  -- --ignored --nocapture --test-threads=1
+  -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A batch of new methods lands when focused campaigns on them agree: fresh seeds
@@ -588,7 +588,10 @@ so it is below the number of the case that did not end: in the example 32 of the
 before it checked nothing. A case that did not end counts as one that was checked. `DAGEIST_FUZZ_START` makes the cases before it and
 passes them over without running them, so the cases from it on are those of a run that began
 at the first, and `DAGEIST_FUZZ_COUNTED` makes the run end where that run would have;
-without it every case before the start counts, which ends the run a little earlier. A
+without it every case before the start counts, so the run ends earlier than the one it goes
+on from by the cases before the start that checked nothing, and a start that is past the end of
+the campaign's cases, which would make none, is refused. `--exact` keeps the other tests whose
+names begin with `a_campaign` out of the run. A
 setting that is no whole number (the seed and the number of cases too), a number of cases of
 0, a deadline of 0, a count above the cases before the start or above the number of cases,
 and a start that makes more cases than a campaign counts are refused, with the variable
@@ -619,7 +622,7 @@ directory:
       mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
     fi
     cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
-      -- --ignored --nocapture --test-threads=1
+      -- --ignored --nocapture --test-threads=1 --exact
     [ -f "$keep/timeout.env" ] || break
   done
 )
