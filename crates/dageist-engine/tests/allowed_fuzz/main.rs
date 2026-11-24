@@ -51,12 +51,26 @@ const CASES: u32 = 1000;
 /// says another. A case that has not ended by then ends the campaign.
 const DEADLINE_MS: u64 = 15_000;
 
-/// Where kept evidence of a disagreement is written, unless a directory is
-/// named by `DAGEIST_FUZZ_KEEP`.
+/// `path` where it is absolute, and where it is relative the path from the root of the
+/// repository, which is where the commands that run a campaign are run from, not the
+/// directory of the engine that the tests run in.
+fn from_the_root(root: &Path, path: PathBuf) -> PathBuf {
+    if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
+    }
+}
+
+/// Where kept evidence of a failing case is written, unless a directory is named by
+/// `DAGEIST_FUZZ_KEEP`, which is taken from the root of the repository if it is relative.
 fn keep_directory() -> PathBuf {
     std::env::var_os("DAGEIST_FUZZ_KEEP").map_or_else(
         || PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("allowed-fuzz"),
-        PathBuf::from,
+        |path| {
+            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+            from_the_root(&root, PathBuf::from(path))
+        },
     )
 }
 
@@ -88,13 +102,6 @@ fn env_focus() -> Option<Focus> {
         Err(std::env::VarError::NotUnicode(_)) => panic!("DAGEIST_FUZZ_FOCUS is not text"),
     };
     Focus::parse(&text).unwrap_or_else(|refusal| panic!("{refusal}"))
-}
-
-fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
-    std::env::var(name)
-        .ok()
-        .and_then(|text| text.trim().replace('_', "").parse().ok())
-        .unwrap_or(default)
 }
 
 #[test]
@@ -164,8 +171,15 @@ fn env_deadline() -> std::time::Duration {
 #[test]
 #[ignore = "a campaign, run on request with DAGEIST_FUZZ_CASES, DAGEIST_FUZZ_SEED and DAGEIST_FUZZ_FOCUS"]
 fn a_campaign() {
-    let seed: u64 = env_number("DAGEIST_FUZZ_SEED", SEED);
-    let cases: u32 = env_number("DAGEIST_FUZZ_CASES", 5_000);
+    let seed = env_whole("DAGEIST_FUZZ_SEED").unwrap_or(SEED);
+    let cases = env_whole("DAGEIST_FUZZ_CASES").map_or(5_000, |cases| {
+        u32::try_from(cases).unwrap_or_else(|_| {
+            panic!(
+                "DAGEIST_FUZZ_CASES is {cases}, more than a campaign counts, {}",
+                u32::MAX
+            )
+        })
+    });
     let focus = env_focus();
     let focused = focus
         .as_ref()
@@ -431,4 +445,17 @@ fn a_setting_that_is_no_number_is_refused_and_says_which() {
         "{refusal}"
     );
     assert!(whole_number("DAGEIST_FUZZ_START", "-1").is_err());
+}
+
+#[test]
+fn a_relative_directory_for_kept_evidence_is_from_the_root_of_the_repository() {
+    let root = Path::new("/the/repository");
+    assert_eq!(
+        from_the_root(root, PathBuf::from("target/tmp/kept")),
+        Path::new("/the/repository/target/tmp/kept")
+    );
+    assert_eq!(
+        from_the_root(root, PathBuf::from("/elsewhere/kept")),
+        Path::new("/elsewhere/kept")
+    );
 }

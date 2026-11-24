@@ -35,8 +35,8 @@ pub struct Observation {
 
 /// Where and how a case is evaluated.
 pub trait Evaluator {
-    /// Evaluates the case written as `canonical`, in no more than `within`.
-    fn observe(&self, canonical: &[u8], within: Duration) -> Result<Observation>;
+    /// Evaluates the case written as `canonical`.
+    fn observe(&self, canonical: &[u8]) -> Result<Observation>;
 }
 
 /// Evaluates a case on the thread that asks, with the target's own evaluation.
@@ -51,7 +51,7 @@ impl<'a> InProcess<'a> {
 }
 
 impl Evaluator for InProcess<'_> {
-    fn observe(&self, canonical: &[u8], _within: Duration) -> Result<Observation> {
+    fn observe(&self, canonical: &[u8]) -> Result<Observation> {
         let outcome = self.target.evaluate(&self.target.decode(canonical)?)?;
         let output_bytes = outcome.detail().map_or(0, |detail| detail.len() as u64);
         Ok(Observation {
@@ -102,16 +102,32 @@ impl Settings {
                 self.start
             ));
         }
-        let uncounted = passed_over - self.counted.unwrap_or(passed_over);
-        let to_make = u64::from(self.cases) + uncounted;
-        if u32::try_from(to_make).is_err() {
+        if let Some(counted) = self.counted
+            && counted > u64::from(self.cases)
+        {
             return Err(format!(
-                "DAGEIST_FUZZ_START={} and DAGEIST_FUZZ_CASES={} make {to_make} cases, \
-                 more than a campaign counts, {}",
+                "DAGEIST_FUZZ_COUNTED is {counted}, more than DAGEIST_FUZZ_CASES={}: \
+                 the campaign had already made all its cases",
+                self.cases
+            ));
+        }
+        let uncounted = passed_over - self.counted.unwrap_or(passed_over);
+        let to_make = u64::from(self.cases)
+            .checked_add(uncounted)
+            .filter(|to_make| u32::try_from(*to_make).is_ok());
+        if to_make.is_none() {
+            return Err(format!(
+                "DAGEIST_FUZZ_START={} and DAGEIST_FUZZ_CASES={} make more cases than a \
+                 campaign counts, {}",
                 self.start,
                 self.cases,
                 u32::MAX
             ));
+        }
+        if self.cases == 0 {
+            return Err(
+                "DAGEIST_FUZZ_CASES is 0, and a campaign makes no cases of that".to_owned(),
+            );
         }
         if self.deadline.is_some_and(|deadline| deadline.is_zero()) {
             return Err("DAGEIST_FUZZ_DEADLINE_MS is 0, and no case ends in no time".to_owned());
@@ -227,7 +243,7 @@ impl<E: Evaluator> CaseTarget for Observing<'_, E> {
         }
         let canonical = self.target.encode(case)?;
         let observation = timed(self.watchdog, number, &canonical, || {
-            self.evaluator.observe(&canonical, Duration::MAX)
+            self.evaluator.observe(&canonical)
         })?;
         for (what, count) in observation.tally {
             *self.tally.borrow_mut().entry(what).or_default() += count;
@@ -327,10 +343,8 @@ fn keep<E: Evaluator>(
         key,
         settings.reduction,
         &AtomicBool::new(false),
-        |input, budget| {
-            let observation = timed(watchdog, ordinal, input, || {
-                evaluator.observe(input, budget.remaining_time)
-            })?;
+        |input, _budget| {
+            let observation = timed(watchdog, ordinal, input, || evaluator.observe(input))?;
             Ok(ReductionEvaluation::new(
                 observation.outcome,
                 observation.output_bytes,
@@ -387,6 +401,8 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     // The case is written down before it is run, so that one that does not
     // return is still found: it is the file `current.case`.
     std::fs::create_dir_all(&settings.keep).expect("a directory for kept evidence");
+    // What an earlier run said of going on is not what this one says.
+    let _ = std::fs::remove_file(settings.keep.join(super::watchdog::GO_ON));
     let current = settings.keep.join("current.case");
     let mut capture = |bytes: &[u8]| {
         std::fs::write(&current, bytes).map_err(|error| {
@@ -450,8 +466,8 @@ mod tests {
     }
 
     impl Evaluator for Misses<'_> {
-        fn observe(&self, canonical: &[u8], within: Duration) -> Result<Observation> {
-            let mut observation = self.evaluation.observe(canonical, within)?;
+        fn observe(&self, canonical: &[u8]) -> Result<Observation> {
+            let mut observation = self.evaluation.observe(canonical)?;
             // Only a case that checked something can end as a failure, as a property that is
             // violated is, so that the cases a run draws are the same with and without it.
             if observation.outcome.is_evaluated()
@@ -540,7 +556,7 @@ mod tests {
             settings
         };
         assert!(settings(1, None, 5).check().is_ok());
-        assert!(settings(10, Some(9), 5).check().is_ok());
+        assert!(settings(10, Some(9), 20).check().is_ok());
         assert!(settings(10, None, 5).check().is_ok());
         let refused = |settings: Settings| settings.check().expect_err("refused");
         assert!(refused(settings(0, None, 5)).contains("DAGEIST_FUZZ_START"));

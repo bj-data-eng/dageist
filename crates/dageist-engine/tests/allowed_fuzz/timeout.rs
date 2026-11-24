@@ -61,7 +61,7 @@ struct Scripted<'a> {
 }
 
 impl Evaluator for Scripted<'_> {
-    fn observe(&self, canonical: &[u8], within: Duration) -> Result<Observation> {
+    fn observe(&self, canonical: &[u8]) -> Result<Observation> {
         use std::io::Write;
         let mut log = std::fs::OpenOptions::new()
             .create(true)
@@ -88,7 +88,7 @@ impl Evaluator for Scripted<'_> {
         if self.panics.as_deref() == Some(canonical) {
             let _ = std::thread::spawn(|| panic!("a thread of Polars panics")).join();
         }
-        let mut observation = self.evaluation.observe(canonical, within)?;
+        let mut observation = self.evaluation.observe(canonical)?;
         // About a quarter of the cases, whichever the run, check nothing, so that cases
         // before a case that hangs are not all counted.
         if is_quiet(canonical) {
@@ -144,10 +144,8 @@ fn a_campaign_for_a_parent_to_watch() {
             .clone()
             .filter(|_| directory.join("replay").exists())
         {
-            super::replayed_in_time(&case, super::env_deadline(), || {
-                scripted.observe(&case, Duration::MAX)
-            })
-            .expect("a replay that does not end does not return");
+            super::replayed_in_time(&case, super::env_deadline(), || scripted.observe(&case))
+                .expect("a replay that does not end does not return");
             return;
         }
         let report = run(&settings, &scripted);

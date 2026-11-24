@@ -12,7 +12,7 @@
 
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -49,6 +49,9 @@ struct Reducing {
 struct Timing {
     current: Option<Current>,
     last: Option<(u64, Vec<u8>)>,
+    /// How many cases before the one in progress were counted, which is read with the case in
+    /// progress, under the same lock, so that a case that ends as it is read is not counted twice.
+    counted: u64,
 }
 
 struct Shared {
@@ -59,8 +62,6 @@ struct Shared {
     reducing: Mutex<Option<Reducing>>,
     /// What the campaign found so far, as it prints it.
     findings: Mutex<Vec<String>>,
-    /// How many cases before the one in progress were counted.
-    counted: AtomicU64,
     stop: AtomicBool,
 }
 
@@ -84,11 +85,11 @@ impl Watchdog {
             timing: Mutex::new(Timing {
                 current: None,
                 last: None,
+                counted: 0,
             }),
             reducing: Mutex::new(None),
             panicked: Mutex::new(None),
             findings: Mutex::new(Vec::new()),
-            counted: AtomicU64::new(0),
             stop: AtomicBool::new(false),
         });
         let noted = Arc::clone(&shared);
@@ -125,13 +126,16 @@ impl Watchdog {
             .spawn(move || {
                 while !looking.stop.load(Ordering::Acquire) {
                     std::thread::sleep(poll);
-                    let late = locked(&looking.timing)
+                    let timing = locked(&looking.timing);
+                    let late = timing
                         .current
                         .as_ref()
                         .filter(|current| current.since.elapsed() >= looking.context.deadline)
                         .map(|current| (current.number, current.canonical.clone()));
                     if let Some((number, canonical)) = late {
-                        timed_out(&looking, number, &canonical);
+                        // The lock is kept to the end, so that the case cannot end, and be
+                        // counted, between its being found late and the process ending.
+                        timed_out(&looking, &timing, number, &canonical);
                     }
                 }
             })
@@ -175,7 +179,7 @@ impl Watchdog {
 
     /// How many cases so far were counted towards the campaign's number of cases.
     pub fn counted(&self, counted: u64) {
-        self.shared.counted.store(counted, Ordering::Relaxed);
+        locked(&self.shared.timing).counted = counted;
     }
 
     /// The campaign found something, which the timer prints if it ends the campaign.
@@ -202,7 +206,7 @@ impl Drop for Watchdog {
 }
 
 /// Keeps what is known, says it, and ends the process.
-fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
+fn timed_out(shared: &Shared, timing: &Timing, number: u64, canonical: &[u8]) -> ! {
     let context = &shared.context;
     let reducing = locked(&shared.reducing);
     let reducing = reducing
@@ -276,7 +280,7 @@ fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
             "DAGEIST_FUZZ_START={}\nDAGEIST_FUZZ_COUNTED={}\n",
             number + 1,
             // A case that did not end counts, as a case that is kept as a failure does.
-            shared.counted.load(Ordering::Relaxed) + 1
+            timing.counted + 1
         );
         let path = directory.join(GO_ON);
         let written = std::fs::write(&path, &settings);
@@ -291,8 +295,11 @@ fn timed_out(shared: &Shared, number: u64, canonical: &[u8]) -> ! {
             path.display()
         ));
     }
-    eprint!("{said}");
-    let _ = std::io::stderr().flush();
+    // Written to the process's own error output, which the test harness does not capture,
+    // since a captured report is lost when the process ends.
+    let mut stderr = std::io::stderr().lock();
+    let _ = stderr.write_all(said.as_bytes());
+    let _ = stderr.flush();
     let _ = std::io::stdout().flush();
     std::process::exit(TIMEOUT_STATUS)
 }
