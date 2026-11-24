@@ -3333,6 +3333,49 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_is_not_settled_where_the_condition_stands_alone_by_another_predicates_refusal() {
+        // `select(when(a.dt.replace(day=1).is_null()).then(a).when(a.dt.replace(day=g).is_null())
+        // .then(a).otherwise(a))`: the rule is asked about the first predicate, and Polars refuses
+        // the second, whose day is text, for the rows, which has no place. With the first made
+        // `true` Polars takes its branch and never evaluates the second, so the control is allowed
+        // for the fold and not for the first predicate.
+        let predicate = |day: String| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.dt.replace","arguments":{{"day":{day}}}}},{{"entry":"Expr.is_null","arguments":{{}}}}]}}}}"#
+            )
+        };
+        let one = r#"{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}"#;
+        let value = |entry: &str| {
+            format!(
+                r#"{{"entry":"{entry}","arguments":{{"statement":{}}}}}"#,
+                col_json("a")
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{},{{"entry":"Then.when","arguments":{{"predicates":{{"many":[{}]}}}}}},{},{}]}}}}]}}}}}}}}]}}"#,
+            predicate(one.to_owned()),
+            value("When.then"),
+            predicate(col_json("g")),
+            value("ChainedWhen.then"),
+            value("ChainedThen.otherwise"),
+        );
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start)
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        let refused = Refused {
+            place: place.clone(),
+            at: place.to_string(),
+            ..refused_as_a_predicate_that_is_no_boolean()
+        };
+        assert_eq!(settle_by_evaluating_the_condition(&case, &refused), None);
+    }
+
+    #[test]
     fn a_non_boolean_predicate_in_a_pivot_aggregate_is_asked_in_the_pivot() {
         // There is no column to stand in for the predicate, so the condition stands alone as the
         // aggregate of the same pivot.
