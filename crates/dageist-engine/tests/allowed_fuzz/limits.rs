@@ -459,9 +459,11 @@ pub enum Limit {
     /// with each such start a column is not refused for it.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
-    /// aggregate makes, with the number it is filled with, whatever the time zone of the fill: it
-    /// takes the number as it is, and its schema and its rows then differ in the zone between the
-    /// engines. It panics when the same shift follows a column of moments, which the tables record
+    /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
+    /// the fill: it takes the number as it is. Its schema names the zone of the receiver and so do
+    /// the rows in memory; the streaming engine gives rows in the zone of the fill for an aggregate
+    /// and for a moment of literals in `with_columns`, and the zone of the receiver for a moment of
+    /// literals in a `select`. It panics when the same shift follows a column of moments, which the tables record
     /// and the named rule that moments share a zone refuses for every receiver. The rule is the
     /// tables' own, so the disagreement is of a rule that refuses what Polars allows, at a shift
     /// that is filled, whose receiver gives one value.
@@ -654,7 +656,7 @@ impl Limit {
                 "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
-                "Polars shifts a moment that is one value with a fill in another time zone, which it panics on for a column of moments, where the tables measured the column"
+                "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where it panics for a column of moments, which the tables measured"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
