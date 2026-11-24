@@ -1931,14 +1931,16 @@ rows is, the tables are stricter by design: a count is no number the editor can 
 case run again with the count made another and nothing else changed, which Polars refuses for lengths: on
 twelve rows, which are the sample's three four times over; on four rows that tie, the second and the third
 twice, where the values that occur most and the values that differ are two, as the sample leaves them one or
-all; and with the number that decides each first, last, nth or placed count made 2, which is neither one value,
-which Polars broadcasts, nor the three rows. A part that Polars drops and whose count is by chance is asked
+all; and with the number that decides each first, last, nth, placed or repeated count made 2 (`head`, `tail`,
+`limit`, `top_k`, `bottom_k`, `gather_every`, `slice` and `repeat`), which is neither one value, which Polars
+broadcasts, nor the three rows. A part that Polars drops and whose count is by chance is asked
 apart from the case, where it is allowed on the sample. A refusal that stays when the count differs is
 not this: a count that is the rows whatever they are, as the values that occur most of the places that sort a
 column are, which Polars allows with any rows, stays a finding, as does a count met by a part Polars folds
-to a null. Only the rules for counts and the table of counts are asked, and a second count elsewhere in the
-case that Polars refuses with the count made another would be taken for the first, which the reduction of a
-case makes unlikely. Such a case is kept as `regressions/by-design-<what it shows>.case`, counted as refused
+to a null. Only the rules for counts and the table of counts are asked. A control changes every count the case
+holds, so it is asked of the item of the step that holds the refused place, and of nothing where that item
+holds a count in more than one place, a count in a chain and one in an expression a call of it is given, as
+another count's refusal for lengths says nothing of the first; such a case stays a finding. Such a case is kept as `regressions/by-design-<what it shows>.case`, counted as refused
 where a count is the rows by chance, and is an expected rejection.
 
 A case that the tables and Polars both refuse is evidence of agreement about the
