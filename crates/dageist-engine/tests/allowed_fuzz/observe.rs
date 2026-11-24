@@ -353,12 +353,26 @@ pub struct Tables {
     /// dtype that the case's tables lack, named by
     /// [`stand_in_column`](super::frames::stand_in_column) in order.
     pub stand_ins: [Option<Representative>; MAX_STAND_INS],
-    /// Both tables hold [`MORE_ROWS`] times their three rows, so that what the three happen to
-    /// equal is no longer what they are.
-    pub more_rows: bool,
+    /// The rows both tables hold, which a control changes where a count is the rows by chance.
+    pub rows: Rows,
 }
 
-/// How many times the three rows a control with more rows is given.
+/// Which rows the tables a case runs on hold.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Rows {
+    /// The three rows of the sample.
+    #[default]
+    Sample,
+    /// The three rows again, [`MORE_ROWS`] times over, one after another: twelve rows, where the
+    /// values that differ and the values that occur most are as few as they were.
+    Repeated,
+    /// The second and third rows, twice over: four rows in which every value that the sample's
+    /// columns hold twice or once occurs as often as the other one does, so that the values that
+    /// occur most are two, and the values that differ are two, which no column's sample has.
+    Tied,
+}
+
+/// How many times the three rows of [`Rows::Repeated`] are given.
 pub const MORE_ROWS: usize = 4;
 
 impl Tables {
@@ -375,7 +389,7 @@ impl Tables {
         Some(Self {
             other_as_left,
             stand_ins,
-            more_rows: false,
+            rows: Rows::Sample,
         })
     }
 
@@ -388,10 +402,10 @@ impl Tables {
         };
         let classes: Vec<Representative> = self.stand_ins.into_iter().flatten().collect();
         let frames = frames.with_stand_ins(&classes);
-        if self.more_rows {
-            frames.repeated(MORE_ROWS)
-        } else {
-            frames
+        match self.rows {
+            Rows::Sample => frames,
+            Rows::Repeated => frames.picked(&(0..MORE_ROWS).flat_map(|_| 0..3).collect::<Vec<_>>()),
+            Rows::Tied => frames.picked(&[1, 2, 1, 2]),
         }
     }
 }

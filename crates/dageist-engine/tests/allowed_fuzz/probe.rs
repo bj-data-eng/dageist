@@ -795,6 +795,36 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     })
 }
 
+/// The cases that ask Polars about the part a count was refused at, alone, as [`settle`] does,
+/// where it is allowed on the sample's rows: the chain through the refused call, and the chain of
+/// the call that takes it. `None` for a part of a pivot's aggregate or of a join's right key, which
+/// stand on columns of their own. The part is allowed as it is, so that what Polars refuses of it
+/// once its count is made another is the count's.
+pub fn counts_alone(case: &Case, refused: &Refused) -> Vec<Case> {
+    let Some(found) = find(case, &refused.place) else {
+        return Vec::new();
+    };
+    if found.in_the_aggregate || found.on_the_other_table {
+        return Vec::new();
+    }
+    let mut probes = vec![probe_of_the_part(&found, &refused.source)];
+    if matches!(refused.source, Source::Polars) && is_a_count_that_may_not_end(&refused.reason) {
+        probes.push(enclosing_probe(&found));
+    }
+    probes
+        .into_iter()
+        .flatten()
+        .filter_map(|probe| {
+            let document = document_of(case, &found, probe.part, probe.filter)?;
+            Some(Case {
+                receiver: case.receiver,
+                argument: case.argument,
+                document,
+            })
+        })
+        .collect()
+}
+
 /// The class of the dtype that reaches the call at `link` of the expression at
 /// `held`, which Polars gave it when it ran the case and the tables predicted:
 /// the tables' dtype is not trusted where Polars' is not the same, for then the

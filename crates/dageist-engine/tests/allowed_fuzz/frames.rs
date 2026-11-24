@@ -15,7 +15,7 @@
 use dageist_engine::allowed::Representative;
 use dageist_engine::document::Inputs;
 use polars::prelude::{
-    DataFrame, DataType, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
+    DataFrame, DataType, IdxCa, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
 };
 
 /// The name of the column the join's `index`th key is paired with on the other
@@ -229,24 +229,16 @@ impl Frames {
         }
     }
 
-    /// The same tables with every row of the left and the other table made `times` times as many:
-    /// the three rows again, one after another, so a column keeps its dtype, its nulls and the
-    /// repeats of its values. A count that the data or the arguments decide, as the values that
-    /// differ are or the first values are, is then no longer the rows, which three rows may
-    /// leave it by chance.
-    pub fn repeated(self, times: usize) -> Self {
-        let again = |frame: &DataFrame| {
-            let mut stacked = frame.clone();
-            for _ in 1..times {
-                stacked
-                    .vstack_mut(frame)
-                    .expect("rows of the same columns stack");
-            }
-            stacked
-        };
+    /// The same tables with the rows `picks` names, of the left and of the other table, in that
+    /// order and as often as they are named: a column keeps its dtype and its values, and a
+    /// count that the data or the arguments decide, as the values that differ are or the first
+    /// values are, is then no longer what three rows leave it by chance.
+    pub fn picked(self, picks: &[u32]) -> Self {
+        let indices = IdxCa::from_vec("".into(), picks.to_vec());
+        let pick = |frame: &DataFrame| frame.take(&indices).expect("the rows named are there");
         Self {
-            rows: again(&self.rows),
-            other_rows: again(&self.other_rows),
+            rows: pick(&self.rows),
+            other_rows: pick(&self.other_rows),
             ..self
         }
     }
@@ -340,13 +332,13 @@ mod tests {
     }
 
     #[test]
-    fn rows_made_more_keep_the_columns_their_dtypes_and_their_repeats() {
+    fn rows_picked_keep_the_columns_their_dtypes_and_their_values() {
         let frames = Frames::new(
             Representative::Date,
             Representative::Int8,
             &[DataType::Int64],
         )
-        .repeated(4);
+        .picked(&[0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]);
         for table in [&frames.rows, &frames.other_rows] {
             assert_eq!(table.height(), 12);
         }
@@ -356,5 +348,9 @@ mod tests {
         let a = frames.rows.column("a").expect("a column");
         assert_eq!(a.dtype(), &Representative::Date.dtype());
         assert_eq!(a.null_count(), 4);
+        let tied =
+            Frames::new(Representative::Date, Representative::Int8, &[]).picked(&[1, 2, 1, 2]);
+        let u = tied.rows.column("u").expect("a column");
+        assert_eq!(u.n_unique().expect("the values that differ"), 2);
     }
 }
