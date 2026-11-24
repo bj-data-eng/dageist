@@ -45,6 +45,52 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   /* Code is set as it is typed: two signs side by side are never drawn as one. */
   --font-mono--font-feature-settings: 'calt' 0, 'liga' 0;
+
+  /*
+   * The colour names shadcn/ui's components are written in, each set to one
+   * of the tokens above. shadcn's own `accent` and `muted`, a hover fill and
+   * a quiet fill, are left out: here `accent` is the orange and `muted` the
+   * quiet text, and the copied components use `hover` and `line` instead.
+   */
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-panel);
+  --color-card-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-canvas);
+  --color-secondary: var(--color-raised);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted-foreground: var(--color-muted);
+  --color-destructive: var(--color-danger);
+  --color-border: var(--color-line);
+  --color-input: var(--color-line-strong);
+  --color-ring: var(--color-line-strong);
+  --color-sidebar: var(--color-panel);
+  --color-sidebar-foreground: var(--color-ink);
+  --color-sidebar-primary: var(--color-accent);
+  --color-sidebar-primary-foreground: var(--color-canvas);
+  --color-sidebar-accent: var(--color-hover);
+  --color-sidebar-accent-foreground: var(--color-ink);
+  --color-sidebar-border: var(--color-line);
+  --color-sidebar-ring: var(--color-line-strong);
+}
+
+/*
+ * The application is always dark, so shadcn/ui's `dark:` styles always apply,
+ * whatever the system's appearance.
+ */
+@custom-variant dark (&:where(*));
+
+/*
+ * A border with no colour of its own is drawn in the line colour, not in the
+ * colour of the text: shadcn/ui's components draw some of their edges so.
+ */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
 }
 
 /*
@@ -98,4 +144,46 @@ body {
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/*
+ * The window behaves like an application, not a web page. The edges do not
+ * stretch and spring back when scrolled past. Words and pictures are not
+ * selected or dragged when clicked or dragged, so a drag moves what the
+ * application moves. The pointer is an arrow over words, not a text cursor.
+ * Text is drawn as macOS draws it on a dark ground. `native-feel.ts` turns off
+ * the browser's own menu and keys in the application's window.
+ */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+img,
+svg,
+a {
+  -webkit-user-drag: none;
+}
+
+/* What is typed, and what is marked as for copying, can still be selected. */
+input,
+textarea,
+[contenteditable='true'],
+[data-selectable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  cursor: text;
 }

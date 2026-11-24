@@ -3,6 +3,9 @@
  * Nothing here knows about dataframes, steps or tables. The colour and font
  * tokens these components use are defined in the shell's stylesheet, which
  * also imports `blocks.css`, the styles of the words "code" is written in.
+ * The components under `shadcn/` are copied from shadcn/ui
+ * (https://ui.shadcn.com), MIT License, Copyright (c) 2023 shadcn, and
+ * drawn in the same tokens.
  */
 
 export { Block, Equals, Seam, Word } from './Block';
@@ -26,3 +29,23 @@ export type { ToggleButtonProps } from './ToggleButton';
 export { TypedBlock } from './TypedBlock';
 export type { TypedBlockProps, TypedKind } from './TypedBlock';
 export { cx } from './cx';
+
+// Components copied from shadcn/ui, with the changes their files note.
+export {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from './shadcn/sidebar';
+export { Collapsible, CollapsibleContent, CollapsibleTrigger } from './shadcn/collapsible';
+export { Skeleton } from './shadcn/skeleton';
+export { cn } from './shadcn/cn';

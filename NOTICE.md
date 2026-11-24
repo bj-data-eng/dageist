@@ -10,10 +10,11 @@ fuzz framework's optional dependencies, and the crates patched in the root
 [Cargo.toml](Cargo.toml), at the versions resolved by [Cargo.lock](Cargo.lock),
 for the direct dependencies of the public API audit generator declared in
 [api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved by
-[its lock file](api/generator/Cargo.lock), and for the libraries and the
-typefaces copied into the view. It does not enumerate the Rust dependencies'
-transitive, optional, platform, or compiled dependencies, and it is not a
-complete inventory for a distributed application bundle.
+[its lock file](api/generator/Cargo.lock), and for the libraries, the
+source code adapted from shadcn/ui and the typefaces copied into the view. It
+does not enumerate the Rust dependencies' transitive, optional, platform, or
+compiled dependencies, and it is not a complete inventory for a distributed
+application bundle.
 
 Vite and its React plugin, the Tailwind CSS Vite plugin, TypeScript, oxlint,
 oxlint-tsgolint, oxfmt, Vitest and the React and Node type declarations,
@@ -71,6 +72,134 @@ distributed by the Floating UI contributors:
 
 * License: [MIT License](licenses/floating-ui/LICENSE)
 * Homepage: [Floating UI](https://floating-ui.com)
+
+This product's view includes React Flow 13.0.3 (the packages `@xyflow/react`
+13.0.3 and `@xyflow/system` 1.0.1), distributed by webkid GmbH:
+
+* License: [MIT License](licenses/react-flow/LICENSE)
+* Homepage: [React Flow](https://reactflow.dev)
+
+This product's view includes zustand 5.1.0, which React Flow depends on,
+distributed by Paul Henschel:
+
+* License: [MIT License](licenses/zustand/LICENSE)
+* Homepage: [zustand](https://github.com/pmndrs/zustand)
+
+This product's view includes classcat 5.0.5, which React Flow depends on,
+distributed by Jorge Bucaran:
+
+* License: [MIT License](licenses/classcat/LICENSE.md)
+* Homepage: [classcat](https://github.com/jorgebucaran/classcat)
+
+This product's view includes react-compiler-runtime 1.0.0, which React Flow
+depends on, distributed by Meta Platforms, Inc. and affiliates as part of the
+[React repository](https://github.com/facebook/react). The package ships no
+license file; its `package.json` declares the MIT License, and the license of
+the React repository, the same text as React's above, applies:
+
+* License: [MIT License](licenses/react/LICENSE)
+* Homepage: [React](https://react.dev)
+
+This product's view includes the D3 modules d3-color 3.1.1, d3-dispatch 3.0.2,
+d3-drag 3.0.1, d3-interpolate 3.0.2, d3-selection 3.0.1, d3-timer 3.0.2,
+d3-transition 3.0.2 and d3-zoom 3.0.1, which React Flow depends on,
+distributed by Mike Bostock:
+
+* License: [ISC License](licenses/d3/LICENSE)
+* Homepage: [D3](https://d3js.org)
+
+This product's view includes the D3 module d3-ease 3.0.2, which React Flow
+depends on, distributed by Mike Bostock, with the easing functions' terms of
+Robert Penner:
+
+* License: [BSD 3-Clause License](licenses/d3-ease/LICENSE)
+* Homepage: [d3-ease](https://d3js.org/d3-ease)
+
+This product's view includes Radix Primitives, the package `radix-ui` 1.8.1
+with the `@radix-ui/*` packages it depends on, distributed by WorkOS:
+
+* License: [MIT License](licenses/radix-ui/LICENSE)
+* Homepage: [Radix Primitives](https://radix-ui.com/primitives)
+
+This product's view includes react-remove-scroll 2.7.2, react-remove-scroll-bar
+2.3.8, react-style-singleton 2.2.3, use-callback-ref 1.3.3, use-sidecar 1.1.3
+and aria-hidden 1.2.6, which Radix Primitives depend on, distributed by Anton
+Korzunov. The react-remove-scroll-bar package ships no license file and none
+could be confirmed for its version; its `package.json` declares the MIT
+License, and this notice does not include a license text for it. The license
+below is the text shipped by the other packages of this entry:
+
+* License: [MIT License](licenses/react-remove-scroll/LICENSE)
+* Homepage: [react-remove-scroll](https://github.com/theKashey/react-remove-scroll)
+* Homepage: [react-remove-scroll-bar](https://github.com/theKashey/react-remove-scroll-bar)
+* Homepage: [react-style-singleton](https://github.com/theKashey/react-style-singleton)
+* Homepage: [use-callback-ref](https://github.com/theKashey/use-callback-ref)
+* Homepage: [use-sidecar](https://github.com/theKashey/use-sidecar)
+* Homepage: [aria-hidden](https://github.com/theKashey/aria-hidden)
+
+This product's view includes detect-node-es 1.1.0, which Radix Primitives
+depend on, distributed by Ilya Kantor:
+
+* License: [MIT License](licenses/detect-node-es/LICENSE)
+* Homepage: [detect-node-es](https://github.com/thekashey/detect-node)
+
+This product's view includes get-nonce 1.0.1, which Radix Primitives depend on,
+distributed by Anton Korzunov:
+
+* License: [MIT License](licenses/get-nonce/LICENSE)
+* Homepage: [get-nonce](https://github.com/theKashey/get-nonce)
+
+This product's view includes tslib 2.9.1, which several of the libraries above
+depend on, distributed by Microsoft Corp.:
+
+* License: [BSD Zero Clause License](licenses/tslib/LICENSE.txt)
+* Homepage: [tslib](https://github.com/Microsoft/tslib)
+
+This product's view includes class-variance-authority 0.7.1, distributed by Joe
+Bell:
+
+* License: [Apache License 2.0](licenses/class-variance-authority/LICENSE)
+* Homepage: [class-variance-authority](https://github.com/joe-bell/cva)
+
+This product's view includes clsx 2.1.1, distributed by Luke Edwards:
+
+* License: [MIT License](licenses/clsx/license)
+* Homepage: [clsx](https://github.com/lukeed/clsx)
+
+This product's view includes tailwind-merge 3.7.0, distributed by Dany
+Castillo:
+
+* License: [MIT License](licenses/tailwind-merge/LICENSE.md)
+* Homepage: [tailwind-merge](https://github.com/dcastil/tailwind-merge)
+
+This product's view includes lucide-react 1.70.0, distributed by the Lucide
+Icons contributors. Its license file also carries the MIT License terms of
+Feather for the icons derived from it:
+
+* License: [ISC License, with the MIT License terms of Feather](licenses/lucide/LICENSE)
+* Homepage: [Lucide](https://lucide.dev)
+
+This product's view includes components adapted from shadcn/ui, copied as
+source code, not as a package, from commit
+`055aa6b7837b1808456a24beb4c97a677864aa82` of
+[shadcn-ui/ui](https://github.com/shadcn-ui/ui) and modified. They are in
+[ui/packages/design/src/shadcn](ui/packages/design/src/shadcn). They are
+distributed by shadcn:
+
+* License: [MIT License](licenses/shadcn-ui/LICENSE.md)
+* Homepage: [shadcn/ui](https://ui.shadcn.com)
+
+This product's view includes components adapted from React Flow UI (`base-node`,
+`base-handle`, `labeled-handle` and `button-handle`), copied as source code,
+not as a package, from its registry at `https://ui.reactflow.dev/registry/` on
+2026-11-24 and modified. They are in
+[ui/packages/canvas/src/react-flow-ui](ui/packages/canvas/src/react-flow-ui).
+They are distributed by webkid GmbH. React Flow UI's pages give the MIT License
+and link to the React Flow repository's licence, which is the text below; the
+source repository of the registry itself is not public:
+
+* License: [MIT License](licenses/react-flow/LICENSE)
+* Homepage: [React Flow UI](https://reactflow.dev/ui)
 
 This product's view includes the upright variable font of the Inter typeface
 4.1, unmodified, distributed by The Inter Project Authors:

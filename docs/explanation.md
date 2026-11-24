@@ -200,10 +200,30 @@ automatically yet, so they are also a review criterion.
 
 | Part | Package | Responsibility |
 | --- | --- | --- |
-| Shell | `@dageist/desktop` | The composition root. It decides which host the view talks to and which feature is on screen, and owns the page, the bundler configuration and the design tokens. |
+| Shell | `@dageist/desktop` | The composition root. It decides which host the view talks to and which feature is on screen, and owns the page, the window's frame, the bundler configuration and the design tokens. |
 | Host door | `@dageist/host` | The contract of every IPC command and its two implementations: over Tauri, and over the [bridge](#the-bridge) in a plain browser. No other package knows Tauri or the bridge's transport. |
 | Design system | `@dageist/design` | Primitive components. It knows nothing about dataframes, steps or tables. |
-| Features | `@dageist/steps`, `@dageist/table` | One package per feature, each exporting one entry component. |
+| Features | `@dageist/canvas`, `@dageist/steps`, `@dageist/table` | One package per feature, each exporting one entry component. |
+
+Some components are copied in as source rather than installed, and changed
+to fit the view's lint and its colours. The design package's
+`src/shadcn/` holds components from [shadcn/ui](https://ui.shadcn.com),
+built on Radix Primitives, such as the side panel. The canvas package's
+`src/react-flow-ui/` holds the node and pin components of
+[React Flow UI](https://reactflow.dev/ui), which draw the canvas's boxes on
+[React Flow](https://reactflow.dev). A README beside each lists where its
+files came from and every change made to them. The shell's stylesheet sets
+shadcn/ui's colour names, such as `sidebar` and `card`, to the view's tokens.
+
+The shell draws the window's frame. The main window's title bar is drawn over
+the page, so macOS draws its window controls at the top left, where the
+`trafficLightPosition` in `tauri.conf.json` puts them, and the side panel's
+toggle stands beside them; a browser has no such controls and shows the
+application's name there instead. The window behaves as an application, not a
+page: a click selects no text, the pointer stays an arrow, and the edges do
+not stretch when scrolled past. In the application's window the browser's own
+menu and keys, such as reload and print, are turned off as well; in a
+browser they are left on, for the page is being worked on.
 
 Three rules keep this workable as the application grows:
 
@@ -2157,18 +2177,32 @@ engine. The decisions below are the ones the core is expected to carry.
 
 ## Current Limitations
 
-The application opens its window on two features. The steps of a transform
-are edited on the engine's claim-timing sample node, offering the operations of
-the engine's catalogue; its two windows
-keep the steps the same by telling each other of every change, where the core
-will later own them. The step editor runs its steps on the engine through the
-host and shows the engine's columns, dtypes, refusals and rows. The table
-viewer shows a generated sample through the engine. The graph model, node
-types, pipeline execution and canvas interactions are not implemented yet.
+The application opens its window on the flow canvas, which fills the window
+behind everything else. A side panel at the left, which slides away, lists
+the workspaces, and the one chosen is drawn over the canvas.
 
-A third tab shows the Pieces page. It is a design prototype, not a feature:
-a static page in plain HTML, CSS and JavaScript where the way the step
+The canvas draws the engine's claim-timing sample node and what supplies its
+inputs, as the host reports them: a box for each supplier with the fields of
+its table or its values, a box for the node with a pin for each input, and a
+wire from each output to the input it feeds. The wires run at right angles,
+each on a lane of its own, around the boxes, and are routed again once a box
+is dropped or a resize ends. Boxes can be moved, and the node's box resized.
+What the host does not report yet, such as a supplier's kind, the node's name
+and its steps, is drawn as stand-ins of the size it will take. The places of
+the boxes are the view's own and are not kept, and the buttons for adding a
+trigger or a following node do nothing yet.
+
+The steps of a transform are edited on the same sample node, offering the
+operations of the engine's catalogue; its two windows keep the steps the same
+by telling each other of every change, where the core will later own them.
+The step editor runs its steps on the engine through the host and shows the
+engine's columns, dtypes, refusals and rows. The table viewer shows a
+generated sample through the engine. The graph model, node types and pipeline
+execution are not implemented yet.
+
+The side panel also lists the Pieces page. It is a design prototype, not a
+feature: a static page in plain HTML, CSS and JavaScript where the way the step
 editor is drawn is tried out in several versions before one is built. It
 works on made-up samples of its own, shares no code with the view's
-packages and calls no host command. The tab that is open is kept in the
+packages and calls no host command. The workspace that is open is kept in the
 page's address, so reloading the page returns to it.

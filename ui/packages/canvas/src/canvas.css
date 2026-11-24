@@ -1,0 +1,83 @@
+/*
+ * React Flow's look, set to the application's tokens. The canvas draws its
+ * own dots, so the shell's dotted background stays still behind it.
+ */
+.dageist-flow {
+  --xy-background-color: var(--color-canvas);
+  --xy-background-pattern-color: var(--color-dot);
+  --xy-edge-stroke: var(--color-line-strong);
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-edge-stroke-width: 1.5;
+  --xy-handle-background-color: var(--color-panel);
+  --xy-handle-border-color: var(--color-muted);
+  --xy-controls-button-background-color: var(--color-panel);
+  --xy-controls-button-background-color-hover: var(--color-hover);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-controls-box-shadow: none;
+  --xy-attribution-background-color: transparent;
+  --xy-minimap-background-color: var(--color-panel);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--color-canvas) 70%, transparent);
+  --xy-minimap-node-background-color: var(--color-line-strong);
+}
+
+/* A box's pin: a small ring on its edge, level with the line it belongs to. */
+.dageist-flow .react-flow__handle {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+}
+
+.dageist-flow .react-flow__attribution a {
+  color: var(--color-muted);
+}
+
+/*
+ * Resizing a box. React Flow's small square handles and one-pixel edges are
+ * hidden and made wide. Each edge can be grabbed within 9 pixels outside it
+ * and 3 inside, so the zone stays clear of a scrollbar along the inside of
+ * the edge, and each corner within 9 pixels of it. The zones lie above the
+ * box's content, so the resize cursor shows as soon as the pointer nears the
+ * box's outline. Nothing is drawn; pointing at the box lights its outline.
+ */
+.dageist-flow .react-flow__resize-control.line {
+  z-index: 1;
+  border-width: 0;
+  border-color: transparent;
+}
+
+.dageist-flow .react-flow__resize-control.line.left,
+.dageist-flow .react-flow__resize-control.line.right {
+  width: 12px;
+}
+
+.dageist-flow .react-flow__resize-control.line.left {
+  transform: translate(-75%, 0);
+}
+
+.dageist-flow .react-flow__resize-control.line.right {
+  transform: translate(-25%, 0);
+}
+
+.dageist-flow .react-flow__resize-control.line.top,
+.dageist-flow .react-flow__resize-control.line.bottom {
+  height: 12px;
+}
+
+.dageist-flow .react-flow__resize-control.line.top {
+  transform: translate(0, -75%);
+}
+
+.dageist-flow .react-flow__resize-control.line.bottom {
+  transform: translate(0, -25%);
+}
+
+.dageist-flow .react-flow__resize-control.handle {
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}

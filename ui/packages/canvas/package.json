@@ -1,0 +1,17 @@
+{
+  "name": "@dageist/canvas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The flow canvas: the node, what supplies its inputs and the wires between them, drawn as boxes that can be moved.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@dageist/design": "0.1.0",
+    "@dageist/host": "0.1.0",
+    "@xyflow/react": "13.0.3",
+    "react": "19.3.1"
+  }
+}

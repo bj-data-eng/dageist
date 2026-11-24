@@ -1,7 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core permissions for the main dageist window and the steps window it opens.",
+  "description": "Core permissions for the main dageist window and the steps window it opens, and moving and zooming a window from the bar drawn in place of its title bar.",
   "windows": ["main", "steps"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize"
+  ]
 }

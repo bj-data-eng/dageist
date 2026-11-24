@@ -10,6 +10,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@dageist/canvas": "0.1.0",
     "@dageist/design": "0.1.0",
     "@dageist/host": "0.1.0",
     "@dageist/steps": "0.1.0",
