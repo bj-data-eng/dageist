@@ -182,6 +182,8 @@ const PREDICATE_RULES: [&str; 2] = [
 /// The innermost expression that holds the place, and what of the place is
 /// left under it.
 struct Found<'a> {
+    /// The path of the place.
+    path: &'a [Segment],
     expression: &'a Expression,
     rest: &'a [Segment],
     /// Every expression the place is inside, outermost first, and how much of
@@ -234,6 +236,7 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
     }
     let (expression, consumed) = held?;
     Some(Found {
+        path,
         expression,
         rest: &path[consumed..],
         levels,
@@ -490,12 +493,15 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
                 && !objection(tables).is_empty()
                 && objection(tables) == objection(probe))
                 || is_the_same_unpacking(tables, probe)
+                || (is_a_count_that_may_not_end(tables) && is_a_refusal_of_lengths(probe))
         }
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             let probe = probe.to_ascii_lowercase();
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
         Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
+        // A count that values meet, or a window is given, is refused as lengths that do not match.
+        Source::Rule(rule) if COUNT_MEETING_RULES.contains(rule) => is_a_refusal_of_lengths(probe),
         // Polars finds no dtype that two zones have in common, and says it of a comparison as it
         // does of a difference or a fill.
         Source::Rule(rule) if *rule == ZONE_RULE => {
@@ -503,6 +509,32 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         }
         _ => false,
     }
+}
+
+/// The rules about a count of values that the data or the arguments decide, which Polars meets
+/// where a call is given values of other lengths than it takes.
+const COUNT_MEETING_RULES: [&str; 2] = ["values-meet-in-count", "window-input-is-not-counted"];
+
+/// How the tables word the reason of a chain whose count of values may not end an expression
+/// where the context takes only one value or the table's rows.
+const A_COUNT_THAT_MAY_NOT_END: &str = "a count of values that the data or the arguments decide";
+
+/// Whether the tables' reason is that a count of values may not end an expression, where Polars
+/// refused it for the lengths that did not match.
+fn is_a_count_that_may_not_end(tables: &str) -> bool {
+    tables.contains(A_COUNT_THAT_MAY_NOT_END) && tables.contains("may not end an expression")
+}
+
+/// Whether Polars refused for values of lengths that do not meet, in the words of its two engines.
+fn is_a_refusal_of_lengths(reason: &str) -> bool {
+    let reason = reason.to_ascii_lowercase();
+    [
+        "lengths don't match",
+        "non-equal length",
+        "different lengths",
+    ]
+    .iter()
+    .any(|words| reason.contains(words))
 }
 
 /// The tables a probe of the part runs on.
@@ -564,11 +596,52 @@ fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<P
     }
 }
 
+/// The probe of the chain that takes the refused place as an argument: the call that is given the
+/// count is the one that meets it beside its other operands, which the place alone does not hold.
+fn enclosing_probe(found: &Found) -> Option<Probe> {
+    if !found.rest.is_empty() || found.levels.len() < 2 {
+        return None;
+    }
+    let (outer, consumed) = found.levels[found.levels.len() - 2];
+    let at = found.path.get(consumed)?;
+    let held = place_of_the_part(found, false);
+    // A predicate of a condition is met by the condition, which its values complete: a condition
+    // of literal values with the predicate stands where the chain of the condition's start would.
+    if matches!(at, Segment::Start)
+        && matches!(
+            found.path.get(consumed + 1),
+            Some(Segment::Parameter(name)) if name == "predicates"
+        )
+    {
+        let started = held.then(Segment::Start);
+        let inside = started
+            .clone()
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        return Some(Probe {
+            part: condition_of(found.expression.clone())?,
+            filter: false,
+            before: None,
+            at: vec![started, inside],
+        });
+    }
+    Some(Probe {
+        part: chain_up_to(outer, Some(at))?,
+        filter: false,
+        before: None,
+        at: vec![held.then(at.clone())],
+    })
+}
+
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
         Source::Polars => chain_probe(found),
-        Source::Rule(rule) if *rule == COUNT_RULE || *rule == ZONE_RULE => chain_probe(found),
+        Source::Rule(rule)
+            if *rule == COUNT_RULE || *rule == ZONE_RULE || COUNT_MEETING_RULES.contains(rule) =>
+        {
+            chain_probe(found)
+        }
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             predicate_probe(found, rule, found_predicate(found)?)
         }
@@ -686,7 +759,12 @@ fn refused_anywhere_as(probed: &Case, tables: Tables, refused: &Refused) -> bool
 /// call is refused for the same reason, is not the refused call's.
 pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     let found = find(case, &refused.place)?;
-    let probe = probe_of_the_part(&found, &refused.source)?;
+    let mut probes = vec![probe_of_the_part(&found, &refused.source)];
+    // A count that may not end an expression where a call is given it is met by the call that
+    // takes it, beside its other operands, which a probe of the count alone does not hold.
+    if matches!(refused.source, Source::Polars) && is_a_count_that_may_not_end(&refused.reason) {
+        probes.push(enclosing_probe(&found));
+    }
     let run = |part: Expression, filter: bool| {
         let document = document_of(case, &found, part, filter)?;
         Some(Case {
@@ -695,18 +773,20 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
             document,
         })
     };
-    let probed = run(probe.part, probe.filter)?;
-    let refusal = refused_as(&probed, tables_of(&found, None), refused, &probe.at)?;
-    if let Some(before) = probe.before {
-        let alone = run(before, false)?;
-        if refused_anywhere_as(&alone, tables_of(&found, None), refused) {
-            return None;
+    probes.into_iter().flatten().find_map(|probe| {
+        let probed = run(probe.part, probe.filter)?;
+        let refusal = refused_as(&probed, tables_of(&found, None), refused, &probe.at)?;
+        if let Some(before) = probe.before {
+            let alone = run(before, false)?;
+            if refused_anywhere_as(&alone, tables_of(&found, None), refused) {
+                return None;
+            }
         }
-    }
-    Some(Settled {
-        probe: probed.document.write(),
-        reason: refusal.reason,
-        showing: Showing::TheSameReason,
+        Some(Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+            showing: Showing::TheSameReason,
+        })
     })
 }
 
