@@ -5192,6 +5192,7 @@ mod tests {
             ]
         };
         let at_the_skew = || at(&[parameter("aggregate_function"), Segment::Link(2)]);
+        let at_the_call = |link: usize| at(&[parameter("aggregate_function"), Segment::Link(link)]);
         for making in [
             "Expr.count",
             "Expr.len",
@@ -5216,6 +5217,60 @@ mod tests {
         assert_eq!(
             refused_by_the_tables_at(&values, at_the_skew(), text),
             vec![]
+        );
+        // The text must be made of the count: a count that no fill with text follows, a fill with
+        // text that comes before the count, and a fill with a number are the sample's text, or no
+        // text, still.
+        let skewed = |links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(call("Expr.skew", Vec::new()));
+            (
+                pivot(chain_of(call("polars.element", Vec::new()), all)),
+                at_the_call(at),
+            )
+        };
+        let fill_with = |value: Call| {
+            call(
+                "Expr.fill_null",
+                vec![("value", Value::Expression(chain_of(value, Vec::new())))],
+            )
+        };
+        let one = || call("polars.lit", vec![("value", Value::Integer(1))]);
+        for (what, links) in [
+            ("a count and no fill", vec![call("Expr.count", Vec::new())]),
+            (
+                "a fill with text before the count",
+                vec![fill_with(text_of("1d")), call("Expr.count", Vec::new())],
+            ),
+            (
+                "a fill with a number after the count",
+                vec![call("Expr.count", Vec::new()), fill_with(one())],
+            ),
+            (
+                "a count, a calculation, and no fill",
+                vec![
+                    call("Expr.count", Vec::new()),
+                    compared_with("Expr.add", chain_of(one(), Vec::new())),
+                ],
+            ),
+        ] {
+            let (case, place) = skewed(links);
+            assert_eq!(
+                refused_by_the_tables_at(&case, place, text),
+                vec![],
+                "{what}"
+            );
+        }
+        // A count, a fill with text and then another call that keeps the text, is still the count's.
+        let (kept_on, place) = skewed(vec![
+            call("Expr.count", Vec::new()),
+            fill_with(text_of("1d")),
+            call("Expr.reverse", Vec::new()),
+        ]);
+        assert_eq!(
+            refused_by_the_tables_at(&kept_on, place, text),
+            vec![Limit::AGroupAggregate]
         );
         // A count after the conversion makes nothing that is converted.
         let after = pivot(chain_of(
