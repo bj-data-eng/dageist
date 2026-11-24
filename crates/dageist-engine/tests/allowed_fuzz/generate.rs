@@ -18,7 +18,7 @@ use dageist_engine::allowed::{
     Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{
-    self, Applies, Entry, Kind, ParameterDefault, Shape as ParamShape, ValueType,
+    self, Applies, Counting, Entry, Kind, ParameterDefault, Shape as ParamShape, ValueType,
 };
 use dageist_engine::document::{Call, Document, Dtype, Expression, Start, Step, StepId, Value};
 use dageist_fuzz::generation::Entropy;
@@ -1150,9 +1150,14 @@ impl Gen<'_> {
             }
             3 => (call("polars.when", Vec::new()), None, true),
             5 => {
+                // A function that gives a count the arguments decide is drawn only where a focus
+                // names it, as the methods that give one are.
                 let starts = match self.focus {
                     Some(focus) if !focus.starts.is_empty() => focus.starts.clone(),
-                    _ => function_starts(),
+                    _ => function_starts()
+                        .into_iter()
+                        .filter(|entry| !is_held_back(entry))
+                        .collect(),
                 };
                 let entry = self.draw.pick(&starts);
                 match self.function_start(entry, slots, depth) {
@@ -1180,7 +1185,12 @@ impl Gen<'_> {
         slots: &mut Vec<Slot>,
         depth: usize,
     ) -> Option<(Call, Option<Representative>)> {
-        let (call, operands) = self.method_call(entry, slots, depth)?;
+        let counted_by_arguments = Counting::of(entry, &[]) == Some(Counting::TheArguments);
+        let (call, operands) = if counted_by_arguments {
+            self.range_call(entry)
+        } else {
+            self.method_call(entry, slots, depth)?
+        };
         let context = Context::from_positions(slots).expect("a position of a step comes first");
         let given: Vec<(&str, Representative)> = operands
             .iter()
@@ -1214,7 +1224,9 @@ impl Gen<'_> {
             .with_arguments(&given)
             .with_options(&words)
             .with_time_zones(&zones);
-        let chosen = if one {
+        let chosen = if counted_by_arguments {
+            chosen.giving_shape(Shape::Counted)
+        } else if one {
             chosen.giving_one()
         } else {
             chosen.giving_many()
@@ -1231,6 +1243,251 @@ impl Gen<'_> {
             OfferVerdict::Refused(_) => None,
         };
         Some((call, class))
+    }
+
+    /// A number typed in without a dtype.
+    fn typed_number(number: i64) -> Expression {
+        Expression::new(
+            Start::Call(call("polars.lit", vec![("value", Value::Integer(number))])),
+            Vec::new(),
+        )
+        .expect("a start")
+    }
+
+    /// A function that makes a date, a moment or a time of day of numbers typed in: the values a
+    /// range is counted from.
+    fn made_of(id: &str, parts: &[(&'static str, i64)]) -> Expression {
+        let given = parts
+            .iter()
+            .map(|(name, number)| (*name, Value::Expression(Self::typed_number(*number))))
+            .collect();
+        Expression::new(Start::Call(call(id, given)), Vec::new()).expect("a start")
+    }
+
+    /// What a range or a repeat is given for the parameter `name` that holds an expression: a
+    /// value of the dtype the parameter takes typed in, mostly, which fixes the count of the range,
+    /// and, as often as a method is given what it refuses, an aggregate of a column, whose count is
+    /// not known, the rows, a count of values and a value of a dtype it does not take.
+    fn range_argument(&mut self, id: &str, name: &str) -> Built {
+        let typed =
+            |expression: Expression, class: Option<Representative>| Built { expression, class };
+        match self
+            .draw
+            .weighted(&[(62, 0_u8), (10, 1), (12, 2), (6, 3), (5, 4), (5, 5)])
+        {
+            0 | 1 => {
+                let odd = self.draw.below(8) == 0;
+                let year = self.draw.pick(&[2024_i64, 2023, 1970, 2000]);
+                let month = self.draw.pick(&[1_i64, 2, 3, 6, 10, 12]);
+                let day = self.draw.pick(&[1_i64, 5, 10, 28, 31]);
+                let hour = self.draw.pick(&[0_i64, 1, 2, 5, 23]);
+                let date = || [("year", year), ("month", month), ("day", day)];
+                match (id, name) {
+                    ("polars.int_range", _) => {
+                        let bound = if odd {
+                            self.draw.pick(&[-1_i64, 300, 256, 70_000])
+                        } else {
+                            self.draw.pick(&[0_i64, 1, 2, 3, 5, 10, 100])
+                        };
+                        typed(Self::typed_number(bound), None)
+                    }
+                    ("polars.linear_space", "num_samples") | ("polars.repeat", "n") => {
+                        let count = if odd {
+                            -1_i64
+                        } else {
+                            self.draw.pick(&[0_i64, 1, 2, 3, 5, 10, 1000])
+                        };
+                        typed(Self::typed_number(count), None)
+                    }
+                    ("polars.linear_space", _) => match self.draw.below(6) {
+                        0 => typed(
+                            Self::made_of("polars.date", &date()),
+                            Some(Representative::Date),
+                        ),
+                        1 => typed(
+                            Self::made_of(
+                                "polars.datetime",
+                                &[
+                                    ("year", year),
+                                    ("month", month),
+                                    ("day", day),
+                                    ("hour", hour),
+                                ],
+                            ),
+                            Some(Representative::Datetime),
+                        ),
+                        _ => typed(Self::typed_number(self.draw.pick(&[0, 1, 2, 10, -5])), None),
+                    },
+                    ("polars.repeat", _) => match self.draw.below(6) {
+                        0 => typed(
+                            Self::made_of("polars.date", &date()),
+                            Some(Representative::Date),
+                        ),
+                        1 => typed(
+                            Expression::new(
+                                Start::Call(call(
+                                    "polars.lit",
+                                    vec![("value", Value::String("a".to_owned()))],
+                                )),
+                                Vec::new(),
+                            )
+                            .expect("a start"),
+                            Some(Representative::String),
+                        ),
+                        2 => typed(
+                            Expression::new(
+                                Start::Call(call("polars.lit", vec![("value", Value::Flag(None))])),
+                                Vec::new(),
+                            )
+                            .expect("a start"),
+                            Some(Representative::Null),
+                        ),
+                        _ => typed(Self::typed_number(self.draw.pick(&[0, 1, 7])), None),
+                    },
+                    ("polars.time_range", _) => {
+                        if odd {
+                            typed(
+                                Self::made_of("polars.date", &date()),
+                                Some(Representative::Date),
+                            )
+                        } else {
+                            typed(
+                                Self::made_of(
+                                    "polars.time",
+                                    &[("hour", hour), ("minute", self.draw.pick(&[0_i64, 30]))],
+                                ),
+                                Some(Representative::Time),
+                            )
+                        }
+                    }
+                    ("polars.datetime_range", _) if self.draw.chance(70) => typed(
+                        Self::made_of(
+                            "polars.datetime",
+                            &[
+                                ("year", year),
+                                ("month", month),
+                                ("day", day),
+                                ("hour", hour),
+                            ],
+                        ),
+                        Some(Representative::Datetime),
+                    ),
+                    // A date is the bound of a range of dates, and of moments too.
+                    _ if odd => typed(Self::typed_number(0), None),
+                    _ => typed(
+                        Self::made_of("polars.date", &date()),
+                        Some(Representative::Date),
+                    ),
+                }
+            }
+            2 => {
+                let (start, class) = self.column();
+                Built {
+                    // The greatest value of the column, which is no null where the column holds
+                    // one: the tables know no null, and the first value of a column may be one.
+                    expression: Expression::new(
+                        Start::Call(start),
+                        vec![call("Expr.max", Vec::new())],
+                    )
+                    .expect("a chain"),
+                    class,
+                }
+            }
+            3 => {
+                let (start, class) = self.column();
+                Built {
+                    expression: Expression::new(Start::Call(start), Vec::new()).expect("a start"),
+                    class,
+                }
+            }
+            4 => {
+                let (start, class) = self.column();
+                Built {
+                    expression: Expression::new(
+                        Start::Call(start),
+                        vec![call(
+                            "Expr.head",
+                            vec![("n", Value::Expression(Self::typed_number(2)))],
+                        )],
+                    )
+                    .expect("a chain"),
+                    class,
+                }
+            }
+            _ => {
+                let text = Expression::new(
+                    Start::Call(call(
+                        "polars.lit",
+                        vec![("value", Value::String("1".to_owned()))],
+                    )),
+                    Vec::new(),
+                )
+                .expect("a start");
+                typed(text, Some(Representative::String))
+            }
+        }
+    }
+
+    /// The call of a function that makes a range or a repeat: each bound, the number of samples or
+    /// of times and the value given as [`Self::range_argument`] says, and the step, the interval,
+    /// the words and the dtype it takes, drawn from what Polars takes and what it refuses.
+    fn range_call(&mut self, entry: &'static Entry) -> (Call, Operands) {
+        let id = entry.id().as_str();
+        let mut given: Vec<(&'static str, Value)> = Vec::new();
+        let mut operands: Operands = Vec::new();
+        for parameter in entry.parameters() {
+            let name = parameter.name();
+            match parameter.kind() {
+                Kind::Expression(_) => {
+                    if !parameter.is_needed() && self.draw.chance(30) {
+                        continue;
+                    }
+                    let built = self.range_argument(id, name);
+                    operands.push((name.to_owned(), built.class));
+                    given.push((name, Value::Expression(built.expression)));
+                }
+                Kind::Value(ValueType::Integer) if self.draw.chance(50) => {
+                    given.push((name, Value::Integer(self.draw.pick(&[1, 2, 3, -1, -2, 0]))));
+                }
+                Kind::Duration if self.draw.chance(70) => {
+                    let texts: &[&str] = match id {
+                        "polars.date_range" => &[
+                            "1d", "2d", "1w", "1mo", "1y", "1q", "12h", "-1d", "0d", "1d1h",
+                        ],
+                        "polars.time_range" => &["1h", "30m", "15m", "1h30m", "1d", "-1h"],
+                        _ => &["1d", "6h", "1h30m", "1mo", "2d12h", "xyz", "-1h", "1w"],
+                    };
+                    given.push((name, Value::Duration(self.draw.pick(texts).to_owned())));
+                }
+                Kind::Choice(words) if self.draw.chance(40) => {
+                    given.push((name, Value::Choice((*self.draw.pick(words)).to_owned())));
+                }
+                Kind::TimeZone if self.draw.chance(35) => {
+                    for (zone, value) in self.time_zones(entry) {
+                        given.push((zone, value));
+                    }
+                }
+                Kind::Dtype if self.draw.chance(35) => {
+                    let classes = if id == "polars.int_range" {
+                        vec![
+                            Representative::Int8,
+                            Representative::UInt8,
+                            Representative::Int32,
+                            Representative::Int64,
+                            Representative::UInt64,
+                            Representative::Float64,
+                        ]
+                    } else {
+                        literal_classes()
+                    };
+                    let class = self.draw.pick(&classes);
+                    given.push((name, dtype_value(class).expect("a class of the document")));
+                }
+                // A parameter that is not drawn this time, and the series that no step makes.
+                _ => {}
+            }
+        }
+        (call(id, given), operands)
     }
 
     /// A chain in the position `slots` end in, `depth` levels inside others.
@@ -2417,6 +2674,57 @@ mod tests {
             5,
             "the cases start a chain from {drawn:?} and not from every function"
         );
+    }
+
+    #[test]
+    fn a_function_that_gives_a_count_the_arguments_decide_is_drawn_only_where_a_focus_names_it() {
+        let ranges = [
+            "int_range",
+            "date_range",
+            "datetime_range",
+            "time_range",
+            "linear_space",
+            "repeat",
+        ];
+        for name in ranges {
+            assert!(
+                is_held_back(entry(&format!("polars.{name}"))),
+                "{name} is not held back"
+            );
+        }
+        let calls =
+            |written: &str, name: &str| written.contains(&format!("\"entry\":\"polars.{name}\""));
+        let focus = Focus::parse("int_range,repeat,date_range")
+            .unwrap()
+            .unwrap();
+        let (mut without, mut with) = (0, 0);
+        let mut typed = 0;
+        for offset in 0..3000_u64 {
+            let bytes = entropy(offset);
+            if let Some(case) = generate(&bytes, None) {
+                let written = case.document.write();
+                without += ranges.iter().filter(|name| calls(&written, name)).count();
+            }
+            if let Some(case) = generate(&bytes, Some(&focus)) {
+                let written = case.document.write();
+                let drawn = ["int_range", "repeat", "date_range"]
+                    .iter()
+                    .any(|name| calls(&written, name));
+                with += usize::from(drawn);
+                // A range that is given numbers typed in has a count that the walk states.
+                typed += usize::from(
+                    drawn && written.contains("\"entry\":\"polars.lit\"")
+                        || written.contains("\"entry\":\"polars.date\""),
+                );
+                // Only the functions named are drawn of those held back.
+                for name in ["datetime_range", "time_range", "linear_space"] {
+                    assert!(!calls(&written, name), "{name} drawn at offset {offset}");
+                }
+            }
+        }
+        assert_eq!(without, 0, "a function held back was drawn without a focus");
+        assert!(with > 500, "{with} cases of 3000 hold a function in focus");
+        assert!(typed > 200, "{typed} cases give a range numbers typed in");
     }
 
     #[test]

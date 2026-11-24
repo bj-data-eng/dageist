@@ -20,6 +20,7 @@ mod nulls;
 mod order;
 mod patterns;
 mod preview;
+mod ranges;
 mod reading;
 mod refusals;
 mod shown;

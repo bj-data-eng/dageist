@@ -168,7 +168,9 @@ fn only_the_parameters_polars_reads_as_one_value_say_how_they_must_be_given_it()
     // count of values and the one value that `head` took of one value, with "must be a scalar value";
     // a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count and take
     // that value. A count of values that `head` or `slice` take, and an approximate quantile's
-    // share, take any of them.
+    // share, take any of them. Every expression a range or a repeat takes is read as one value, and
+    // refuses the rows, a count and the value that `head` took of one value alike, with "non-scalar
+    // start passed" or "must be a scalar value".
     let mut found: Vec<(&str, &str, catalog::OneValue)> = catalog::entries()
         .iter()
         .flat_map(|entry| {
@@ -190,6 +192,23 @@ fn only_the_parameters_polars_reads_as_one_value_say_how_they_must_be_given_it()
             ("Expr.shift", "fill_value", catalog::OneValue::Scalar),
             ("Expr.shift", "n", catalog::OneValue::Scalar),
             ("Expr.top_k", "k", catalog::OneValue::SingleRow),
+            ("polars.date_range", "end", catalog::OneValue::Scalar),
+            ("polars.date_range", "start", catalog::OneValue::Scalar),
+            ("polars.datetime_range", "end", catalog::OneValue::Scalar),
+            ("polars.datetime_range", "start", catalog::OneValue::Scalar),
+            ("polars.int_range", "end", catalog::OneValue::Scalar),
+            ("polars.int_range", "start", catalog::OneValue::Scalar),
+            ("polars.linear_space", "end", catalog::OneValue::Scalar),
+            (
+                "polars.linear_space",
+                "num_samples",
+                catalog::OneValue::Scalar
+            ),
+            ("polars.linear_space", "start", catalog::OneValue::Scalar),
+            ("polars.repeat", "n", catalog::OneValue::Scalar),
+            ("polars.repeat", "value", catalog::OneValue::Scalar),
+            ("polars.time_range", "end", catalog::OneValue::Scalar),
+            ("polars.time_range", "start", catalog::OneValue::Scalar),
         ]
     );
 }

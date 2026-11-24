@@ -3278,11 +3278,39 @@
       "slots": []
     },
     {
+      "entry": "polars.date_range",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Date",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.datetime",
       "verdict": {
         "kind": "allowed",
         "result": "Datetime(us)",
         "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.datetime_range",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "counted",
         "ending": {
           "kind": "allowed"
         }
@@ -3336,11 +3364,60 @@
       "slots": []
     },
     {
+      "entry": "polars.int_range",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int64",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "start",
+        "literal": {
+          "kind": "integer",
+          "value": 0,
+          "shown": "0"
+        }
+      },
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.linear_space",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.lit",
       "verdict": {
         "kind": "allowed",
         "result": null,
         "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.repeat",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "counted",
         "ending": {
           "kind": "allowed"
         }
@@ -3361,6 +3438,20 @@
       },
       "argument": null,
       "leftOut": "hour",
+      "slots": []
+    },
+    {
+      "entry": "polars.time_range",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Time",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": "start",
       "slots": []
     },
     {

@@ -464,9 +464,13 @@ decides of what it gives, a moment in it or in none, is the walk's, as is whethe
 reads one is a duration Polars reads, which it asks of Polars with the dtype that the method follows.
 A method that takes some of the values it follows, so that the data or the arguments decide how many it
 gives, is named in `Counting::of` in `crates/dageist-engine/src/catalog/counting.rs` with what decides it, and the
-walk works its count out of the arguments in `counted_by` in `crates/dageist-engine/src/document/walk.rs`. The
+walk works its count out of the arguments in `counted_by` in `crates/dageist-engine/src/document/walk.rs`. A function that
+starts an expression with a count its arguments decide, as the ranges and `repeat` do, is named there too, as
+`Counting::TheArguments`, and the walk asks `made_by` in `crates/dageist-engine/src/document/ranges.rs` how many values it
+gives and what no arguments make of it; its expression parameters that Polars reads as one value say so with
+`reading_one_value`, and the generator of the tables lists them in `SCALAR_ONLY`. The
 generator of the tables then writes `counted` for it in the dtype and option tables, whatever three rows give, and
-measures its context going on to one value. The fuzz target draws such a method only where
+measures its context going on to one value. The fuzz target draws such a method, and such a function, only where
 `DAGEIST_FUZZ_FOCUS` names it, until every shape of a count that the catalogue is to have exists.
 A new step of a table also needs what a new step starts with, in `start_step` in
 `crates/dageist-engine/src/catalog/starting.rs`, and, where it has a flag or a choice, what the generator

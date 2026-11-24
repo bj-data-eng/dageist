@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 59516 combinations: 22885 allowed; 11550 refused when Polars resolved the schema, 25081 when it ran the rows, 0 when it ran the empty table.
+# 59856 combinations: 23052 allowed; 11702 refused when Polars resolved the schema, 25102 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -59028,6 +59028,58 @@ polars.date | year | - | UInt16 | allowed Date many
 polars.date | year | - | UInt32 | allowed Date many
 polars.date | year | - | UInt64 | allowed Date many
 polars.date | year | - | UInt8 | allowed Date many
+polars.date_range | end | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.date_range | end | - | Boolean | refused schema: 'start' must be Date or Datetime, got Boolean
+polars.date_range | end | - | Date | allowed Date counted
+polars.date_range | end | - | Datetime(us) | allowed Date counted
+polars.date_range | end | - | Datetime(us, UTC) | allowed Date counted
+polars.date_range | end | - | Decimal(10, 2) | refused schema: 'start' must be Date or Datetime, got Decimal(10, 2)
+polars.date_range | end | - | Duration(us) | refused schema: 'start' must be Date or Datetime, got Duration('μs')
+polars.date_range | end | - | Float16 | refused schema: 'start' must be Date or Datetime, got Float16
+polars.date_range | end | - | Float32 | refused schema: 'start' must be Date or Datetime, got Float32
+polars.date_range | end | - | Float64 | refused schema: 'start' must be Date or Datetime, got Float64
+polars.date_range | end | - | Int128 | refused schema: 'start' must be Date or Datetime, got Int128
+polars.date_range | end | - | Int16 | refused schema: 'start' must be Date or Datetime, got Int16
+polars.date_range | end | - | Int32 | refused schema: 'start' must be Date or Datetime, got Int32
+polars.date_range | end | - | Int64 | refused schema: 'start' must be Date or Datetime, got Int64
+polars.date_range | end | - | Int8 | refused schema: 'start' must be Date or Datetime, got Int8
+polars.date_range | end | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.date_range | end | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.date_range | end | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.date_range | end | - | String | refused schema: 'start' must be Date or Datetime, got String
+polars.date_range | end | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.date_range | end | - | Time | refused schema: 'start' must be Date or Datetime, got Time
+polars.date_range | end | - | UInt128 | refused schema: 'start' must be Date or Datetime, got UInt128
+polars.date_range | end | - | UInt16 | refused schema: 'start' must be Date or Datetime, got UInt16
+polars.date_range | end | - | UInt32 | refused schema: 'start' must be Date or Datetime, got UInt32
+polars.date_range | end | - | UInt64 | refused schema: 'start' must be Date or Datetime, got UInt64
+polars.date_range | end | - | UInt8 | refused schema: 'start' must be Date or Datetime, got UInt8
+polars.date_range | start | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.date_range | start | - | Boolean | refused schema: 'start' must be Date or Datetime, got Boolean
+polars.date_range | start | - | Date | allowed Date counted
+polars.date_range | start | - | Datetime(us) | allowed Date counted
+polars.date_range | start | - | Datetime(us, UTC) | allowed Date counted
+polars.date_range | start | - | Decimal(10, 2) | refused schema: 'start' must be Date or Datetime, got Decimal(10, 2)
+polars.date_range | start | - | Duration(us) | refused schema: 'start' must be Date or Datetime, got Duration('μs')
+polars.date_range | start | - | Float16 | refused schema: 'start' must be Date or Datetime, got Float16
+polars.date_range | start | - | Float32 | refused schema: 'start' must be Date or Datetime, got Float32
+polars.date_range | start | - | Float64 | refused schema: 'start' must be Date or Datetime, got Float64
+polars.date_range | start | - | Int128 | refused schema: 'start' must be Date or Datetime, got Int128
+polars.date_range | start | - | Int16 | refused schema: 'start' must be Date or Datetime, got Int16
+polars.date_range | start | - | Int32 | refused schema: 'start' must be Date or Datetime, got Int32
+polars.date_range | start | - | Int64 | refused schema: 'start' must be Date or Datetime, got Int64
+polars.date_range | start | - | Int8 | refused schema: 'start' must be Date or Datetime, got Int8
+polars.date_range | start | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.date_range | start | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.date_range | start | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.date_range | start | - | String | refused schema: 'start' must be Date or Datetime, got String
+polars.date_range | start | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.date_range | start | - | Time | refused schema: 'start' must be Date or Datetime, got Time
+polars.date_range | start | - | UInt128 | refused schema: 'start' must be Date or Datetime, got UInt128
+polars.date_range | start | - | UInt16 | refused schema: 'start' must be Date or Datetime, got UInt16
+polars.date_range | start | - | UInt32 | refused schema: 'start' must be Date or Datetime, got UInt32
+polars.date_range | start | - | UInt64 | refused schema: 'start' must be Date or Datetime, got UInt64
+polars.date_range | start | - | UInt8 | refused schema: 'start' must be Date or Datetime, got UInt8
 polars.datetime | day | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
 polars.datetime | day | - | Boolean | allowed Datetime(us) many
 polars.datetime | day | - | Date | allowed Datetime(us) many
@@ -59210,6 +59262,58 @@ polars.datetime | year | - | UInt16 | allowed Datetime(us) many
 polars.datetime | year | - | UInt32 | allowed Datetime(us) many
 polars.datetime | year | - | UInt64 | allowed Datetime(us) many
 polars.datetime | year | - | UInt8 | allowed Datetime(us) many
+polars.datetime_range | end | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.datetime_range | end | - | Boolean | refused schema: 'start' must be Date or Datetime, got Boolean
+polars.datetime_range | end | - | Date | allowed Datetime(us) counted
+polars.datetime_range | end | - | Datetime(us) | allowed Datetime(us) counted
+polars.datetime_range | end | - | Datetime(us, UTC) | allowed Datetime(us, UTC) counted
+polars.datetime_range | end | - | Decimal(10, 2) | refused schema: 'start' must be Date or Datetime, got Decimal(10, 2)
+polars.datetime_range | end | - | Duration(us) | refused schema: 'start' must be Date or Datetime, got Duration('μs')
+polars.datetime_range | end | - | Float16 | refused schema: 'start' must be Date or Datetime, got Float16
+polars.datetime_range | end | - | Float32 | refused schema: 'start' must be Date or Datetime, got Float32
+polars.datetime_range | end | - | Float64 | refused schema: 'start' must be Date or Datetime, got Float64
+polars.datetime_range | end | - | Int128 | refused schema: 'start' must be Date or Datetime, got Int128
+polars.datetime_range | end | - | Int16 | refused schema: 'start' must be Date or Datetime, got Int16
+polars.datetime_range | end | - | Int32 | refused schema: 'start' must be Date or Datetime, got Int32
+polars.datetime_range | end | - | Int64 | refused schema: 'start' must be Date or Datetime, got Int64
+polars.datetime_range | end | - | Int8 | refused schema: 'start' must be Date or Datetime, got Int8
+polars.datetime_range | end | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.datetime_range | end | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.datetime_range | end | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.datetime_range | end | - | String | refused schema: 'start' must be Date or Datetime, got String
+polars.datetime_range | end | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.datetime_range | end | - | Time | refused schema: 'start' must be Date or Datetime, got Time
+polars.datetime_range | end | - | UInt128 | refused schema: 'start' must be Date or Datetime, got UInt128
+polars.datetime_range | end | - | UInt16 | refused schema: 'start' must be Date or Datetime, got UInt16
+polars.datetime_range | end | - | UInt32 | refused schema: 'start' must be Date or Datetime, got UInt32
+polars.datetime_range | end | - | UInt64 | refused schema: 'start' must be Date or Datetime, got UInt64
+polars.datetime_range | end | - | UInt8 | refused schema: 'start' must be Date or Datetime, got UInt8
+polars.datetime_range | start | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.datetime_range | start | - | Boolean | refused schema: 'start' must be Date or Datetime, got Boolean
+polars.datetime_range | start | - | Date | allowed Datetime(us) counted
+polars.datetime_range | start | - | Datetime(us) | allowed Datetime(us) counted
+polars.datetime_range | start | - | Datetime(us, UTC) | allowed Datetime(us, UTC) counted
+polars.datetime_range | start | - | Decimal(10, 2) | refused schema: 'start' must be Date or Datetime, got Decimal(10, 2)
+polars.datetime_range | start | - | Duration(us) | refused schema: 'start' must be Date or Datetime, got Duration('μs')
+polars.datetime_range | start | - | Float16 | refused schema: 'start' must be Date or Datetime, got Float16
+polars.datetime_range | start | - | Float32 | refused schema: 'start' must be Date or Datetime, got Float32
+polars.datetime_range | start | - | Float64 | refused schema: 'start' must be Date or Datetime, got Float64
+polars.datetime_range | start | - | Int128 | refused schema: 'start' must be Date or Datetime, got Int128
+polars.datetime_range | start | - | Int16 | refused schema: 'start' must be Date or Datetime, got Int16
+polars.datetime_range | start | - | Int32 | refused schema: 'start' must be Date or Datetime, got Int32
+polars.datetime_range | start | - | Int64 | refused schema: 'start' must be Date or Datetime, got Int64
+polars.datetime_range | start | - | Int8 | refused schema: 'start' must be Date or Datetime, got Int8
+polars.datetime_range | start | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.datetime_range | start | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.datetime_range | start | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.datetime_range | start | - | String | refused schema: 'start' must be Date or Datetime, got String
+polars.datetime_range | start | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.datetime_range | start | - | Time | refused schema: 'start' must be Date or Datetime, got Time
+polars.datetime_range | start | - | UInt128 | refused schema: 'start' must be Date or Datetime, got UInt128
+polars.datetime_range | start | - | UInt16 | refused schema: 'start' must be Date or Datetime, got UInt16
+polars.datetime_range | start | - | UInt32 | refused schema: 'start' must be Date or Datetime, got UInt32
+polars.datetime_range | start | - | UInt64 | refused schema: 'start' must be Date or Datetime, got UInt64
+polars.datetime_range | start | - | UInt8 | refused schema: 'start' must be Date or Datetime, got UInt8
 polars.duration | - | - | - | allowed Duration(us) one
 polars.duration | days | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 1 of duration
 polars.duration | days | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 1 of duration
@@ -59445,6 +59549,189 @@ polars.from_epoch | column | - | UInt16 | allowed Datetime(us) many
 polars.from_epoch | column | - | UInt32 | allowed Datetime(us) many
 polars.from_epoch | column | - | UInt64 | allowed Datetime(us) many
 polars.from_epoch | column | - | UInt8 | allowed Datetime(us) many
+polars.int_range | - | - | - | allowed Int64 counted
+polars.int_range | end | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.int_range | end | - | Boolean | refused schema: `start` must be numeric for `int_range`, got bool
+polars.int_range | end | - | Date | refused schema: `start` must be numeric for `int_range`, got date
+polars.int_range | end | - | Datetime(us) | refused schema: `start` must be numeric for `int_range`, got datetime[μs]
+polars.int_range | end | - | Datetime(us, UTC) | refused schema: `start` must be numeric for `int_range`, got datetime[μs, UTC]
+polars.int_range | end | - | Decimal(10, 2) | allowed Int64 counted
+polars.int_range | end | - | Duration(us) | refused schema: `start` must be numeric for `int_range`, got duration[μs]
+polars.int_range | end | - | Float16 | allowed Int64 counted
+polars.int_range | end | - | Float32 | allowed Int64 counted
+polars.int_range | end | - | Float64 | allowed Int64 counted
+polars.int_range | end | - | Int128 | allowed Int64 counted
+polars.int_range | end | - | Int16 | allowed Int64 counted
+polars.int_range | end | - | Int32 | allowed Int64 counted
+polars.int_range | end | - | Int64 | allowed Int64 counted
+polars.int_range | end | - | Int8 | allowed Int64 counted
+polars.int_range | end | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.int_range | end | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.int_range | end | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.int_range | end | - | String | refused schema: `start` must be numeric for `int_range`, got str
+polars.int_range | end | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.int_range | end | - | Time | refused schema: `start` must be numeric for `int_range`, got time
+polars.int_range | end | - | UInt128 | allowed Int64 counted
+polars.int_range | end | - | UInt16 | allowed Int64 counted
+polars.int_range | end | - | UInt32 | allowed Int64 counted
+polars.int_range | end | - | UInt64 | allowed Int64 counted
+polars.int_range | end | - | UInt8 | allowed Int64 counted
+polars.int_range | start | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.int_range | start | - | Boolean | refused schema: `start` must be numeric for `int_range`, got bool
+polars.int_range | start | - | Date | refused schema: `start` must be numeric for `int_range`, got date
+polars.int_range | start | - | Datetime(us) | refused schema: `start` must be numeric for `int_range`, got datetime[μs]
+polars.int_range | start | - | Datetime(us, UTC) | refused schema: `start` must be numeric for `int_range`, got datetime[μs, UTC]
+polars.int_range | start | - | Decimal(10, 2) | allowed Int64 counted
+polars.int_range | start | - | Duration(us) | refused schema: `start` must be numeric for `int_range`, got duration[μs]
+polars.int_range | start | - | Float16 | allowed Int64 counted
+polars.int_range | start | - | Float32 | allowed Int64 counted
+polars.int_range | start | - | Float64 | allowed Int64 counted
+polars.int_range | start | - | Int128 | allowed Int64 counted
+polars.int_range | start | - | Int16 | allowed Int64 counted
+polars.int_range | start | - | Int32 | allowed Int64 counted
+polars.int_range | start | - | Int64 | allowed Int64 counted
+polars.int_range | start | - | Int8 | allowed Int64 counted
+polars.int_range | start | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.int_range | start | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.int_range | start | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.int_range | start | - | String | refused schema: `start` must be numeric for `int_range`, got str
+polars.int_range | start | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.int_range | start | - | Time | refused schema: `start` must be numeric for `int_range`, got time
+polars.int_range | start | - | UInt128 | allowed Int64 counted
+polars.int_range | start | - | UInt16 | allowed Int64 counted
+polars.int_range | start | - | UInt32 | allowed Int64 counted
+polars.int_range | start | - | UInt64 | allowed Int64 counted
+polars.int_range | start | - | UInt8 | allowed Int64 counted
+polars.linear_space | end | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.linear_space | end | - | Boolean | refused schema: 'start' and 'end' have incompatible dtypes, got Boolean and Boolean
+polars.linear_space | end | - | Date | allowed Datetime(us) counted
+polars.linear_space | end | - | Datetime(us) | allowed Datetime(us) counted
+polars.linear_space | end | - | Datetime(us, UTC) | allowed Datetime(us, UTC) counted
+polars.linear_space | end | - | Decimal(10, 2) | refused schema: 'start' and 'end' have incompatible dtypes, got Decimal(10, 2) and Decimal(10, 2)
+polars.linear_space | end | - | Duration(us) | allowed Duration(us) counted
+polars.linear_space | end | - | Float16 | refused rows: the schema says Float16 and the rows give Float64
+polars.linear_space | end | - | Float32 | allowed Float32 counted
+polars.linear_space | end | - | Float64 | allowed Float64 counted
+polars.linear_space | end | - | Int128 | allowed Float64 counted
+polars.linear_space | end | - | Int16 | allowed Float64 counted
+polars.linear_space | end | - | Int32 | allowed Float64 counted
+polars.linear_space | end | - | Int64 | allowed Float64 counted
+polars.linear_space | end | - | Int8 | allowed Float64 counted
+polars.linear_space | end | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | end | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | end | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.linear_space | end | - | String | refused schema: 'start' and 'end' have incompatible dtypes, got String and String
+polars.linear_space | end | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.linear_space | end | - | Time | allowed Time counted
+polars.linear_space | end | - | UInt128 | allowed Float64 counted
+polars.linear_space | end | - | UInt16 | allowed Float64 counted
+polars.linear_space | end | - | UInt32 | allowed Float64 counted
+polars.linear_space | end | - | UInt64 | allowed Float64 counted
+polars.linear_space | end | - | UInt8 | allowed Float64 counted
+polars.linear_space | num_samples | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.linear_space | num_samples | - | Boolean | allowed Float64 counted
+polars.linear_space | num_samples | - | Date | allowed Float64 counted
+polars.linear_space | num_samples | - | Datetime(us) | allowed Float64 counted
+polars.linear_space | num_samples | - | Datetime(us, UTC) | allowed Float64 counted
+polars.linear_space | num_samples | - | Decimal(10, 2) | allowed Float64 counted
+polars.linear_space | num_samples | - | Duration(us) | allowed Float64 counted
+polars.linear_space | num_samples | - | Float16 | allowed Float64 counted
+polars.linear_space | num_samples | - | Float32 | allowed Float64 counted
+polars.linear_space | num_samples | - | Float64 | allowed Float64 counted
+polars.linear_space | num_samples | - | Int128 | allowed Float64 counted
+polars.linear_space | num_samples | - | Int16 | allowed Float64 counted
+polars.linear_space | num_samples | - | Int32 | allowed Float64 counted
+polars.linear_space | num_samples | - | Int64 | allowed Float64 counted
+polars.linear_space | num_samples | - | Int8 | allowed Float64 counted
+polars.linear_space | num_samples | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | num_samples | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | num_samples | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.linear_space | num_samples | - | String | allowed Float64 counted
+polars.linear_space | num_samples | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.linear_space | num_samples | - | Time | allowed Float64 counted
+polars.linear_space | num_samples | - | UInt128 | allowed Float64 counted
+polars.linear_space | num_samples | - | UInt16 | allowed Float64 counted
+polars.linear_space | num_samples | - | UInt32 | allowed Float64 counted
+polars.linear_space | num_samples | - | UInt64 | allowed Float64 counted
+polars.linear_space | num_samples | - | UInt8 | allowed Float64 counted
+polars.linear_space | start | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.linear_space | start | - | Boolean | refused schema: 'start' and 'end' have incompatible dtypes, got Boolean and Boolean
+polars.linear_space | start | - | Date | allowed Datetime(us) counted
+polars.linear_space | start | - | Datetime(us) | allowed Datetime(us) counted
+polars.linear_space | start | - | Datetime(us, UTC) | allowed Datetime(us, UTC) counted
+polars.linear_space | start | - | Decimal(10, 2) | refused schema: 'start' and 'end' have incompatible dtypes, got Decimal(10, 2) and Decimal(10, 2)
+polars.linear_space | start | - | Duration(us) | allowed Duration(us) counted
+polars.linear_space | start | - | Float16 | refused rows: the schema says Float16 and the rows give Float64
+polars.linear_space | start | - | Float32 | allowed Float32 counted
+polars.linear_space | start | - | Float64 | allowed Float64 counted
+polars.linear_space | start | - | Int128 | allowed Float64 counted
+polars.linear_space | start | - | Int16 | allowed Float64 counted
+polars.linear_space | start | - | Int32 | allowed Float64 counted
+polars.linear_space | start | - | Int64 | allowed Float64 counted
+polars.linear_space | start | - | Int8 | allowed Float64 counted
+polars.linear_space | start | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | start | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.linear_space | start | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.linear_space | start | - | String | refused schema: 'start' and 'end' have incompatible dtypes, got String and String
+polars.linear_space | start | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.linear_space | start | - | Time | allowed Time counted
+polars.linear_space | start | - | UInt128 | allowed Float64 counted
+polars.linear_space | start | - | UInt16 | allowed Float64 counted
+polars.linear_space | start | - | UInt32 | allowed Float64 counted
+polars.linear_space | start | - | UInt64 | allowed Float64 counted
+polars.linear_space | start | - | UInt8 | allowed Float64 counted
+polars.repeat | n | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.repeat | n | - | Boolean | refused rows: expected expression of dtype 'integer', got 'bool'
+polars.repeat | n | - | Date | refused rows: expected expression of dtype 'integer', got 'date'
+polars.repeat | n | - | Datetime(us) | refused rows: expected expression of dtype 'integer', got 'datetime[μs]'
+polars.repeat | n | - | Datetime(us, UTC) | refused rows: expected expression of dtype 'integer', got 'datetime[μs, UTC]'
+polars.repeat | n | - | Decimal(10, 2) | refused rows: expected expression of dtype 'integer', got 'decimal[10,2]'
+polars.repeat | n | - | Duration(us) | refused rows: expected expression of dtype 'integer', got 'duration[μs]'
+polars.repeat | n | - | Float16 | refused rows: expected expression of dtype 'integer', got 'f16'
+polars.repeat | n | - | Float32 | refused rows: expected expression of dtype 'integer', got 'f32'
+polars.repeat | n | - | Float64 | refused rows: expected expression of dtype 'integer', got 'f64'
+polars.repeat | n | - | Int128 | allowed Int32 counted
+polars.repeat | n | - | Int16 | allowed Int32 counted
+polars.repeat | n | - | Int32 | allowed Int32 counted
+polars.repeat | n | - | Int64 | allowed Int32 counted
+polars.repeat | n | - | Int8 | allowed Int32 counted
+polars.repeat | n | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | n | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | n | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.repeat | n | - | String | refused rows: expected expression of dtype 'integer', got 'str'
+polars.repeat | n | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.repeat | n | - | Time | refused rows: expected expression of dtype 'integer', got 'time'
+polars.repeat | n | - | UInt128 | allowed Int32 counted
+polars.repeat | n | - | UInt16 | allowed Int32 counted
+polars.repeat | n | - | UInt32 | allowed Int32 counted
+polars.repeat | n | - | UInt64 | allowed Int32 counted
+polars.repeat | n | - | UInt8 | allowed Int32 counted
+polars.repeat | value | - | Array(Int64, 2) | allowed Array(Int64, 2) counted
+polars.repeat | value | - | Boolean | allowed Boolean counted
+polars.repeat | value | - | Date | allowed Date counted
+polars.repeat | value | - | Datetime(us) | allowed Datetime(us) counted
+polars.repeat | value | - | Datetime(us, UTC) | allowed Datetime(us, UTC) counted
+polars.repeat | value | - | Decimal(10, 2) | allowed Decimal(10, 2) counted
+polars.repeat | value | - | Duration(us) | allowed Duration(us) counted
+polars.repeat | value | - | Float16 | allowed Float16 counted
+polars.repeat | value | - | Float32 | allowed Float32 counted
+polars.repeat | value | - | Float64 | allowed Float64 counted
+polars.repeat | value | - | Int128 | allowed Int128 counted
+polars.repeat | value | - | Int16 | allowed Int16 counted
+polars.repeat | value | - | Int32 | allowed Int32 counted
+polars.repeat | value | - | Int64 | allowed Int64 counted
+polars.repeat | value | - | Int8 | allowed Int8 counted
+polars.repeat | value | - | List(Int64) | allowed List(Int64) counted
+polars.repeat | value | - | List(String) | allowed List(String) counted
+polars.repeat | value | - | Null | allowed Null counted
+polars.repeat | value | - | String | allowed String counted
+polars.repeat | value | - | Struct(x: Int64, y: String) | allowed Struct(x: Int64, y: String) counted
+polars.repeat | value | - | Time | allowed Time counted
+polars.repeat | value | - | UInt128 | allowed UInt128 counted
+polars.repeat | value | - | UInt16 | allowed UInt16 counted
+polars.repeat | value | - | UInt32 | allowed UInt32 counted
+polars.repeat | value | - | UInt64 | allowed UInt64 counted
+polars.repeat | value | - | UInt8 | allowed UInt8 counted
 polars.time | - | - | - | allowed Time one
 polars.time | hour | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
 polars.time | hour | - | Boolean | allowed Time many
@@ -59550,3 +59837,56 @@ polars.time | second | - | UInt16 | allowed Time many
 polars.time | second | - | UInt32 | allowed Time many
 polars.time | second | - | UInt64 | allowed Time many
 polars.time | second | - | UInt8 | allowed Time many
+polars.time_range | - | - | - | allowed Time counted
+polars.time_range | end | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.time_range | end | - | Boolean | allowed Time counted
+polars.time_range | end | - | Date | refused rows: casting from Date to Time not supported
+polars.time_range | end | - | Datetime(us) | allowed Time counted
+polars.time_range | end | - | Datetime(us, UTC) | allowed Time counted
+polars.time_range | end | - | Decimal(10, 2) | refused rows: casting from Decimal(10, 2) to Time not supported
+polars.time_range | end | - | Duration(us) | refused rows: casting from Duration('μs') to Time not supported
+polars.time_range | end | - | Float16 | allowed Time counted
+polars.time_range | end | - | Float32 | allowed Time counted
+polars.time_range | end | - | Float64 | allowed Time counted
+polars.time_range | end | - | Int128 | allowed Time counted
+polars.time_range | end | - | Int16 | allowed Time counted
+polars.time_range | end | - | Int32 | allowed Time counted
+polars.time_range | end | - | Int64 | allowed Time counted
+polars.time_range | end | - | Int8 | allowed Time counted
+polars.time_range | end | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.time_range | end | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.time_range | end | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.time_range | end | - | String | refused rows: casting from string to time is not supported. It was removed in Polars 2.0. Use `str.to_time()` instead.
+polars.time_range | end | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.time_range | end | - | Time | allowed Time counted
+polars.time_range | end | - | UInt128 | allowed Time counted
+polars.time_range | end | - | UInt16 | allowed Time counted
+polars.time_range | end | - | UInt32 | allowed Time counted
+polars.time_range | end | - | UInt64 | allowed Time counted
+polars.time_range | end | - | UInt8 | allowed Time counted
+polars.time_range | start | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.time_range | start | - | Boolean | allowed Time counted
+polars.time_range | start | - | Date | refused rows: casting from Date to Time not supported
+polars.time_range | start | - | Datetime(us) | allowed Time counted
+polars.time_range | start | - | Datetime(us, UTC) | allowed Time counted
+polars.time_range | start | - | Decimal(10, 2) | refused rows: casting from Decimal(10, 2) to Time not supported
+polars.time_range | start | - | Duration(us) | refused rows: casting from Duration('μs') to Time not supported
+polars.time_range | start | - | Float16 | allowed Time counted
+polars.time_range | start | - | Float32 | allowed Time counted
+polars.time_range | start | - | Float64 | allowed Time counted
+polars.time_range | start | - | Int128 | allowed Time counted
+polars.time_range | start | - | Int16 | allowed Time counted
+polars.time_range | start | - | Int32 | allowed Time counted
+polars.time_range | start | - | Int64 | allowed Time counted
+polars.time_range | start | - | Int8 | allowed Time counted
+polars.time_range | start | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.time_range | start | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.time_range | start | - | Null | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+polars.time_range | start | - | String | refused rows: casting from string to time is not supported. It was removed in Polars 2.0. Use `str.to_time()` instead.
+polars.time_range | start | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.time_range | start | - | Time | allowed Time counted
+polars.time_range | start | - | UInt128 | allowed Time counted
+polars.time_range | start | - | UInt16 | allowed Time counted
+polars.time_range | start | - | UInt32 | allowed Time counted
+polars.time_range | start | - | UInt64 | allowed Time counted
+polars.time_range | start | - | UInt8 | allowed Time counted

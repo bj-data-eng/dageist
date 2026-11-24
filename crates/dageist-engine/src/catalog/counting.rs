@@ -2,8 +2,8 @@
 //! value nor as many as the table has rows.
 //!
 //! The tables of allowed combinations measure a call on three rows and cannot say a count such as
-//! the first two values, or the values of a column that differ, for the count is what the data and
-//! the arguments make it, and three rows decide it by chance. The catalogue says which methods
+//! the first two values, or the values of a column that differ, or the values of a range, for the
+//! count is what the data and the arguments make it, and three rows decide it by chance. The catalogue says which methods
 //! decide it, and by what; the walk works the count out of the arguments a call is given.
 
 use super::Entry;
@@ -31,6 +31,10 @@ pub enum Counting {
     /// As many as the value it follows has less the rows the first values it drops take:
     /// `diff` that is told to drop what has no value before it.
     TheRowsLess(&'static str),
+    /// As many values as the arguments fix, where a function starts an expression: the bounds and
+    /// the step or interval of a range, the number of samples of a linear space, the times a value
+    /// is repeated. The walk works the count out of the arguments that are typed in.
+    TheArguments,
 }
 
 impl Counting {
@@ -54,6 +58,12 @@ impl Counting {
             {
                 Self::TheRowsLess("n")
             }
+            "polars.int_range"
+            | "polars.date_range"
+            | "polars.datetime_range"
+            | "polars.time_range"
+            | "polars.linear_space"
+            | "polars.repeat" => Self::TheArguments,
             _ => return None,
         })
     }

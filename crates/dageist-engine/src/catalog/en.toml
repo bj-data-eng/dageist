@@ -1675,6 +1675,185 @@ label = "second"
 name = "microsecond"
 label = "microsecond"
 
+[entries."polars.int_range"]
+name = "int_range"
+hint = "whole numbers from a start up to, not including, an end"
+
+[entries."polars.int_range".parameters.start]
+name = "start"
+label = "from"
+
+[entries."polars.int_range".parameters.end]
+name = "end"
+label = "up to"
+
+[entries."polars.int_range".parameters.step]
+name = "step"
+label = "step"
+
+[entries."polars.int_range".parameters.dtype]
+name = "dtype"
+label = "as dtype"
+
+[entries."polars.int_range".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.date_range"]
+name = "date_range"
+hint = "the dates from a start to an end, an interval apart"
+
+[entries."polars.date_range".parameters.start]
+name = "start"
+label = "from"
+
+[entries."polars.date_range".parameters.end]
+name = "end"
+label = "to"
+
+[entries."polars.date_range".parameters.interval]
+name = "interval"
+label = "every"
+
+[entries."polars.date_range".parameters.closed]
+name = "closed"
+label = "ends included"
+
+[entries."polars.date_range".parameters.closed.choices]
+both = "both"
+left = "left"
+right = "right"
+none = "none"
+
+[entries."polars.date_range".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.datetime_range"]
+name = "datetime_range"
+hint = "the moments from a start to an end, an interval apart"
+
+[entries."polars.datetime_range".parameters.start]
+name = "start"
+label = "from"
+
+[entries."polars.datetime_range".parameters.end]
+name = "end"
+label = "to"
+
+[entries."polars.datetime_range".parameters.interval]
+name = "interval"
+label = "every"
+
+[entries."polars.datetime_range".parameters.closed]
+name = "closed"
+label = "ends included"
+
+[entries."polars.datetime_range".parameters.closed.choices]
+both = "both"
+left = "left"
+right = "right"
+none = "none"
+
+[entries."polars.datetime_range".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."polars.datetime_range".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+
+[entries."polars.datetime_range".parameters.time_zone]
+name = "time_zone"
+label = "in"
+none = "None"
+none_hint = "moments of no time zone, or of the zone of the bounds"
+
+[entries."polars.datetime_range".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.time_range"]
+name = "time_range"
+hint = "the times of day from a start to an end, an interval apart"
+
+[entries."polars.time_range".parameters.start]
+name = "start"
+label = "from"
+
+[entries."polars.time_range".parameters.end]
+name = "end"
+label = "to"
+
+[entries."polars.time_range".parameters.interval]
+name = "interval"
+label = "every"
+
+[entries."polars.time_range".parameters.closed]
+name = "closed"
+label = "ends included"
+
+[entries."polars.time_range".parameters.closed.choices]
+both = "both"
+left = "left"
+right = "right"
+none = "none"
+
+[entries."polars.time_range".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.linear_space"]
+name = "linear_space"
+hint = "a number of values evenly spaced from a start to an end"
+
+[entries."polars.linear_space".parameters.start]
+name = "start"
+label = "from"
+
+[entries."polars.linear_space".parameters.end]
+name = "end"
+label = "to"
+
+[entries."polars.linear_space".parameters.num_samples]
+name = "num_samples"
+label = "how many"
+
+[entries."polars.linear_space".parameters.closed]
+name = "closed"
+label = "ends included"
+
+[entries."polars.linear_space".parameters.closed.choices]
+both = "both"
+left = "left"
+right = "right"
+none = "none"
+
+[entries."polars.linear_space".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.repeat"]
+name = "repeat"
+hint = "one value repeated a number of times"
+
+[entries."polars.repeat".parameters.value]
+name = "value"
+label = "value"
+
+[entries."polars.repeat".parameters.n]
+name = "n"
+label = "times"
+
+[entries."polars.repeat".parameters.dtype]
+name = "dtype"
+label = "as dtype"
+
+[entries."polars.repeat".parameters.eager]
+name = "eager"
+label = "as a series"
+
 [entries."polars.element"]
 name = "element"
 hint = "each value of the cell being combined"

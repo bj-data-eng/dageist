@@ -56,6 +56,7 @@
 #   parameter-takes-one-value: a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
+#   range-is-valid: a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it and of any value made of literals alone, no length below nothing to cut it by.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #   time-zone-is-valid: a time zone must be one Polars reads.
 #   values-meet-in-count: the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal.
@@ -70,7 +71,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13920 combinations: 9343 allowed; 2650 refused when Polars resolved the schema, 1927 when it ran the rows, 0 when it ran the empty table.
+# 14340 combinations: 9571 allowed; 2742 refused when Polars resolved the schema, 2027 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -7452,6 +7453,66 @@ Expr.is_in | sort > over.partition_by | continues | Int64 | Int64 | - | allowed 
 Expr.is_in | sort > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
 Expr.is_in | sort | continues | Int64 | Int64 | - | allowed Boolean many
 Expr.is_in | sort | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in[other=list] | filter > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | filter > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | filter > condition.value | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | filter > condition.value | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | filter > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | filter > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | filter > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | filter > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | filter | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | filter | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | join_left > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | join_left > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | join_left > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | join_left > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | join_left > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_left > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_left > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_left > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_left | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in[other=list] | join_left | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in[other=list] | join_right > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | join_right > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | join_right > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | join_right > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | join_right > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_right > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_right > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_right > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in[other=list] | join_right | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in[other=list] | join_right | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate > over.order_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in[other=list] | pivot_aggregate > over.order_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in[other=list] | pivot_aggregate > over.partition_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in[other=list] | pivot_aggregate > over.partition_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in[other=list] | pivot_aggregate | continues | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in[other=list] | pivot_aggregate | ends | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in[other=list] | select > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | select > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | select > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | select | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | sort > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in[other=list] | sort > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in[other=list] | sort | ends | Int64 | List(Int64) | - | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Boolean many
@@ -13572,6 +13633,66 @@ polars.date | sort > over.partition_by | continues | - | - | - | allowed Date ma
 polars.date | sort > over.partition_by | ends | - | - | - | allowed Date many
 polars.date | sort | continues | - | - | - | allowed Date many
 polars.date | sort | ends | - | - | - | allowed Date many
+polars.date_range | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Date counted
+polars.date_range | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | filter > over.order_by | continues | - | - | - | allowed Date counted
+polars.date_range | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.date_range | filter > over.partition_by | continues | - | - | - | allowed Date counted
+polars.date_range | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | filter | continues | - | - | filter-predicate-is-boolean | allowed Date counted
+polars.date_range | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left > condition.value | continues | - | - | - | allowed Date counted
+polars.date_range | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date counted
+polars.date_range | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > condition.value | continues | - | - | - | allowed Date counted
+polars.date_range | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.date_range | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date counted
+polars.date_range | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.date_range | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.date_range | pivot_aggregate > condition.value | continues | - | - | - | allowed Date counted
+polars.date_range | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.date_range | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.date_range | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.date_range | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.date_range | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.date_range | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Date counted
+polars.date_range | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.date_range | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.date_range | select > condition.value | continues | - | - | - | allowed Date counted
+polars.date_range | select > condition.value | ends | - | - | - | allowed -
+polars.date_range | select > over.order_by | continues | - | - | - | allowed Date counted
+polars.date_range | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.date_range | select > over.partition_by | continues | - | - | - | allowed Date counted
+polars.date_range | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | select | continues | - | - | - | allowed Date counted
+polars.date_range | select | ends | - | - | - | allowed -
+polars.date_range | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Date counted
+polars.date_range | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | sort > condition.value | continues | - | - | - | allowed Date counted
+polars.date_range | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | sort > over.order_by | continues | - | - | - | allowed Date counted
+polars.date_range | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.date_range | sort > over.partition_by | continues | - | - | - | allowed Date counted
+polars.date_range | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.date_range | sort | continues | - | - | - | allowed Date counted
+polars.date_range | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.datetime | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) many
 polars.datetime | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `datetime`
 polars.datetime | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Datetime(us) many
@@ -13632,6 +13753,66 @@ polars.datetime | sort > over.partition_by | continues | - | - | - | allowed Dat
 polars.datetime | sort > over.partition_by | ends | - | - | - | allowed Datetime(us) many
 polars.datetime | sort | continues | - | - | - | allowed Datetime(us) many
 polars.datetime | sort | ends | - | - | - | allowed Datetime(us) many
+polars.datetime_range | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | filter > over.order_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.datetime_range | filter > over.partition_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | filter | continues | - | - | filter-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left > condition.value | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) counted
+polars.datetime_range | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > condition.value | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) counted
+polars.datetime_range | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.datetime_range | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.datetime_range | pivot_aggregate > condition.value | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.datetime_range | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.datetime_range | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.datetime_range | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.datetime_range | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.datetime_range | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Datetime(us) counted
+polars.datetime_range | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.datetime_range | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.datetime_range | select > condition.value | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | select > condition.value | ends | - | - | - | allowed -
+polars.datetime_range | select > over.order_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.datetime_range | select > over.partition_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | select | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | select | ends | - | - | - | allowed -
+polars.datetime_range | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) counted
+polars.datetime_range | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | sort > condition.value | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | sort > over.order_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.datetime_range | sort > over.partition_by | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.datetime_range | sort | continues | - | - | - | allowed Datetime(us) counted
+polars.datetime_range | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.duration | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Duration(us) many
 polars.duration | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[μs]` for series with name `literal`
 polars.duration | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Duration(us) many
@@ -13812,6 +13993,126 @@ polars.from_epoch | sort > over.partition_by | continues | - | - | - | allowed D
 polars.from_epoch | sort > over.partition_by | ends | - | - | - | allowed Datetime(us) many
 polars.from_epoch | sort | continues | - | - | - | allowed Datetime(us) many
 polars.from_epoch | sort | ends | - | - | - | allowed Datetime(us) many
+polars.int_range | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Int64 counted
+polars.int_range | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | filter > over.order_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.int_range | filter > over.partition_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | filter | continues | - | - | filter-predicate-is-boolean | allowed Int64 counted
+polars.int_range | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left > condition.value | continues | - | - | - | allowed Int64 counted
+polars.int_range | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+polars.int_range | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > condition.value | continues | - | - | - | allowed Int64 counted
+polars.int_range | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.int_range | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+polars.int_range | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.int_range | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.int_range | pivot_aggregate > condition.value | continues | - | - | - | allowed Int64 counted
+polars.int_range | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.int_range | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.int_range | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.int_range | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.int_range | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.int_range | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+polars.int_range | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.int_range | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.int_range | select > condition.value | continues | - | - | - | allowed Int64 counted
+polars.int_range | select > condition.value | ends | - | - | - | allowed -
+polars.int_range | select > over.order_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.int_range | select > over.partition_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | select | continues | - | - | - | allowed Int64 counted
+polars.int_range | select | ends | - | - | - | allowed -
+polars.int_range | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 counted
+polars.int_range | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | sort > condition.value | continues | - | - | - | allowed Int64 counted
+polars.int_range | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | sort > over.order_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.int_range | sort > over.partition_by | continues | - | - | - | allowed Int64 counted
+polars.int_range | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.int_range | sort | continues | - | - | - | allowed Int64 counted
+polars.int_range | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | filter > over.order_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.linear_space | filter > over.partition_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | filter | continues | - | - | filter-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left > condition.value | continues | - | - | - | allowed Float64 counted
+polars.linear_space | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Float64 counted
+polars.linear_space | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > condition.value | continues | - | - | - | allowed Float64 counted
+polars.linear_space | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.linear_space | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Float64 counted
+polars.linear_space | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.linear_space | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.linear_space | pivot_aggregate > condition.value | continues | - | - | - | allowed Float64 counted
+polars.linear_space | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.linear_space | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.linear_space | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.linear_space | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.linear_space | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.linear_space | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Float64 counted
+polars.linear_space | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.linear_space | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.linear_space | select > condition.value | continues | - | - | - | allowed Float64 counted
+polars.linear_space | select > condition.value | ends | - | - | - | allowed -
+polars.linear_space | select > over.order_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.linear_space | select > over.partition_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | select | continues | - | - | - | allowed Float64 counted
+polars.linear_space | select | ends | - | - | - | allowed -
+polars.linear_space | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Float64 counted
+polars.linear_space | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | sort > condition.value | continues | - | - | - | allowed Float64 counted
+polars.linear_space | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | sort > over.order_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.linear_space | sort > over.partition_by | continues | - | - | - | allowed Float64 counted
+polars.linear_space | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.linear_space | sort | continues | - | - | - | allowed Float64 counted
+polars.linear_space | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.lit | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 one
 polars.lit | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed Boolean one
 polars.lit | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Int32 one
@@ -13872,6 +14173,66 @@ polars.lit | sort > over.partition_by | continues | - | - | - | allowed Int32 on
 polars.lit | sort > over.partition_by | ends | - | - | - | allowed Int32 one
 polars.lit | sort | continues | - | - | - | allowed Int32 one
 polars.lit | sort | ends | - | - | - | allowed Int32 one
+polars.repeat | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Int32 counted
+polars.repeat | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | filter > over.order_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.repeat | filter > over.partition_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | filter | continues | - | - | filter-predicate-is-boolean | allowed Int32 counted
+polars.repeat | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left > condition.value | continues | - | - | - | allowed Int32 counted
+polars.repeat | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int32 counted
+polars.repeat | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > condition.value | continues | - | - | - | allowed Int32 counted
+polars.repeat | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.repeat | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int32 counted
+polars.repeat | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.repeat | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.repeat | pivot_aggregate > condition.value | continues | - | - | - | allowed Int32 counted
+polars.repeat | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.repeat | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.repeat | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.repeat | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.repeat | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.repeat | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Int32 counted
+polars.repeat | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.repeat | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.repeat | select > condition.value | continues | - | - | - | allowed Int32 counted
+polars.repeat | select > condition.value | ends | - | - | - | allowed -
+polars.repeat | select > over.order_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.repeat | select > over.partition_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | select | continues | - | - | - | allowed Int32 counted
+polars.repeat | select | ends | - | - | - | allowed -
+polars.repeat | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 counted
+polars.repeat | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | sort > condition.value | continues | - | - | - | allowed Int32 counted
+polars.repeat | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | sort > over.order_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.repeat | sort > over.partition_by | continues | - | - | - | allowed Int32 counted
+polars.repeat | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.repeat | sort | continues | - | - | - | allowed Int32 counted
+polars.repeat | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.time | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time many
 polars.time | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `time` for series with name `datetime`
 polars.time | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Time many
@@ -13932,6 +14293,66 @@ polars.time | sort > over.partition_by | continues | - | - | - | allowed Time ma
 polars.time | sort > over.partition_by | ends | - | - | - | allowed Time many
 polars.time | sort | continues | - | - | - | allowed Time many
 polars.time | sort | ends | - | - | - | allowed Time many
+polars.time_range | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Time counted
+polars.time_range | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | filter > over.order_by | continues | - | - | - | allowed Time counted
+polars.time_range | filter > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.time_range | filter > over.partition_by | continues | - | - | - | allowed Time counted
+polars.time_range | filter > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | filter | continues | - | - | filter-predicate-is-boolean | allowed Time counted
+polars.time_range | filter | ends | - | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left > condition.value | continues | - | - | - | allowed Time counted
+polars.time_range | join_left > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Time counted
+polars.time_range | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > condition.value | continues | - | - | - | allowed Time counted
+polars.time_range | join_right > condition.value | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.time_range | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Time counted
+polars.time_range | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+polars.time_range | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.time_range | pivot_aggregate > condition.value | continues | - | - | - | allowed Time counted
+polars.time_range | pivot_aggregate > condition.value | ends | - | - | - | allowed -
+polars.time_range | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+polars.time_range | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.time_range | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.time_range | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.time_range | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Time counted
+polars.time_range | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed -
+polars.time_range | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
+polars.time_range | select > condition.value | continues | - | - | - | allowed Time counted
+polars.time_range | select > condition.value | ends | - | - | - | allowed -
+polars.time_range | select > over.order_by | continues | - | - | - | allowed Time counted
+polars.time_range | select > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.time_range | select > over.partition_by | continues | - | - | - | allowed Time counted
+polars.time_range | select > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | select | continues | - | - | - | allowed Time counted
+polars.time_range | select | ends | - | - | - | allowed -
+polars.time_range | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time counted
+polars.time_range | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | sort > condition.value | continues | - | - | - | allowed Time counted
+polars.time_range | sort > condition.value | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | sort > over.order_by | continues | - | - | - | allowed Time counted
+polars.time_range | sort > over.order_by | ends | - | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+polars.time_range | sort > over.partition_by | continues | - | - | - | allowed Time counted
+polars.time_range | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.time_range | sort | continues | - | - | - | allowed Time counted
+polars.time_range | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.when | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 polars.when | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 polars.when | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed -

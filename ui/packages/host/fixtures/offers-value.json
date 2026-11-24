@@ -3328,7 +3328,37 @@
       "slots": []
     },
     {
+      "entry": "polars.date_range",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.datetime",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.datetime_range",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -3388,6 +3418,36 @@
       "slots": []
     },
     {
+      "entry": "polars.int_range",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.linear_space",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.lit",
       "verdict": {
         "kind": "refused",
@@ -3403,7 +3463,37 @@
       "slots": []
     },
     {
+      "entry": "polars.repeat",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.time",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.time_range",
       "verdict": {
         "kind": "refused",
         "refusal": {

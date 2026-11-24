@@ -12,13 +12,15 @@ use std::sync::Arc;
 
 use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
+use polars::lazy::dsl::{date_range, time_range};
 use polars::prelude::{
-    AnyValue, ApproxQuantileMethod, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr,
-    FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
-    MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError, QuantileMethod,
-    RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
+    AnyValue, ApproxQuantileMethod, ClosedInterval, ClosedWindow, DataType, DatetimeArgs, Duration,
+    DurationArgs, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation,
+    LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError,
+    QuantileMethod, RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
     SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal,
-    binary_expr, by_name, col, cols, datetime, duration, element, lit, when,
+    binary_expr, by_name, col, cols, datetime, datetime_range, duration, element, int_range,
+    linear_space, lit, repeat, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -2282,6 +2284,145 @@ fn polars_from_epoch(arguments: &Arguments) -> Result<Expr, BuildError> {
     })
 }
 
+/// `eager` is Python's choice of a series over a plan, which a step never makes.
+fn lazily(arguments: &Arguments) -> Result<(), BuildError> {
+    if arguments.flag("eager", false)? {
+        return Err(refused(
+            "eager makes a series where a step makes a plan, so a step is always lazy",
+        ));
+    }
+    Ok(())
+}
+
+/// How a range treats its two ends, as the word of `closed` says.
+fn closed_window(arguments: &Arguments) -> Result<ClosedWindow, BuildError> {
+    Ok(match arguments.choice("closed", CLOSED, "both")? {
+        "left" => ClosedWindow::Left,
+        "right" => ClosedWindow::Right,
+        "none" => ClosedWindow::None,
+        _ => ClosedWindow::Both,
+    })
+}
+
+/// The interval a range steps by, which Polars parses from the text and refuses where it is none.
+fn interval(
+    arguments: &Arguments,
+    default: &'static str,
+) -> Result<(String, Duration), BuildError> {
+    let text = match arguments.get("interval") {
+        None => default.to_owned(),
+        Some(_) => arguments.duration("interval")?,
+    };
+    let parsed = Duration::try_parse(&text)?;
+    Ok((text, parsed))
+}
+
+/// `polars.int_range`: whole numbers from `start` up to but not including `end`, stepping by
+/// `step`. Python reads one bound as the end, from 0.
+fn polars_int_range(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let start = arguments.expression("start")?.unwrap_or_else(|| lit(0));
+    let (start, end) = match arguments.expression("end")? {
+        Some(end) => (start, end),
+        None => (lit(0), start),
+    };
+    let dtype = optional_dtype(arguments, "dtype")?.unwrap_or(DataType::Int64);
+    Ok(int_range(start, end, whole(arguments, "step", 1)?, dtype))
+}
+
+/// `polars.date_range`: the dates from `start` to `end`, an interval apart.
+fn polars_date_range(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let (_, interval) = interval(arguments, "1d")?;
+    Ok(date_range(
+        Some(arguments.required_expression("start")?),
+        Some(arguments.required_expression("end")?),
+        Some(interval),
+        None,
+        closed_window(arguments)?,
+    )?)
+}
+
+/// `polars.datetime_range`: the moments from `start` to `end`, an interval apart, in the unit and
+/// the zone given. Python counts in nanoseconds where the interval says them and no unit is given.
+fn polars_datetime_range(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let (text, interval) = interval(arguments, "1d")?;
+    let time_unit = match arguments.get("time_unit") {
+        None if text.contains("ns") => Some(TimeUnit::Nanoseconds),
+        None => None,
+        Some(_) => Some(time_unit(arguments, "time_unit", TIME_UNIT, None)?),
+    };
+    let time_zone = match arguments.get("time_zone") {
+        None => None,
+        Some(_) => arguments.time_zone("time_zone", true)?,
+    };
+    Ok(datetime_range(
+        Some(arguments.required_expression("start")?),
+        Some(arguments.required_expression("end")?),
+        Some(interval),
+        None,
+        closed_window(arguments)?,
+        time_unit,
+        time_zone,
+    )?)
+}
+
+/// A time of day, as the nanoseconds since midnight Python's `time` is.
+pub(crate) fn time_of_day(hours: i64, minutes: i64, seconds: i64, microseconds: i64) -> Expr {
+    let nanoseconds = (((hours * 60 + minutes) * 60 + seconds) * 1_000_000 + microseconds) * 1_000;
+    lit(Scalar::new(DataType::Time, AnyValue::Time(nanoseconds)))
+}
+
+/// `polars.time_range`: the times of day from `start`, midnight, to `end`, the last microsecond of
+/// the day, an interval apart. Python refuses an interval of days, weeks, months and years.
+fn polars_time_range(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let (text, interval) = interval(arguments, "1h")?;
+    for unit in ["y", "mo", "w", "d"] {
+        if text.contains(unit) {
+            return Err(BuildError::Polars(PolarsError::InvalidOperation(
+                format!("invalid interval unit for time_range: found '{unit}'").into(),
+            )));
+        }
+    }
+    let start = arguments
+        .expression("start")?
+        .unwrap_or_else(|| time_of_day(0, 0, 0, 0));
+    let end = arguments
+        .expression("end")?
+        .unwrap_or_else(|| time_of_day(23, 59, 59, 999_999));
+    Ok(time_range(start, end, interval, closed_window(arguments)?))
+}
+
+/// `polars.linear_space`: `num_samples` numbers or moments evenly from `start` to `end`.
+fn polars_linear_space(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let closed = match arguments.choice("closed", CLOSED, "both")? {
+        "left" => ClosedInterval::Left,
+        "right" => ClosedInterval::Right,
+        "none" => ClosedInterval::None,
+        _ => ClosedInterval::Both,
+    };
+    Ok(linear_space(
+        arguments.required_expression("start")?,
+        arguments.required_expression("end")?,
+        arguments.required_expression("num_samples")?,
+        closed,
+    ))
+}
+
+/// `polars.repeat`: `n` copies of one value, as the dtype given where one is.
+fn polars_repeat(arguments: &Arguments) -> Result<Expr, BuildError> {
+    lazily(arguments)?;
+    let value = arguments.required_expression("value")?;
+    let value = match optional_dtype(arguments, "dtype")? {
+        Some(dtype) => value.cast(dtype),
+        None => value,
+    };
+    Ok(repeat(value, arguments.required_expression("n")?))
+}
+
 /// Every entry, ordered by identifier.
 pub(super) const ENTRIES: &[Entry] = &[
     Entry {
@@ -4403,6 +4544,20 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Function(polars_date),
     },
     Entry {
+        id: EntryId("polars.date_range"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("start", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            required("end", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            optional("interval", Kind::Duration, Shape::One, "'1d'"),
+            optional("closed", Kind::Choice(CLOSED), Shape::One, "'both'").keyword_only(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_date_range),
+    },
+    Entry {
         id: EntryId("polars.datetime"),
         family: Family::Start,
         accepts: &[],
@@ -4422,6 +4577,24 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_datetime),
+    },
+    Entry {
+        id: EntryId("polars.datetime_range"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("start", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            required("end", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            optional("interval", Kind::Duration, Shape::One, "'1d'"),
+            optional("closed", Kind::Choice(CLOSED), Shape::One, "'both'").keyword_only(),
+            optional("time_unit", Kind::Choice(TIME_UNIT), Shape::One, "None").keyword_only(),
+            optional("time_zone", Kind::TimeZone, Shape::One, "None")
+                .keyword_only()
+                .or_no_time_zone(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_datetime_range),
     },
     Entry {
         id: EntryId("polars.duration"),
@@ -4461,6 +4634,34 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Function(polars_from_epoch),
     },
     Entry {
+        id: EntryId("polars.int_range"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            optional("start", EXPRESSION, Shape::One, "0").reading_one_value(OneValue::Scalar),
+            optional("end", EXPRESSION, Shape::One, "None").reading_one_value(OneValue::Scalar),
+            optional("step", Kind::Value(ValueType::Integer), Shape::One, "1"),
+            optional("dtype", Kind::Dtype, Shape::One, "Int64").keyword_only(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_int_range),
+    },
+    Entry {
+        id: EntryId("polars.linear_space"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("start", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            required("end", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            required("num_samples", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            optional("closed", Kind::Choice(CLOSED), Shape::One, "'both'").keyword_only(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_linear_space),
+    },
+    Entry {
         id: EntryId("polars.lit"),
         family: Family::Start,
         accepts: &[],
@@ -4471,6 +4672,19 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_lit),
+    },
+    Entry {
+        id: EntryId("polars.repeat"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("value", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            required("n", EXPRESSION, Shape::One).reading_one_value(OneValue::Scalar),
+            optional("dtype", Kind::Dtype, Shape::One, "None").keyword_only(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_repeat),
     },
     Entry {
         id: EntryId("polars.time"),
@@ -4484,6 +4698,20 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_time),
+    },
+    Entry {
+        id: EntryId("polars.time_range"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            optional("start", EXPRESSION, Shape::One, "None").reading_one_value(OneValue::Scalar),
+            optional("end", EXPRESSION, Shape::One, "None").reading_one_value(OneValue::Scalar),
+            optional("interval", Kind::Duration, Shape::One, "'1h'"),
+            optional("closed", Kind::Choice(CLOSED), Shape::One, "'both'").keyword_only(),
+            flag("eager", "False").keyword_only().not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_time_range),
     },
     Entry {
         id: EntryId("polars.when"),

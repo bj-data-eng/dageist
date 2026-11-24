@@ -280,17 +280,24 @@ fn what_may_start_an_expression_depends_on_where_it_stands() {
         offered(&select, "polars.element")["verdict"]["refusal"]["source"],
         json!({ "by": "rule", "rule": "element-only-in-pivot-aggregate" })
     );
-    // A function that makes a date, a moment or a length of time starts a chain beside them.
+    // A function that makes a date, a moment, a length of time, a range or a repeat starts a chain
+    // beside them.
     assert_eq!(
         allowed(&select),
         [
             "polars.col",
             "polars.date",
+            "polars.date_range",
             "polars.datetime",
+            "polars.datetime_range",
             "polars.duration",
             "polars.from_epoch",
+            "polars.int_range",
+            "polars.linear_space",
             "polars.lit",
+            "polars.repeat",
             "polars.time",
+            "polars.time_range",
             "polars.when"
         ]
     );
@@ -299,12 +306,18 @@ fn what_may_start_an_expression_depends_on_where_it_stands() {
         allowed(&pivot),
         [
             "polars.date",
+            "polars.date_range",
             "polars.datetime",
+            "polars.datetime_range",
             "polars.duration",
             "polars.element",
             "polars.from_epoch",
+            "polars.int_range",
+            "polars.linear_space",
             "polars.lit",
+            "polars.repeat",
             "polars.time",
+            "polars.time_range",
             "polars.when"
         ]
     );
@@ -1072,11 +1085,17 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
     let starts = [
         at("polars.col"),
         at("polars.date"),
+        at("polars.date_range"),
         at("polars.datetime"),
+        at("polars.datetime_range"),
         at("polars.duration"),
         at("polars.from_epoch"),
+        at("polars.int_range"),
+        at("polars.linear_space"),
         at("polars.lit"),
+        at("polars.repeat"),
         at("polars.time"),
+        at("polars.time_range"),
         at("polars.when"),
     ];
     let select_start = rows[0][0].as_array().expect("words of a mask");

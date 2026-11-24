@@ -477,6 +477,7 @@ export const RULE_NAMES = [
   'moments-share-a-zone',
   'parameter-takes-one-value',
   'pattern-is-valid',
+  'range-is-valid',
   'replacement-values-match-in-number',
   'time-zone-is-valid',
   'values-meet-in-count',
