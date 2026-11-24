@@ -6,6 +6,7 @@ mod counts;
 mod dates;
 mod defaults;
 mod dtypes;
+mod edits;
 mod floats;
 mod frames;
 mod holes;

@@ -313,6 +313,12 @@ impl Refusal {
         self
     }
 
+    /// The place and the cause, by value.
+    pub(super) fn into_parts(self) -> (Place, Cause) {
+        let Refused { place, cause } = *self.0;
+        (place, cause)
+    }
+
     pub(super) fn under_all(mut self, path: Vec<Segment>) -> Self {
         self.0.place = std::mem::take(&mut self.0.place).under_all(path);
         self

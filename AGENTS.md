@@ -59,7 +59,7 @@ and current source establishes behavior.
 | Fuzz framework identity, features and dependencies | [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml) |
 | Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
-| The step document's format, its reading and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
+| The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |

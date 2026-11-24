@@ -163,9 +163,22 @@ const PIVOT_AGGREGATE: &str = "first";
 /// keeps them.
 const JOIN_HOW: &str = "left";
 
-/// The comparison a new filter starts with: its field and what it is compared
-/// with are still to be given.
+/// The comparison a new filter, and a new line of a condition, starts with: its field and what
+/// it is compared with are still to be given.
 const FILTER_COMPARISON: Comparison = Comparison::Equal;
+
+impl Setting {
+    /// A test that starts as a new filter's does, and a new line of a condition: an equality
+    /// of a field and a value, each still to be given.
+    #[must_use]
+    pub(crate) fn started_test() -> Self {
+        Self::Comparison {
+            entry: FILTER_COMPARISON.entry(),
+            field: Box::new(Self::ToGive),
+            other: Box::new(Self::ToGive),
+        }
+    }
+}
 
 /// What the step the entry `entry` stands for starts with, on `frame`, or
 /// `None` where the entry is not a step of the list.
@@ -203,14 +216,7 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
                 Setting::ToGive,
             )]),
         )],
-        "LazyFrame.filter" => vec![(
-            "predicates",
-            Setting::List(vec![Setting::Comparison {
-                entry: FILTER_COMPARISON.entry(),
-                field: Box::new(Setting::ToGive),
-                other: Box::new(Setting::ToGive),
-            }]),
-        )],
+        "LazyFrame.filter" => vec![("predicates", Setting::List(vec![Setting::started_test()]))],
         "LazyFrame.sort" => vec![start_of("by")?],
         "LazyFrame.select" => vec![(
             "exprs",

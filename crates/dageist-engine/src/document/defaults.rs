@@ -54,7 +54,7 @@ impl Call {
     /// How many items the parameter `of` holds, with the starred parameter
     /// that follows it in Python's signature, as `sort`'s `by` and `more_by`
     /// are the keys the flags for each key are given for.
-    fn key_count(&self, of: &str) -> usize {
+    pub(super) fn key_count(&self, of: &str) -> usize {
         let parameters = self.entry().parameters();
         let items = |name: &str| match self.argument(name) {
             Some(Value::Many(items)) => items.len(),
