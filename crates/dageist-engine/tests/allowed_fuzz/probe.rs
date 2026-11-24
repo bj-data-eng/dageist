@@ -3620,4 +3620,110 @@ mod tests {
             );
         }
     }
+
+    /// `filter(b.drop_nulls().diff(null_behavior="drop") < 1)`: the count is one value on the
+    /// sample's three rows, which a filter's predicate takes, and Polars refuses nothing of it
+    /// alone.
+    const A_COUNT_OF_ONE_BY_CHANCE: &str = r#"{"a":"Date","b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[{"entry":"Expr.drop_nulls","arguments":{}},{"entry":"Expr.diff","arguments":{"null_behavior":{"choice":"drop"}}},{"entry":"Expr.lt","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_count_the_rule_refuses_is_settled_by_polars_refusing_the_part_for_its_lengths() {
+        // `sort(by=k.truediv(b.diff(drop)).entropy())`: the rule refuses a division of the rows by
+        // a count of two, and Polars drops a sort key that is one value, as the entropy is; asked
+        // as written, it refuses the division for the lengths.
+        let case = kept("stricter-a-count-met-by-an-operand-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("values-meet-in-count")
+        ));
+        let found = settle(&case, &refused).expect("a division that Polars refuses alone");
+        assert!(found.probe.contains("Expr.truediv"), "{}", found.probe);
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
+    fn a_count_meeting_a_folded_null_is_settled_by_polars_refusing_the_comparison_alone() {
+        // `sort(by=when(null.diff(drop) < null.fill_nan(b)).then(h).nan_max())`: Polars drops the
+        // key, for the maximum is one value, and refuses the comparison on its own for the lengths.
+        let case = kept("stricter-a-count-met-by-a-folded-null-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("values-meet-in-count")
+        ));
+        let found = settle(&case, &refused).expect("a comparison that Polars refuses alone");
+        assert!(found.probe.contains("Expr.lt"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_count_given_to_a_condition_is_settled_by_polars_refusing_the_condition_alone() {
+        // `sort(by=when(f).then(k.diff(drop)).arg_max())`: the tables refuse the count where a
+        // condition's value ends a sort key, in Polars' words for the lengths, and Polars drops the
+        // key. The value is refused beside its predicate, in the condition that holds it.
+        let case = kept("stricter-a-count-given-to-a-condition-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(refused.source, Source::Polars));
+        let found = settle(&case, &refused).expect("a condition that Polars refuses alone");
+        assert!(found.probe.contains("polars.when"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_window_over_a_count_is_settled_by_polars_refusing_the_window_alone() {
+        let case = kept("stricter-a-window-over-a-count-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("window-input-is-not-counted")
+        ));
+        let found = settle(&case, &refused).expect("a window that Polars refuses alone");
+        assert!(found.probe.contains("Expr.over"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_count_that_polars_allows_alone_is_not_settled_by_the_part() {
+        // The count is one value where the rows are three, and Polars allows the part alone: it is
+        // the position, a filter's predicate, that the tables refuse a count in, and which takes
+        // a count that is one by chance. The probe shows nothing.
+        let case = Case::decode(A_COUNT_OF_ONE_BY_CHANCE.as_bytes()).expect("a case");
+        let refused = refusal(&case);
+        assert!(matches!(refused.source, Source::Polars));
+        assert_eq!(settle(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_refusal_that_is_not_about_lengths_settles_no_count() {
+        let counted = "a count of values that the data or the arguments decide, which is neither \
+            one value nor the table's rows, may not end an expression in sort: lengths don't match: \
+            zip node received non-equal length inputs";
+        let rule = Source::Rule("values-meet-in-count");
+        let window = Source::Rule("window-input-is-not-counted");
+        for (source, tables) in [
+            (&rule, "the values a call meets must be one value"),
+            (&window, "a window takes a value as long as its group"),
+            (&Source::Polars, counted),
+        ] {
+            assert!(same_reason(
+                source,
+                tables,
+                "lengths don't match: zip node received non-equal length inputs"
+            ));
+            assert!(same_reason(
+                source,
+                tables,
+                "cannot evaluate two Series of different lengths (0 and 3)"
+            ));
+            assert!(!same_reason(
+                source,
+                tables,
+                "cannot cast List type (inner: 'String', to: 'Int8')"
+            ));
+            assert!(!same_reason(
+                source,
+                tables,
+                "dtype `null` has no time unit"
+            ));
+        }
+    }
 }
