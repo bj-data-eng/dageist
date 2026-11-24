@@ -97,7 +97,6 @@ export function AppSidebar<Id extends string>({
         <SidebarGroup>
           <SidebarGroupLabel>Nodes</SidebarGroupLabel>
           <SidebarMenu>
-            <span className="sr-only">Not loaded</span>
             {NODE_STAND_INS.map((key) => (
               <SidebarMenuItem key={key}>
                 <SidebarMenuSkeleton />

@@ -28,15 +28,19 @@ const BROWSER_KEYS_ALONE = new Set(['F3', 'F5', 'BrowserBack', 'BrowserForward',
 /**
  * Reports whether `press` asks the browser for something only a web page
  * has, which the application's window should not do. Command is the Meta key
- * on a Mac and Control elsewhere; both are taken, since the window cannot
- * tell which keyboard it has. Alt with an arrow goes back or forward.
+ * on a Mac, `onMac`, and Control elsewhere. On a Mac, Control with a letter
+ * moves the cursor in a text field, as Control+F moves it forward, so it is
+ * left alone. Alt with an arrow goes back or forward.
  */
-export function isBrowserKey(press: KeyPress): boolean {
+export function isBrowserKey(press: KeyPress, onMac: boolean): boolean {
   if (BROWSER_KEYS_ALONE.has(press.key)) return true;
   if (press.altKey && (press.key === 'ArrowLeft' || press.key === 'ArrowRight')) return true;
-  const command = press.metaKey || press.ctrlKey;
+  const command = onMac ? press.metaKey : press.ctrlKey;
   return command && BROWSER_KEYS_WITH_COMMAND.has(press.key.toLowerCase());
 }
+
+/** Whether the window runs on a Mac, where Command is the Meta key. */
+const ON_MAC = navigator.userAgent.includes('Mac');
 
 /** Reports whether `target` is a place to type, which keeps the browser's menu for copy and paste. */
 function isTypingPlace(target: EventTarget | null): boolean {
@@ -55,7 +59,7 @@ function onContextMenu(event: MouseEvent): void {
 
 /** Keeps the browser from acting on its own keys. The view's own handlers still see them. */
 function onKeyDown(event: KeyboardEvent): void {
-  if (isBrowserKey(event)) event.preventDefault();
+  if (isBrowserKey(event, ON_MAC)) event.preventDefault();
 }
 
 /**

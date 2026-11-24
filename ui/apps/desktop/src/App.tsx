@@ -200,7 +200,10 @@ export function App(): React.JSX.Element {
         <SidebarTrigger className="text-muted" />
       </div>
       <div className="relative min-w-0 flex-1 bg-dots">
-        <div className="absolute inset-0">{host !== null && <FlowCanvas host={host} />}</div>
+        {/* Under another workspace the canvas takes no keys, clicks or focus. */}
+        <div className="absolute inset-0" inert={workspace !== 'flow'}>
+          {host !== null && <FlowCanvas host={host} />}
+        </div>
         <main
           className={cx(
             'absolute inset-x-0 top-[52px] bottom-0 flex min-h-0 flex-col px-7 pb-6',
