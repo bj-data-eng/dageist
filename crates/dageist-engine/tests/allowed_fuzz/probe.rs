@@ -116,8 +116,10 @@ pub enum Showing {
     ForAnyDtypeOfTheArgument,
     /// The tables refused a part of a predicate of a condition that Polars allows, because the
     /// values of the condition are one expression and Polars drops its predicates. The case with
-    /// the values made to differ is refused by Polars for the tables' reason, so the predicate is
-    /// evaluated there, and it is the dropping that Polars allows the case for.
+    /// the values made to differ is refused by Polars for the tables' reason, or, for a call the
+    /// tables judge by its parts, for the part it meets first where the case with the predicate
+    /// that holds the call made `false` is allowed, so the predicate is evaluated there, and it is
+    /// the dropping that Polars allows the case for.
     WhereTheValuesDiffer,
     /// The rule that a condition's predicate be a `Boolean` refused a predicate that Polars allows
     /// because it never evaluates it: a call that follows the condition makes it one value that
@@ -153,11 +155,11 @@ impl Settled {
                 self.probe, self.reason
             ),
             Showing::WhereTheValuesDiffer => format!(
-                "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason: {}",
+                "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason or, for a call judged by its parts, for the part it meets first: {}",
                 self.probe, self.reason
             ),
             Showing::WhereTheConditionIsEvaluated => format!(
-                "Polars never evaluates the predicate where what follows its condition makes it one value, and refuses the condition alone {}, {}, which is allowed with the predicate made true: {}",
+                "Polars never evaluates the predicate where what follows its condition makes it one value, and refuses the condition alone {}, {}, which is allowed with the predicate made false: {}",
                 self.probe,
                 if is_refused_as_a_predicate_that_is_no_boolean(&self.reason) {
                     "for the rule's reason"

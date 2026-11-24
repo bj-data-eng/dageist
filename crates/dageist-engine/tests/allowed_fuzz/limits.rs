@@ -96,8 +96,8 @@ pub enum Limit {
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
     ///   made by a fill with a text literal after the call that counts, or of the numbers of a
-    ///   group cast or filled to text by the call before it, which read as the numbers, or of what a column
-    ///   of the dtype Null is compared or calculated with, which stays null;
+    ///   group cast or filled to text by the call before it, which read as the numbers, or of what
+    ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -458,7 +458,9 @@ pub enum Limit {
     /// predicate a chain that starts from a literal, or from a function that makes a date, a time,
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
-    /// follows the quantile, cut after the quantile it is allowed.
+    /// follows the quantile, cut after the quantile it is allowed. The cut control leaves a gap: a
+    /// refusal of a call after the quantile that Polars would give the case once the quantile is
+    /// no longer refused is not seen, for what follows the quantile is not asked of the column.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -817,7 +819,8 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
 
 /// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
 /// group cast to text and nothing else: the values the pivot reads are columns of numbers, and the
-/// one call before it casts them to text or fills them with a text literal. The text reads as the numbers, which the sample's does not.
+/// one call before it casts them to text or fills them with a text literal. The text reads as the
+/// numbers, which the sample's does not.
 fn is_text_of_the_numbers_of_a_group(
     frames: &Frames,
     step: &Call,
@@ -832,7 +835,8 @@ fn is_text_of_the_numbers_of_a_group(
         && chain.links().first().is_some_and(|first| {
             // A cast to text, or a fill with a text literal, which gives numbers the dtype text.
             (is(first, "Expr.cast")
-                && matches!(first.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String"))
+                && matches!(first.argument("dtype"), Some(Value::Dtype(dtype))
+                    if dtype.to_string() == "String"))
                 || is_a_fill_with_text(first)
         })
         && !values.is_empty()
@@ -5622,8 +5626,8 @@ mod tests {
                 "{id}"
             );
         }
-        // A cast of the nulls is a column of nulls of the dtype it casts to, which a conversion that
-        // follows meets as nulls.
+        // A cast of the nulls is a column of nulls of the dtype it casts to, which a conversion
+        // that follows meets as nulls.
         assert_eq!(
             excused_by_kept("uncovered-a-group-aggregate--text-made-of-a-column-of-nulls.case"),
             vec![Limit::AGroupAggregate]
@@ -6344,8 +6348,8 @@ mod tests {
 
     #[test]
     fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
-        // A subtraction, a negation, the bits of a number flipped, a difference of the numbers and a
-        // number typed below zero take the values of a column below zero.
+        // A subtraction, a negation, the bits of a number flipped, a difference of the numbers and
+        // a number typed below zero take the values of a column below zero.
         assert_eq!(
             excused_by_kept("uncovered-a-negative-exponent--a-difference.case"),
             vec![Limit::ANegativeExponent]

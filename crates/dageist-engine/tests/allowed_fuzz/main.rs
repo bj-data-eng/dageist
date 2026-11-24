@@ -333,7 +333,8 @@ fn kept_cases_replay_as_settled() {
         }
         if name.starts_with("fixed-") {
             // On one thread Polars refuses the part the probe asks about for the tables' own
-            // reason, where it does not on more, so the case settles as a part it does not evaluate.
+            // reason, where it does not on more, so the case settles as a part it does not
+            // evaluate.
             let on_one_thread = one_thread() && SETTLED_AS_STRICTER_ON_ONE_THREAD.contains(&name);
             if on_one_thread && outcome.kind() == OutcomeKind::ExpectedRejection {
                 assert!(
