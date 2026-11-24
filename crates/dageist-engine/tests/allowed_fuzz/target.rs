@@ -613,6 +613,11 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
                             return outcome;
                         }
+                        // What Polars does with the part that the tables did not measure, which a
+                        // limit names, as a rule is the tables' own.
+                        if let Some(outcome) = excused("refused by a rule, Polars allows") {
+                            return outcome;
+                        }
                         // A predicate the rule refuses may hold a call Polars refuses first,
                         // or may not be evaluated, so it is asked on a column of its dtype.
                         if is_a_predicate_rule(rule)

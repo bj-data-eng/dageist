@@ -458,11 +458,19 @@ pub enum Limit {
     /// a length of time and reads no column, and takes an approximate quantile: the case run again
     /// with each such start a column is not refused for it.
     AnApproximateQuantileOfALiteralInACondition,
+    /// Polars shifts a moment that is one value, which a function of literals alone or an
+    /// aggregate makes, with the number it is filled with, whatever the time zone of the fill: it
+    /// takes the number as it is, and its schema and its rows then differ in the zone between the
+    /// engines. It panics when the same shift follows a column of moments, which the tables record
+    /// and the named rule that moments share a zone refuses for every receiver. The rule is the
+    /// tables' own, so the disagreement is of a rule that refuses what Polars allows, at a shift
+    /// that is filled, whose receiver gives one value.
+    AMomentOfOneValueFilledInAnotherZone,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 37] = [
+    pub const ALL: [Self; 38] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -500,6 +508,7 @@ impl Limit {
         Self::APartOfADateThatDependsOnTheRows,
         Self::AMomentBeyondTheRangeOfAUnit,
         Self::AnApproximateQuantileOfALiteralInACondition,
+        Self::AMomentOfOneValueFilledInAnotherZone,
     ];
 
     /// The name a kept case is filed under.
@@ -553,6 +562,9 @@ impl Limit {
             Self::AMomentBeyondTheRangeOfAUnit => "a-moment-beyond-the-range-of-a-unit",
             Self::AnApproximateQuantileOfALiteralInACondition => {
                 "an-approximate-quantile-of-a-literal-in-a-condition"
+            }
+            Self::AMomentOfOneValueFilledInAnotherZone => {
+                "a-moment-of-one-value-filled-in-another-zone"
             }
         }
     }
@@ -640,6 +652,9 @@ impl Limit {
             }
             Self::AnApproximateQuantileOfALiteralInACondition => {
                 "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+            }
+            Self::AMomentOfOneValueFilledInAnotherZone => {
+                "Polars shifts a moment that is one value with a fill in another time zone, which it panics on for a column of moments, where the tables measured the column"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -1009,23 +1024,44 @@ fn reached_by_an_explode(holder: &Expression, reach: Reach) -> bool {
 /// are single.
 fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
-    let single = |call: &Call| {
-        // What a replacement lists is a table of values, which gives no more values than what it
-        // follows.
-        is(call, "Expr.replace")
-            || is(call, "Expr.replace_strict")
-            || operands(call)
-                .into_iter()
-                .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
-    };
     if let Some(last) = links.iter().rposition(is_one_value) {
-        return links[last + 1..].iter().all(single);
+        return links[last + 1..].iter().all(is_single);
     }
     match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => literals && links.iter().all(single),
-        Start::Call(start) if is(start, "polars.when") => single(start) && links.iter().all(single),
+        Start::Call(start) if is(start, "polars.lit") => literals && links.iter().all(is_single),
+        Start::Call(start) if is(start, "polars.when") => {
+            is_single(start) && links.iter().all(is_single)
+        }
         _ => false,
     }
+}
+
+/// Whether `call` gives no more values than what it follows: what a replacement lists is a table
+/// of values, and any other call is given nothing but single values.
+fn is_single(call: &Call) -> bool {
+    is(call, "Expr.replace")
+        || is(call, "Expr.replace_strict")
+        || operands(call)
+            .into_iter()
+            .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
+}
+
+/// Whether the first `upto` links of `expression` give one value, that a literal, an aggregate or
+/// a function that makes a date, a time, a moment or a length of time of literals alone makes: the
+/// chain is [`wholly_single`], or starts from such a function and gives no more values after it.
+fn gives_one_value_of_literals(expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    wholly_single(expression, upto, true)
+        || (matches!(expression.start(), Start::Call(start)
+        if start.entry().applies() == catalog::Applies::Function
+            && !is(start, "polars.col")
+            && !is(start, "polars.element")
+            && !operands(start).into_iter().any(|(_, operand)| {
+                any_call(operand, &|call| {
+                    is(call, "polars.col") || is(call, "polars.element")
+                })
+            }))
+            && links.iter().all(is_single))
 }
 
 /// Where a place is in an expression that holds it: in what the chain starts
@@ -1165,6 +1201,8 @@ enum Disagreement<'a> {
     PolarsRefuses(&'a Refusal),
     /// The tables refuse it, here, and Polars allows it.
     PolarsAllows(&'a Refused),
+    /// A named rule refuses it, here, and Polars allows it.
+    RuleRefuses(&'a Refused),
 }
 
 fn is_lengths(reason: &str) -> bool {
@@ -4500,6 +4538,17 @@ fn applies(
                 && refusal.reason.contains("aggregation context")
                 && held.iter().any(|(_, held)| window_over_a_window(held))
         }
+        (Limit::AMomentOfOneValueFilledInAnotherZone, Disagreement::RuleRefuses(refused)) => {
+            // The rule that moments share a zone refuses the fill of a shift, and what the shift
+            // follows is one value, which Polars shifts as it does not a column.
+            let locus = locate(case, &refused.place);
+            matches!(refused.source, Source::Rule(rule) if rule == "moments-share-a-zone")
+                && locus.call.is_some_and(|call| is(call, "Expr.shift"))
+                && locus
+                    .chain
+                    .zip(locus.index)
+                    .is_some_and(|(chain, at)| gives_one_value_of_literals(chain, at))
+        }
         _ => false,
     }
 }
@@ -4517,6 +4566,9 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
         (Verdict::Allows, Some(refusal)) => Disagreement::PolarsRefuses(refusal),
         (Verdict::Refuses(refused), None) if matches!(refused.source, Source::Polars) => {
             Disagreement::PolarsAllows(refused)
+        }
+        (Verdict::Refuses(refused), None) if matches!(refused.source, Source::Rule(_)) => {
+            Disagreement::RuleRefuses(refused)
         }
         _ => return Vec::new(),
     };
