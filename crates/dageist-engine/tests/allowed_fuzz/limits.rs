@@ -663,7 +663,7 @@ impl Limit {
                 "Polars casts the values of a bound of clip to the dtype it clips, and a count of characters to a whole number, which the tables measured as the sample's rows, and a bound or a count with others passes"
             }
             Self::ACastOfAValueTheDtypeCannotHold => {
-                "a strict cast, which a test of closeness, a fill by a value and a count of characters make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
+                "a strict cast, which a test of closeness, a fill by a value, a count of characters and a difference of unsigned numbers make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
             }
             Self::ADropChangesTheLengths => {
                 "a drop of nulls or of NaNs leaves fewer values where the rows hold one, which the tables measured on a column that holds none"
