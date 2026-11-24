@@ -58,7 +58,7 @@
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #   time-zone-is-valid: a time zone must be one Polars reads.
 #   values-meet-in-count: the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal.
-#   window-input-is-not-counted: a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, unless the window joins the values of a group into a list or explodes them.
+#   window-input-is-not-counted: a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, unless the window joins the values of a group into a list or explodes them.
 #   window-input-is-not-widened: a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or

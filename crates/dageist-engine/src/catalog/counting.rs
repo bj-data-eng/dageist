@@ -57,12 +57,4 @@ impl Counting {
             _ => return None,
         })
     }
-
-    /// Whether the method gives one value of one value, as the first value of one is: it takes
-    /// some of the values of what it follows. The values where a condition holds are not, for
-    /// the condition meets the one value with each of its own.
-    #[must_use]
-    pub const fn keeps_one_value(self) -> bool {
-        !matches!(self, Self::TheCondition | Self::TheArgument(_))
-    }
 }

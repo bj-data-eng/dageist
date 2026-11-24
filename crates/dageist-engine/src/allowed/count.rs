@@ -18,30 +18,32 @@ pub enum Count {
 }
 
 impl Count {
-    /// Whether the count can be that of another: two counts that are both fixed and differ never
-    /// are, and one that is not known may be any.
+    /// What two counts that an operation meets give, where they are the same number: the one
+    /// both fix, and what is known of either where the other is not. `None` where they cannot be
+    /// the same, which two counts that are fixed and differ are not, nor a count and a bound that
+    /// it exceeds.
     #[must_use]
-    pub const fn may_equal(self, other: Self) -> bool {
+    pub const fn meeting(self, other: Self) -> Option<Self> {
         match (self, other) {
-            (Self::Exactly(first), Self::Exactly(second)) => first == second,
-            (Self::Exactly(exactly), Self::AtMost(most))
-            | (Self::AtMost(most), Self::Exactly(exactly)) => exactly <= most,
-            _ => true,
-        }
-    }
-
-    /// The count of what two values of these counts give where an operation meets them: the same
-    /// where they are the same fixed number, and what is known of both otherwise.
-    #[must_use]
-    pub const fn meeting(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Exactly(first), Self::Exactly(second)) if first == second => self,
-            (Self::Exactly(exactly), Self::AtMost(_))
-            | (Self::AtMost(_), Self::Exactly(exactly)) => Self::Exactly(exactly),
-            (Self::AtMost(first), Self::AtMost(second)) => {
-                Self::AtMost(if first < second { first } else { second })
+            (Self::Exactly(first), Self::Exactly(second)) => {
+                if first == second {
+                    Some(self)
+                } else {
+                    None
+                }
             }
-            _ => Self::NotKnown,
+            (Self::Exactly(exactly), Self::AtMost(most))
+            | (Self::AtMost(most), Self::Exactly(exactly)) => {
+                if exactly <= most {
+                    Some(Self::Exactly(exactly))
+                } else {
+                    None
+                }
+            }
+            (Self::AtMost(first), Self::AtMost(second)) => {
+                Some(Self::AtMost(if first < second { first } else { second }))
+            }
+            (Self::NotKnown, known) | (known, Self::NotKnown) => Some(known),
         }
     }
 
@@ -61,6 +63,30 @@ impl fmt::Display for Count {
             Self::Exactly(count) => write!(formatter, "{count}"),
             Self::AtMost(count) => write!(formatter, "at most {count}"),
             Self::NotKnown => formatter.write_str("a number the data decide"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Count;
+
+    #[test]
+    fn two_counts_that_meet_are_the_number_they_both_fix() {
+        use Count::{AtMost, Exactly, NotKnown};
+        let cases = [
+            (Exactly(2), Exactly(2), Some(Exactly(2))),
+            (Exactly(2), Exactly(3), None),
+            (Exactly(2), AtMost(3), Some(Exactly(2))),
+            (Exactly(3), AtMost(2), None),
+            (AtMost(3), AtMost(2), Some(AtMost(2))),
+            (NotKnown, Exactly(4), Some(Exactly(4))),
+            (AtMost(4), NotKnown, Some(AtMost(4))),
+            (NotKnown, NotKnown, Some(NotKnown)),
+        ];
+        for (first, second, met) in cases {
+            assert_eq!(first.meeting(second), met, "{first:?} with {second:?}");
+            assert_eq!(second.meeting(first), met, "{second:?} with {first:?}");
         }
     }
 }
