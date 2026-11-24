@@ -5281,6 +5281,63 @@ mod tests {
                 "{id} of dates"
             );
         }
+        // What picks or orders the nulls leaves nulls: the first or the last of them, the smallest
+        // or the largest, and the nulls in another order.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-cast-of-a-comparison-of-nulls--through-a-last.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        for id in [
+            "Expr.first",
+            "Expr.last",
+            "Expr.min",
+            "Expr.max",
+            "Expr.reverse",
+            "Expr.sort",
+        ] {
+            let case = pivot_of(
+                Representative::Null,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        compared_with("Expr.ne", chain_of(text_of("1d"), Vec::new())),
+                        call(id, Vec::new()),
+                        cast_to(Representative::Null, Vec::new()),
+                    ],
+                ),
+            );
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &case,
+                    at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                    reason
+                ),
+                vec![Limit::AGroupAggregate],
+                "{id}"
+            );
+        }
+        // A call that counts them leaves a number, which is no null to keep.
+        let counted = pivot_of(
+            Representative::Null,
+            chain_of(
+                call("polars.element", Vec::new()),
+                vec![
+                    compared_with("Expr.ne", chain_of(text_of("1d"), Vec::new())),
+                    call("Expr.count", Vec::new()),
+                    cast_to(Representative::Null, Vec::new()),
+                ],
+            ),
+        );
+        assert_eq!(
+            refused_by_the_tables_at(
+                &counted,
+                at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                reason
+            ),
+            vec![]
+        );
         // A call that gives a value for a null, as the test for one, leaves booleans to cast.
         assert_eq!(
             refused_by_the_tables_at(
