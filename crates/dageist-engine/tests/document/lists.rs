@@ -1083,3 +1083,135 @@ fn no_method_followed_by_any_call_is_run_into_a_panic_of_polars() {
             .join("\n")
     );
 }
+
+/// What the walk claims after the expression, and what Polars gives: the class the walk says the
+/// last call gives (none where it refused or does not know), and the dtype Polars resolved.
+fn claimed_and_given(expression: Value) -> (Option<Representative>, Option<DataType>) {
+    let path = vec![Segment::Parameter("exprs".to_owned()), Segment::Item(0)];
+    let document = Document::read(&document(vec![step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![expression]) }),
+    )]))
+    .expect("a document");
+    let report = document
+        .run_on(&inputs(), &frame())
+        .expect("the table has a schema");
+    let walked = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|walked| walked.place().path() == path)
+        .and_then(|walked| walked.places().last().copied().flatten())
+        .and_then(|place| match place.after() {
+            After::Value { dtype, .. } => Some(dtype),
+            _ => None,
+        });
+    let given = report.steps()[0]
+        .expressions()
+        .iter()
+        .find(|traced| traced.place().path() == path)
+        .and_then(|traced| match traced.links().last()? {
+            Resolution::Dtype(dtype) => Some(dtype.clone()),
+            _ => report.steps()[0]
+                .schema()
+                .and_then(|schema| schema.iter().next().map(|(_, dtype)| dtype.clone())),
+        });
+    (walked, given)
+}
+
+/// Arrays of two and of three that meet are not arrays: Polars refuses to add them and gives a list
+/// where it fills one with the other or takes one for a value and the other for another of a
+/// condition, so the walk, which carries the width of an array, never claims an array for them, and
+/// claims one where the widths are the same.
+#[test]
+fn arrays_of_other_widths_are_not_met_as_arrays_and_those_of_one_width_are() {
+    let two = column_of(Representative::Array(Inner::Int64));
+    let three = WIDE;
+    let on = |column: &str, links: Vec<Value>| chain(col_call(column), links);
+    let true_literal = || {
+        chain(
+            call("polars.lit", json!({ "value": { "flag": true } })),
+            vec![],
+        )
+    };
+    let condition = |then: &str, otherwise: &str| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![true_literal()]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": field(then) })),
+                call("Then.otherwise", json!({ "statement": field(otherwise) })),
+            ],
+        )
+    };
+    let met = [
+        (
+            "an array of two plus an array of three",
+            on(
+                &two,
+                vec![call("Expr.add", json!({ "other": field(three) }))],
+            ),
+        ),
+        (
+            "an array of two filled with an array of three",
+            on(
+                &two,
+                vec![call("Expr.fill_null", json!({ "value": field(three) }))],
+            ),
+        ),
+        (
+            "an array of three filled with an array of two",
+            on(
+                three,
+                vec![call("Expr.fill_null", json!({ "value": field(&two) }))],
+            ),
+        ),
+        (
+            "a condition of an array of two and of three",
+            condition(&two, three),
+        ),
+        (
+            "a condition of an array of three and of two",
+            condition(three, &two),
+        ),
+    ];
+    let mut wrong = Vec::new();
+    for (label, expression) in met {
+        let (claimed, given) = claimed_and_given(expression);
+        if let Some(claimed @ Representative::Array(_)) = claimed {
+            wrong.push(format!(
+                "{label}: the walk claims {claimed}, Polars gives {given:?}"
+            ));
+        }
+    }
+    // The same width is an array, as Polars gives.
+    for (label, expression) in [
+        (
+            "an array of two filled with an array of two",
+            on(
+                &two,
+                vec![call("Expr.fill_null", json!({ "value": field(&two) }))],
+            ),
+        ),
+        ("a condition of two arrays of two", condition(&two, &two)),
+        (
+            "an array of three plus an array of three",
+            on(
+                three,
+                vec![call("Expr.add", json!({ "other": field(three) }))],
+            ),
+        ),
+    ] {
+        let (claimed, given) = claimed_and_given(expression);
+        let expected = given.as_ref().and_then(Representative::of);
+        if !matches!(expected, Some(Representative::Array(_))) || claimed != expected {
+            wrong.push(format!(
+                "{label}: the walk claims {claimed:?}, Polars gives {given:?}"
+            ));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
