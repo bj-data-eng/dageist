@@ -93,11 +93,14 @@ pub enum Limit {
     ///   the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
-    ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
-    ///   what they follow to a float as a cast does, and of the text of a count or a position,
-    ///   made by a fill with a text literal after the call that counts, or of the numbers of a
-    ///   group cast or filled to text by the first call, which a fill, a reverse, a sort, a drop
-    ///   of the nulls or one value picked may follow, and which read as the numbers, or of what
+    ///   arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or
+    ///   a kurtosis in the same places, which convert what they follow to a float as a cast
+    ///   does, and of the text of a count or a position, made by a fill with a text literal after
+    ///   the call that counts, or of the numbers of a group cast or filled to text by the first
+    ///   call, which a fill, a reverse, a sort, a drop of the nulls, a running maximum or
+    ///   minimum or one value picked may follow, and which read as the numbers, or of the
+    ///   values of a group written by a first call with a format of digits alone, as the year,
+    ///   which read as numbers, or of what
     ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -250,7 +253,10 @@ pub enum Limit {
     /// whose numbers every number dtype holds. Polars refusing the rows, with a failed
     /// conversion that has no place, in a case whose refusal is the bound's or the listed
     /// value's: the case run again with the bounds of every `clip` undone and the values of
-    /// every replacement made null is not refused for a failed conversion.
+    /// every replacement made null is not refused for a failed conversion. A table with no rows
+    /// holds no value to convert, except for a bound that holds an aggregate, whose value of
+    /// nothing, as the not-a-number of an entropy, is there: the empty table is asked for a `clip`
+    /// so bounded.
     ABoundTheDtypeCannotHold,
     /// Polars casts a bound of `clip` to the dtype it clips, and a count of characters that a
     /// method of text takes to a whole number, and a bound or a count whose values that dtype
@@ -286,9 +292,10 @@ pub enum Limit {
     /// give as one thing, and refuse a method whose schema says one dtype and whose rows give
     /// another, as the cube root of a null does, which is the target's own comparison and shows
     /// only where rows are given. The tables refusing, when they run rows, with the reason that
-    /// the schema says one dtype and the rows give another, at a call after a `drop_nulls` in
-    /// its chain, which Polars allows; the drop is why where Polars, asked again with each drop
-    /// a fill of nulls forward, refuses the case for that reason.
+    /// the schema says one dtype and the rows give another, at a call after a `drop_nulls` or a
+    /// `drop_nans` in its chain, or in what the chain's start is given, which Polars allows; the
+    /// drop is why where Polars, asked again with each drop a fill of nulls forward, refuses the
+    /// case for that reason.
     ADropLeavesNoRows,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
@@ -311,9 +318,12 @@ pub enum Limit {
     /// and so may a table with no rows, where the sum of nothing is a value for a root or a
     /// logarithm to give an infinity. Polars refusing the rows, the empty table's too, with a
     /// failed conversion that has no place, in a case with a strict `cast`, a test of closeness,
-    /// a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype
-    /// and no default: the case run again with each cast made not strict, each test a comparison,
-    /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
+    /// a fill by a value or of NaN, a difference where the failed conversion is of an unsigned
+    /// number to a signed one (it converts them to the dtype of its result, so a subtraction that
+    /// wraps to a number beyond it is refused), a count of characters, or a strict replacement
+    /// given a dtype and no default: the case run again with each cast made not strict, each test
+    /// a comparison, each fill and each such difference a fill forward, each count the whole
+    /// number 1 and each replacement not asked for
     /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
     /// when it works out the schema, so the refusal may be the schema's, and then it names the
     /// scalar the literal is, and the strict cast it is given to where it says where. A date made of
@@ -323,8 +333,9 @@ pub enum Limit {
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
     /// table's rows or another expression's values. The tables measure the two in a context on
     /// a column that holds no null, where they drop nothing: how many values a column has is for
-    /// its rows to say. Polars refusing the rows, with a reason about lengths that has no place,
-    /// in a case with a `drop_nulls` or a `drop_nans`: the case run again with each of them
+    /// its rows to say. Polars refusing the rows, with a reason about lengths that has no place
+    /// (a replacement's `default` of other length than its input is one), in a case with a
+    /// `drop_nulls` or a `drop_nans`: the case run again with each of them
     /// made a call that fills nulls forward, which keeps every value, is not refused for lengths.
     ADropChangesTheLengths,
     /// A window evaluates what it follows once for each group, and what a replacement lists as
@@ -418,8 +429,9 @@ pub enum Limit {
     /// where they are not. The tables measured the replacement in select, on columns. Polars
     /// refusing the rows or the empty table with either refusal, which has no place, in a case
     /// with a branch of a condition that holds a chain that starts from a literal and replaces
-    /// after an aggregate: the case run again with each such literal a column of text is not
-    /// refused for it.
+    /// after an aggregate or a running value (the sum, the product, the minimum, the maximum or
+    /// the count so far, which it reads of a literal as it does an aggregate): the case run again
+    /// with each such literal a column of text is not refused for it.
     AReplacementOfALiteralAggregateInABranch,
     /// A format writes the fields of the calendar and of the clock that a dtype has, and Polars refuses
     /// one it has no field for, such as a year for a time of day, an hour for a date, a field that does
@@ -429,11 +441,13 @@ pub enum Limit {
     /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
-    /// `dt.replace`, and the functions that make a date, a moment or a time of parts, convert each
-    /// part they are given to a whole number of the width of the part and refuse a value outside
-    /// the calendar's range, and one that does not convert, when the rows run, so what they do
-    /// with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
-    /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
+    /// `dt.replace`, and the functions that make a date, a moment, a time or a length of time of
+    /// parts, convert each part they are given to a whole number of the width of the part and
+    /// refuse a value outside the calendar's range, and one that does not convert, when the rows
+    /// run, so what they do with a part that is no number written in depends on the values of
+    /// the rows. The tables measured the column that stands for an argument, whose values are 1
+    /// and 3, or true and false, of which false is a day of 0 that no date has. Polars refusing
+    /// the rows or the
     /// empty table with the refusal that the components of a date or a time are invalid, or that a
     /// value does not convert, which has no place, in a case with a call given a part: the
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
@@ -451,9 +465,11 @@ pub enum Limit {
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
     /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
-    /// literals alone make, which is one value, where it stands in a value of a branch of a
-    /// condition, or in the predicate of a `when` after the first, with the reason that the
-    /// quantile holds a null. It meets it in a select, a filter, a sort key, a join key, a window,
+    /// literals alone make, or of a value that it folds into a null literal (a comparison or an
+    /// arithmetic given the null literal, such as `mean() >= null`), which is one value, where it
+    /// stands in a value of a branch of a condition, or in the predicate of a `when` after the
+    /// first, with the reason that the quantile holds a null. It meets it in a select, a filter,
+    /// a sort key, a join key, a window,
     /// the predicate of the first `when`, and on a column in the condition. The tables measured the
     /// call in a condition on columns. Polars refusing the rows or the empty table with that
     /// refusal, which has no place, in a case with a condition that holds in a value or in a later
@@ -461,10 +477,12 @@ pub enum Limit {
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
     /// follows the quantile, cut after the quantile it is allowed, or with a column of the
-    /// literal's own dtype for each quantile, which a filter's rule asks for. The cut control
-    /// leaves a gap: a refusal of a call after the quantile that Polars would give the case once
-    /// the quantile is no longer refused is not seen, for what follows the quantile is not asked
-    /// of the column.
+    /// literal's own dtype for each quantile (the number cast to it where the literal is given a
+    /// dtype that no column has, such as a time of the day), which a filter's rule asks for. For a
+    /// quantile that follows a fold the case is asked with every such fold left out, which the
+    /// other controls are then made of. The cut control leaves a gap: a refusal of a call after
+    /// the quantile that Polars would give the case once the quantile is no longer refused is not
+    /// seen, for what follows the quantile is not asked of the column.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -476,11 +494,25 @@ pub enum Limit {
     /// every receiver. The rule is the tables' own, so the disagreement is of a rule that refuses
     /// what Polars allows, at a shift that is filled, whose receiver gives one value.
     AMomentOfOneValueFilledInAnotherZone,
+    /// Polars folds a comparison or an arithmetic with the null literal into a null before it runs
+    /// what the call followed or what an argument was made of, so a part inside it is never met:
+    /// `h + null` and `null + h` are a null whatever `h` is, and what is made of it is made of a
+    /// null. The tables judge the part as written and refuse a call for the dtype of what it is
+    /// given. Polars allowing the step, where the refused call is given an expression that holds
+    /// such a call, at any depth, with another call after it (a fold that ends a chain leaves a
+    /// null literal, a literal's), and Polars refusing the case run again with each such call left
+    /// out (a null receiver is replaced by the other operand) for the reason the tables gave,
+    /// where it lies inside the expression that holds the refused call or has no place: the fold
+    /// is then why Polars allows it. A case that is the same without them, or that Polars still
+    /// allows or refuses for another reason, is excused by nothing, and a call that follows a fold
+    /// in its own chain is a probe's, which asks it of a value of its dtype. A panic is the panic
+    /// limit's, whatever its control shows.
+    APartPolarsFoldsToANull,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -519,6 +551,7 @@ impl Limit {
         Self::AMomentBeyondTheRangeOfAUnit,
         Self::AnApproximateQuantileOfALiteralInACondition,
         Self::AMomentOfOneValueFilledInAnotherZone,
+        Self::APartPolarsFoldsToANull,
     ];
 
     /// The name a kept case is filed under.
@@ -576,6 +609,7 @@ impl Limit {
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "a-moment-of-one-value-filled-in-another-zone"
             }
+            Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
         }
     }
 
@@ -643,7 +677,7 @@ impl Limit {
                 "Polars casts the values of a bound of clip to the dtype it clips, and a count of characters to a whole number, which the tables measured as the sample's rows, and a bound or a count with others passes"
             }
             Self::ACastOfAValueTheDtypeCannotHold => {
-                "a strict cast, which a test of closeness, a fill by a value and a count of characters make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
+                "a strict cast, which a test of closeness, a fill by a value, a count of characters and a difference of unsigned numbers make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
             }
             Self::ADropChangesTheLengths => {
                 "a drop of nulls or of NaNs leaves fewer values where the rows hold one, which the tables measured on a column that holds none"
@@ -661,10 +695,13 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::AnApproximateQuantileOfALiteralInACondition => {
-                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make or that it folds into a null literal, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
+            }
+            Self::APartPolarsFoldsToANull => {
+                "Polars folds a comparison or an arithmetic with a null literal into a null before it runs what that call followed, so a part inside it is never met, where the tables judged the part as written"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -821,6 +858,65 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
         .is_some_and(|counted| links[counted + 1..].iter().any(is_a_fill_with_text))
 }
 
+/// Whether every call of `links` keeps each value as it is and takes none away.
+fn keeps_each_value(links: &[Call]) -> bool {
+    links.iter().all(|link| {
+        matches!(
+            link.entry().id().as_str(),
+            "Expr.forward_fill"
+                | "Expr.backward_fill"
+                | "Expr.reverse"
+                | "Expr.sort"
+                | "Expr.drop_nulls"
+                | "Expr.first"
+                | "Expr.last"
+                | "Expr.min"
+                | "Expr.max"
+                | "Expr.cum_max"
+                | "Expr.cum_min"
+        )
+    })
+}
+
+/// The directives of a format that write digits alone.
+const DIRECTIVES_OF_DIGITS: &str = "YymdHMSIjfuwCUWGgV";
+
+/// Whether the call writes a moment with a format of digits alone, directives that write digits
+/// and digits, so that the text it gives reads as a number.
+fn writes_digits_alone(call: &Call) -> bool {
+    if !(is(call, "Expr.dt.to_string") || is(call, "Expr.dt.strftime")) {
+        return false;
+    }
+    let Some(Value::String(format)) = call.argument("format") else {
+        return false;
+    };
+    let mut characters = format.chars();
+    let mut written = false;
+    while let Some(character) = characters.next() {
+        let digits = match character {
+            '%' => characters
+                .next()
+                .is_some_and(|directive| DIRECTIVES_OF_DIGITS.contains(directive)),
+            other => other.is_ascii_digit(),
+        };
+        if !digits {
+            return false;
+        }
+        written = true;
+    }
+    written
+}
+
+/// Whether the call at `at` of the aggregate `chain` of a pivot follows the values of a group
+/// written with a format of digits alone, and nothing else that takes a value away: the text reads
+/// as a number, which the sample's does not.
+fn is_a_date_written_as_digits(chain: &Expression, at: usize) -> bool {
+    matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
+        && at >= 1
+        && keeps_each_value(&chain.links()[1..at])
+        && chain.links().first().is_some_and(writes_digits_alone)
+}
+
 /// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
 /// group cast to text and nothing else: the values the pivot reads are columns of numbers, the
 /// first call casts them to text or fills them with a text literal, and any that follow it keep
@@ -837,20 +933,7 @@ fn is_text_of_the_numbers_of_a_group(
     matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
         && at >= 1
         // What stands between keeps each value as it is and takes none away.
-        && chain.links()[1..at].iter().all(|link| {
-            matches!(
-                link.entry().id().as_str(),
-                "Expr.forward_fill"
-                    | "Expr.backward_fill"
-                    | "Expr.reverse"
-                    | "Expr.sort"
-                    | "Expr.drop_nulls"
-                    | "Expr.first"
-                    | "Expr.last"
-                    | "Expr.min"
-                    | "Expr.max"
-            )
-        })
+        && keeps_each_value(&chain.links()[1..at])
         && chain.links().first().is_some_and(|first| {
             // A cast to text, or a fill with a text literal, which gives numbers the dtype text.
             (is(first, "Expr.cast")
@@ -921,6 +1004,25 @@ fn compares_with_a_null(call: &Call) -> bool {
         && operands(call)
             .into_iter()
             .any(|(_, operand)| is_the_bare_null_literal(operand))
+}
+
+/// Whether a link of `chain`, which is at `place`, before the call at `at` is a bitwise call given
+/// the null literal that follows whole numbers, as the tables say: the bitwise call of a whole
+/// number with a null is a null in each row, where one of a `Boolean` is not (a null with a true
+/// is a true).
+fn gives_a_null_of_whole_numbers(
+    prediction: &Prediction,
+    chain: &Expression,
+    place: &Place,
+    at: usize,
+) -> bool {
+    chain.links()[..at].iter().enumerate().any(|(link, call)| {
+        is_a_bitwise_call(call)
+            && operands(call)
+                .into_iter()
+                .any(|(_, operand)| is_the_bare_null_literal(operand))
+            && class_after(prediction, place, link).is_some_and(|class| class.dtype().is_integer())
+    })
 }
 
 /// Whether `expression` is the null literal and no more.
@@ -2179,6 +2281,18 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
     })
 }
 
+/// Whether the call is a difference, which converts unsigned numbers to the signed dtype of its
+/// result, strictly.
+fn is_a_difference(call: &Call) -> bool {
+    is(call, "Expr.diff")
+}
+
+/// Whether the reason is the failed conversion of an unsigned number to a signed dtype, as a
+/// difference makes where a subtraction wrapped to a number beyond it.
+fn is_an_unsigned_conversion_to_a_signed_one(reason: &str) -> bool {
+    reason.starts_with("conversion from `u") && reason.contains("` to `i")
+}
+
 /// Whether the call converts strictly, so that it refuses a value its dtype cannot hold: a `cast`
 /// that is neither told to wrap numbers that overflow nor to give a null where a value does not
 /// convert, a test of closeness and a fill by a value or of NaN, which convert what they meet to
@@ -2265,9 +2379,13 @@ fn without_counts(call: &Call) -> Option<Call> {
 /// The case with no strict cast: each gives a null where a value does not convert, a test of
 /// closeness is the comparison of what it compares and a fill by a value a fill forward, which
 /// convert nothing, a count of characters is the whole number 1, which converts without a failure,
-/// and a replacement is not asked for a dtype, which converts nothing.
-fn case_without_strict_casts(case: &Case) -> Option<Case> {
+/// and a replacement is not asked for a dtype, which converts nothing. Where `differences`, each
+/// difference is a fill forward too, which converts nothing.
+fn case_without_strict_casts(case: &Case, differences: bool) -> Option<Case> {
     case_changed(case, &|call| {
+        if differences && is_a_difference(call) {
+            return Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok();
+        }
         if !is_a_strict_cast(call) {
             return None;
         }
@@ -2296,8 +2414,11 @@ fn case_without_strict_casts(case: &Case) -> Option<Case> {
 /// Whether Polars refuses the case for a failed conversion still when no cast is strict: the
 /// cast is then no cause of it. Which of two failures of a plan Polars names depends on which
 /// thread gets there first, so the case is run again.
-fn refused_for_a_failed_conversion_without_strict_casts(case: &Case) -> Option<bool> {
-    changed(case_without_strict_casts(case), case).map(|control| {
+fn refused_for_a_failed_conversion_without_strict_casts(
+    case: &Case,
+    differences: bool,
+) -> Option<bool> {
+    changed(case_without_strict_casts(case, differences), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control).refusal.is_some_and(|refusal| {
                 unplaced(&refusal) && is_a_failed_conversion(&refusal.reason)
@@ -2366,14 +2487,23 @@ const A_PATTERN_READ_AS_MANY: [&str; 2] = [
     "pattern cannot be 'null' in 'replace' expression",
 ];
 
-/// Whether the chain starts from a literal and replaces after an aggregate.
+/// Whether the call gives a running value: the sum, the product, the minimum, the maximum or the
+/// count so far, which Polars' streaming engine reads of a literal as it reads an aggregate.
+fn is_a_running_value(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.cum_sum" | "Expr.cum_prod" | "Expr.cum_min" | "Expr.cum_max" | "Expr.cum_count"
+    )
+}
+
+/// Whether the chain starts from a literal and replaces after an aggregate or a running value.
 fn is_a_literal_aggregate_replaced(expression: &Expression) -> bool {
     if !matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")) {
         return false;
     }
     let mut aggregated = false;
     for link in expression.links() {
-        if is_one_value(link) {
+        if is_one_value(link) || is_a_running_value(link) {
             aggregated = true;
         } else if aggregated && is_a_text_replacement(link) {
             return true;
@@ -2493,6 +2623,32 @@ const PARTS_OF_A_DATE: [&str; 7] = [
     "microsecond",
 ];
 
+/// The parts `duration` is given, which it converts to whole numbers as the calendar's are.
+const PARTS_OF_A_LENGTH_OF_TIME: [&str; 8] = [
+    "weeks",
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+];
+
+/// The parts that the call is given to convert: a length of time's, or a date's.
+fn parts_of(call: &Call) -> &'static [&'static str] {
+    if is(call, "polars.duration") {
+        &PARTS_OF_A_LENGTH_OF_TIME
+    } else {
+        &PARTS_OF_A_DATE
+    }
+}
+
+/// Whether the parameter of the call holds a part that it converts.
+fn is_a_part_of(call: &Call, parameter: &str) -> bool {
+    parts_of(call).contains(&parameter)
+}
+
 /// Whether the reason is that the components of a date or of a time are invalid, as a day of 0 or
 /// a minute below zero are.
 fn is_a_refusal_of_the_components_of_a_date(reason: &str) -> bool {
@@ -2506,13 +2662,15 @@ fn is_a_refusal_of_a_part_of_a_date(reason: &str) -> bool {
 }
 
 /// Whether the call is given a part of a date or a time to convert: a `dt.replace`, or one of the
-/// functions that make a date, a moment or a time of parts, which convert each as it does.
+/// functions that make a date, a moment, a time or a length of time of parts, which convert each
+/// as it does.
 fn is_given_a_part_of_a_date(call: &Call) -> bool {
     (is(call, "Expr.dt.replace")
         || is(call, "polars.date")
         || is(call, "polars.datetime")
-        || is(call, "polars.time"))
-        && PARTS_OF_A_DATE
+        || is(call, "polars.time")
+        || is(call, "polars.duration"))
+        && parts_of(call)
             .iter()
             .any(|part| call.argument(part).is_some())
 }
@@ -2538,7 +2696,7 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
             .arguments()
             .iter()
             .map(|given| {
-                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                let value = if is_a_part_of(call, given.parameter()) {
                     Value::Expression(one.clone())
                 } else {
                     given.value().clone()
@@ -2622,8 +2780,7 @@ fn case_with_the_text_parts_as(case: &Case, value: Value) -> Option<Case> {
             .map(|given| {
                 let value = match given.value() {
                     Value::Expression(part)
-                        if PARTS_OF_A_DATE.contains(&given.parameter())
-                            && is_a_literal_of_text(part) =>
+                        if is_a_part_of(call, given.parameter()) && is_a_literal_of_text(part) =>
                     {
                         Value::Expression(literal.clone())
                     }
@@ -2668,7 +2825,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
             .arguments()
             .iter()
             .map(|given| {
-                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                let value = if is_a_part_of(call, given.parameter()) {
                     Value::Expression(literal.clone())
                 } else {
                     given.value().clone()
@@ -2823,21 +2980,23 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| false)
+    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| None, &|_| false)
 }
 
-/// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, and
-/// each chain made so is cut after its first call that `cut_after` accepts: what follows is no
-/// part of what the column stands in for.
+/// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, cast
+/// to the dtype `cast_to` says of it, if it does, and each chain made so is cut after its first
+/// call that `cut_after` accepts: what follows is no part of what the column stands in for.
 fn call_with_columns_cut_for(
     call: &Call,
     is_it: &dyn Fn(&Expression) -> bool,
     column_of: &dyn Fn(&Expression) -> String,
+    cast_to: &dyn Fn(&Expression) -> Option<Value>,
     cut_after: &dyn Fn(&Call) -> bool,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
         column_of: &'a dyn Fn(&Expression) -> String,
+        cast_to: &'a dyn Fn(&Expression) -> Option<Value>,
         cut_after: &'a dyn Fn(&Call) -> bool,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
@@ -2880,6 +3039,9 @@ fn call_with_columns_cut_for(
             }
         };
         let mut links = Vec::new();
+        if replaced && let Some(dtype) = (replacing.cast_to)(expression) {
+            links.push(Call::new(catalog::entry("Expr.cast")?, vec![("dtype", dtype)]).ok()?);
+        }
         for link in expression.links() {
             links.push(call_replaced(link, replacing)?);
             if replaced && (replacing.cut_after)(link) {
@@ -2901,6 +3063,7 @@ fn call_with_columns_cut_for(
         &Replacing {
             is_it,
             column_of,
+            cast_to,
             cut_after,
         },
     )
@@ -2919,6 +3082,22 @@ fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
             .links()
             .iter()
             .any(|link| is(link, "Expr.approx_quantile"))
+}
+
+/// Whether the chain takes an approximate quantile of a value that Polars folds into a null
+/// literal: a link before the quantile is a comparison or an arithmetic given the null literal.
+fn is_an_approximate_quantile_of_a_fold(expression: &Expression) -> bool {
+    let links = expression.links();
+    links.iter().enumerate().any(|(at, link)| {
+        is(link, "Expr.approx_quantile") && links[..at].iter().any(compares_with_a_null)
+    })
+}
+
+/// Whether the chain takes an approximate quantile that Polars reads as null where it stands in a
+/// condition: of a value that literals alone make, or of one it folds into a null literal.
+fn is_a_null_quantile_receiver(expression: &Expression) -> bool {
+    is_an_approximate_quantile_of_literals(expression)
+        || is_an_approximate_quantile_of_a_fold(expression)
 }
 
 /// Whether the call is where a condition's values and later predicates are evaluated together: a
@@ -2945,6 +3124,19 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
+/// The dtype a literal is given, where no column of the sample has it: the number cast to it
+/// stands in for the literal. `None` for a literal that has no dtype of its own or a column of its
+/// dtype, a `Boolean` or text.
+fn dtype_of_the_literal_with_no_column(start: &Call) -> Option<Value> {
+    if !is(start, "polars.lit") || column_of_the_dtype_of(start).is_some() {
+        return None;
+    }
+    match start.argument("dtype") {
+        Some(dtype @ Value::Dtype(_)) => Some(dtype.clone()),
+        _ => None,
+    }
+}
+
 /// The column that stands in for the literal an approximate quantile starts from, of the literal's
 /// own dtype: `f`, which holds booleans, for a `Boolean`, and `g`, which holds text, for text.
 /// `None` for another dtype, where the column `k` of numbers stands in.
@@ -2966,42 +3158,64 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 
 /// Whether Polars refuses the case, for any reason, still when each approximate quantile that
 /// starts from literals alone is a column's: the literals are then no cause, or not shown to be.
-/// `Some(false)` is a control that is allowed every time it runs. The case with the column in the
+/// `Some(false)` is a control that is allowed every time it runs. Where a quantile follows a link
+/// that Polars folds into a null literal, every such link is left out first, and what follows
+/// asks the case so. The case with the column in the
 /// literal's place is asked first, and where that is refused for what follows the quantile, which
 /// a column of numbers may not be given where a literal of text was, the case is asked again cut
 /// after the quantile, so that the column stands in for the literal and not for the dtype of what
 /// follows it; and again with a column of the literal's own dtype, which a filter reads as a
 /// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
-/// join's keys read the column both tables hold, and other places the column `k`. The cut control
-/// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
-/// column of the literal's own dtype is chosen for each quantile from its own literal, a `Boolean`
-/// one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case start
-/// from, and so whichever comes first.
+/// join's keys read the columns both tables hold, `u` and `key`, either of which the control may
+/// be, for a join refuses two keys named alike, and other places read the column `k`. The cut
+/// control leaves a gap: a refusal of a call after the quantile that Polars would give is not
+/// seen. The column of the literal's own dtype is chosen for each quantile from its own literal, a
+/// `Boolean` one `f`, a text one `g`, and any other `k`, cast to the dtype the literal is given
+/// where no column of the sample has it, whatever the other quantiles of the case start from, and
+/// so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
-    let step = &case.document.steps()[0];
+    // Where a quantile follows a value that Polars folds into a null literal, no column stands in
+    // for a literal there: the control leaves every such fold out, which is what the column of
+    // each other control is made of.
+    let folded = operands(case.document.steps()[0].call())
+        .into_iter()
+        .any(|(_, held)| holds_in_a_branch(held, &is_an_approximate_quantile_of_a_fold));
+    let base = if folded {
+        case_without_folds(case)?
+    } else {
+        case.clone()
+    };
+    let step = &base.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
-    let numbers = if joins { "u" } else { "k" };
+    // The columns of numbers that stand in: a join's keys read the columns both tables hold, `u`
+    // and `key`, and the other keys of the join may be named for one of them, which a join
+    // refuses twice, so each is asked; other places read `k`.
+    let columns: &[&str] = if joins { &["u", "key"] } else { &["k"] };
+    let numbers = columns[0];
     // Whether some quantile starts from a literal that has a column of its own dtype.
     let owned = std::cell::Cell::new(false);
     let recording = |expression: &Expression| {
         let found = is_an_approximate_quantile_of_literals(expression);
         if found
             && let Start::Call(start) = expression.start()
-            && column_of_the_dtype_of(start).is_some()
+            && (column_of_the_dtype_of(start).is_some()
+                || dtype_of_the_literal_with_no_column(start).is_some())
         {
             owned.set(true);
         }
         found
     };
-    let control = |column_of: &dyn Fn(&Expression) -> String, cut_after: &dyn Fn(&Call) -> bool| {
+    let control = |column_of: &dyn Fn(&Expression) -> String,
+                   cast_to: &dyn Fn(&Expression) -> Option<Value>,
+                   cut_after: &dyn Fn(&Call) -> bool| {
         let rebuilt = Step::new(
             step.id().clone(),
-            call_with_columns_cut_for(step.call(), &recording, column_of, cut_after)?,
+            call_with_columns_cut_for(step.call(), &recording, column_of, cast_to, cut_after)?,
         )
         .ok()?;
         let control = Case {
-            receiver: case.receiver,
-            argument: case.argument,
+            receiver: base.receiver,
+            argument: base.argument,
             document: Document::new(vec![rebuilt]).ok()?,
         };
         changed(Some(control), case)
@@ -3009,21 +3223,31 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     };
     let never = |_: &Call| false;
     let after_the_quantile = |link: &Call| is(link, "Expr.approx_quantile");
-    let numeric = |_: &Expression| numbers.to_owned();
     // Each quantile's own column: the one of the dtype its literal has, and the numbers where it
     // has none, whatever the other quantiles of the case start from.
     let own = |expression: &Expression| match expression.start() {
         Start::Call(start) => column_of_the_dtype_of(start).unwrap_or(numbers).to_owned(),
         Start::Input(_) | Start::Hole => numbers.to_owned(),
     };
-    let mut refused = control(&numeric, &never)?;
-    if refused {
-        refused = control(&numeric, &after_the_quantile)?;
+    // The number cast to the dtype of a literal that no column has, for the quantile's own.
+    let own_cast = |expression: &Expression| match expression.start() {
+        Start::Call(start) => dtype_of_the_literal_with_no_column(start),
+        Start::Input(_) | Start::Hole => None,
+    };
+    let no_cast = |_: &Expression| None;
+    let mut refused = true;
+    for column in columns {
+        let numeric = |_: &Expression| (*column).to_owned();
+        let mut refused_here = control(&numeric, &no_cast, &never)?;
+        if refused_here {
+            refused_here = control(&numeric, &no_cast, &after_the_quantile)?;
+        }
+        refused = refused && refused_here;
     }
     if refused && !joins && owned.get() {
-        refused = control(&own, &never)?;
+        refused = control(&own, &own_cast, &never)?;
         if refused {
-            refused = control(&own, &after_the_quantile)?;
+            refused = control(&own, &own_cast, &after_the_quantile)?;
         }
     }
     Some(refused)
@@ -3200,9 +3424,19 @@ fn refused_for_lengths_without_drops(case: &Case) -> Option<bool> {
 /// What a replacement is refused with when what replaces it has fewer values than what it replaces.
 const NEW_AS_LONG_AS_OLD: &str = "must have the same length as `old`";
 
+/// What a replacement is refused with when its default has neither as many values as its input nor
+/// one.
+const DEFAULT_AS_LONG_AS_INPUT: &str = "must have the same length as the input or have length 1";
+
+/// Whether the reason is one of the two a replacement is refused with for a number of values.
+fn is_a_replacement_count(reason: &str) -> bool {
+    reason.contains(NEW_AS_LONG_AS_OLD) || reason.contains(DEFAULT_AS_LONG_AS_INPUT)
+}
+
 /// Whether Polars refuses the case for the reason given still when no call drops: for the words of
-/// a replacement that it be given as many values as it replaces, those words, and not another
-/// refusal about lengths, which a fill in place of the drop may meet for its own reasons.
+/// a replacement that it be given as many values as it replaces, or that its default be as many
+/// as its input or one, those words, and not another refusal about lengths, which a fill in
+/// place of the drop may meet for its own reasons.
 fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<bool> {
     changed(case_without_drops(case), case).map(|control| {
         (0..RUNS).any(|_| {
@@ -3210,6 +3444,8 @@ fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<boo
                 unplaced(&refusal)
                     && if reason.contains(NEW_AS_LONG_AS_OLD) {
                         refusal.reason.contains(NEW_AS_LONG_AS_OLD)
+                    } else if reason.contains(DEFAULT_AS_LONG_AS_INPUT) {
+                        refusal.reason.contains(DEFAULT_AS_LONG_AS_INPUT)
                     } else {
                         is_lengths(&refusal.reason)
                     }
@@ -3396,6 +3632,15 @@ fn has_a_bound(call: &Call) -> bool {
         || ["old", "new"]
             .iter()
             .any(|value| is_a_replaced_value(call, value) && call.argument(value).is_some())
+}
+
+/// Whether the call is a `clip` that has a bound which holds an aggregate: one value, which is
+/// there when the table has no rows, where a column has none.
+fn is_a_clip_bounded_by_an_aggregate(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && operands(call)
+            .into_iter()
+            .any(|(_, bound)| any_call(bound, &is_one_value))
 }
 
 /// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
@@ -3775,6 +4020,121 @@ fn refused_for_lengths_without_explodes(case: &Case) -> Option<bool> {
             observe(&control)
                 .refusal
                 .is_some_and(|refusal| unplaced(&refusal) && is_lengths(&refusal.reason))
+        })
+    })
+}
+
+/// Whether the expression, or one inside it, has a link that Polars folds into a null which
+/// another link follows: what follows is run on a null, which the tables do not know. A fold that
+/// ends a chain leaves a null literal, which is a literal's.
+fn holds_a_fold_before_a_link(expression: &Expression) -> bool {
+    let count = expression.links().len();
+    (0..count.saturating_sub(1)).any(|at| is_a_fold_at(expression, at))
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_fold_before_a_link(inside))
+            })
+}
+
+/// Whether the link at `at` of the chain is one that Polars folds into a null: a comparison or an
+/// arithmetic given the null literal, or the first link where the chain starts from the null
+/// literal and the link is one that carries nulls.
+fn is_a_fold_at(expression: &Expression, at: usize) -> bool {
+    let Some(link) = expression.links().get(at) else {
+        return false;
+    };
+    compares_with_a_null(link)
+        || (at == 0
+            && carries_nulls(link.entry().id().as_str())
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None)))))
+}
+
+/// The call with every link that Polars folds into a null left out, in the call and in the
+/// expressions it holds: what followed each is then given what the call followed.
+fn call_without_folds(call: &Call) -> Option<Call> {
+    fn value(held: &Value) -> Option<Value> {
+        Some(match held {
+            Value::Expression(inner) => Value::Expression(expression(inner)?),
+            Value::Many(items) => Value::Many(items.iter().map(value).collect::<Option<Vec<_>>>()?),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((value(key)?, value(entry)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    fn expression(held: &Expression) -> Option<Expression> {
+        // A fold whose receiver is the null literal leaves the other operand in its place.
+        let (start, rest) = match (held.start(), held.links().first()) {
+            (Start::Call(_), Some(first))
+                if is_a_fold_at(held, 0) && !compares_with_a_null(first) =>
+            {
+                let others = operands(first);
+                let [(_, other)] = others.as_slice() else {
+                    return None;
+                };
+                let other = expression(other)?;
+                let mut links = other.links().to_vec();
+                links.extend(held.links()[1..].iter().cloned());
+                (other.start().clone(), links)
+            }
+            (Start::Call(start), _) => (
+                Start::Call(call_without_folds(start)?),
+                held.links().to_vec(),
+            ),
+            (other, _) => (other.clone(), held.links().to_vec()),
+        };
+        let links = rest
+            .iter()
+            .filter(|link| !compares_with_a_null(link))
+            .map(call_without_folds)
+            .collect::<Option<Vec<_>>>()?;
+        Expression::new(start, links).ok()
+    }
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), value(given.value())?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// The case with every call that Polars folds into a null left out.
+fn case_without_folds(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_without_folds(step.call())?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case, with every call that it folds into a null left out, for the
+/// reason the tables gave: where it has a place, it lies inside the expression that holds the
+/// refused part. `None` where nothing is folded, which the case itself is.
+fn refused_without_folds(case: &Case, refused: &Refused) -> Option<bool> {
+    let locus = locate(case, &refused.place);
+    let within = locus.places.first()?;
+    changed(case_without_folds(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && refusal
+                        .place
+                        .as_ref()
+                        .is_none_or(|place| place.path().starts_with(within.path()))
+            })
         })
     })
 }
@@ -4200,9 +4560,9 @@ fn applies(
             unplaced(refusal)
                 && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains(A_NULL_QUANTILE)
-                && held.iter().any(|(_, held)| {
-                    holds_in_a_branch(held, &is_an_approximate_quantile_of_literals)
-                })
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_in_a_branch(held, &is_a_null_quantile_receiver))
                 && refused_with_columns_for_a_quantile(case) == Some(false)
         }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
@@ -4369,7 +4729,7 @@ fn applies(
             // a drop makes fewer where the rows hold a null: that is a refusal about lengths here
             // and is not one for the rows' own, which the drop's control shows.
             unplaced(refusal)
-                && (is_lengths(&refusal.reason) || refusal.reason.contains(NEW_AS_LONG_AS_OLD))
+                && (is_lengths(&refusal.reason) || is_a_replacement_count(&refusal.reason))
                 && held.iter().any(|(_, held)| any_call(held, &is_a_drop))
                 && refused_for_lengths_without_drops_as(case, &refusal.reason) == Some(false)
         }
@@ -4479,11 +4839,17 @@ fn applies(
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
+                                        || locus.places.last().is_some_and(|held| {
+                                            gives_a_null_of_whole_numbers(
+                                                prediction, chain, held, at,
+                                            )
+                                        })
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
                                         // The text of a count or a position, which reads as it.
                                         || (is_a_failed_conversion_of_text(&refused.reason)
                                             && (makes_text_of_a_count(&chain.links()[..at])
+                                                || is_a_date_written_as_digits(chain, at)
                                                 || is_text_of_the_numbers_of_a_group(
                                                     &frames, step, chain, at,
                                                 )))
@@ -4652,11 +5018,16 @@ fn applies(
                     ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::ABoundTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
-            // The rows hold the value; a table with no rows holds none to convert. The bound is
-            // the cause where Polars stops refusing for a failed conversion when no `clip` has
-            // one.
+            // The rows hold the value, and so may a table with no rows, where an aggregate of
+            // nothing, as the entropy, is a value of its own for the bound to be cast from. The
+            // bound is the cause where Polars stops refusing for a failed conversion when no
+            // `clip` has one.
             unplaced(refusal)
-                && refusal.stage == Stage::Rows
+                && (refusal.stage == Stage::Rows
+                    || (refusal.stage == Stage::Empty
+                        && held
+                            .iter()
+                            .any(|(_, held)| any_call(held, &is_a_clip_bounded_by_an_aggregate))))
                 && is_a_failed_conversion(&refusal.reason)
                 && held.iter().any(|(_, held)| any_call(held, &has_a_bound))
                 && refused_for_a_failed_conversion_without_bounds(case) == Some(false)
@@ -4708,9 +5079,13 @@ fn applies(
             refused.stage == Some(TableStage::Rows)
                 && refused.reason.starts_with(SCHEMA_SAYS)
                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                    chain.links()[..at]
-                        .iter()
-                        .any(|call| is(call, "Expr.drop_nulls"))
+                    // A drop of nulls or of NaNs before the call in its chain, or in what the
+                    // start of the chain is given, which the start is made of.
+                    chain.links()[..at].iter().any(is_a_drop)
+                        || matches!(chain.start(), Start::Call(start)
+                            if operands(start)
+                                .into_iter()
+                                .any(|(_, given)| any_call(given, &is_a_drop)))
                 })
                 && refused_with_each_drop_a_fill(case, &refused.reason)
         }
@@ -4730,10 +5105,17 @@ fn applies(
                         locate(case, place).call.is_some_and(is_a_strict_cast)
                     })))
                 && is_a_failed_conversion(&refusal.reason)
-                && held
-                    .iter()
-                    .any(|(_, held)| any_call(held, &is_a_strict_cast))
-                && refused_for_a_failed_conversion_without_strict_casts(case) == Some(false)
+                && {
+                    // A difference converts an unsigned number to a signed one, which the other
+                    // casts of the limit do not make of the failure.
+                    let differences = is_an_unsigned_conversion_to_a_signed_one(&refusal.reason);
+                    held.iter().any(|(_, held)| {
+                        any_call(held, &|call| {
+                            is_a_strict_cast(call) || (differences && is_a_difference(call))
+                        })
+                    }) && refused_for_a_failed_conversion_without_strict_casts(case, differences)
+                        == Some(false)
+                }
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -4750,6 +5132,20 @@ fn applies(
                     .chain
                     .zip(locus.index)
                     .is_some_and(|(chain, at)| gives_one_value_of_literals(chain, at))
+        }
+        (Limit::APartPolarsFoldsToANull, Disagreement::PolarsAllows(refused)) => {
+            // The refused call is given an expression that holds a call that Polars folds, which
+            // a call follows, and Polars refuses the case, with every such call left out, for the
+            // tables' reason. A call that follows a fold in its own chain is asked of a value of
+            // its dtype instead ([`super::probe::settle_on_a_value`]), and a panic is the panic
+            // limit's.
+            !is_panic(&refused.reason)
+                && locate(case, &refused.place).call.is_some_and(|call| {
+                    operands(call)
+                        .into_iter()
+                        .any(|(_, given)| holds_a_fold_before_a_link(given))
+                })
+                && refused_without_folds(case, refused) == Some(true)
         }
         _ => false,
     }
@@ -5495,6 +5891,133 @@ mod tests {
             ),
             vec![]
         );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_a_bitwise_call_given_a_null_of_whole_numbers() {
+        // `element().n_unique().or_(null).cast(Null)`: a bitwise call of whole numbers given the
+        // null literal is a null in each row, which a cast to the dtype Null takes, where the
+        // tables measured the count's values, which it cannot.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-cast-of-a-bitwise-call-given-a-null.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        let cast = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(cast_to(Representative::Null, Vec::new()));
+            excused_by(&pivot(chain_of(call("polars.element", Vec::new()), all)))
+        };
+        let or_null = || {
+            call(
+                "Expr.or_",
+                vec![(
+                    "others",
+                    Value::Many(vec![Value::Expression(chain(null(), &[]))]),
+                )],
+            )
+        };
+        // The call that gives no null is no cause of the failed conversion: another call of
+        // whole numbers is not asked.
+        assert!(!cast(vec![call("Expr.sum", Vec::new())]).contains(&Limit::AGroupAggregate));
+        // A bitwise call after the count that is given another value is not a null.
+        let given_a_count = call(
+            "Expr.or_",
+            vec![(
+                "others",
+                Value::Many(vec![Value::Expression(chain(
+                    column("a"),
+                    &["Expr.n_unique"],
+                ))]),
+            )],
+        );
+        assert!(
+            !cast(vec![call("Expr.n_unique", Vec::new()), given_a_count])
+                .contains(&Limit::AGroupAggregate)
+        );
+        assert!(
+            cast(vec![call("Expr.n_unique", Vec::new()), or_null()])
+                .contains(&Limit::AGroupAggregate)
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_date_written_as_digits_and_for_no_other_format() {
+        // `element().dt.to_string("%Y").skew()`: the year of a date written alone reads as a
+        // number, where the tables measured the sample's text, which no number reads.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-date-written-as-digits.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let written = |entry: &str, format: &str, receiver: Representative| {
+            let case = pivot_of(
+                receiver,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        call(entry, vec![("format", Value::String(format.to_owned()))]),
+                        call("Expr.skew", Vec::new()),
+                    ],
+                ),
+            );
+            refused_by_the_tables_at(
+                &case,
+                at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                text,
+            )
+        };
+        // A running maximum or minimum picks one of the values, so the text still reads as a
+        // number.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-date-written-as-digits--kept-by-a-running-maximum.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        for keeping in ["Expr.cum_max", "Expr.cum_min"] {
+            let case = pivot_of(
+                Representative::Date,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        call(
+                            "Expr.dt.to_string",
+                            vec![("format", Value::String("%Y".to_owned()))],
+                        ),
+                        call(keeping, Vec::new()),
+                        call("Expr.skew", Vec::new()),
+                    ],
+                ),
+            );
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &case,
+                    at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                    text
+                ),
+                vec![Limit::AGroupAggregate],
+                "{keeping}"
+            );
+        }
+        for entry in ["Expr.dt.to_string", "Expr.dt.strftime"] {
+            for format in ["%Y", "%Y%m%d", "%H%M%S", "20%y"] {
+                assert_eq!(
+                    written(entry, format, Representative::Date),
+                    vec![Limit::AGroupAggregate],
+                    "{entry} {format}"
+                );
+            }
+            // A format that writes a name or a separator does not read as a number.
+            for format in ["%Y-%m-%d", "%b", "%Y %m", "%A", ""] {
+                assert_eq!(
+                    written(entry, format, Representative::Date),
+                    vec![],
+                    "{entry} {format}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -6793,6 +7316,34 @@ mod tests {
         assert_eq!(
             refused_for_a_bound(&nested, None, Stage::Rows, BOUND_NOT_HELD),
             vec![Limit::ABoundTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_in_the_empty_table_where_an_aggregate_is_a_bound() {
+        // `lit(1, Datetime).clip(lower_bound=k.entropy())`: the entropy of no rows is a NaN, a
+        // value of its own that the bound is cast to the dtype from, where a column of no rows has
+        // none to convert.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-bound-the-dtype-cannot-hold--an-aggregate-in-the-empty-table.case"
+            ),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+        let held = "conversion from `f64` to `datetime[μs, UTC]` failed in column 'k' for 1 out of 1 values: [NaN]";
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("k"), &["Expr.entropy"])), None)],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Empty, held),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+        // A clip with no bound is no cause of a failed conversion.
+        let unbounded = select(vec![chain_of(column("a"), vec![clip_with(None, None)])]);
+        assert_eq!(
+            refused_for_a_bound(&unbounded, None, Stage::Empty, held),
+            vec![]
         );
     }
 
@@ -9412,6 +9963,41 @@ mod tests {
         );
     }
 
+    const DIFFERENCE_NOT_HELD: &str = "conversion from `u64` to `i64` failed in column 'g' for 1 out of 1 values: [18446744073709551614]";
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_difference_of_unsigned_numbers_is_why() {
+        // `diff` converts what it follows to the signed dtype of its result, strictly, so the
+        // number that a subtraction of unsigned numbers wraps to is refused where the sample's
+        // is not, and Polars stops refusing once nothing is a difference.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-cast-of-a-value-the-dtype-cannot-hold--a-difference-of-unsigned-numbers.case"
+            ),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        let difference = select(vec![chain_of(
+            column("k"),
+            vec![
+                compared_with("Expr.sub", chain(column("k"), &[])),
+                call("Expr.diff", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&difference, None, Stage::Rows, DIFFERENCE_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A subtraction with no difference after it is no cause of the failure.
+        let subtraction = select(vec![chain_of(
+            column("k"),
+            vec![compared_with("Expr.sub", chain(column("k"), &[]))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&subtraction, None, Stage::Rows, DIFFERENCE_NOT_HELD),
+            vec![]
+        );
+    }
+
     const COUNT_NOT_HELD: &str =
         "conversion from `f64` to `u64` failed in column 'k' for 1 out of 1 values: [-2.262654]";
 
@@ -9769,6 +10355,11 @@ mod tests {
     /// `when(true).then(lit("a").join().replace_all(pattern, "_")).otherwise(h)`, or the replacement
     /// as a plain chain, `start` being the chain's own start.
     fn branch_replacing(start: Call, in_a_branch: bool) -> Case {
+        branch_replacing_after(start, "Expr.str.join", in_a_branch)
+    }
+
+    /// As [`branch_replacing`], with the call `before` the replacement the one that is named.
+    fn branch_replacing_after(start: Call, before: &str, in_a_branch: bool) -> Case {
         let replace = call(
             "Expr.str.replace_all",
             vec![
@@ -9782,7 +10373,7 @@ mod tests {
                 ),
             ],
         );
-        let replaced = chain_of(start, vec![call("Expr.str.join", Vec::new()), replace]);
+        let replaced = chain_of(start, vec![call(before, Vec::new()), replace]);
         if !in_a_branch {
             return select(vec![replaced]);
         }
@@ -9824,6 +10415,41 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_excused_for_a_running_value_of_a_literal_replaced_in_a_branch() {
+        // `when(..).then(lit("1d").cum_min().str.replace(..))`: the running minimum of a literal
+        // is read as one value too, which the literal is the cause of.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-replacement-of-a-literal-aggregate-in-a-branch--a-running-value.case"
+            ),
+            vec![Limit::AReplacementOfALiteralAggregateInABranch]
+        );
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        for running in ["Expr.cum_min", "Expr.cum_max"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_replacing_after(text.clone(), running, true),
+                    None,
+                    Stage::Rows,
+                    NULL_PATTERN
+                ),
+                vec![Limit::AReplacementOfALiteralAggregateInABranch],
+                "{running}"
+            );
+        }
+        // A call that gives each value of a literal as it is, with nothing running, is neither.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing_after(text, "Expr.reverse", true),
+                None,
+                Stage::Rows,
+                NULL_PATTERN
+            ),
+            vec![]
+        );
     }
 
     #[test]
@@ -9947,6 +10573,84 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_receiver_polars_folds_to_a_null_where_removing_the_fold_allows_it()
+     {
+        // `k + null .approx_quantile(1.0)` in a branch: Polars folds the sum into a null literal,
+        // which the quantile then refuses as it refuses any literal. Without the sum it is a
+        // column's quantile, which is allowed.
+        const LIMIT: Limit = Limit::AnApproximateQuantileOfALiteralInACondition;
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-value-polars-folds-to-a-null.case"
+            ),
+            vec![LIMIT]
+        );
+        let folded = |start: Call, in_a_branch: bool| {
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    start,
+                    vec![compared_with("Expr.add", chain(null(), &[]))],
+                    a_share_of_one(),
+                    in_a_branch,
+                    Vec::new(),
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE,
+            )
+        };
+        assert_eq!(folded(column("k"), true), vec![LIMIT]);
+        // Outside a condition's value Polars does not refuse it so.
+        assert_eq!(folded(column("k"), false), vec![]);
+        // Without the fold the quantile of a column is allowed: nothing is folded to a null.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(column("k"), a_share_of_one(), true),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A fold after the quantile is no receiver the quantile reads as null.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    column("k"),
+                    Vec::new(),
+                    a_share_of_one(),
+                    true,
+                    vec![compared_with("Expr.add", chain(null(), &[]))],
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // Where the case is refused without the fold too, for the count of the characters of a
+        // number, the fold is no reason it is.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    column("k"),
+                    vec![
+                        compared_with("Expr.add", chain(null(), &[])),
+                        call("Expr.str.len_chars", Vec::new()),
+                    ],
+                    a_share_of_one(),
+                    true,
+                    Vec::new(),
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
     }
 
     /// `when(f).then(k)` and further links, with `predicate` the predicate of the first `when`
@@ -10079,6 +10783,11 @@ mod tests {
             kept_cases.push(
                 "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
             );
+            // The control's column is another key's own column, and a join refuses two keys
+            // that are named alike, so the control asks the other column both tables hold too.
+            kept_cases.push(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key-beside-a-key-of-the-same-column.case",
+            );
         }
         for kept in kept_cases {
             assert_eq!(
@@ -10178,6 +10887,164 @@ mod tests {
     }
 
     #[test]
+    fn a_part_polars_folds_to_a_null_is_excused_where_removing_the_fold_makes_it_refuse() {
+        // `datetime(year="1d", month=h + null .str.split("a"), day=null, minute=1)`: Polars folds
+        // the sum with a null into a null literal and never meets the list of text the month
+        // would be, which the tables refuse to cast to a whole number. Without the sum Polars
+        // refuses it for the same reason.
+        const SLUG: &str = "a-part-polars-folds-to-a-null";
+        let reason = "cannot cast List type (inner: 'String', to: 'Int8')";
+        assert_eq!(
+            slugs(excused_by_kept(
+                "uncovered-a-part-polars-folds-to-a-null.case"
+            )),
+            vec![SLUG]
+        );
+        let text = |value: &str| {
+            chain_of(
+                call(
+                    "polars.lit",
+                    vec![("value", Value::String(value.to_owned()))],
+                ),
+                Vec::new(),
+            )
+        };
+        let datetime = |month: Expression| {
+            chain_of(
+                call(
+                    "polars.datetime",
+                    vec![
+                        ("year", Value::Expression(text("1d"))),
+                        ("month", Value::Expression(month)),
+                        ("day", Value::Expression(chain(null(), &[]))),
+                        ("minute", Value::Expression(whole(1))),
+                    ],
+                ),
+                Vec::new(),
+            )
+        };
+        let split = || call("Expr.str.split", vec![("by", Value::Expression(text("a")))]);
+        let sum_with_null = || compared_with("Expr.add", chain(null(), &[]));
+        let at_the_start =
+            |item: usize| at(&[parameter("exprs"), Segment::Item(item), Segment::Start]);
+        let asked = |items: Vec<Expression>, item: usize| {
+            slugs(refused_by_the_tables_at(
+                &select(items),
+                at_the_start(item),
+                reason,
+            ))
+        };
+        // The fold, then the part: excused.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    column("h"),
+                    vec![sum_with_null(), split()]
+                ))],
+                0
+            ),
+            vec![SLUG]
+        );
+        // The null first, as the receiver of the sum: Polars folds that the same, and the control
+        // puts the other operand in the null's place.
+        assert_eq!(
+            slugs(excused_by_kept(
+                "uncovered-a-part-polars-folds-to-a-null--a-null-receiver.case"
+            )),
+            vec![SLUG]
+        );
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    null(),
+                    vec![compared_with("Expr.add", chain(column("h"), &[])), split()]
+                ))],
+                0
+            ),
+            vec![SLUG]
+        );
+        // The null is no receiver where something comes before it, and a null that the sum ends
+        // the chain with is still a literal's.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    null(),
+                    vec![compared_with("Expr.add", chain(column("h"), &[]))]
+                ))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
+        // No fold: the control is the case itself, which shows nothing.
+        assert_eq!(
+            asked(vec![datetime(chain_of(column("h"), vec![split()]))], 0),
+            Vec::<&str>::new()
+        );
+        // The fold ends the chain: the month is then a null literal, which is a literal's.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    column("h"),
+                    vec![split(), sum_with_null()]
+                ))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
+        // The fold, but the case is not refused for the tables' reason without it: Polars allows a
+        // month that is a column, so the fold is no reason it allows the step.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(column("k"), vec![sum_with_null()]))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
+        // A call that follows a fold in its own chain, and is given none, is for the probe.
+        assert_eq!(
+            slugs(excused_by_kept(
+                "stricter-a-running-sum-of-a-null-comparison.case"
+            )),
+            Vec::<&str>::new()
+        );
+        // A panic is never the fold's: the exponent is folded to a null, which Polars allows, and
+        // is the number 100 without the fold, which it panics for, as the tables recorded, and
+        // the limit for a panic is the one that excuses it.
+        let overflow = "Polars panicked: attempt to exponentiate with overflow";
+        let powered = select(vec![chain_of(
+            column("k"),
+            vec![call(
+                "Expr.pow",
+                vec![(
+                    "exponent",
+                    Value::Expression(chain_of(
+                        call("polars.lit", vec![("value", Value::Integer(100))]),
+                        vec![sum_with_null(), call("Expr.abs", Vec::new())],
+                    )),
+                )],
+            )],
+        )]);
+        let found = slugs(refused_by_the_tables_at(
+            &powered,
+            at(&[parameter("exprs"), Segment::Item(0), Segment::Link(0)]),
+            overflow,
+        ));
+        assert!(!found.contains(&SLUG), "{found:?}");
+        assert!(found.contains(&"a-panic"), "{found:?}");
+        // A fold in another expression of the step is no reason Polars allows this one.
+        assert_eq!(
+            asked(
+                vec![
+                    chain_of(column("k"), vec![sum_with_null()]),
+                    datetime(chain_of(column("h"), vec![split()])),
+                ],
+                1
+            ),
+            Vec::<&str>::new()
+        );
+    }
+
+    #[test]
     fn a_null_quantile_is_excused_where_the_column_is_refused_after_it_and_not_before_it() {
         // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
         // refused for the year of a number, which a literal that is no number was not asked, and
@@ -10212,6 +11079,68 @@ mod tests {
         assert_eq!(
             refused_for_a_bound(&plain, None, Stage::Rows, NULL_QUANTILE),
             vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_literal_of_a_dtype_no_column_has_given_the_call_before_it()
+    {
+        // `lit(1, Time).dt.hour().approx_quantile(1)` in a branch: a column of numbers is refused
+        // for the hour of a number, which a literal of a time of the day was not asked, and no
+        // column of the sample holds a time of the day. The number cast to that dtype stands for
+        // the literal, and is allowed, so the literal is why the quantile is refused.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-literal-with-a-dtype-of-its-own.case"
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        let time = |value: i64| {
+            let dtype = Dtype::new(Representative::Time.dtype()).expect("a dtype");
+            call(
+                "polars.lit",
+                vec![
+                    ("value", Value::Integer(value)),
+                    ("dtype", Value::Dtype(dtype)),
+                ],
+            )
+        };
+        let hour = || vec![call("Expr.dt.hour", Vec::new())];
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(time(1), hour(), a_share_of_one(), true, Vec::new()),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        // A call before the quantile that the time of the day is refused for too is no cause the
+        // literal shows: the number cast to its dtype is refused for it as well.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    time(1),
+                    vec![call("Expr.str.to_uppercase", Vec::new())],
+                    a_share_of_one(),
+                    true,
+                    Vec::new()
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A share that is a null is refused for the time of the day cast from a number as well.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(time(1), hour(), chain(null(), &[]), true, Vec::new()),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
         );
     }
 
@@ -10592,6 +11521,53 @@ mod tests {
                 "{said}"
             );
         }
+    }
+
+    #[test]
+    fn a_part_of_a_length_of_time_that_the_rows_decide_is_excused_like_a_part_of_a_date() {
+        // `duration(days=a.not_())` of an unsigned `a`: the part is the bitwise complement of the
+        // rows, a number beyond the signed dtype that the length of time converts it to, where the
+        // tables measured values every dtype holds.
+        let not_held = "conversion from `u64` to `i64` failed in column 'a' for 1 out of 1 values: [18446744073709551614]";
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-length-of-time.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        let lasting = |days: Expression| {
+            select(vec![chain_of(
+                call("polars.duration", vec![("days", Value::Expression(days))]),
+                Vec::new(),
+            )])
+        };
+        assert_eq!(
+            refused_for_a_bound(
+                &lasting(chain(column("k"), &["Expr.not_"])),
+                None,
+                Stage::Rows,
+                not_held
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        // A part that is the number 1 already: the control is the case itself.
+        assert_eq!(
+            refused_for_a_bound(&lasting(whole(1)), None, Stage::Rows, not_held),
+            vec![]
+        );
+        // A length of time given no part has none to convert.
+        assert_eq!(
+            refused_for_a_bound(
+                &select(vec![chain_of(
+                    call("polars.duration", Vec::new()),
+                    Vec::new()
+                )]),
+                None,
+                Stage::Rows,
+                not_held
+            ),
+            vec![]
+        );
     }
 
     #[test]
@@ -11494,7 +12470,7 @@ mod tests {
         // so it is no evidence that the call is not the cause, which is not a refusal either.
         let plain = select(vec![chain(column("a"), &["Expr.sqrt"])]);
         assert_eq!(
-            refused_for_a_failed_conversion_without_strict_casts(&plain),
+            refused_for_a_failed_conversion_without_strict_casts(&plain, false),
             None
         );
         assert_eq!(refused_for_lengths_without_drops(&plain), None);
@@ -11741,6 +12717,81 @@ mod tests {
     }
 
     #[test]
+    fn a_default_of_another_length_than_the_input_is_a_refusal_about_lengths_a_drop_causes() {
+        // `lit(1).replace_strict(u, b, default=b.nan_max().drop_nulls())`: the default of a
+        // replacement must have as many values as the input or one, and a drop leaves none where
+        // the aggregate of no rows is a null.
+        let reason = "`default` input for `replace_strict` must have the same length as the input or have length 1";
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-drop-changes-the-lengths--the-default-of-a-replacement.case"
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
+        let replaced = |default: Expression| {
+            select(vec![chain_of(
+                call("polars.lit", vec![("value", Value::Integer(1))]),
+                vec![call(
+                    "Expr.replace_strict",
+                    vec![
+                        ("old", Value::Expression(chain(column("u"), &[]))),
+                        ("new", Value::Expression(chain(column("b"), &[]))),
+                        ("default", Value::Expression(default)),
+                    ],
+                )],
+            )])
+        };
+        assert_eq!(
+            refused_for_a_bound(
+                &replaced(chain(column("b"), &["Expr.nan_max", "Expr.drop_nulls"])),
+                None,
+                Stage::Empty,
+                reason
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
+        // Without a drop nothing excuses it: a default of another length than the input, as the
+        // first two rows or the distinct values of a column are, is a refusal the tables do not
+        // see, and the limit for the rows' lengths does not take these words.
+        let aside = |default: Expression| {
+            let case = replaced(default);
+            (
+                refused_for_a_bound(&case, None, Stage::Rows, reason),
+                excused_by(&case),
+            )
+        };
+        let first_two = chain_of(
+            column("b"),
+            vec![call("Expr.head", vec![("n", Value::Expression(whole(2)))])],
+        );
+        let kept_where_f = chain_of(
+            column("b"),
+            vec![call(
+                "Expr.filter",
+                vec![("predicates", many(vec![chain(column("f"), &[])]))],
+            )],
+        );
+        for default in [
+            first_two,
+            chain(column("b"), &["Expr.unique"]),
+            kept_where_f,
+        ] {
+            let (said, found) = aside(default);
+            assert_eq!(said, vec![]);
+            assert_eq!(found, vec![]);
+        }
+        assert_eq!(
+            refused_for_a_bound(
+                &replaced(chain(column("b"), &["Expr.nan_max"])),
+                None,
+                Stage::Empty,
+                reason
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn an_exponent_of_another_length_than_its_base_is_a_refusal_about_lengths() {
         // A power given an exponent of as many values as the table has rows, after a drop that
         // left its base fewer, is refused for the lengths, as a window or another call is.
@@ -11814,6 +12865,24 @@ mod tests {
         );
         let case = select_of_a_null_literal(&["Expr.drop_nulls", "Expr.cbrt"]);
         assert_eq!(excused_by(&case), vec![Limit::ADropLeavesNoRows]);
+    }
+
+    #[test]
+    fn a_call_after_a_function_given_a_drop_of_nans_is_excused_and_one_given_none_is_not() {
+        // `time(second=h.is_last_distinct().entropy().drop_nans()).cbrt()`: the drop of the NaN
+        // leaves the time no rows, so the rows do not show that the cube root of a time is a float
+        // where its plan says the dtype Time. The drop is in what the start is given.
+        let name = "uncovered-a-drop-leaves-no-rows--a-drop-of-nans-in-what-a-start-is-given.case";
+        assert_eq!(excused_by_kept(name), vec![Limit::ADropLeavesNoRows]);
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions")
+            .join(name);
+        let text = std::fs::read_to_string(path).expect("a kept case");
+        // The same without the drop: Polars refuses the cube root of a time as the tables do.
+        let without = text.replace(r#",{"entry":"Expr.drop_nans","arguments":{}}"#, "");
+        assert_ne!(without, text);
+        let case = Case::decode(without.as_bytes()).expect("a case");
+        assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
     }
 
     #[test]

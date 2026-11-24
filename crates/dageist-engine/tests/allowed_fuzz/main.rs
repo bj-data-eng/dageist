@@ -263,8 +263,10 @@ const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case
 
 /// The kept cases that Polars refuses on more than one thread and allows on one (#103), where the
 /// tables and Polars then agree: a null quantile in a join key.
-const AGREE_ON_ONE_THREAD: [&str; 1] =
-    ["uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case"];
+const AGREE_ON_ONE_THREAD: [&str; 2] = [
+    "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
+    "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key-beside-a-key-of-the-same-column.case",
+];
 
 /// How many threads Polars runs on: the size of its own pool, which `POLARS_MAX_THREADS` sets and
 /// which is the number of cores where it is not set.
