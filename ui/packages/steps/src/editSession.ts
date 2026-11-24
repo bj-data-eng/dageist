@@ -60,8 +60,6 @@ export interface Session {
    * at the first that is not made. `null` is for a window that has no document yet.
    */
   readonly act: (drawn: number | null, edits: Action) => Promise<Sent>;
-  /** The revision of the document the window holds, or `null` before it has one. */
-  readonly revision: () => number | null;
   /** Says that another window has made the document be at `said`. */
   readonly heard: (said: number) => void;
   /** Ends the session: its window is gone and is told nothing more. */
@@ -72,6 +70,9 @@ export interface Session {
 function wordsOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** What an action comes to before the window has a document. */
+export const NOT_LOADED: Sent = { status: 'failed', reason: 'The steps are not loaded yet.' };
 
 /** The words for an edit made against a document that has since changed. */
 const CHANGED_SINCE = 'The steps changed since you did this, so it was not done. Try again.';
@@ -111,7 +112,7 @@ export function createSession(port: SessionPort, listener: SessionListener): Ses
   };
 
   const run = async (drawn: number | null, edits: Action): Promise<Sent> => {
-    if (drawn === null) return { status: 'failed', reason: 'The steps are not loaded yet.' };
+    if (drawn === null) return NOT_LOADED;
     let against = drawn;
     let last: Sent = { status: 'failed', reason: 'Nothing was done.' };
     for (const edit of edits) {
@@ -152,7 +153,6 @@ export function createSession(port: SessionPort, listener: SessionListener): Ses
       queue = next;
       return next;
     },
-    revision: () => held,
     heard: (said) => {
       if (said !== held) void load();
     },

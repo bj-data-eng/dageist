@@ -32,7 +32,7 @@ import type {
 } from '@dageist/host';
 
 import type { Action, Session, Sent } from './editSession';
-import { createSession } from './editSession';
+import { NOT_LOADED, createSession } from './editSession';
 import type { Path, StepAt } from './model/doc';
 import { placeOf } from './model/doc';
 
@@ -55,13 +55,6 @@ export interface Editor {
    */
   readonly act: (drawn: number | null, edits: Action) => Promise<Sent>;
 }
-
-/** What went wrong, in words. */
-function wordsOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-const NOT_LOADED: Sent = { status: 'failed', reason: 'The steps are not loaded yet.' };
 
 /**
  * Holds the node's document for one window: asks the host for it, asks again when another window
@@ -115,12 +108,7 @@ export function useEditor(host: Host): Editor {
 
   const act = useCallback(async (drawn: number | null, edits: Action): Promise<Sent> => {
     const open = session.current;
-    if (open === null) return NOT_LOADED;
-    try {
-      return await open.act(drawn, edits);
-    } catch (error) {
-      return { status: 'failed', reason: wordsOf(error) };
-    }
+    return open === null ? NOT_LOADED : open.act(drawn, edits);
   }, []);
 
   const dismiss = useCallback(() => {
