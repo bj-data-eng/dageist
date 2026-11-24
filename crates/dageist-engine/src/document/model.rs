@@ -787,13 +787,23 @@ impl Value {
     /// The argument for a parameter of `kind` that holds `literal`, as the
     /// kind holds it: a number for a parameter that takes a number, and text
     /// as a duration, a pattern, a time zone, a path or plain text, as the
-    /// parameter's kind says. Whether the kind takes it is for
+    /// parameter's kind says. A whole number that no number holds exactly is
+    /// not rounded: it stays a whole number, which [`Call::new`] refuses for a
+    /// parameter of numbers. Whether the kind takes the argument is for
     /// [`Call::new`] to say.
     #[must_use]
     pub fn from_literal(literal: &Literal, kind: Kind) -> Self {
         match (literal, kind) {
-            // A whole number given to a parameter of numbers is the number it names.
-            (Literal::Integer(value), Kind::Value(ValueType::Float)) => Self::Float(*value as f64),
+            // A whole number given to a parameter of numbers is the number it names, unless no
+            // number is it: it is left whole, which the parameter refuses, and not rounded.
+            (Literal::Integer(value), Kind::Value(ValueType::Float)) => {
+                let number = *value as f64;
+                if number as i128 == i128::from(*value) {
+                    Self::Float(number)
+                } else {
+                    Self::Integer(*value)
+                }
+            }
             (Literal::Integer(value), _) => Self::Integer(*value),
             (Literal::Float(value), _) => Self::Float(*value),
             (Literal::String(text), Kind::Duration) => Self::Duration(text.clone()),
