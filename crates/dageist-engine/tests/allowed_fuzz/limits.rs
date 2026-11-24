@@ -10625,6 +10625,68 @@ mod tests {
     }
 
     #[test]
+    fn a_null_quantile_is_excused_for_a_literal_of_a_dtype_no_column_has_given_the_call_before_it()
+    {
+        // `lit(1, Time).dt.hour().approx_quantile(1)` in a branch: a column of numbers is refused
+        // for the hour of a number, which a literal of a time of the day was not asked, and no
+        // column of the sample holds a time of the day. The number cast to that dtype stands for
+        // the literal, and is allowed, so the literal is why the quantile is refused.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-literal-with-a-dtype-of-its-own.case"
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        let time = |value: i64| {
+            let dtype = Dtype::new(Representative::Time.dtype()).expect("a dtype");
+            call(
+                "polars.lit",
+                vec![
+                    ("value", Value::Integer(value)),
+                    ("dtype", Value::Dtype(dtype)),
+                ],
+            )
+        };
+        let hour = || vec![call("Expr.dt.hour", Vec::new())];
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(time(1), hour(), a_share_of_one(), true, Vec::new()),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        // A call before the quantile that the time of the day is refused for too is no cause the
+        // literal shows: the number cast to its dtype is refused for it as well.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    time(1),
+                    vec![call("Expr.str.to_uppercase", Vec::new())],
+                    a_share_of_one(),
+                    true,
+                    Vec::new()
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A share that is a null is refused for the time of the day cast from a number as well.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(time(1), hour(), chain(null(), &[]), true, Vec::new()),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_null_quantile_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
         // The approximate quantile stands in a select, where Polars meets it: no branch holds it.
         assert_eq!(
