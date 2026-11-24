@@ -14,6 +14,7 @@ mod oracle;
 mod probe;
 mod rebuilt;
 mod sample;
+mod siblings;
 mod tables;
 mod text;
 mod typed;
