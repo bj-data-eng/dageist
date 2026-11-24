@@ -319,6 +319,97 @@ fn a_key_taken_from_the_more_keys_of_a_sort_takes_its_value_of_the_per_key_optio
 }
 
 #[test]
+fn keys_added_by_giving_more_by_its_first_item_take_a_value_for_each_per_key_option() {
+    // One key and one value; the option for more keys starts with one key still to be picked.
+    let document = read(vec![step(
+        "order",
+        "LazyFrame.sort",
+        json!({ "by": many(vec![field("a")]), "descending": many(vec![flag(true)]) }),
+    )]);
+    let edited = document
+        .add_option(&step_at(0, "order"), "more_by")
+        .expect("added");
+    assert_steps(
+        &edited,
+        vec![step(
+            "order",
+            "LazyFrame.sort",
+            json!({
+                "by": many(vec![field("a")]),
+                "more_by": many(vec![hole()]),
+                "descending": many(vec![flag(true), flag(false)]),
+            }),
+        )],
+    );
+}
+
+#[test]
+fn keys_taken_away_by_clearing_by_take_their_values_of_each_per_key_option() {
+    let document = read(vec![sort(
+        json!({ "descending": many(vec![flag(true), flag(false)]) }),
+    )]);
+    let edited = document
+        .clear_argument(&inside(0, "order", vec![parameter("by")]))
+        .expect("cleared");
+    assert_steps(
+        &edited,
+        vec![step(
+            "order",
+            "LazyFrame.sort",
+            json!({ "descending": many(vec![]) }),
+        )],
+    );
+}
+
+#[test]
+fn keys_set_as_a_whole_list_leave_each_per_key_option_a_value_for_each() {
+    let by = inside(0, "order", vec![parameter("by")]);
+    let keys = |names: &[&str]| {
+        Value::Many(
+            names
+                .iter()
+                .map(|name| Value::Expression(Expression::field(*name).expect("a field")))
+                .collect(),
+        )
+    };
+    let document = read(vec![sort(
+        json!({ "descending": many(vec![flag(true), flag(false)]) }),
+    )]);
+    // Three keys: the new one holds Polars' default.
+    let longer = document
+        .set_argument(&by, keys(&["a", "b", "c"]))
+        .expect("set");
+    let written = super::json_of(&longer);
+    assert_eq!(
+        written["steps"][0]["call"]["arguments"]["descending"],
+        many(vec![flag(true), flag(false), flag(false)])
+    );
+    // One key: the values of the others go.
+    let shorter = longer.set_argument(&by, keys(&["a"])).expect("set");
+    let written = super::json_of(&shorter);
+    assert_eq!(
+        written["steps"][0]["call"]["arguments"]["descending"],
+        many(vec![flag(true)])
+    );
+}
+
+#[test]
+fn keys_set_as_a_whole_list_leave_one_value_for_every_key_as_it_is() {
+    let document = read(vec![sort(json!({ "descending": flag(true) }))]);
+    let edited = document
+        .set_argument(
+            &inside(0, "order", vec![parameter("by")]),
+            Value::Many(vec![Value::Expression(Expression::field("a").expect("a"))]),
+        )
+        .expect("set");
+    let written = super::json_of(&edited);
+    assert_eq!(
+        written["steps"][0]["call"]["arguments"]["descending"],
+        flag(true)
+    );
+}
+
+#[test]
 fn a_per_key_option_is_set_for_one_key_and_the_other_keys_keep_the_default() {
     let edited = read(vec![sort(json!({}))])
         .set_for_item(
