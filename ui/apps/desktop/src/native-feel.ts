@@ -39,9 +39,6 @@ export function isBrowserKey(press: KeyPress, onMac: boolean): boolean {
   return command && BROWSER_KEYS_WITH_COMMAND.has(press.key.toLowerCase());
 }
 
-/** Whether the window runs on a Mac, where Command is the Meta key. */
-const ON_MAC = navigator.userAgent.includes('Mac');
-
 /** Reports whether `target` is a place to type, which keeps the browser's menu for copy and paste. */
 function isTypingPlace(target: EventTarget | null): boolean {
   return (
@@ -57,9 +54,13 @@ function onContextMenu(event: MouseEvent): void {
   if (!isTypingPlace(event.target)) event.preventDefault();
 }
 
-/** Keeps the browser from acting on its own keys. The view's own handlers still see them. */
+/**
+ * Keeps the browser from acting on its own keys. The view's own handlers still
+ * see them. The platform is read here, when a key is pressed, so the module
+ * reads nothing of the browser when it is loaded.
+ */
 function onKeyDown(event: KeyboardEvent): void {
-  if (isBrowserKey(event, ON_MAC)) event.preventDefault();
+  if (isBrowserKey(event, navigator.userAgent.includes('Mac'))) event.preventDefault();
 }
 
 /**
