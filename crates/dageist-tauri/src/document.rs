@@ -18,6 +18,7 @@
 //! formats no value and never reads a number it cannot hold.
 
 use std::sync::{Mutex, PoisonError};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use dageist_engine::allowed::{Literal, Place as OfferPlace};
 use dageist_engine::catalog::StepFrame;
@@ -812,14 +813,18 @@ pub struct Documents {
 }
 
 impl Documents {
-    /// The documents of a node whose steps are `document`, at the first revision.
-    pub fn of(document: Document) -> Self {
+    /// The documents of a node whose steps are `document`, at `revision`.
+    fn starting_at(document: Document, revision: u64) -> Self {
         Self {
-            held: Mutex::new(Held {
-                document,
-                revision: 1,
-            }),
+            held: Mutex::new(Held { document, revision }),
         }
+    }
+
+    /// The documents of a node whose steps are `document`, at revision 1, so that a test can name
+    /// the revision it expects. A host does not start there: see [`first_revision`].
+    #[cfg(test)]
+    pub fn of(document: Document) -> Self {
+        Self::starting_at(document, 1)
     }
 
     /// The documents of the sample node, which starts with its own steps.
@@ -829,7 +834,10 @@ impl Documents {
     /// When the sample node cannot be made.
     pub fn sample() -> Result<Self, ErrorView> {
         let node = ClaimTiming::new().map_err(ErrorView::from)?;
-        Ok(Self::of(node.steps().clone()))
+        Ok(Self::starting_at(
+            node.steps().clone(),
+            first_revision(SystemTime::now()),
+        ))
     }
 
     /// The document and its revision, together.
@@ -893,6 +901,18 @@ impl Documents {
             }),
         }
     }
+}
+
+/// The revision a host starts its document at: the milliseconds from the Unix epoch to `now`,
+/// a whole number far below what the view holds exactly. A page that outlives its host holds a
+/// revision of that host, so each start of a host is at a revision a page of an earlier one
+/// cannot hold, unless that host made as many edits as there were milliseconds before the next
+/// one started. Edits then count up from it by one.
+fn first_revision(now: SystemTime) -> u64 {
+    let millis = now
+        .duration_since(UNIX_EPOCH)
+        .map_or(1, |since| since.as_millis());
+    u64::try_from(millis).unwrap_or(u64::MAX >> 12).max(1)
 }
 
 fn stale(asked: u64, current: u64) -> ErrorView {

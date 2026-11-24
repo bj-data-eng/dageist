@@ -847,6 +847,14 @@ is not in the document until it has one, and the document never holds a part tha
 half made. A draft belongs to the parameter it would give a value to, and stays through
 changes elsewhere in the document until that step or call is gone, the document gives the
 parameter, or the person gives it its value.
+
+A revision belongs to one lifetime of a host. It goes up by one with each edit, and a
+host starts at the milliseconds since the Unix epoch when it started, so a page that
+outlives its host, as one open across a restart does, holds a revision no later host is at
+and its next edit is stale, not made on a document it never saw. The window asks for the
+document when it gains focus or becomes visible, and after an action fails, so it draws the
+new host's document before the person acts, and takes it whatever its revision is.
+
 The functions that remain in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/doc.ts) read the
 document's shapes, such as which step is a sort, which expression is a test or a
