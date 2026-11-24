@@ -7,6 +7,7 @@ mod build;
 mod candidates;
 mod every_variant;
 mod generate;
+mod nested;
 mod nulls;
 mod offers;
 mod oracle;
