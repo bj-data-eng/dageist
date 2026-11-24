@@ -10076,6 +10076,67 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_null_quantile_is_excused_for_a_receiver_polars_folds_to_a_null_where_removing_the_fold_allows_it()
+     {
+        // `k + null .approx_quantile(1.0)` in a branch: Polars folds the sum into a null literal,
+        // which the quantile then refuses as it refuses any literal. Without the sum it is a
+        // column's quantile, which is allowed.
+        const LIMIT: Limit = Limit::AnApproximateQuantileOfALiteralInACondition;
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-value-polars-folds-to-a-null.case"
+            ),
+            vec![LIMIT]
+        );
+        let folded = |start: Call, in_a_branch: bool| {
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    start,
+                    vec![compared_with("Expr.add", chain(null(), &[]))],
+                    a_share_of_one(),
+                    in_a_branch,
+                    Vec::new(),
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE,
+            )
+        };
+        assert_eq!(folded(column("k"), true), vec![LIMIT]);
+        // Outside a condition's value Polars does not refuse it so.
+        assert_eq!(folded(column("k"), false), vec![]);
+        // Without the fold the quantile of a column is allowed: nothing is folded to a null.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(column("k"), a_share_of_one(), true),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A fold after the quantile is no receiver the quantile reads as null.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    column("k"),
+                    Vec::new(),
+                    a_share_of_one(),
+                    true,
+                    vec![compared_with("Expr.add", chain(null(), &[]))],
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // Where the case is refused without the fold too, for the quantile of text, which Polars
+        // does not take, the fold is no reason it is.
+        assert_eq!(folded(column("g"), true), vec![]);
+    }
+
     /// `when(f).then(k)` and further links, with `predicate` the predicate of the first `when`
     /// (`first`), of the second (`second`) or of the third (`third`), the others being the column
     /// `f`, and every value the column `k`.
