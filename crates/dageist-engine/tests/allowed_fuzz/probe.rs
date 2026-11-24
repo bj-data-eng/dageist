@@ -3024,6 +3024,63 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_is_not_settled_by_the_refusal_of_another_predicate_of_the_condition() {
+        // `when(a.dt.replace(day=1).is_null()).then(a).when(f.dt.replace(day=g).is_null()).then(a)
+        // .otherwise(a)`: Polars drops the predicates. Where the last value differs it refuses the
+        // second predicate, whose day is text, and the first it allows. The refusal the tables
+        // are asked about is the first predicate's replacement, which that refusal does not show.
+        let col = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+            )
+        };
+        let predicate = |start: &str, day: String| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{start}"]}}}}}},"then":[{{"entry":"Expr.dt.replace","arguments":{{"day":{day}}}}},{{"entry":"Expr.is_null","arguments":{{}}}}]}}}}"#
+            )
+        };
+        let one = r#"{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}"#
+            .to_owned();
+        let value = |entry: &str| {
+            format!(
+                r#"{{"entry":"{entry}","arguments":{{"statement":{}}}}}"#,
+                col("a")
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{},{{"entry":"Then.when","arguments":{{"predicates":{{"many":[{}]}}}}}},{},{}]}}}}]}}}}}}}}]}}"#,
+            predicate("a", one),
+            value("When.then"),
+            predicate("f", col("g")),
+            value("ChainedWhen.then"),
+            value("ChainedThen.otherwise"),
+        );
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start)
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0));
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "`round` operation not supported for dtype `bool` (expected: date/datetime)"
+                .to_owned(),
+            argument_unknown: false,
+        };
+        assert!(
+            observe(&case).refusal.is_none(),
+            "Polars drops the predicates"
+        );
+        assert_eq!(settle_by_values_that_differ(&case, &refused), None);
+    }
+
+    #[test]
     fn a_predicate_is_not_settled_where_the_values_made_to_differ_are_not_refused_for_its_reason() {
         let case = kept("stricter-a-predicate-that-is-dropped.case");
         let refused = refusal(&case);
