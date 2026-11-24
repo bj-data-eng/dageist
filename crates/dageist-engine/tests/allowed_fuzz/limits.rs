@@ -94,7 +94,9 @@ pub enum Limit {
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
-    ///   what they follow to a float as a cast does;
+    ///   what they follow to a float as a cast does, and of the text of a count or a position,
+    ///   which reads as the number, or of what a column of the dtype Null is compared or
+    ///   calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -763,6 +765,51 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` gives numbers whatever the values it follows hold: a count, or the positions
+/// or the runs of the values. Where the numbers are turned to text, the text reads as the numbers
+/// again, which the sample's text, as a duration, does not.
+fn gives_a_number_of_its_own(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.count"
+            | "Expr.len"
+            | "Expr.n_unique"
+            | "Expr.null_count"
+            | "Expr.approx_n_unique"
+            | "Expr.arg_sort"
+            | "Expr.arg_max"
+            | "Expr.arg_min"
+            | "Expr.rle_id"
+            | "Expr.cum_count"
+    )
+}
+
+/// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
+/// columns that are all of the dtype Null and only compare them or do arithmetic with them, which
+/// leaves a null in each row: the call at `upto` meets nulls, where the tables measured the
+/// values of a column that holds some.
+fn leaves_nulls_of_a_column_of_nulls(
+    frames: &Frames,
+    step: &Call,
+    chain: &Expression,
+    upto: usize,
+) -> bool {
+    let Some(Value::Columns(values)) = step.argument("values") else {
+        return false;
+    };
+    matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
+        && upto > 0
+        && !values.is_empty()
+        && values.iter().all(|name| {
+            frames
+                .dtype_of(name)
+                .is_some_and(|dtype| *dtype == polars::prelude::DataType::Null)
+        })
+        && chain.links()[..upto]
+            .iter()
+            .all(|link| carries_nulls(link.entry().id().as_str()))
 }
 
 /// Whether `call` is a comparison or an arithmetic given the null literal, which is a null in each
@@ -4195,6 +4242,15 @@ fn applies(
                                         || chain.links()[..at].iter().any(compares_with_a_null)
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
+                                        // The text of a count or a position, which reads as it.
+                                        || (is_a_failed_conversion_of_text(&refused.reason)
+                                            && chain.links()[..at]
+                                                .iter()
+                                                .any(gives_a_number_of_its_own))
+                                        // The values of a column of nulls, which stay null.
+                                        || leaves_nulls_of_a_column_of_nulls(
+                                            &frames, step, chain, at,
+                                        )
                                 }))
                         })
                     })
