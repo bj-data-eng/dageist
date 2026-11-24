@@ -474,6 +474,181 @@ fn keys_of_more_by_set_as_a_longer_or_shorter_list_keep_the_values_of_by() {
     assert_eq!(shorter, many(vec![flag(true)]));
 }
 
+/// The arguments of a sort by `by`, then `more_by` the field `b`, with `extra` arguments.
+fn arguments_after(
+    by: &[&str],
+    extra: Json,
+    edit: impl Fn(&dageist_engine::document::Document) -> dageist_engine::document::Document,
+) -> Json {
+    let fields = |names: &[&str]| many(names.iter().map(|name| field(name)).collect());
+    let mut arguments = json!({ "by": fields(by), "more_by": fields(&["b"]) });
+    for (name, value) in extra.as_object().expect("an object") {
+        arguments[name] = value.clone();
+    }
+    let document = read(vec![step("order", "LazyFrame.sort", arguments)]);
+    super::json_of(&edit(&document))["steps"][0]["call"]["arguments"].clone()
+}
+
+#[test]
+fn every_per_key_option_that_is_a_list_follows_the_keys_when_they_are_replaced() {
+    let by = inside(0, "order", vec![parameter("by")]);
+    let lists = || {
+        json!({
+            "descending": many(vec![flag(false), flag(true)]),
+            "nulls_last": many(vec![flag(true), flag(false)]),
+        })
+    };
+    let longer = arguments_after(&["a"], lists(), |document| {
+        document
+            .set_argument(&by, keys_of(&["a", "c"]))
+            .expect("set")
+    });
+    assert_eq!(
+        longer["descending"],
+        many(vec![flag(false), flag(false), flag(true)])
+    );
+    assert_eq!(
+        longer["nulls_last"],
+        many(vec![flag(true), flag(false), flag(false)])
+    );
+    let cleared = arguments_after(&["a"], lists(), |document| {
+        document.clear_argument(&by).expect("cleared")
+    });
+    assert_eq!(cleared["descending"], many(vec![flag(true)]));
+    assert_eq!(cleared["nulls_last"], many(vec![flag(false)]));
+}
+
+#[test]
+fn clearing_more_by_takes_only_the_values_of_its_keys_with_it() {
+    let more = inside(0, "order", vec![parameter("more_by")]);
+    // The keys are `a`, `c`, then `b` of `more_by`.
+    let after = arguments_after(
+        &["a", "c"],
+        json!({ "descending": many(vec![flag(false), flag(true), flag(true)]) }),
+        |document| document.clear_argument(&more).expect("cleared"),
+    );
+    assert_eq!(after["descending"], many(vec![flag(false), flag(true)]));
+}
+
+/// A step that selects `a` sorted by the fields `by`, and `descending`, in a chain.
+fn sorted_by(by: &[&str], descending: &[bool]) -> Json {
+    let fields = many(by.iter().map(|name| field(name)).collect());
+    step(
+        "calc",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![field_then("a", vec![call(
+            "Expr.sort_by",
+            json!({
+                "by": fields,
+                "descending": many(descending.iter().map(|value| flag(*value)).collect()),
+            }),
+        )])]) }),
+    )
+}
+
+#[test]
+fn the_per_key_values_of_a_method_in_a_chain_follow_its_keys_too() {
+    let by = inside(
+        0,
+        "calc",
+        vec![
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("by"),
+        ],
+    );
+    let document = read(vec![sorted_by(&["b"], &[true])]);
+    let added = document
+        .insert_item(
+            &by,
+            1,
+            Value::Expression(Expression::field("c").expect("c")),
+        )
+        .expect("added");
+    assert_steps(&added, vec![sorted_by(&["b", "c"], &[true, false])]);
+    let replaced = document
+        .set_argument(&by, keys_of(&["b", "c", "d"]))
+        .expect("set");
+    assert_steps(
+        &replaced,
+        vec![sorted_by(&["b", "c", "d"], &[true, false, false])],
+    );
+    let removed = added
+        .remove_item(&inside(
+            0,
+            "calc",
+            vec![
+                parameter("exprs"),
+                Segment::Item(0),
+                Segment::Link(0),
+                parameter("by"),
+                Segment::Item(0),
+            ],
+        ))
+        .expect("removed");
+    assert_steps(&removed, vec![sorted_by(&["c"], &[false])]);
+}
+
+#[test]
+fn a_list_of_values_of_the_wrong_length_is_cut_where_it_ends_and_its_stray_values_stay() {
+    let by = inside(0, "order", vec![parameter("by")]);
+    let more = inside(0, "order", vec![parameter("more_by")]);
+    // Four values for two keys: the stretch of the new keys is taken from where the keys of `by`
+    // start, and the values after it, the stray ones included, stay.
+    let stray = arguments_after(
+        &["a"],
+        json!({ "descending": many(vec![flag(true), flag(false), flag(true), flag(false)]) }),
+        |document| {
+            document
+                .set_argument(&by, keys_of(&["a", "c"]))
+                .expect("set")
+        },
+    );
+    assert_eq!(
+        stray["descending"],
+        many(vec![
+            flag(true),
+            flag(false),
+            flag(false),
+            flag(true),
+            flag(false)
+        ])
+    );
+    // One value for two keys: the keys of `more_by` start past its end, so there is nothing of theirs
+    // to take away, and nothing is made up.
+    let short = arguments_after(
+        &["a"],
+        json!({ "descending": many(vec![flag(true)]) }),
+        |document| document.clear_argument(&more).expect("cleared"),
+    );
+    assert_eq!(short["descending"], many(vec![flag(true)]));
+}
+
+#[test]
+fn a_per_key_option_longer_than_the_keys_is_made_as_many_when_one_key_is_set() {
+    // Two keys and four values.
+    let edited = read(vec![sort(json!({ "descending": many(vec![
+        flag(true),
+        flag(false),
+        flag(true),
+        flag(false),
+    ]) }))])
+    .set_for_item(
+        &step_at(0, "order"),
+        "descending",
+        0,
+        Value::Flag(Some(false)),
+    )
+    .expect("set");
+    assert_steps(
+        &edited,
+        vec![sort(
+            json!({ "descending": many(vec![flag(false), flag(false)]) }),
+        )],
+    );
+}
+
 #[test]
 fn keys_set_as_a_whole_list_leave_one_value_for_every_key_as_it_is() {
     let document = read(vec![sort(json!({ "descending": flag(true) }))]);
