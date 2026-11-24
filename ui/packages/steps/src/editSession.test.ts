@@ -33,23 +33,29 @@ const MOVE: EditRequest = {
 interface Deferred<T> {
   readonly promise: Promise<T>;
   readonly resolve: (value: T) => void;
+  readonly reject: (error: Error) => void;
 }
 
 function deferred<T>(): Deferred<T> {
   const settle: Array<(value: T) => void> = [];
-  const promise = new Promise<T>((done) => {
+  const fail: Array<(error: Error) => void> = [];
+  const promise = new Promise<T>((done, failed) => {
     settle.push(done);
+    fail.push(failed);
   });
   return {
     promise,
     resolve: (value) => {
       settle[0]?.(value);
     },
+    reject: (error) => {
+      fail[0]?.(error);
+    },
   };
 }
 
 /** What a session told its window, and what it asked the host. */
-interface Record {
+interface Seen {
   readonly held: number[];
   readonly notices: string[];
   readonly failures: Array<string | null>;
@@ -63,7 +69,7 @@ function sessionOver(
   answers: ReadonlyArray<EditAnswerView | Error | Promise<EditAnswerView>>,
   loaded: ReadonlyArray<DocumentStateView | Promise<DocumentStateView>> = [at(1)],
 ) {
-  const record: Record = {
+  const record: Seen = {
     held: [],
     notices: [],
     failures: [],
@@ -231,6 +237,16 @@ describe('an action that is several edits', () => {
     expect(record.held).toEqual([4]);
   });
 
+  it('does not take a failure of the host for a stale revision', async () => {
+    const failure = new HostError('edit_document', 'failed', 'could not run the document');
+    const { session, record } = sessionOver([failure], [at(2)]);
+
+    const sent = await session.act(1, [REMOVE]);
+
+    expect(sent).toEqual({ status: 'failed', reason: failure.message });
+    expect(record.notices).toEqual([failure.message]);
+  });
+
   it('stops where the host cannot be asked, and says what went wrong', async () => {
     const { session, record } = sessionOver([new Error('no network'), edited(2)]);
 
@@ -256,10 +272,8 @@ describe('the document asked for', () => {
     const { session, record } = sessionOver([], [at(5), at(1)]);
 
     await session.load();
-    expect(session.revision()).toBe(5);
     await session.load();
 
-    expect(session.revision()).toBe(1);
     expect(record.held).toEqual([5, 1]);
   });
 
@@ -276,7 +290,6 @@ describe('the document asked for', () => {
     await first;
 
     expect(record.held).toEqual([7]);
-    expect(session.revision()).toBe(7);
   });
 
   it('is ignored when an edit was answered after it was asked for', async () => {
@@ -289,7 +302,19 @@ describe('the document asked for', () => {
     await loading;
 
     expect(record.held).toEqual([3]);
-    expect(session.revision()).toBe(3);
+  });
+
+  it('says nothing of a failure that a later request overtook, however late it comes', async () => {
+    const late = deferred<DocumentStateView>();
+    const { session, record } = sessionOver([], [late.promise, at(7)]);
+
+    const first = session.load();
+    await session.load();
+    late.reject(new Error('the bridge went away'));
+    await first;
+
+    expect(record.held).toEqual([7]);
+    expect(record.failures).toEqual([null]);
   });
 
   it('says why it could not be had, and says no more once it can', async () => {
@@ -317,6 +342,18 @@ describe('the document asked for', () => {
     await session.load();
 
     expect(record.failures).toEqual(['the bridge is not running', null]);
+  });
+
+  it('is asked for again when another window says it is at a lower revision, as after a restart', async () => {
+    const { session, record } = sessionOver([], [at(5), at(1)]);
+    await session.load();
+
+    session.heard(1);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(record.loads).toBe(2);
+    expect(record.held).toEqual([5, 1]);
   });
 
   it('is asked for again when another window says it is at another revision, and not at the same one', async () => {
