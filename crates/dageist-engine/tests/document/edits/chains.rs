@@ -65,11 +65,8 @@ fn the_start_of_an_expression_is_changed_and_its_links_stay() {
         "a",
         vec![call("Expr.abs", json!({}))],
     ))]);
-    let Start::Call(call_of_b) = Expression::field("b").expect("b").start().clone() else {
-        panic!("a field starts with a call");
-    };
     let edited = document
-        .set_start(&item(), Start::Call(call_of_b))
+        .set_start(&item(), Start::field("b").expect("b"))
         .expect("set");
     assert_steps(
         &edited,
@@ -380,13 +377,10 @@ fn the_field_a_test_reads_is_the_start_of_its_expression() {
         "LazyFrame.filter",
         json!({ "predicates": many(vec![started_test()]) }),
     )]);
-    let Start::Call(a) = Expression::field("a").expect("a").start().clone() else {
-        panic!("a call");
-    };
     let edited = document
         .set_start(
             &inside(0, "calc", vec![parameter("predicates"), Segment::Item(0)]),
-            Start::Call(a),
+            Start::field("a").expect("a"),
         )
         .expect("set");
     assert_steps(
@@ -433,4 +427,16 @@ fn swapping_a_method_carries_the_argument_into_the_shape_the_new_method_holds() 
             vec![call("Expr.shift", json!({ "n": whole(2) }))],
         ))],
     );
+}
+
+#[test]
+fn the_start_that_reads_a_field_is_the_start_of_the_expression_that_reads_it() {
+    let start = Start::field("a").expect("a");
+    assert_eq!(Expression::field("a").expect("a").start(), &start);
+    // Both take the name as text, owned or borrowed, as `Expression::input` does.
+    assert_eq!(
+        Expression::field(String::from("a")).expect("a"),
+        Expression::field("a").expect("a")
+    );
+    assert_eq!(Expression::input(String::from("t")), Expression::input("t"));
 }

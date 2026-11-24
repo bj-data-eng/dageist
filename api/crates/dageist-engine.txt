@@ -863,6 +863,8 @@ pub enum dageist_engine::document::Start
 pub dageist_engine::document::Start::Call(dageist_engine::document::Call)
 pub dageist_engine::document::Start::Hole
 pub dageist_engine::document::Start::Input(alloc::string::String)
+impl dageist_engine::document::Start
+pub fn dageist_engine::document::Start::field(name: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub enum dageist_engine::document::StepRows
 pub dageist_engine::document::StepRows::Counted(dageist_engine::document::Counted)
 pub dageist_engine::document::StepRows::Failed(polars_error::PolarsError)
@@ -1038,7 +1040,7 @@ impl core::fmt::Display for dageist_engine::document::EmptyStepId
 pub fn dageist_engine::document::EmptyStepId::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::Expression
 impl dageist_engine::document::Expression
-pub fn dageist_engine::document::Expression::field(name: &str) -> core::result::Result<Self, dageist_engine::document::Refusal>
+pub fn dageist_engine::document::Expression::field(name: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub const fn dageist_engine::document::Expression::hole() -> Self
 pub fn dageist_engine::document::Expression::input(name: impl core::convert::Into<alloc::string::String>) -> Self
 pub fn dageist_engine::document::Expression::literal(literal: &dageist_engine::allowed::Literal) -> core::result::Result<Self, dageist_engine::document::Refusal>

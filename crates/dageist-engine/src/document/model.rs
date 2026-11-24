@@ -730,6 +730,21 @@ fn typed_text(expression: &Expression) -> Option<&String> {
     }
 }
 
+impl Start {
+    /// The start that reads the column called `name`: the call `polars.col(name)`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue has no `polars.col`, or refuses its argument.
+    pub fn field(name: impl Into<String>) -> Result<Self, Refusal> {
+        let call = Call::new(
+            function("polars.col")?,
+            [("name", Value::Columns(vec![name.into()]))],
+        )?;
+        Ok(Self::Call(call))
+    }
+}
+
 impl Expression {
     /// An expression with nothing picked yet: its start is a [`Start::Hole`].
     /// A step that holds it is incomplete, not refused.
@@ -756,12 +771,8 @@ impl Expression {
     /// # Errors
     ///
     /// When the catalogue has no `polars.col`, or refuses its argument.
-    pub fn field(name: &str) -> Result<Self, Refusal> {
-        let call = Call::new(
-            function("polars.col")?,
-            [("name", Value::Columns(vec![name.to_owned()]))],
-        )?;
-        Self::new(Start::Call(call), Vec::new())
+    pub fn field(name: impl Into<String>) -> Result<Self, Refusal> {
+        Self::new(Start::field(name)?, Vec::new())
     }
 
     /// An expression that is `literal`, the same on every row: `polars.lit`,

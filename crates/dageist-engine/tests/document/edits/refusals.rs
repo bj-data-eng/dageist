@@ -5,7 +5,7 @@ use dageist_engine::allowed::Literal;
 use dageist_engine::catalog;
 use dageist_engine::catalog::StepFrame;
 use dageist_engine::document::{
-    Call, Cause, Document, EditProblem, Expression, Segment, Thing, Value, ValueKind, Wanted,
+    Call, Cause, Document, EditProblem, Expression, Segment, Start, Thing, Value, ValueKind, Wanted,
 };
 use serde_json::json;
 
@@ -335,11 +335,7 @@ fn a_step_nested_deeper_than_a_document_may_be_written_is_refused_at_the_step() 
             [("n", Value::Expression(deep.clone()))],
         )
         .expect("a call");
-        deep = Expression::new(
-            Expression::field("a").expect("a").start().clone(),
-            vec![shift],
-        )
-        .expect("an expression");
+        deep = Expression::new(Start::field("a").expect("a"), vec![shift]).expect("an expression");
     }
     let item = inside(0, "first", vec![parameter("exprs"), Segment::Item(0)]);
     assert_refused(

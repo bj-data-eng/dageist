@@ -230,7 +230,7 @@ fn some_edit(dice: &mut Dice, document: &Document) -> Option<Result<Document, Ed
             let start = match dice.below(3) {
                 0 => Start::Hole,
                 1 => Start::Input("holidays".to_owned()),
-                _ => Expression::field("b").ok()?.start().clone(),
+                _ => Start::field("b").ok()?,
             };
             document.set_start(expression, start)
         }
