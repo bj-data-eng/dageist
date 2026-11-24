@@ -429,8 +429,9 @@ pub enum Limit {
     /// where they are not. The tables measured the replacement in select, on columns. Polars
     /// refusing the rows or the empty table with either refusal, which has no place, in a case
     /// with a branch of a condition that holds a chain that starts from a literal and replaces
-    /// after an aggregate: the case run again with each such literal a column of text is not
-    /// refused for it.
+    /// after an aggregate or a running value (the sum, the product, the minimum, the maximum or
+    /// the count so far, which it reads of a literal as it does an aggregate): the case run again
+    /// with each such literal a column of text is not refused for it.
     AReplacementOfALiteralAggregateInABranch,
     /// A format writes the fields of the calendar and of the clock that a dtype has, and Polars refuses
     /// one it has no field for, such as a year for a time of day, an hour for a date, a field that does
@@ -2484,14 +2485,23 @@ const A_PATTERN_READ_AS_MANY: [&str; 2] = [
     "pattern cannot be 'null' in 'replace' expression",
 ];
 
-/// Whether the chain starts from a literal and replaces after an aggregate.
+/// Whether the call gives a running value: the sum, the product, the minimum, the maximum or the
+/// count so far, which Polars' streaming engine reads of a literal as it reads an aggregate.
+fn is_a_running_value(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.cum_sum" | "Expr.cum_prod" | "Expr.cum_min" | "Expr.cum_max" | "Expr.cum_count"
+    )
+}
+
+/// Whether the chain starts from a literal and replaces after an aggregate or a running value.
 fn is_a_literal_aggregate_replaced(expression: &Expression) -> bool {
     if !matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")) {
         return false;
     }
     let mut aggregated = false;
     for link in expression.links() {
-        if is_one_value(link) {
+        if is_one_value(link) || is_a_running_value(link) {
             aggregated = true;
         } else if aggregated && is_a_text_replacement(link) {
             return true;
