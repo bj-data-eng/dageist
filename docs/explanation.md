@@ -1651,8 +1651,9 @@ what surrounds it, after the limits, in these ways:
   drop its predicates either. It counts when Polars refuses it in the predicate, or in the rows
   that evaluate it, and allows the same condition with the predicate made `false` every time it
   runs, which drops the branch the predicate guards and leaves the other predicates evaluated, as a
-  `true` would not where Polars takes its branch and never evaluates those after it, so it shows that
-  it is the predicate Polars refuses once nothing hides it. The refusal may
+  `true` would not where Polars takes its branch and never evaluates those after it, and the same
+  condition with it made `true`, which keeps the value the branch guards, is allowed too, so the value is
+  no cause, and it shows that it is the predicate Polars refuses once nothing hides it. The refusal may
   be in the rule's words or in other words, for what the predicate holds is met before its dtype
   is judged, and the outcome says which; both are a refusal of the predicate where it is
   evaluated, which the editor keeps refusing where Polars does not evaluate it, as it holds every

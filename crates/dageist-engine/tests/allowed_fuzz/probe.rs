@@ -1734,7 +1734,8 @@ const CONDITION_RULE: &str = "condition-predicate-is-boolean";
 /// to differ from the others, which removes what Polars folds or drops it for. Polars refusing it
 /// shows that Polars evaluates the predicate and refuses it once nothing hides it. That it is the
 /// predicate is shown by a control: the same condition with that predicate made `false` is allowed,
-/// which drops its branch and leaves the other predicates evaluated, as a `true` would not.
+/// which drops its branch and leaves the other predicates evaluated, as a `true` would not; and by
+/// a second, with it made `true`, which keeps the value the branch guards and shows it is no cause.
 ///
 /// The refusal may be in the rule's words, or in other words for what the predicate holds, which
 /// Polars meets before it judges the dtype. Both are a refusal of the predicate once it is
@@ -1769,6 +1770,19 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
     )
     .ok()?;
     let with_falsity = replaced_through(&alone, inner, &falsity)?;
+    // Made `false` the predicate drops the value its branch guards with it, so a value that Polars
+    // refuses only when the rows run, with a refusal that has no place, would be shown as the
+    // predicate's fault. Made `true` the branch is taken and its value is evaluated, so that
+    // case, which is allowed only where the value is no cause, shows the value is fine.
+    let truth = Expression::new(
+        Start::Call(call(
+            "polars.lit",
+            vec![("value", Value::Flag(Some(true)))],
+        )?),
+        Vec::new(),
+    )
+    .ok()?;
+    let with_truth = replaced_through(&alone, inner, &truth)?;
     let run = |part: Expression| {
         Some(Case {
             receiver: case.receiver,
@@ -1778,14 +1792,18 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
     };
     let probed = run(alone)?;
     let control = run(with_falsity)?;
+    let value_control = run(with_truth)?;
     let tables = tables_of(&found, None);
     let refusal = (0..RUNS).find_map(|_| {
         observe_probe(&probed, tables)
             .refusal
             .filter(|refusal| lies_in(refusal, &predicate_place))
     })?;
-    // The control is allowed every time it runs.
-    if (0..RUNS).any(|_| observe_probe(&control, tables).refusal.is_some()) {
+    // The controls are allowed every time they run.
+    if (0..RUNS).any(|_| {
+        observe_probe(&control, tables).refusal.is_some()
+            || observe_probe(&value_control, tables).refusal.is_some()
+    }) {
         return None;
     }
     Some(Settled {
