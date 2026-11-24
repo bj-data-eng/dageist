@@ -69,7 +69,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13800 combinations: 9274 allowed; 2608 refused when Polars resolved the schema, 1918 when it ran the rows, 0 when it ran the empty table.
+# 13920 combinations: 9343 allowed; 2650 refused when Polars resolved the schema, 1927 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -7391,6 +7391,66 @@ Expr.is_first_distinct | sort > over.partition_by | continues | Int64 | - | - | 
 Expr.is_first_distinct | sort > over.partition_by | ends | Int64 | - | - | allowed Boolean many
 Expr.is_first_distinct | sort | continues | Int64 | - | - | allowed Boolean many
 Expr.is_first_distinct | sort | ends | Int64 | - | - | allowed Boolean many
+Expr.is_in | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.value | ends | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | filter > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | filter > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | filter > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | filter | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter | ends | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_left > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.is_in | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | select > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | select > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | select | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | sort > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | sort > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort | continues | Int64 | Int64 | - | allowed Boolean many
+Expr.is_in | sort | ends | Int64 | Int64 | - | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Boolean many
@@ -10031,6 +10091,66 @@ Expr.round_sig_figs | sort > over.partition_by | continues | Int64 | - | - | all
 Expr.round_sig_figs | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.round_sig_figs | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.round_sig_figs | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.search_sorted | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `_POLARS_TMP_PHYS_`
+Expr.search_sorted | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | filter > condition.value | ends | Int64 | Int64 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.search_sorted | filter > over.order_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | filter > over.order_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | filter > over.partition_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | filter > over.partition_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | filter | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | filter | ends | Int64 | Int64 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.search_sorted | join_left > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_left | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.search_sorted | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.search_sorted | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.search_sorted | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.search_sorted | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.search_sorted | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.search_sorted | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.search_sorted | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.search_sorted | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | select > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `_POLARS_TMP_PHYS_`
+Expr.search_sorted | select > condition.value | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select > condition.value | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select > over.order_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select > over.order_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select > over.partition_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select > over.partition_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | select | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed UInt32 many
+Expr.search_sorted | sort > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `_POLARS_TMP_PHYS_`
+Expr.search_sorted | sort > condition.value | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > condition.value | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > over.order_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > over.order_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > over.partition_by | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort > over.partition_by | ends | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort | continues | Int64 | Int64 | - | allowed UInt32 many
+Expr.search_sorted | sort | ends | Int64 | Int64 | - | allowed UInt32 many
 Expr.shift | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.shift | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.shift | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 many
@@ -10361,15 +10481,15 @@ Expr.slice | join_right > over.partition_by | continues | Int64 | Int64 | - | re
 Expr.slice | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.slice | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
 Expr.slice | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
-Expr.slice | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
 Expr.slice | pivot_aggregate > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean counted
-Expr.slice | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Int64 counted
 Expr.slice | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Int64 counted
 Expr.slice | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.slice | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
 Expr.slice | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
 Expr.slice | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.slice | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 counted
 Expr.slice | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 counted
 Expr.slice | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
 Expr.slice | select > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean counted

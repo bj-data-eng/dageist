@@ -1174,6 +1174,17 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let Some(given) = chosen.shape {
         shape = given;
     }
+    // What a method that takes some of the values says of how it ends is what the table of counts
+    // says of the count it gives, which it is not where what it follows is one value: the first of
+    // one value is that value, which ends where one value does.
+    if shape != Shape::Counted
+        && matches!(
+            catalog::Counting::of(entry, chosen.options),
+            Some(counting) if !matches!(counting, catalog::Counting::TheArgument(_))
+        )
+    {
+        ends = Outcome::Allowed(None);
+    }
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
     let boolean_needed = Rule::boolean_needed(place.context);

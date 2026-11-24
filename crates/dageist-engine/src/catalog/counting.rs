@@ -26,7 +26,7 @@ pub enum Counting {
     /// predicate meets even one value with each of its own.
     TheCondition,
     /// As many as the values of an argument: the places `gather` takes, the elements that
-    /// `search_sorted` looks for.
+    /// `search_sorted` looks for, one place for each.
     TheArgument(&'static str),
     /// As many as the value it follows has less the rows the first values it drops take:
     /// `diff` that is told to drop what has no value before it.
@@ -46,6 +46,7 @@ impl Counting {
             "Expr.unique" | "Expr.mode" | "Expr.arg_unique" | "Expr.unique_counts" => Self::TheData,
             "Expr.filter" => Self::TheCondition,
             "Expr.gather" => Self::TheArgument("indices"),
+            "Expr.search_sorted" => Self::TheArgument("element"),
             "Expr.diff"
                 if options
                     .iter()

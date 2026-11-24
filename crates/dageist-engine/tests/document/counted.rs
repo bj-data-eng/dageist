@@ -544,3 +544,117 @@ fn the_values_of_a_condition_are_as_many_as_one_another() {
         RefusalSource::Rule(Rule::ValuesMeetInCount)
     );
 }
+
+#[test]
+fn what_a_method_takes_of_one_value_ends_where_one_value_does() {
+    // The first of one value is that value, and the places of the values that differ in one value
+    // are the place of that one: a sort key takes one value, which a count it is not.
+    let literal = || call("polars.lit", json!({ "value": { "integer": 1 } }));
+    for method in [call("Expr.arg_unique", json!({})), head(2)] {
+        let walk = walk_of(
+            "LazyFrame.sort",
+            json!({ "by": many(vec![chain(literal(), vec![method])]) }),
+        );
+        assert_eq!(walk.refusal(), None);
+    }
+}
+
+#[test]
+fn a_replacement_is_given_what_it_replaces_by_as_many_as_it_replaces_or_one() {
+    let replacing = |new: Value| {
+        select_of(vec![on(
+            "a",
+            vec![call(
+                "Expr.replace",
+                json!({ "old": field("a"), "new": new }),
+            )],
+        )])
+    };
+    assert_eq!(
+        refusal_source(&replacing(on("a", vec![head(2)]))),
+        RefusalSource::Rule(Rule::ValuesMeetInCount)
+    );
+    assert_eq!(replacing(whole(1)).refusal(), None);
+}
+
+#[test]
+fn a_search_gives_a_place_for_each_value_it_looks_for() {
+    // The sorted values of `a` are searched for one value, for the rows, and for a count.
+    let typed = chain(
+        call(
+            "polars.lit",
+            json!({ "value": { "integer": 2 }, "dtype": { "dtype": "Int64" } }),
+        ),
+        Vec::new(),
+    );
+    let search = |element: Value| {
+        select_of(vec![on(
+            "a",
+            vec![
+                call("Expr.sort", json!({})),
+                call("Expr.search_sorted", json!({ "element": element })),
+            ],
+        )])
+    };
+    for (name, element, shape, count) in [
+        ("one value", typed, Shape::One, None),
+        ("the rows", field("k"), Shape::Many, None),
+        (
+            "a count",
+            on("k", vec![head(2)]),
+            Shape::Counted,
+            Some(Count::AtMost(2)),
+        ),
+    ] {
+        let walk = search(element);
+        assert_eq!(walk.refusal(), None, "{name}");
+        assert_eq!(
+            last_after(item(&walk, 0)),
+            after(Representative::UInt32, shape),
+            "{name}"
+        );
+        assert_eq!(item(&walk, 0).count(), count, "{name}");
+    }
+}
+
+#[test]
+fn is_in_gives_the_values_it_follows_unless_it_is_given_a_list_of_each() {
+    let is_in = |receiver: Vec<Value>, other: Value| {
+        select_of(vec![on(
+            "a",
+            [
+                receiver,
+                vec![call("Expr.is_in", json!({ "other": other }))],
+            ]
+            .concat(),
+        )])
+    };
+    let sum = || vec![call("Expr.sum", json!({}))];
+    // A column of the values' own dtype is their set, whole: one value is asked of it, and each of
+    // the rows is.
+    for (name, receiver, shape) in [
+        ("one value", sum(), Shape::One),
+        ("the rows", Vec::new(), Shape::Many),
+    ] {
+        assert_eq!(
+            last_after(item(&is_in(receiver, field("k")), 0)),
+            after(Representative::Boolean, shape),
+            "{name} given a column"
+        );
+    }
+    // A list of each group's values is met row by row, so one value is asked of each.
+    let lists = on(
+        "a",
+        vec![call(
+            "Expr.over",
+            json!({
+                "partition_by": many(vec![field("k")]),
+                "mapping_strategy": { "choice": "join" },
+            }),
+        )],
+    );
+    assert_eq!(
+        last_after(item(&is_in(sum(), lists), 0)),
+        after(Representative::Boolean, Shape::Many)
+    );
+}

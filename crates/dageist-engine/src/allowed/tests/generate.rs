@@ -161,10 +161,17 @@ const LITERAL_IN_CONTEXTS: [(&str, &str); 5] = [
 /// no other column to give: Polars reads the value of a replacement of every match as the one value
 /// every match is replaced by where it is a literal, and refuses a null, as it refuses a null
 /// share of a quantile.
-const NOT_NULL_FOR_A_GROUP: [(&str, &str); 3] = [
+const NOT_NULL_FOR_A_GROUP: [(&str, &str); 10] = [
     ("Expr.str.replace_all", "value"),
     ("Expr.quantile", "quantile"),
     ("Expr.approx_quantile", "quantile"),
+    ("Expr.head", "n"),
+    ("Expr.limit", "n"),
+    ("Expr.tail", "n"),
+    ("Expr.slice", "offset"),
+    ("Expr.slice", "length"),
+    ("Expr.top_k", "k"),
+    ("Expr.bottom_k", "k"),
 ];
 
 /// The expression that stands for an argument of `dtype` for `parameter` of

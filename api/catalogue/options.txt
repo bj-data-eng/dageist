@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 7746 combinations: 5114 allowed; 851 refused when Polars resolved the schema, 1781 when it ran the rows, 0 when it ran the empty table.
+# 7954 combinations: 5322 allowed; 851 refused when Polars resolved the schema, 1781 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -4142,6 +4142,58 @@ Expr.is_close | UInt64 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt64 | nans_equal=true | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=true | allowed Boolean many
+Expr.is_in | Array(Int64, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(Int64, 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Boolean | nulls_equal=false | allowed Boolean many
+Expr.is_in | Boolean | nulls_equal=true | allowed Boolean many
+Expr.is_in | Date | nulls_equal=false | allowed Boolean many
+Expr.is_in | Date | nulls_equal=true | allowed Boolean many
+Expr.is_in | Datetime(us) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Datetime(us) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Datetime(us, UTC) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Datetime(us, UTC) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Decimal(10, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Decimal(10, 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Duration(us) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Duration(us) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Float16 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Float16 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Float32 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Float32 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Float64 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Float64 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Int128 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Int128 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Int16 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Int16 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Int32 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Int32 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Int64 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Int64 | nulls_equal=true | allowed Boolean many
+Expr.is_in | Int8 | nulls_equal=false | allowed Boolean many
+Expr.is_in | Int8 | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(Int64) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(Int64) | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(String) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(String) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Null | nulls_equal=false | allowed Boolean many
+Expr.is_in | Null | nulls_equal=true | allowed Boolean many
+Expr.is_in | String | nulls_equal=false | allowed Boolean many
+Expr.is_in | String | nulls_equal=true | allowed Boolean many
+Expr.is_in | Struct(x: Int64, y: String) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Struct(x: Int64, y: String) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Time | nulls_equal=false | allowed Boolean many
+Expr.is_in | Time | nulls_equal=true | allowed Boolean many
+Expr.is_in | UInt128 | nulls_equal=false | allowed Boolean many
+Expr.is_in | UInt128 | nulls_equal=true | allowed Boolean many
+Expr.is_in | UInt16 | nulls_equal=false | allowed Boolean many
+Expr.is_in | UInt16 | nulls_equal=true | allowed Boolean many
+Expr.is_in | UInt32 | nulls_equal=false | allowed Boolean many
+Expr.is_in | UInt32 | nulls_equal=true | allowed Boolean many
+Expr.is_in | UInt64 | nulls_equal=false | allowed Boolean many
+Expr.is_in | UInt64 | nulls_equal=true | allowed Boolean many
+Expr.is_in | UInt8 | nulls_equal=false | allowed Boolean many
+Expr.is_in | UInt8 | nulls_equal=true | allowed Boolean many
 Expr.kurtosis | Array(Int64, 2) | fisher=false, bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
 Expr.kurtosis | Array(Int64, 2) | fisher=false, bias=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
 Expr.kurtosis | Array(Int64, 2) | fisher=true, bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
@@ -5286,6 +5338,162 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.search_sorted | Array(Int64, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Int64, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Int64, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Int64, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Int64, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Int64, 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Boolean | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Boolean | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Boolean | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Boolean | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Boolean | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Boolean | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Date | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Date | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Date | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Date | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Date | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Date | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Datetime(us, UTC) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Decimal(10, 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Duration(us) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Float16 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Float16 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Float16 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Float16 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Float16 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Float16 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Float32 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Float32 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Float32 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Float32 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Float32 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Float32 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Float64 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Float64 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Float64 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Float64 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Float64 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Float64 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Int128 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Int128 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Int128 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Int128 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Int128 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Int128 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Int16 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Int16 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Int16 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Int16 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Int16 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Int16 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Int32 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Int32 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Int32 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Int32 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Int32 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Int32 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Int64 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Int64 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Int64 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Int64 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Int64 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Int64 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Int8 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Int8 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Int8 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Int8 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Int8 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Int8 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Int64) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(String) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(String) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(String) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(String) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(String) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(String) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Null | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Null | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Null | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Null | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Null | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Null | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | String | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | String | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | String | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | String | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | String | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | String | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Struct(x: Int64, y: String) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Time | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Time | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Time | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Time | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Time | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Time | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt128 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt16 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt32 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt64 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | UInt8 | side=right, descending=true | allowed UInt32 many
 Expr.skew | Array(Int64, 2) | bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
 Expr.skew | Array(Int64, 2) | bias=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
 Expr.skew | Boolean | bias=false | allowed Float64 one

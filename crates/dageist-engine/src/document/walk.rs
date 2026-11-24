@@ -1954,11 +1954,29 @@ impl Walker<'_> {
                 Some((result, shape)) => (result.class(), shape),
                 None => (None, Shape::Many),
             };
+            // What a method that takes some of the values gives of how many is the arguments' to
+            // say, whether or not the dtype of one of them is known.
+            let (option_words, _) = option_words(link);
+            let option_words: Vec<(&str, &str)> = option_words
+                .iter()
+                .map(|(name, word)| (name.as_str(), word.as_str()))
+                .collect();
+            let (shape, count) = match &verdict {
+                Verdict::Allowed(allowance) if Counting::of(entry, &option_words).is_some() => {
+                    let receiver = match &cur {
+                        Cur::Value { shape, count, .. } => (*shape, *count),
+                        _ => (Shape::Many, Count::NotKnown),
+                    };
+                    self.counted_after(link, receiver, arguments, allowance)
+                        .unwrap_or((shape, Count::NotKnown))
+                }
+                _ => (shape, Count::NotKnown),
+            };
             return (
                 Cur::Value {
                     dtype,
                     shape,
-                    count: Count::NotKnown,
+                    count,
                 },
                 standing,
             );
@@ -2050,6 +2068,22 @@ impl Walker<'_> {
             Cur::Value { shape, count, .. } => (*shape, *count),
             _ => (Shape::Many, Count::NotKnown),
         };
+        // The values a replacement lists and the default it gives are as many as what they meet, or
+        // one, where one of them is a count too.
+        if matches!(cur, Cur::Value { .. })
+            && !branches_are_one
+            && replaces_by_another_count(entry, arguments, receiver)
+            && let Err(refusal) = allowed::rule_forbids_values_of_other_counts()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
                 let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
@@ -2221,7 +2255,7 @@ impl Walker<'_> {
         let meets = |receiver: (Shape, Count)| -> Result<(Shape, Count), Refusal> {
             let mut met = receiver;
             for (name, given) in arguments {
-                if !(given.known && given.counted && meets_receiver(entry, name)) {
+                if !(given.known && given.counted && meets_receiver(entry, name, given)) {
                     continue;
                 }
                 met = meet(met, (given.shape, given.count)).ok_or_else(|| {
@@ -2314,7 +2348,7 @@ fn meet(first: (Shape, Count), second: (Shape, Count)) -> Option<(Shape, Count)>
 /// Whether the parameter `name` of the method `entry` is met with the value the method follows, as
 /// the other side of an operation is, and so must give as many values as it, or one. What the
 /// method takes the values of, and what a window keys by, are not.
-fn meets_receiver(entry: &Entry, name: &str) -> bool {
+fn meets_receiver(entry: &Entry, name: &str, operand: &Operand) -> bool {
     let id = entry.id().as_str();
     if id == "Expr.over" {
         return false;
@@ -2322,10 +2356,25 @@ fn meets_receiver(entry: &Entry, name: &str) -> bool {
     if let Some(Counting::TheArgument(parameter)) = Counting::of(entry, &[]) {
         return parameter != name;
     }
-    entry
-        .parameters()
-        .iter()
-        .any(|parameter| parameter.name() == name && allowed::broadcasts(entry, name))
+    is_met_by_its_dtype(entry, name, operand)
+        && entry
+            .parameters()
+            .iter()
+            .any(|parameter| parameter.name() == name)
+}
+
+/// Whether the operand `name` of `entry` is met with each value of the value the method follows, as
+/// the catalogue says of the parameter, except where the dtype of the operand decides it: `is_in` meets
+/// a list column row by row with the values it follows, and takes a column of their own dtype as their
+/// set, whole, so that it gives as many values as they.
+fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
+    if entry.id().as_str() == "Expr.is_in" && name == "other" {
+        return matches!(
+            operand.dtype,
+            Some(Representative::ListOfInteger | Representative::ListOfString)
+        );
+    }
+    broadcasts(entry, name)
 }
 
 /// A whole number the call is given for `parameter`, typed in, where it is one.
@@ -2436,9 +2485,9 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
     // parameter is: a fact about the method, which the catalogue holds apart from how a number
     // typed without a dtype adapts. What a replacement lists is a table of values, which gives no
     // more values than what it follows, and a shift takes one value only: neither broadcasts.
-    let given_many = arguments
-        .iter()
-        .any(|(name, operand)| operand.shape == Shape::Many && broadcasts(entry, name));
+    let given_many = arguments.iter().any(|(name, operand)| {
+        operand.shape == Shape::Many && is_met_by_its_dtype(entry, name, operand)
+    });
     if shape == Shape::One && given_many {
         Shape::Many
     } else {
@@ -2475,6 +2524,37 @@ fn gives_other_numbers_of_values(
             }
             None => false,
         }
+    })
+}
+
+/// Whether the call `entry` is given values for a parameter that gives as many as another, or one,
+/// of a count that is not as many as that: a count is not the rows, and two counts that are fixed and
+/// differ are not the same. Values of one and of many are judged by [`gives_other_numbers_of_values`].
+fn replaces_by_another_count(
+    entry: &Entry,
+    arguments: &[(String, Operand)],
+    receiver: (Shape, Count),
+) -> bool {
+    let operand = |name: &str| {
+        arguments
+            .iter()
+            .find(|(given, _)| given == name)
+            .map(|(_, operand)| operand)
+            .filter(|operand| operand.known && operand.counted)
+            .map(|operand| (operand.shape, operand.count))
+    };
+    entry.parameters().iter().any(|parameter| {
+        let (Some(mine), Some(as_many)) = (operand(parameter.name()), parameter.as_many_as())
+        else {
+            return false;
+        };
+        let other = match as_many {
+            AsManyAs::TheReceiver => Some(receiver),
+            AsManyAs::Parameter(other) => operand(other),
+        };
+        other.is_some_and(|other| {
+            (mine.0 == Shape::Counted || other.0 == Shape::Counted) && meet(mine, other).is_none()
+        })
     })
 }
 

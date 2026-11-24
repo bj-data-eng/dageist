@@ -16,6 +16,14 @@ use super::build::{column, expression, expressions, method, null_of, one_of, pat
 use super::probe::measure;
 use super::sample::Frames;
 
+/// Whether the method gives a count of values that the data or its arguments decide, which the walk
+/// states from the arguments and these measurements of one value and many cannot: the count of
+/// `is_in` follows the dtype of the values it is given, a list column's being met row by row and a
+/// column of the values' own dtype being their set.
+fn gives_a_count(entry: &Entry) -> bool {
+    catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
+}
+
 /// A value of `dtype` that is one value: the number 1 where it can be, and a null where not.
 fn literal_of(dtype: &DataType) -> polars::prelude::Expr {
     one_of(dtype)
@@ -168,7 +176,7 @@ fn the_catalogue_says_for_each_expression_parameter_whether_polars_meets_a_recei
         // What a method that gives a count of values that the data or the arguments decide gives
         // is that count, which the walk states from the arguments and these measurements of one
         // value and many cannot.
-        .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
+        .filter(|entry| !gives_a_count(entry))
     {
         for parameter in entry
             .parameters()
@@ -219,7 +227,7 @@ fn a_method_given_a_literal_beside_a_column_receiver_gives_what_the_tables_say()
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
-        .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
+        .filter(|entry| !gives_a_count(entry))
     {
         for parameter in entry
             .parameters()

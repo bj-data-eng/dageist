@@ -335,9 +335,10 @@ fn methods() -> Vec<&'static Entry> {
 /// Whether a method gives a count of values that the data or the arguments decide, which a
 /// campaign draws only where a focus names it: the shape of such a count is the first of several
 /// that the catalogue gains, and the campaigns that check them are not a gate of the engine's tests
-/// until every shape exists. [`Counting`](catalog::Counting) says which methods.
+/// until every shape exists. [`Counting`](catalog::Counting) says which methods, and `is_in`, whose
+/// count follows the dtype of the values it is given, is one too.
 fn is_held_back(entry: &Entry) -> bool {
-    catalog::Counting::of(entry, &[]).is_some()
+    catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
 }
 
 /// The functions that start a chain and take expressions, which a chain may start from besides a

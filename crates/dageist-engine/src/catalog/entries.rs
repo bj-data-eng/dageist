@@ -16,9 +16,9 @@ use polars::prelude::{
     AnyValue, ApproxQuantileMethod, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr,
     FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
     MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError, QuantileMethod,
-    RankMethod, RankOptions, RoundMode, Scalar, Selector, Series, SortMultipleOptions, SortOptions,
-    TimeUnit, TimeZone, WindowMapping, all, all_horizontal, binary_expr, by_name, col, cols,
-    datetime, duration, element, lit, when,
+    RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
+    SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal,
+    binary_expr, by_name, col, cols, datetime, duration, element, lit, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -188,6 +188,9 @@ const APPROX_QUANTILE_METHOD: &[&str] = &["auto", "kll", "req_lo", "req_hi", "re
 // The words Python's `approx_quantile` takes for `error_tightness`: `formal` is Polars'
 // `use_formal_bound`.
 const ERROR_TIGHTNESS: &[&str] = &["empirical", "formal"];
+// The words Python's `search_sorted` takes for `side`: which place among values that are equal to the one
+// looked for, the first, the last or any.
+const SEARCH_SIDE: &[&str] = &["any", "left", "right"];
 // Python's `diff` takes `ignore` and `drop` for `null_behavior`. `drop` leaves out the values that
 // have none before them, as many as `n` says, so it gives as many values as the rows less `n`, a
 // count the data decide.
@@ -779,6 +782,27 @@ fn expr_filter(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
         1 => Ok(expr.filter(predicates.remove(0))),
         _ => Ok(expr.filter(all_horizontal(&predicates)?)),
     }
+}
+
+fn is_in(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(other) = arguments.expression("other")? else {
+        return Err(BuildError::Missing { parameter: "other" });
+    };
+    Ok(expr.is_in(other, arguments.flag("nulls_equal", false)?))
+}
+
+fn search_sorted(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(element) = arguments.expression("element")? else {
+        return Err(BuildError::Missing {
+            parameter: "element",
+        });
+    };
+    let side = match arguments.choice("side", SEARCH_SIDE, "any")? {
+        "left" => SearchSortedSide::Left,
+        "right" => SearchSortedSide::Right,
+        _ => SearchSortedSide::Any,
+    };
+    Ok(expr.search_sorted(element, side, arguments.flag("descending", false)?))
 }
 
 fn sum(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -3133,6 +3157,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(is_first_distinct),
     },
     Entry {
+        id: EntryId("Expr.is_in"),
+        family: Family::Compare,
+        accepts: ANY,
+        parameters: &[
+            required("other", EXPRESSION, Shape::One),
+            flag("nulls_equal", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_in),
+    },
+    Entry {
         id: EntryId("Expr.is_infinite"),
         family: Family::Checks,
         accepts: NUMERIC,
@@ -3557,6 +3592,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         )],
         laziness: Laziness::Lazy,
         build: Build::Expression(round_sig_figs),
+    },
+    Entry {
+        id: EntryId("Expr.search_sorted"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            required("element", EXPRESSION, Shape::One),
+            optional("side", Kind::Choice(SEARCH_SIDE), Shape::One, "'any'"),
+            flag("descending", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(search_sorted),
     },
     Entry {
         id: EntryId("Expr.shift"),

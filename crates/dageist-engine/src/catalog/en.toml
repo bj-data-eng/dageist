@@ -2143,6 +2143,39 @@ hint = "the place of the first of each different value"
 name = "unique_counts"
 hint = "how often each different value occurs"
 
+[entries."Expr.is_in"]
+name = "is_in"
+hint = "whether the value is among the others"
+
+[entries."Expr.is_in".parameters.other]
+name = "other"
+label = "among"
+
+[entries."Expr.is_in".parameters.nulls_equal]
+name = "nulls_equal"
+label = "empty values equal"
+
+[entries."Expr.search_sorted"]
+name = "search_sorted"
+hint = "the place a value would take in the sorted values"
+
+[entries."Expr.search_sorted".parameters.element]
+name = "element"
+label = "value"
+
+[entries."Expr.search_sorted".parameters.side]
+name = "side"
+label = "among equal values"
+
+[entries."Expr.search_sorted".parameters.side.choices]
+any = "any"
+left = "left"
+right = "right"
+
+[entries."Expr.search_sorted".parameters.descending]
+name = "descending"
+label = "largest first"
+
 [entries."Expr.pct_change"]
 name = "pct_change"
 hint = "how much a value grew from the one n rows earlier"

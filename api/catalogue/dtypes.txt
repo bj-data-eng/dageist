@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 58164 combinations: 22314 allowed; 10810 refused when Polars resolved the schema, 25040 when it ran the rows, 0 when it ran the empty table.
+# 59516 combinations: 22885 allowed; 11550 refused when Polars resolved the schema, 25081 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -23408,6 +23408,682 @@ Expr.is_first_distinct | - | UInt16 | - | allowed Boolean many
 Expr.is_first_distinct | - | UInt32 | - | allowed Boolean many
 Expr.is_first_distinct | - | UInt64 | - | allowed Boolean many
 Expr.is_first_distinct | - | UInt8 | - | allowed Boolean many
+Expr.is_in | other | Array(Int64, 2) | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Array(Int64, 2) | Boolean | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Boolean data. Hint: container dtype (Boolean) must be nested
+Expr.is_in | other | Array(Int64, 2) | Date | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Date data. Hint: container dtype (Date) must be nested
+Expr.is_in | other | Array(Int64, 2) | Datetime(us) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Datetime('μs') data. Hint: container dtype (Datetime('μs')) must be nested
+Expr.is_in | other | Array(Int64, 2) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Datetime('μs', 'UTC') data. Hint: container dtype (Datetime('μs', 'UTC')) must be nested
+Expr.is_in | other | Array(Int64, 2) | Decimal(10, 2) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Decimal(10, 2) data. Hint: container dtype (Decimal(10, 2)) must be nested
+Expr.is_in | other | Array(Int64, 2) | Duration(us) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Duration('μs') data. Hint: container dtype (Duration('μs')) must be nested
+Expr.is_in | other | Array(Int64, 2) | Float16 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Float16 data. Hint: container dtype (Float16) must be nested
+Expr.is_in | other | Array(Int64, 2) | Float32 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Float32 data. Hint: container dtype (Float32) must be nested
+Expr.is_in | other | Array(Int64, 2) | Float64 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Float64 data. Hint: container dtype (Float64) must be nested
+Expr.is_in | other | Array(Int64, 2) | Int128 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Int128 data. Hint: container dtype (Int128) must be nested
+Expr.is_in | other | Array(Int64, 2) | Int16 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Int16 data. Hint: container dtype (Int16) must be nested
+Expr.is_in | other | Array(Int64, 2) | Int32 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Int32 data. Hint: container dtype (Int32) must be nested
+Expr.is_in | other | Array(Int64, 2) | Int64 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Int64 data. Hint: container dtype (Int64) must be nested
+Expr.is_in | other | Array(Int64, 2) | Int8 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Int8 data. Hint: container dtype (Int8) must be nested
+Expr.is_in | other | Array(Int64, 2) | List(Int64) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in List(List(Int64)) data
+Expr.is_in | other | Array(Int64, 2) | List(String) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in List(List(String)) data
+Expr.is_in | other | Array(Int64, 2) | Null | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Null data. Hint: container dtype (Null) must be nested
+Expr.is_in | other | Array(Int64, 2) | String | refused schema: 'is_in' cannot check for Array(Int64, 2) values in String data. Hint: container dtype (String) must be nested
+Expr.is_in | other | Array(Int64, 2) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Struct({'x': Int64, 'y': String}) data. Hint: container dtype (Struct({'x': Int64, 'y': String})) must be nested
+Expr.is_in | other | Array(Int64, 2) | Time | refused schema: 'is_in' cannot check for Array(Int64, 2) values in Time data. Hint: container dtype (Time) must be nested
+Expr.is_in | other | Array(Int64, 2) | UInt128 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in UInt128 data. Hint: container dtype (UInt128) must be nested
+Expr.is_in | other | Array(Int64, 2) | UInt16 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in UInt16 data. Hint: container dtype (UInt16) must be nested
+Expr.is_in | other | Array(Int64, 2) | UInt32 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in UInt32 data. Hint: container dtype (UInt32) must be nested
+Expr.is_in | other | Array(Int64, 2) | UInt64 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in UInt64 data. Hint: container dtype (UInt64) must be nested
+Expr.is_in | other | Array(Int64, 2) | UInt8 | refused schema: 'is_in' cannot check for Array(Int64, 2) values in UInt8 data. Hint: container dtype (UInt8) must be nested
+Expr.is_in | other | Boolean | Array(Int64, 2) | refused schema: 'is_in' cannot check for Boolean values in Array(Int64, 2) data
+Expr.is_in | other | Boolean | Boolean | allowed Boolean many
+Expr.is_in | other | Boolean | Date | refused schema: 'is_in' cannot check for Boolean values in List(Date) data
+Expr.is_in | other | Boolean | Datetime(us) | refused schema: 'is_in' cannot check for Boolean values in List(Datetime('μs')) data
+Expr.is_in | other | Boolean | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Boolean values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Boolean | Decimal(10, 2) | refused schema: 'is_in' cannot check for Boolean values in List(Decimal(10, 2)) data
+Expr.is_in | other | Boolean | Duration(us) | refused schema: 'is_in' cannot check for Boolean values in List(Duration('μs')) data
+Expr.is_in | other | Boolean | Float16 | refused schema: 'is_in' cannot check for Boolean values in List(Float16) data
+Expr.is_in | other | Boolean | Float32 | refused schema: 'is_in' cannot check for Boolean values in List(Float32) data
+Expr.is_in | other | Boolean | Float64 | refused schema: 'is_in' cannot check for Boolean values in List(Float64) data
+Expr.is_in | other | Boolean | Int128 | refused schema: 'is_in' cannot check for Boolean values in List(Int128) data
+Expr.is_in | other | Boolean | Int16 | refused schema: 'is_in' cannot check for Boolean values in List(Int16) data
+Expr.is_in | other | Boolean | Int32 | refused schema: 'is_in' cannot check for Boolean values in List(Int32) data
+Expr.is_in | other | Boolean | Int64 | refused schema: 'is_in' cannot check for Boolean values in List(Int64) data
+Expr.is_in | other | Boolean | Int8 | refused schema: 'is_in' cannot check for Boolean values in List(Int8) data
+Expr.is_in | other | Boolean | List(Int64) | refused schema: 'is_in' cannot check for Boolean values in List(Int64) data
+Expr.is_in | other | Boolean | List(String) | refused schema: 'is_in' cannot check for Boolean values in List(String) data
+Expr.is_in | other | Boolean | Null | allowed Boolean many
+Expr.is_in | other | Boolean | String | refused schema: 'is_in' cannot check for Boolean values in List(String) data
+Expr.is_in | other | Boolean | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Boolean values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Boolean | Time | refused schema: 'is_in' cannot check for Boolean values in List(Time) data
+Expr.is_in | other | Boolean | UInt128 | refused schema: 'is_in' cannot check for Boolean values in List(UInt128) data
+Expr.is_in | other | Boolean | UInt16 | refused schema: 'is_in' cannot check for Boolean values in List(UInt16) data
+Expr.is_in | other | Boolean | UInt32 | refused schema: 'is_in' cannot check for Boolean values in List(UInt32) data
+Expr.is_in | other | Boolean | UInt64 | refused schema: 'is_in' cannot check for Boolean values in List(UInt64) data
+Expr.is_in | other | Boolean | UInt8 | refused schema: 'is_in' cannot check for Boolean values in List(UInt8) data
+Expr.is_in | other | Date | Array(Int64, 2) | refused schema: 'is_in' cannot check for Date values in Array(Int64, 2) data
+Expr.is_in | other | Date | Boolean | refused schema: 'is_in' cannot check for Date values in List(Boolean) data
+Expr.is_in | other | Date | Date | allowed Boolean many
+Expr.is_in | other | Date | Datetime(us) | refused schema: 'is_in' cannot check for Date values in List(Datetime('μs')) data
+Expr.is_in | other | Date | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Date values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Date | Decimal(10, 2) | refused schema: 'is_in' cannot check for Date values in List(Decimal(10, 2)) data
+Expr.is_in | other | Date | Duration(us) | refused schema: 'is_in' cannot check for Date values in List(Duration('μs')) data
+Expr.is_in | other | Date | Float16 | refused schema: 'is_in' cannot check for Date values in List(Float16) data
+Expr.is_in | other | Date | Float32 | refused schema: 'is_in' cannot check for Date values in List(Float32) data
+Expr.is_in | other | Date | Float64 | refused schema: 'is_in' cannot check for Date values in List(Float64) data
+Expr.is_in | other | Date | Int128 | refused schema: 'is_in' cannot check for Date values in List(Int128) data
+Expr.is_in | other | Date | Int16 | refused schema: 'is_in' cannot check for Date values in List(Int16) data
+Expr.is_in | other | Date | Int32 | refused schema: 'is_in' cannot check for Date values in List(Int32) data
+Expr.is_in | other | Date | Int64 | refused schema: 'is_in' cannot check for Date values in List(Int64) data
+Expr.is_in | other | Date | Int8 | refused schema: 'is_in' cannot check for Date values in List(Int8) data
+Expr.is_in | other | Date | List(Int64) | refused schema: 'is_in' cannot check for Date values in List(Int64) data
+Expr.is_in | other | Date | List(String) | refused schema: 'is_in' cannot check for Date values in List(String) data
+Expr.is_in | other | Date | Null | allowed Boolean many
+Expr.is_in | other | Date | String | refused schema: 'is_in' cannot check for Date values in List(String) data
+Expr.is_in | other | Date | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Date values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Date | Time | refused schema: 'is_in' cannot check for Date values in List(Time) data
+Expr.is_in | other | Date | UInt128 | refused schema: 'is_in' cannot check for Date values in List(UInt128) data
+Expr.is_in | other | Date | UInt16 | refused schema: 'is_in' cannot check for Date values in List(UInt16) data
+Expr.is_in | other | Date | UInt32 | refused schema: 'is_in' cannot check for Date values in List(UInt32) data
+Expr.is_in | other | Date | UInt64 | refused schema: 'is_in' cannot check for Date values in List(UInt64) data
+Expr.is_in | other | Date | UInt8 | refused schema: 'is_in' cannot check for Date values in List(UInt8) data
+Expr.is_in | other | Datetime(us) | Array(Int64, 2) | refused schema: 'is_in' cannot check for Datetime('μs') values in Array(Int64, 2) data
+Expr.is_in | other | Datetime(us) | Boolean | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Boolean) data
+Expr.is_in | other | Datetime(us) | Date | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Date) data
+Expr.is_in | other | Datetime(us) | Datetime(us) | allowed Boolean many
+Expr.is_in | other | Datetime(us) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Datetime('μs', 'UTC')) data, as one is time-zone-aware and the other is not Hint: use `dt.replace_time_zone` to give both sides a time zone, or neither.
+Expr.is_in | other | Datetime(us) | Decimal(10, 2) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Decimal(10, 2)) data
+Expr.is_in | other | Datetime(us) | Duration(us) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Duration('μs')) data
+Expr.is_in | other | Datetime(us) | Float16 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Float16) data
+Expr.is_in | other | Datetime(us) | Float32 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Float32) data
+Expr.is_in | other | Datetime(us) | Float64 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Float64) data
+Expr.is_in | other | Datetime(us) | Int128 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int128) data
+Expr.is_in | other | Datetime(us) | Int16 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int16) data
+Expr.is_in | other | Datetime(us) | Int32 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int32) data
+Expr.is_in | other | Datetime(us) | Int64 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int64) data
+Expr.is_in | other | Datetime(us) | Int8 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int8) data
+Expr.is_in | other | Datetime(us) | List(Int64) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Int64) data
+Expr.is_in | other | Datetime(us) | List(String) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(String) data
+Expr.is_in | other | Datetime(us) | Null | allowed Boolean many
+Expr.is_in | other | Datetime(us) | String | refused schema: 'is_in' cannot check for Datetime('μs') values in List(String) data
+Expr.is_in | other | Datetime(us) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Datetime(us) | Time | refused schema: 'is_in' cannot check for Datetime('μs') values in List(Time) data
+Expr.is_in | other | Datetime(us) | UInt128 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(UInt128) data
+Expr.is_in | other | Datetime(us) | UInt16 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(UInt16) data
+Expr.is_in | other | Datetime(us) | UInt32 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(UInt32) data
+Expr.is_in | other | Datetime(us) | UInt64 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(UInt64) data
+Expr.is_in | other | Datetime(us) | UInt8 | refused schema: 'is_in' cannot check for Datetime('μs') values in List(UInt8) data
+Expr.is_in | other | Datetime(us, UTC) | Array(Int64, 2) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in Array(Int64, 2) data
+Expr.is_in | other | Datetime(us, UTC) | Boolean | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Boolean) data
+Expr.is_in | other | Datetime(us, UTC) | Date | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Date) data
+Expr.is_in | other | Datetime(us, UTC) | Datetime(us) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Datetime('μs')) data, as one is time-zone-aware and the other is not Hint: use `dt.replace_time_zone` to give both sides a time zone, or neither.
+Expr.is_in | other | Datetime(us, UTC) | Datetime(us, UTC) | allowed Boolean many
+Expr.is_in | other | Datetime(us, UTC) | Decimal(10, 2) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Decimal(10, 2)) data
+Expr.is_in | other | Datetime(us, UTC) | Duration(us) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Duration('μs')) data
+Expr.is_in | other | Datetime(us, UTC) | Float16 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Float16) data
+Expr.is_in | other | Datetime(us, UTC) | Float32 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Float32) data
+Expr.is_in | other | Datetime(us, UTC) | Float64 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Float64) data
+Expr.is_in | other | Datetime(us, UTC) | Int128 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int128) data
+Expr.is_in | other | Datetime(us, UTC) | Int16 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int16) data
+Expr.is_in | other | Datetime(us, UTC) | Int32 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int32) data
+Expr.is_in | other | Datetime(us, UTC) | Int64 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int64) data
+Expr.is_in | other | Datetime(us, UTC) | Int8 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int8) data
+Expr.is_in | other | Datetime(us, UTC) | List(Int64) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Int64) data
+Expr.is_in | other | Datetime(us, UTC) | List(String) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(String) data
+Expr.is_in | other | Datetime(us, UTC) | Null | allowed Boolean many
+Expr.is_in | other | Datetime(us, UTC) | String | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(String) data
+Expr.is_in | other | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Datetime(us, UTC) | Time | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(Time) data
+Expr.is_in | other | Datetime(us, UTC) | UInt128 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(UInt128) data
+Expr.is_in | other | Datetime(us, UTC) | UInt16 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(UInt16) data
+Expr.is_in | other | Datetime(us, UTC) | UInt32 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(UInt32) data
+Expr.is_in | other | Datetime(us, UTC) | UInt64 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(UInt64) data
+Expr.is_in | other | Datetime(us, UTC) | UInt8 | refused schema: 'is_in' cannot check for Datetime('μs', 'UTC') values in List(UInt8) data
+Expr.is_in | other | Decimal(10, 2) | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Boolean | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Boolean) data
+Expr.is_in | other | Decimal(10, 2) | Date | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Date) data
+Expr.is_in | other | Decimal(10, 2) | Datetime(us) | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Datetime('μs')) data
+Expr.is_in | other | Decimal(10, 2) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Decimal(10, 2) | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Duration(us) | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Duration('μs')) data
+Expr.is_in | other | Decimal(10, 2) | Float16 | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Float16) data
+Expr.is_in | other | Decimal(10, 2) | Float32 | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Float32) data
+Expr.is_in | other | Decimal(10, 2) | Float64 | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Float64) data
+Expr.is_in | other | Decimal(10, 2) | Int128 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Int16 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Int32 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Int64 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | Int8 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | List(Int64) | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | List(String) | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(String) data
+Expr.is_in | other | Decimal(10, 2) | Null | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | String | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(String) data
+Expr.is_in | other | Decimal(10, 2) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Decimal(10, 2) | Time | refused schema: 'is_in' cannot check for Decimal(10, 2) values in List(Time) data
+Expr.is_in | other | Decimal(10, 2) | UInt128 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | UInt16 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | UInt32 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | UInt64 | allowed Boolean many
+Expr.is_in | other | Decimal(10, 2) | UInt8 | allowed Boolean many
+Expr.is_in | other | Duration(us) | Array(Int64, 2) | refused schema: 'is_in' cannot check for Duration('μs') values in Array(Int64, 2) data
+Expr.is_in | other | Duration(us) | Boolean | refused schema: 'is_in' cannot check for Duration('μs') values in List(Boolean) data
+Expr.is_in | other | Duration(us) | Date | refused schema: 'is_in' cannot check for Duration('μs') values in List(Date) data
+Expr.is_in | other | Duration(us) | Datetime(us) | refused schema: 'is_in' cannot check for Duration('μs') values in List(Datetime('μs')) data
+Expr.is_in | other | Duration(us) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Duration('μs') values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Duration(us) | Decimal(10, 2) | refused schema: 'is_in' cannot check for Duration('μs') values in List(Decimal(10, 2)) data
+Expr.is_in | other | Duration(us) | Duration(us) | allowed Boolean many
+Expr.is_in | other | Duration(us) | Float16 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Float16) data
+Expr.is_in | other | Duration(us) | Float32 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Float32) data
+Expr.is_in | other | Duration(us) | Float64 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Float64) data
+Expr.is_in | other | Duration(us) | Int128 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int128) data
+Expr.is_in | other | Duration(us) | Int16 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int16) data
+Expr.is_in | other | Duration(us) | Int32 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int32) data
+Expr.is_in | other | Duration(us) | Int64 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int64) data
+Expr.is_in | other | Duration(us) | Int8 | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int8) data
+Expr.is_in | other | Duration(us) | List(Int64) | refused schema: 'is_in' cannot check for Duration('μs') values in List(Int64) data
+Expr.is_in | other | Duration(us) | List(String) | refused schema: 'is_in' cannot check for Duration('μs') values in List(String) data
+Expr.is_in | other | Duration(us) | Null | allowed Boolean many
+Expr.is_in | other | Duration(us) | String | refused schema: 'is_in' cannot check for Duration('μs') values in List(String) data
+Expr.is_in | other | Duration(us) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Duration('μs') values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Duration(us) | Time | refused schema: 'is_in' cannot check for Duration('μs') values in List(Time) data
+Expr.is_in | other | Duration(us) | UInt128 | refused schema: 'is_in' cannot check for Duration('μs') values in List(UInt128) data
+Expr.is_in | other | Duration(us) | UInt16 | refused schema: 'is_in' cannot check for Duration('μs') values in List(UInt16) data
+Expr.is_in | other | Duration(us) | UInt32 | refused schema: 'is_in' cannot check for Duration('μs') values in List(UInt32) data
+Expr.is_in | other | Duration(us) | UInt64 | refused schema: 'is_in' cannot check for Duration('μs') values in List(UInt64) data
+Expr.is_in | other | Duration(us) | UInt8 | refused schema: 'is_in' cannot check for Duration('μs') values in List(UInt8) data
+Expr.is_in | other | Float16 | Array(Int64, 2) | refused schema: 'is_in' cannot check for Float16 values in Array(Int64, 2) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | Boolean | refused schema: 'is_in' cannot check for Float16 values in List(Boolean) data
+Expr.is_in | other | Float16 | Date | refused schema: 'is_in' cannot check for Float16 values in List(Date) data
+Expr.is_in | other | Float16 | Datetime(us) | refused schema: 'is_in' cannot check for Float16 values in List(Datetime('μs')) data
+Expr.is_in | other | Float16 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Float16 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Float16 | Decimal(10, 2) | refused schema: 'is_in' cannot check for Float16 values in List(Decimal(10, 2)) data
+Expr.is_in | other | Float16 | Duration(us) | refused schema: 'is_in' cannot check for Float16 values in List(Duration('μs')) data
+Expr.is_in | other | Float16 | Float16 | allowed Boolean many
+Expr.is_in | other | Float16 | Float32 | allowed Boolean many
+Expr.is_in | other | Float16 | Float64 | allowed Boolean many
+Expr.is_in | other | Float16 | Int128 | refused schema: 'is_in' cannot check for Float16 values in List(Int128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | Int16 | refused schema: 'is_in' cannot check for Float16 values in List(Int16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | Int32 | refused schema: 'is_in' cannot check for Float16 values in List(Int32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | Int64 | refused schema: 'is_in' cannot check for Float16 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | Int8 | refused schema: 'is_in' cannot check for Float16 values in List(Int8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float16. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | List(Int64) | refused schema: 'is_in' cannot check for Float16 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | List(String) | refused schema: 'is_in' cannot check for Float16 values in List(String) data
+Expr.is_in | other | Float16 | Null | allowed Boolean many
+Expr.is_in | other | Float16 | String | refused schema: 'is_in' cannot check for Float16 values in List(String) data
+Expr.is_in | other | Float16 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Float16 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Float16 | Time | refused schema: 'is_in' cannot check for Float16 values in List(Time) data
+Expr.is_in | other | Float16 | UInt128 | refused schema: 'is_in' cannot check for Float16 values in List(UInt128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | UInt16 | refused schema: 'is_in' cannot check for Float16 values in List(UInt16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | UInt32 | refused schema: 'is_in' cannot check for Float16 values in List(UInt32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | UInt64 | refused schema: 'is_in' cannot check for Float16 values in List(UInt64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float16 | UInt8 | refused schema: 'is_in' cannot check for Float16 values in List(UInt8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float16. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Array(Int64, 2) | refused schema: 'is_in' cannot check for Float32 values in Array(Int64, 2) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Boolean | refused schema: 'is_in' cannot check for Float32 values in List(Boolean) data
+Expr.is_in | other | Float32 | Date | refused schema: 'is_in' cannot check for Float32 values in List(Date) data
+Expr.is_in | other | Float32 | Datetime(us) | refused schema: 'is_in' cannot check for Float32 values in List(Datetime('μs')) data
+Expr.is_in | other | Float32 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Float32 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Float32 | Decimal(10, 2) | refused schema: 'is_in' cannot check for Float32 values in List(Decimal(10, 2)) data
+Expr.is_in | other | Float32 | Duration(us) | refused schema: 'is_in' cannot check for Float32 values in List(Duration('μs')) data
+Expr.is_in | other | Float32 | Float16 | allowed Boolean many
+Expr.is_in | other | Float32 | Float32 | allowed Boolean many
+Expr.is_in | other | Float32 | Float64 | allowed Boolean many
+Expr.is_in | other | Float32 | Int128 | refused schema: 'is_in' cannot check for Float32 values in List(Int128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Int16 | refused schema: 'is_in' cannot check for Float32 values in List(Int16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Int32 | refused schema: 'is_in' cannot check for Float32 values in List(Int32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Int64 | refused schema: 'is_in' cannot check for Float32 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | Int8 | refused schema: 'is_in' cannot check for Float32 values in List(Int8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | List(Int64) | refused schema: 'is_in' cannot check for Float32 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | List(String) | refused schema: 'is_in' cannot check for Float32 values in List(String) data
+Expr.is_in | other | Float32 | Null | allowed Boolean many
+Expr.is_in | other | Float32 | String | refused schema: 'is_in' cannot check for Float32 values in List(String) data
+Expr.is_in | other | Float32 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Float32 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Float32 | Time | refused schema: 'is_in' cannot check for Float32 values in List(Time) data
+Expr.is_in | other | Float32 | UInt128 | refused schema: 'is_in' cannot check for Float32 values in List(UInt128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | UInt16 | refused schema: 'is_in' cannot check for Float32 values in List(UInt16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | UInt32 | refused schema: 'is_in' cannot check for Float32 values in List(UInt32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | UInt64 | refused schema: 'is_in' cannot check for Float32 values in List(UInt64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float32 | UInt8 | refused schema: 'is_in' cannot check for Float32 values in List(UInt8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Array(Int64, 2) | refused schema: 'is_in' cannot check for Float64 values in Array(Int64, 2) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Boolean | refused schema: 'is_in' cannot check for Float64 values in List(Boolean) data
+Expr.is_in | other | Float64 | Date | refused schema: 'is_in' cannot check for Float64 values in List(Date) data
+Expr.is_in | other | Float64 | Datetime(us) | refused schema: 'is_in' cannot check for Float64 values in List(Datetime('μs')) data
+Expr.is_in | other | Float64 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Float64 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Float64 | Decimal(10, 2) | refused schema: 'is_in' cannot check for Float64 values in List(Decimal(10, 2)) data
+Expr.is_in | other | Float64 | Duration(us) | refused schema: 'is_in' cannot check for Float64 values in List(Duration('μs')) data
+Expr.is_in | other | Float64 | Float16 | allowed Boolean many
+Expr.is_in | other | Float64 | Float32 | allowed Boolean many
+Expr.is_in | other | Float64 | Float64 | allowed Boolean many
+Expr.is_in | other | Float64 | Int128 | refused schema: 'is_in' cannot check for Float64 values in List(Int128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Int16 | refused schema: 'is_in' cannot check for Float64 values in List(Int16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Int32 | refused schema: 'is_in' cannot check for Float64 values in List(Int32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Int64 | refused schema: 'is_in' cannot check for Float64 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | Int8 | refused schema: 'is_in' cannot check for Float64 values in List(Int8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | List(Int64) | refused schema: 'is_in' cannot check for Float64 values in List(Int64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | List(String) | refused schema: 'is_in' cannot check for Float64 values in List(String) data
+Expr.is_in | other | Float64 | Null | allowed Boolean many
+Expr.is_in | other | Float64 | String | refused schema: 'is_in' cannot check for Float64 values in List(String) data
+Expr.is_in | other | Float64 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Float64 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Float64 | Time | refused schema: 'is_in' cannot check for Float64 values in List(Time) data
+Expr.is_in | other | Float64 | UInt128 | refused schema: 'is_in' cannot check for Float64 values in List(UInt128) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | UInt16 | refused schema: 'is_in' cannot check for Float64 values in List(UInt16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | UInt32 | refused schema: 'is_in' cannot check for Float64 values in List(UInt32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | UInt64 | refused schema: 'is_in' cannot check for Float64 values in List(UInt64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Float64 | UInt8 | refused schema: 'is_in' cannot check for Float64 values in List(UInt8) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int128 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Int128 | Boolean | refused schema: 'is_in' cannot check for Int128 values in List(Boolean) data
+Expr.is_in | other | Int128 | Date | refused schema: 'is_in' cannot check for Int128 values in List(Date) data
+Expr.is_in | other | Int128 | Datetime(us) | refused schema: 'is_in' cannot check for Int128 values in List(Datetime('μs')) data
+Expr.is_in | other | Int128 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Int128 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Int128 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Int128 | Duration(us) | refused schema: 'is_in' cannot check for Int128 values in List(Duration('μs')) data
+Expr.is_in | other | Int128 | Float16 | refused schema: 'is_in' cannot check for Int128 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int128 | Float32 | refused schema: 'is_in' cannot check for Int128 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int128 | Float64 | refused schema: 'is_in' cannot check for Int128 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int128 | Int128 | allowed Boolean many
+Expr.is_in | other | Int128 | Int16 | allowed Boolean many
+Expr.is_in | other | Int128 | Int32 | allowed Boolean many
+Expr.is_in | other | Int128 | Int64 | allowed Boolean many
+Expr.is_in | other | Int128 | Int8 | allowed Boolean many
+Expr.is_in | other | Int128 | List(Int64) | allowed Boolean many
+Expr.is_in | other | Int128 | List(String) | refused schema: 'is_in' cannot check for Int128 values in List(String) data
+Expr.is_in | other | Int128 | Null | allowed Boolean many
+Expr.is_in | other | Int128 | String | refused schema: 'is_in' cannot check for Int128 values in List(String) data
+Expr.is_in | other | Int128 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Int128 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Int128 | Time | refused schema: 'is_in' cannot check for Int128 values in List(Time) data
+Expr.is_in | other | Int128 | UInt128 | allowed Boolean many
+Expr.is_in | other | Int128 | UInt16 | allowed Boolean many
+Expr.is_in | other | Int128 | UInt32 | allowed Boolean many
+Expr.is_in | other | Int128 | UInt64 | allowed Boolean many
+Expr.is_in | other | Int128 | UInt8 | allowed Boolean many
+Expr.is_in | other | Int16 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Int16 | Boolean | refused schema: 'is_in' cannot check for Int16 values in List(Boolean) data
+Expr.is_in | other | Int16 | Date | refused schema: 'is_in' cannot check for Int16 values in List(Date) data
+Expr.is_in | other | Int16 | Datetime(us) | refused schema: 'is_in' cannot check for Int16 values in List(Datetime('μs')) data
+Expr.is_in | other | Int16 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Int16 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Int16 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Int16 | Duration(us) | refused schema: 'is_in' cannot check for Int16 values in List(Duration('μs')) data
+Expr.is_in | other | Int16 | Float16 | refused schema: 'is_in' cannot check for Int16 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int16 | Float32 | refused schema: 'is_in' cannot check for Int16 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int16 | Float64 | refused schema: 'is_in' cannot check for Int16 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int16 | Int128 | allowed Boolean many
+Expr.is_in | other | Int16 | Int16 | allowed Boolean many
+Expr.is_in | other | Int16 | Int32 | allowed Boolean many
+Expr.is_in | other | Int16 | Int64 | allowed Boolean many
+Expr.is_in | other | Int16 | Int8 | allowed Boolean many
+Expr.is_in | other | Int16 | List(Int64) | allowed Boolean many
+Expr.is_in | other | Int16 | List(String) | refused schema: 'is_in' cannot check for Int16 values in List(String) data
+Expr.is_in | other | Int16 | Null | allowed Boolean many
+Expr.is_in | other | Int16 | String | refused schema: 'is_in' cannot check for Int16 values in List(String) data
+Expr.is_in | other | Int16 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Int16 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Int16 | Time | refused schema: 'is_in' cannot check for Int16 values in List(Time) data
+Expr.is_in | other | Int16 | UInt128 | allowed Boolean many
+Expr.is_in | other | Int16 | UInt16 | allowed Boolean many
+Expr.is_in | other | Int16 | UInt32 | allowed Boolean many
+Expr.is_in | other | Int16 | UInt64 | allowed Boolean many
+Expr.is_in | other | Int16 | UInt8 | allowed Boolean many
+Expr.is_in | other | Int32 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Int32 | Boolean | refused schema: 'is_in' cannot check for Int32 values in List(Boolean) data
+Expr.is_in | other | Int32 | Date | refused schema: 'is_in' cannot check for Int32 values in List(Date) data
+Expr.is_in | other | Int32 | Datetime(us) | refused schema: 'is_in' cannot check for Int32 values in List(Datetime('μs')) data
+Expr.is_in | other | Int32 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Int32 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Int32 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Int32 | Duration(us) | refused schema: 'is_in' cannot check for Int32 values in List(Duration('μs')) data
+Expr.is_in | other | Int32 | Float16 | refused schema: 'is_in' cannot check for Int32 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int32 | Float32 | refused schema: 'is_in' cannot check for Int32 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int32 | Float64 | refused schema: 'is_in' cannot check for Int32 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int32 | Int128 | allowed Boolean many
+Expr.is_in | other | Int32 | Int16 | allowed Boolean many
+Expr.is_in | other | Int32 | Int32 | allowed Boolean many
+Expr.is_in | other | Int32 | Int64 | allowed Boolean many
+Expr.is_in | other | Int32 | Int8 | allowed Boolean many
+Expr.is_in | other | Int32 | List(Int64) | allowed Boolean many
+Expr.is_in | other | Int32 | List(String) | refused schema: 'is_in' cannot check for Int32 values in List(String) data
+Expr.is_in | other | Int32 | Null | allowed Boolean many
+Expr.is_in | other | Int32 | String | refused schema: 'is_in' cannot check for Int32 values in List(String) data
+Expr.is_in | other | Int32 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Int32 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Int32 | Time | refused schema: 'is_in' cannot check for Int32 values in List(Time) data
+Expr.is_in | other | Int32 | UInt128 | allowed Boolean many
+Expr.is_in | other | Int32 | UInt16 | allowed Boolean many
+Expr.is_in | other | Int32 | UInt32 | allowed Boolean many
+Expr.is_in | other | Int32 | UInt64 | allowed Boolean many
+Expr.is_in | other | Int32 | UInt8 | allowed Boolean many
+Expr.is_in | other | Int64 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Int64 | Boolean | refused schema: 'is_in' cannot check for Int64 values in List(Boolean) data
+Expr.is_in | other | Int64 | Date | refused schema: 'is_in' cannot check for Int64 values in List(Date) data
+Expr.is_in | other | Int64 | Datetime(us) | refused schema: 'is_in' cannot check for Int64 values in List(Datetime('μs')) data
+Expr.is_in | other | Int64 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Int64 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Int64 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Int64 | Duration(us) | refused schema: 'is_in' cannot check for Int64 values in List(Duration('μs')) data
+Expr.is_in | other | Int64 | Float16 | refused schema: 'is_in' cannot check for Int64 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int64 | Float32 | refused schema: 'is_in' cannot check for Int64 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int64 | Float64 | refused schema: 'is_in' cannot check for Int64 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int64 | Int128 | allowed Boolean many
+Expr.is_in | other | Int64 | Int16 | allowed Boolean many
+Expr.is_in | other | Int64 | Int32 | allowed Boolean many
+Expr.is_in | other | Int64 | Int64 | allowed Boolean many
+Expr.is_in | other | Int64 | Int8 | allowed Boolean many
+Expr.is_in | other | Int64 | List(Int64) | allowed Boolean many
+Expr.is_in | other | Int64 | List(String) | refused schema: 'is_in' cannot check for Int64 values in List(String) data
+Expr.is_in | other | Int64 | Null | allowed Boolean many
+Expr.is_in | other | Int64 | String | refused schema: 'is_in' cannot check for Int64 values in List(String) data
+Expr.is_in | other | Int64 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Int64 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Int64 | Time | refused schema: 'is_in' cannot check for Int64 values in List(Time) data
+Expr.is_in | other | Int64 | UInt128 | allowed Boolean many
+Expr.is_in | other | Int64 | UInt16 | allowed Boolean many
+Expr.is_in | other | Int64 | UInt32 | allowed Boolean many
+Expr.is_in | other | Int64 | UInt64 | allowed Boolean many
+Expr.is_in | other | Int64 | UInt8 | allowed Boolean many
+Expr.is_in | other | Int8 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Int8 | Boolean | refused schema: 'is_in' cannot check for Int8 values in List(Boolean) data
+Expr.is_in | other | Int8 | Date | refused schema: 'is_in' cannot check for Int8 values in List(Date) data
+Expr.is_in | other | Int8 | Datetime(us) | refused schema: 'is_in' cannot check for Int8 values in List(Datetime('μs')) data
+Expr.is_in | other | Int8 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Int8 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Int8 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Int8 | Duration(us) | refused schema: 'is_in' cannot check for Int8 values in List(Duration('μs')) data
+Expr.is_in | other | Int8 | Float16 | refused schema: 'is_in' cannot check for Int8 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float16. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int8 | Float32 | refused schema: 'is_in' cannot check for Int8 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int8 | Float64 | refused schema: 'is_in' cannot check for Int8 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | Int8 | Int128 | allowed Boolean many
+Expr.is_in | other | Int8 | Int16 | allowed Boolean many
+Expr.is_in | other | Int8 | Int32 | allowed Boolean many
+Expr.is_in | other | Int8 | Int64 | allowed Boolean many
+Expr.is_in | other | Int8 | Int8 | allowed Boolean many
+Expr.is_in | other | Int8 | List(Int64) | allowed Boolean many
+Expr.is_in | other | Int8 | List(String) | refused schema: 'is_in' cannot check for Int8 values in List(String) data
+Expr.is_in | other | Int8 | Null | allowed Boolean many
+Expr.is_in | other | Int8 | String | refused schema: 'is_in' cannot check for Int8 values in List(String) data
+Expr.is_in | other | Int8 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Int8 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Int8 | Time | refused schema: 'is_in' cannot check for Int8 values in List(Time) data
+Expr.is_in | other | Int8 | UInt128 | allowed Boolean many
+Expr.is_in | other | Int8 | UInt16 | allowed Boolean many
+Expr.is_in | other | Int8 | UInt32 | allowed Boolean many
+Expr.is_in | other | Int8 | UInt64 | allowed Boolean many
+Expr.is_in | other | Int8 | UInt8 | allowed Boolean many
+Expr.is_in | other | List(Int64) | Array(Int64, 2) | refused schema: 'is_in' cannot check for List(Int64) values in List(Array(Int64, 2)) data
+Expr.is_in | other | List(Int64) | Boolean | refused schema: 'is_in' cannot check for List(Int64) values in Boolean data. Hint: container dtype (Boolean) must be nested
+Expr.is_in | other | List(Int64) | Date | refused schema: 'is_in' cannot check for List(Int64) values in Date data. Hint: container dtype (Date) must be nested
+Expr.is_in | other | List(Int64) | Datetime(us) | refused schema: 'is_in' cannot check for List(Int64) values in Datetime('μs') data. Hint: container dtype (Datetime('μs')) must be nested
+Expr.is_in | other | List(Int64) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for List(Int64) values in Datetime('μs', 'UTC') data. Hint: container dtype (Datetime('μs', 'UTC')) must be nested
+Expr.is_in | other | List(Int64) | Decimal(10, 2) | refused schema: 'is_in' cannot check for List(Int64) values in Decimal(10, 2) data. Hint: container dtype (Decimal(10, 2)) must be nested
+Expr.is_in | other | List(Int64) | Duration(us) | refused schema: 'is_in' cannot check for List(Int64) values in Duration('μs') data. Hint: container dtype (Duration('μs')) must be nested
+Expr.is_in | other | List(Int64) | Float16 | refused schema: 'is_in' cannot check for List(Int64) values in Float16 data. Hint: container dtype (Float16) must be nested
+Expr.is_in | other | List(Int64) | Float32 | refused schema: 'is_in' cannot check for List(Int64) values in Float32 data. Hint: container dtype (Float32) must be nested
+Expr.is_in | other | List(Int64) | Float64 | refused schema: 'is_in' cannot check for List(Int64) values in Float64 data. Hint: container dtype (Float64) must be nested
+Expr.is_in | other | List(Int64) | Int128 | refused schema: 'is_in' cannot check for List(Int64) values in Int128 data. Hint: container dtype (Int128) must be nested
+Expr.is_in | other | List(Int64) | Int16 | refused schema: 'is_in' cannot check for List(Int64) values in Int16 data. Hint: container dtype (Int16) must be nested
+Expr.is_in | other | List(Int64) | Int32 | refused schema: 'is_in' cannot check for List(Int64) values in Int32 data. Hint: container dtype (Int32) must be nested
+Expr.is_in | other | List(Int64) | Int64 | refused schema: 'is_in' cannot check for List(Int64) values in Int64 data. Hint: container dtype (Int64) must be nested
+Expr.is_in | other | List(Int64) | Int8 | refused schema: 'is_in' cannot check for List(Int64) values in Int8 data. Hint: container dtype (Int8) must be nested
+Expr.is_in | other | List(Int64) | List(Int64) | allowed Boolean many
+Expr.is_in | other | List(Int64) | List(String) | refused schema: 'is_in' cannot check for List(Int64) values in List(List(String)) data
+Expr.is_in | other | List(Int64) | Null | refused schema: 'is_in' cannot check for List(Int64) values in Null data. Hint: container dtype (Null) must be nested
+Expr.is_in | other | List(Int64) | String | refused schema: 'is_in' cannot check for List(Int64) values in String data. Hint: container dtype (String) must be nested
+Expr.is_in | other | List(Int64) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for List(Int64) values in Struct({'x': Int64, 'y': String}) data. Hint: container dtype (Struct({'x': Int64, 'y': String})) must be nested
+Expr.is_in | other | List(Int64) | Time | refused schema: 'is_in' cannot check for List(Int64) values in Time data. Hint: container dtype (Time) must be nested
+Expr.is_in | other | List(Int64) | UInt128 | refused schema: 'is_in' cannot check for List(Int64) values in UInt128 data. Hint: container dtype (UInt128) must be nested
+Expr.is_in | other | List(Int64) | UInt16 | refused schema: 'is_in' cannot check for List(Int64) values in UInt16 data. Hint: container dtype (UInt16) must be nested
+Expr.is_in | other | List(Int64) | UInt32 | refused schema: 'is_in' cannot check for List(Int64) values in UInt32 data. Hint: container dtype (UInt32) must be nested
+Expr.is_in | other | List(Int64) | UInt64 | refused schema: 'is_in' cannot check for List(Int64) values in UInt64 data. Hint: container dtype (UInt64) must be nested
+Expr.is_in | other | List(Int64) | UInt8 | refused schema: 'is_in' cannot check for List(Int64) values in UInt8 data. Hint: container dtype (UInt8) must be nested
+Expr.is_in | other | List(String) | Array(Int64, 2) | refused schema: 'is_in' cannot check for List(String) values in List(Array(Int64, 2)) data
+Expr.is_in | other | List(String) | Boolean | refused schema: 'is_in' cannot check for List(String) values in Boolean data. Hint: container dtype (Boolean) must be nested
+Expr.is_in | other | List(String) | Date | refused schema: 'is_in' cannot check for List(String) values in Date data. Hint: container dtype (Date) must be nested
+Expr.is_in | other | List(String) | Datetime(us) | refused schema: 'is_in' cannot check for List(String) values in Datetime('μs') data. Hint: container dtype (Datetime('μs')) must be nested
+Expr.is_in | other | List(String) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for List(String) values in Datetime('μs', 'UTC') data. Hint: container dtype (Datetime('μs', 'UTC')) must be nested
+Expr.is_in | other | List(String) | Decimal(10, 2) | refused schema: 'is_in' cannot check for List(String) values in Decimal(10, 2) data. Hint: container dtype (Decimal(10, 2)) must be nested
+Expr.is_in | other | List(String) | Duration(us) | refused schema: 'is_in' cannot check for List(String) values in Duration('μs') data. Hint: container dtype (Duration('μs')) must be nested
+Expr.is_in | other | List(String) | Float16 | refused schema: 'is_in' cannot check for List(String) values in Float16 data. Hint: container dtype (Float16) must be nested
+Expr.is_in | other | List(String) | Float32 | refused schema: 'is_in' cannot check for List(String) values in Float32 data. Hint: container dtype (Float32) must be nested
+Expr.is_in | other | List(String) | Float64 | refused schema: 'is_in' cannot check for List(String) values in Float64 data. Hint: container dtype (Float64) must be nested
+Expr.is_in | other | List(String) | Int128 | refused schema: 'is_in' cannot check for List(String) values in Int128 data. Hint: container dtype (Int128) must be nested
+Expr.is_in | other | List(String) | Int16 | refused schema: 'is_in' cannot check for List(String) values in Int16 data. Hint: container dtype (Int16) must be nested
+Expr.is_in | other | List(String) | Int32 | refused schema: 'is_in' cannot check for List(String) values in Int32 data. Hint: container dtype (Int32) must be nested
+Expr.is_in | other | List(String) | Int64 | refused schema: 'is_in' cannot check for List(String) values in Int64 data. Hint: container dtype (Int64) must be nested
+Expr.is_in | other | List(String) | Int8 | refused schema: 'is_in' cannot check for List(String) values in Int8 data. Hint: container dtype (Int8) must be nested
+Expr.is_in | other | List(String) | List(Int64) | refused schema: 'is_in' cannot check for List(String) values in List(List(Int64)) data
+Expr.is_in | other | List(String) | List(String) | allowed Boolean many
+Expr.is_in | other | List(String) | Null | refused schema: 'is_in' cannot check for List(String) values in Null data. Hint: container dtype (Null) must be nested
+Expr.is_in | other | List(String) | String | refused schema: 'is_in' cannot check for List(String) values in String data. Hint: container dtype (String) must be nested
+Expr.is_in | other | List(String) | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for List(String) values in Struct({'x': Int64, 'y': String}) data. Hint: container dtype (Struct({'x': Int64, 'y': String})) must be nested
+Expr.is_in | other | List(String) | Time | refused schema: 'is_in' cannot check for List(String) values in Time data. Hint: container dtype (Time) must be nested
+Expr.is_in | other | List(String) | UInt128 | refused schema: 'is_in' cannot check for List(String) values in UInt128 data. Hint: container dtype (UInt128) must be nested
+Expr.is_in | other | List(String) | UInt16 | refused schema: 'is_in' cannot check for List(String) values in UInt16 data. Hint: container dtype (UInt16) must be nested
+Expr.is_in | other | List(String) | UInt32 | refused schema: 'is_in' cannot check for List(String) values in UInt32 data. Hint: container dtype (UInt32) must be nested
+Expr.is_in | other | List(String) | UInt64 | refused schema: 'is_in' cannot check for List(String) values in UInt64 data. Hint: container dtype (UInt64) must be nested
+Expr.is_in | other | List(String) | UInt8 | refused schema: 'is_in' cannot check for List(String) values in UInt8 data. Hint: container dtype (UInt8) must be nested
+Expr.is_in | other | Null | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | Null | Boolean | allowed Boolean many
+Expr.is_in | other | Null | Date | allowed Boolean many
+Expr.is_in | other | Null | Datetime(us) | allowed Boolean many
+Expr.is_in | other | Null | Datetime(us, UTC) | allowed Boolean many
+Expr.is_in | other | Null | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | Null | Duration(us) | allowed Boolean many
+Expr.is_in | other | Null | Float16 | allowed Boolean many
+Expr.is_in | other | Null | Float32 | allowed Boolean many
+Expr.is_in | other | Null | Float64 | allowed Boolean many
+Expr.is_in | other | Null | Int128 | allowed Boolean many
+Expr.is_in | other | Null | Int16 | allowed Boolean many
+Expr.is_in | other | Null | Int32 | allowed Boolean many
+Expr.is_in | other | Null | Int64 | allowed Boolean many
+Expr.is_in | other | Null | Int8 | allowed Boolean many
+Expr.is_in | other | Null | List(Int64) | allowed Boolean many
+Expr.is_in | other | Null | List(String) | allowed Boolean many
+Expr.is_in | other | Null | Null | allowed Boolean many
+Expr.is_in | other | Null | String | allowed Boolean many
+Expr.is_in | other | Null | Struct(x: Int64, y: String) | allowed Boolean many
+Expr.is_in | other | Null | Time | allowed Boolean many
+Expr.is_in | other | Null | UInt128 | allowed Boolean many
+Expr.is_in | other | Null | UInt16 | allowed Boolean many
+Expr.is_in | other | Null | UInt32 | allowed Boolean many
+Expr.is_in | other | Null | UInt64 | allowed Boolean many
+Expr.is_in | other | Null | UInt8 | allowed Boolean many
+Expr.is_in | other | String | Array(Int64, 2) | refused schema: 'is_in' cannot check for String values in Array(Int64, 2) data
+Expr.is_in | other | String | Boolean | refused schema: 'is_in' cannot check for String values in List(Boolean) data
+Expr.is_in | other | String | Date | refused schema: 'is_in' cannot check for String values in List(Date) data
+Expr.is_in | other | String | Datetime(us) | refused schema: 'is_in' cannot check for String values in List(Datetime('μs')) data
+Expr.is_in | other | String | Datetime(us, UTC) | refused schema: 'is_in' cannot check for String values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | String | Decimal(10, 2) | refused schema: 'is_in' cannot check for String values in List(Decimal(10, 2)) data
+Expr.is_in | other | String | Duration(us) | refused schema: 'is_in' cannot check for String values in List(Duration('μs')) data
+Expr.is_in | other | String | Float16 | refused schema: 'is_in' cannot check for String values in List(Float16) data
+Expr.is_in | other | String | Float32 | refused schema: 'is_in' cannot check for String values in List(Float32) data
+Expr.is_in | other | String | Float64 | refused schema: 'is_in' cannot check for String values in List(Float64) data
+Expr.is_in | other | String | Int128 | refused schema: 'is_in' cannot check for String values in List(Int128) data
+Expr.is_in | other | String | Int16 | refused schema: 'is_in' cannot check for String values in List(Int16) data
+Expr.is_in | other | String | Int32 | refused schema: 'is_in' cannot check for String values in List(Int32) data
+Expr.is_in | other | String | Int64 | refused schema: 'is_in' cannot check for String values in List(Int64) data
+Expr.is_in | other | String | Int8 | refused schema: 'is_in' cannot check for String values in List(Int8) data
+Expr.is_in | other | String | List(Int64) | refused schema: 'is_in' cannot check for String values in List(Int64) data
+Expr.is_in | other | String | List(String) | allowed Boolean many
+Expr.is_in | other | String | Null | allowed Boolean many
+Expr.is_in | other | String | String | allowed Boolean many
+Expr.is_in | other | String | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for String values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | String | Time | refused schema: 'is_in' cannot check for String values in List(Time) data
+Expr.is_in | other | String | UInt128 | refused schema: 'is_in' cannot check for String values in List(UInt128) data
+Expr.is_in | other | String | UInt16 | refused schema: 'is_in' cannot check for String values in List(UInt16) data
+Expr.is_in | other | String | UInt32 | refused schema: 'is_in' cannot check for String values in List(UInt32) data
+Expr.is_in | other | String | UInt64 | refused schema: 'is_in' cannot check for String values in List(UInt64) data
+Expr.is_in | other | String | UInt8 | refused schema: 'is_in' cannot check for String values in List(UInt8) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Array(Int64, 2) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in Array(Int64, 2) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Boolean | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Boolean) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Date | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Date) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Datetime(us) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Datetime('μs')) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Decimal(10, 2) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Decimal(10, 2)) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Duration(us) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Duration('μs')) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Float16 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Float16) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Float32 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Float32) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Float64 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Float64) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Int128 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int128) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Int16 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int16) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Int32 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int32) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Int64 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int64) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Int8 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int8) data
+Expr.is_in | other | Struct(x: Int64, y: String) | List(Int64) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Int64) data
+Expr.is_in | other | Struct(x: Int64, y: String) | List(String) | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(String) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Null | allowed Boolean many
+Expr.is_in | other | Struct(x: Int64, y: String) | String | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(String) data
+Expr.is_in | other | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | allowed Boolean many
+Expr.is_in | other | Struct(x: Int64, y: String) | Time | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(Time) data
+Expr.is_in | other | Struct(x: Int64, y: String) | UInt128 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(UInt128) data
+Expr.is_in | other | Struct(x: Int64, y: String) | UInt16 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(UInt16) data
+Expr.is_in | other | Struct(x: Int64, y: String) | UInt32 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(UInt32) data
+Expr.is_in | other | Struct(x: Int64, y: String) | UInt64 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(UInt64) data
+Expr.is_in | other | Struct(x: Int64, y: String) | UInt8 | refused schema: 'is_in' cannot check for Struct({'x': Int64, 'y': String}) values in List(UInt8) data
+Expr.is_in | other | Time | Array(Int64, 2) | refused schema: 'is_in' cannot check for Time values in Array(Int64, 2) data
+Expr.is_in | other | Time | Boolean | refused schema: 'is_in' cannot check for Time values in List(Boolean) data
+Expr.is_in | other | Time | Date | refused schema: 'is_in' cannot check for Time values in List(Date) data
+Expr.is_in | other | Time | Datetime(us) | refused schema: 'is_in' cannot check for Time values in List(Datetime('μs')) data
+Expr.is_in | other | Time | Datetime(us, UTC) | refused schema: 'is_in' cannot check for Time values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | Time | Decimal(10, 2) | refused schema: 'is_in' cannot check for Time values in List(Decimal(10, 2)) data
+Expr.is_in | other | Time | Duration(us) | refused schema: 'is_in' cannot check for Time values in List(Duration('μs')) data
+Expr.is_in | other | Time | Float16 | refused schema: 'is_in' cannot check for Time values in List(Float16) data
+Expr.is_in | other | Time | Float32 | refused schema: 'is_in' cannot check for Time values in List(Float32) data
+Expr.is_in | other | Time | Float64 | refused schema: 'is_in' cannot check for Time values in List(Float64) data
+Expr.is_in | other | Time | Int128 | refused schema: 'is_in' cannot check for Time values in List(Int128) data
+Expr.is_in | other | Time | Int16 | refused schema: 'is_in' cannot check for Time values in List(Int16) data
+Expr.is_in | other | Time | Int32 | refused schema: 'is_in' cannot check for Time values in List(Int32) data
+Expr.is_in | other | Time | Int64 | refused schema: 'is_in' cannot check for Time values in List(Int64) data
+Expr.is_in | other | Time | Int8 | refused schema: 'is_in' cannot check for Time values in List(Int8) data
+Expr.is_in | other | Time | List(Int64) | refused schema: 'is_in' cannot check for Time values in List(Int64) data
+Expr.is_in | other | Time | List(String) | refused schema: 'is_in' cannot check for Time values in List(String) data
+Expr.is_in | other | Time | Null | allowed Boolean many
+Expr.is_in | other | Time | String | refused schema: 'is_in' cannot check for Time values in List(String) data
+Expr.is_in | other | Time | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for Time values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | Time | Time | allowed Boolean many
+Expr.is_in | other | Time | UInt128 | refused schema: 'is_in' cannot check for Time values in List(UInt128) data
+Expr.is_in | other | Time | UInt16 | refused schema: 'is_in' cannot check for Time values in List(UInt16) data
+Expr.is_in | other | Time | UInt32 | refused schema: 'is_in' cannot check for Time values in List(UInt32) data
+Expr.is_in | other | Time | UInt64 | refused schema: 'is_in' cannot check for Time values in List(UInt64) data
+Expr.is_in | other | Time | UInt8 | refused schema: 'is_in' cannot check for Time values in List(UInt8) data
+Expr.is_in | other | UInt128 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | UInt128 | Boolean | refused schema: 'is_in' cannot check for UInt128 values in List(Boolean) data
+Expr.is_in | other | UInt128 | Date | refused schema: 'is_in' cannot check for UInt128 values in List(Date) data
+Expr.is_in | other | UInt128 | Datetime(us) | refused schema: 'is_in' cannot check for UInt128 values in List(Datetime('μs')) data
+Expr.is_in | other | UInt128 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for UInt128 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | UInt128 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | UInt128 | Duration(us) | refused schema: 'is_in' cannot check for UInt128 values in List(Duration('μs')) data
+Expr.is_in | other | UInt128 | Float16 | refused schema: 'is_in' cannot check for UInt128 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt128 | Float32 | refused schema: 'is_in' cannot check for UInt128 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt128 | Float64 | refused schema: 'is_in' cannot check for UInt128 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt128 | Int128 | allowed Boolean many
+Expr.is_in | other | UInt128 | Int16 | allowed Boolean many
+Expr.is_in | other | UInt128 | Int32 | allowed Boolean many
+Expr.is_in | other | UInt128 | Int64 | allowed Boolean many
+Expr.is_in | other | UInt128 | Int8 | allowed Boolean many
+Expr.is_in | other | UInt128 | List(Int64) | allowed Boolean many
+Expr.is_in | other | UInt128 | List(String) | refused schema: 'is_in' cannot check for UInt128 values in List(String) data
+Expr.is_in | other | UInt128 | Null | allowed Boolean many
+Expr.is_in | other | UInt128 | String | refused schema: 'is_in' cannot check for UInt128 values in List(String) data
+Expr.is_in | other | UInt128 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for UInt128 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | UInt128 | Time | refused schema: 'is_in' cannot check for UInt128 values in List(Time) data
+Expr.is_in | other | UInt128 | UInt128 | allowed Boolean many
+Expr.is_in | other | UInt128 | UInt16 | allowed Boolean many
+Expr.is_in | other | UInt128 | UInt32 | allowed Boolean many
+Expr.is_in | other | UInt128 | UInt64 | allowed Boolean many
+Expr.is_in | other | UInt128 | UInt8 | allowed Boolean many
+Expr.is_in | other | UInt16 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | UInt16 | Boolean | refused schema: 'is_in' cannot check for UInt16 values in List(Boolean) data
+Expr.is_in | other | UInt16 | Date | refused schema: 'is_in' cannot check for UInt16 values in List(Date) data
+Expr.is_in | other | UInt16 | Datetime(us) | refused schema: 'is_in' cannot check for UInt16 values in List(Datetime('μs')) data
+Expr.is_in | other | UInt16 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for UInt16 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | UInt16 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | UInt16 | Duration(us) | refused schema: 'is_in' cannot check for UInt16 values in List(Duration('μs')) data
+Expr.is_in | other | UInt16 | Float16 | refused schema: 'is_in' cannot check for UInt16 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt16 | Float32 | refused schema: 'is_in' cannot check for UInt16 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt16 | Float64 | refused schema: 'is_in' cannot check for UInt16 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt16 | Int128 | allowed Boolean many
+Expr.is_in | other | UInt16 | Int16 | allowed Boolean many
+Expr.is_in | other | UInt16 | Int32 | allowed Boolean many
+Expr.is_in | other | UInt16 | Int64 | allowed Boolean many
+Expr.is_in | other | UInt16 | Int8 | allowed Boolean many
+Expr.is_in | other | UInt16 | List(Int64) | allowed Boolean many
+Expr.is_in | other | UInt16 | List(String) | refused schema: 'is_in' cannot check for UInt16 values in List(String) data
+Expr.is_in | other | UInt16 | Null | allowed Boolean many
+Expr.is_in | other | UInt16 | String | refused schema: 'is_in' cannot check for UInt16 values in List(String) data
+Expr.is_in | other | UInt16 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for UInt16 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | UInt16 | Time | refused schema: 'is_in' cannot check for UInt16 values in List(Time) data
+Expr.is_in | other | UInt16 | UInt128 | allowed Boolean many
+Expr.is_in | other | UInt16 | UInt16 | allowed Boolean many
+Expr.is_in | other | UInt16 | UInt32 | allowed Boolean many
+Expr.is_in | other | UInt16 | UInt64 | allowed Boolean many
+Expr.is_in | other | UInt16 | UInt8 | allowed Boolean many
+Expr.is_in | other | UInt32 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | UInt32 | Boolean | refused schema: 'is_in' cannot check for UInt32 values in List(Boolean) data
+Expr.is_in | other | UInt32 | Date | refused schema: 'is_in' cannot check for UInt32 values in List(Date) data
+Expr.is_in | other | UInt32 | Datetime(us) | refused schema: 'is_in' cannot check for UInt32 values in List(Datetime('μs')) data
+Expr.is_in | other | UInt32 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for UInt32 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | UInt32 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | UInt32 | Duration(us) | refused schema: 'is_in' cannot check for UInt32 values in List(Duration('μs')) data
+Expr.is_in | other | UInt32 | Float16 | refused schema: 'is_in' cannot check for UInt32 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt32 | Float32 | refused schema: 'is_in' cannot check for UInt32 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt32 | Float64 | refused schema: 'is_in' cannot check for UInt32 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt32 | Int128 | allowed Boolean many
+Expr.is_in | other | UInt32 | Int16 | allowed Boolean many
+Expr.is_in | other | UInt32 | Int32 | allowed Boolean many
+Expr.is_in | other | UInt32 | Int64 | allowed Boolean many
+Expr.is_in | other | UInt32 | Int8 | allowed Boolean many
+Expr.is_in | other | UInt32 | List(Int64) | allowed Boolean many
+Expr.is_in | other | UInt32 | List(String) | refused schema: 'is_in' cannot check for UInt32 values in List(String) data
+Expr.is_in | other | UInt32 | Null | allowed Boolean many
+Expr.is_in | other | UInt32 | String | refused schema: 'is_in' cannot check for UInt32 values in List(String) data
+Expr.is_in | other | UInt32 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for UInt32 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | UInt32 | Time | refused schema: 'is_in' cannot check for UInt32 values in List(Time) data
+Expr.is_in | other | UInt32 | UInt128 | allowed Boolean many
+Expr.is_in | other | UInt32 | UInt16 | allowed Boolean many
+Expr.is_in | other | UInt32 | UInt32 | allowed Boolean many
+Expr.is_in | other | UInt32 | UInt64 | allowed Boolean many
+Expr.is_in | other | UInt32 | UInt8 | allowed Boolean many
+Expr.is_in | other | UInt64 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | UInt64 | Boolean | refused schema: 'is_in' cannot check for UInt64 values in List(Boolean) data
+Expr.is_in | other | UInt64 | Date | refused schema: 'is_in' cannot check for UInt64 values in List(Date) data
+Expr.is_in | other | UInt64 | Datetime(us) | refused schema: 'is_in' cannot check for UInt64 values in List(Datetime('μs')) data
+Expr.is_in | other | UInt64 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for UInt64 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | UInt64 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | UInt64 | Duration(us) | refused schema: 'is_in' cannot check for UInt64 values in List(Duration('μs')) data
+Expr.is_in | other | UInt64 | Float16 | refused schema: 'is_in' cannot check for UInt64 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt64 | Float32 | refused schema: 'is_in' cannot check for UInt64 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt64 | Float64 | refused schema: 'is_in' cannot check for UInt64 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt64 | Int128 | allowed Boolean many
+Expr.is_in | other | UInt64 | Int16 | allowed Boolean many
+Expr.is_in | other | UInt64 | Int32 | allowed Boolean many
+Expr.is_in | other | UInt64 | Int64 | allowed Boolean many
+Expr.is_in | other | UInt64 | Int8 | allowed Boolean many
+Expr.is_in | other | UInt64 | List(Int64) | allowed Boolean many
+Expr.is_in | other | UInt64 | List(String) | refused schema: 'is_in' cannot check for UInt64 values in List(String) data
+Expr.is_in | other | UInt64 | Null | allowed Boolean many
+Expr.is_in | other | UInt64 | String | refused schema: 'is_in' cannot check for UInt64 values in List(String) data
+Expr.is_in | other | UInt64 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for UInt64 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | UInt64 | Time | refused schema: 'is_in' cannot check for UInt64 values in List(Time) data
+Expr.is_in | other | UInt64 | UInt128 | allowed Boolean many
+Expr.is_in | other | UInt64 | UInt16 | allowed Boolean many
+Expr.is_in | other | UInt64 | UInt32 | allowed Boolean many
+Expr.is_in | other | UInt64 | UInt64 | allowed Boolean many
+Expr.is_in | other | UInt64 | UInt8 | allowed Boolean many
+Expr.is_in | other | UInt8 | Array(Int64, 2) | allowed Boolean many
+Expr.is_in | other | UInt8 | Boolean | refused schema: 'is_in' cannot check for UInt8 values in List(Boolean) data
+Expr.is_in | other | UInt8 | Date | refused schema: 'is_in' cannot check for UInt8 values in List(Date) data
+Expr.is_in | other | UInt8 | Datetime(us) | refused schema: 'is_in' cannot check for UInt8 values in List(Datetime('μs')) data
+Expr.is_in | other | UInt8 | Datetime(us, UTC) | refused schema: 'is_in' cannot check for UInt8 values in List(Datetime('μs', 'UTC')) data
+Expr.is_in | other | UInt8 | Decimal(10, 2) | allowed Boolean many
+Expr.is_in | other | UInt8 | Duration(us) | refused schema: 'is_in' cannot check for UInt8 values in List(Duration('μs')) data
+Expr.is_in | other | UInt8 | Float16 | refused schema: 'is_in' cannot check for UInt8 values in List(Float16) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float16. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt8 | Float32 | refused schema: 'is_in' cannot check for UInt8 values in List(Float32) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float32. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt8 | Float64 | refused schema: 'is_in' cannot check for UInt8 values in List(Float64) data. Hint: Before version 2.0, Polars would perform this check by lossily coercing the operands to Float64. However, since Polars 2.0, for 'is_in' it is required to explicitly cast (one of) the operands to a compatible type.
+Expr.is_in | other | UInt8 | Int128 | allowed Boolean many
+Expr.is_in | other | UInt8 | Int16 | allowed Boolean many
+Expr.is_in | other | UInt8 | Int32 | allowed Boolean many
+Expr.is_in | other | UInt8 | Int64 | allowed Boolean many
+Expr.is_in | other | UInt8 | Int8 | allowed Boolean many
+Expr.is_in | other | UInt8 | List(Int64) | allowed Boolean many
+Expr.is_in | other | UInt8 | List(String) | refused schema: 'is_in' cannot check for UInt8 values in List(String) data
+Expr.is_in | other | UInt8 | Null | allowed Boolean many
+Expr.is_in | other | UInt8 | String | refused schema: 'is_in' cannot check for UInt8 values in List(String) data
+Expr.is_in | other | UInt8 | Struct(x: Int64, y: String) | refused schema: 'is_in' cannot check for UInt8 values in List(Struct({'x': Int64, 'y': String})) data
+Expr.is_in | other | UInt8 | Time | refused schema: 'is_in' cannot check for UInt8 values in List(Time) data
+Expr.is_in | other | UInt8 | UInt128 | allowed Boolean many
+Expr.is_in | other | UInt8 | UInt16 | allowed Boolean many
+Expr.is_in | other | UInt8 | UInt32 | allowed Boolean many
+Expr.is_in | other | UInt8 | UInt64 | allowed Boolean many
+Expr.is_in | other | UInt8 | UInt8 | allowed Boolean many
 Expr.is_infinite | - | Array(Int64, 2) | - | refused rows: `is_infinite` operation not supported for dtype `array[i64, 2]`
 Expr.is_infinite | - | Boolean | - | refused rows: `is_infinite` operation not supported for dtype `bool`
 Expr.is_infinite | - | Date | - | refused rows: `is_infinite` operation not supported for dtype `date`
@@ -37786,6 +38462,682 @@ Expr.round_sig_figs | - | UInt16 | - | allowed UInt16 many
 Expr.round_sig_figs | - | UInt32 | - | allowed UInt32 many
 Expr.round_sig_figs | - | UInt64 | - | allowed UInt64 many
 Expr.round_sig_figs | - | UInt8 | - | allowed UInt8 many
+Expr.search_sorted | element | Array(Int64, 2) | Array(Int64, 2) | allowed UInt32 many
+Expr.search_sorted | element | Array(Int64, 2) | Boolean | refused schema: could not determine supertype of: [array[i64, 2], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Date | refused schema: could not determine supertype of: [array[i64, 2], date] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Datetime(us) | refused schema: could not determine supertype of: [array[i64, 2], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Datetime(us, UTC) | refused schema: could not determine supertype of: [array[i64, 2], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Decimal(10, 2) | refused schema: could not determine supertype of: [array[i64, 2], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Duration(us) | refused schema: could not determine supertype of: [array[i64, 2], duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Float16 | refused schema: could not determine supertype of: [array[i64, 2], f16] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Float32 | refused schema: could not determine supertype of: [array[i64, 2], f32] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Float64 | refused schema: could not determine supertype of: [array[i64, 2], f64] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Int128 | refused schema: could not determine supertype of: [array[i64, 2], i128] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Int16 | refused schema: could not determine supertype of: [array[i64, 2], i16] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Int32 | refused schema: could not determine supertype of: [array[i64, 2], i32] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Int64 | refused schema: could not determine supertype of: [array[i64, 2], i64] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Int8 | refused schema: could not determine supertype of: [array[i64, 2], i8] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | List(Int64) | allowed UInt32 many
+Expr.search_sorted | element | Array(Int64, 2) | List(String) | allowed UInt32 many
+Expr.search_sorted | element | Array(Int64, 2) | Null | allowed UInt32 many
+Expr.search_sorted | element | Array(Int64, 2) | String | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.search_sorted | element | Array(Int64, 2) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [array[i64, 2], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | Time | refused schema: could not determine supertype of: [array[i64, 2], time] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | UInt128 | refused schema: could not determine supertype of: [array[i64, 2], u128] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | UInt16 | refused schema: could not determine supertype of: [array[i64, 2], u16] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | UInt32 | refused schema: could not determine supertype of: [array[i64, 2], u32] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | UInt64 | refused schema: could not determine supertype of: [array[i64, 2], u64] in expression 'search_sorted'
+Expr.search_sorted | element | Array(Int64, 2) | UInt8 | refused schema: could not determine supertype of: [array[i64, 2], u8] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Array(Int64, 2) | refused schema: could not determine supertype of: [bool, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Date | refused schema: could not determine supertype of: [bool, date] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Datetime(us) | refused schema: could not determine supertype of: [bool, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Datetime(us, UTC) | refused schema: could not determine supertype of: [bool, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Decimal(10, 2) | refused schema: could not determine supertype of: [bool, decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Duration(us) | refused schema: could not determine supertype of: [bool, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | List(Int64) | refused schema: could not determine supertype of: [bool, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | List(String) | refused schema: could not determine supertype of: [bool, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Null | allowed UInt32 many
+Expr.search_sorted | element | Boolean | String | refused schema: got invalid or ambiguous dtypes: '[bool, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [bool, struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | Time | refused schema: could not determine supertype of: [bool, time] in expression 'search_sorted'
+Expr.search_sorted | element | Boolean | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Boolean | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Date | Array(Int64, 2) | refused schema: could not determine supertype of: [date, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Boolean | refused schema: could not determine supertype of: [date, bool] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Date | allowed UInt32 many
+Expr.search_sorted | element | Date | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Date | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Date | Decimal(10, 2) | refused schema: could not determine supertype of: [date, decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Duration(us) | refused rows: casting from Duration('μs') to Date not supported
+Expr.search_sorted | element | Date | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Date | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Date | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Date | Int128 | refused schema: could not determine supertype of: [date, i128] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Int16 | refused schema: could not determine supertype of: [date, i16] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Date | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Date | Int8 | refused schema: could not determine supertype of: [date, i8] in expression 'search_sorted'
+Expr.search_sorted | element | Date | List(Int64) | refused schema: could not determine supertype of: [date, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Date | List(String) | refused schema: could not determine supertype of: [date, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Null | allowed UInt32 many
+Expr.search_sorted | element | Date | String | refused schema: got invalid or ambiguous dtypes: '[date, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Date | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [date, struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Date | Time | refused schema: could not determine supertype of: [date, time] in expression 'search_sorted'
+Expr.search_sorted | element | Date | UInt128 | refused schema: could not determine supertype of: [date, u128] in expression 'search_sorted'
+Expr.search_sorted | element | Date | UInt16 | refused schema: could not determine supertype of: [date, u16] in expression 'search_sorted'
+Expr.search_sorted | element | Date | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Date | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Date | UInt8 | refused schema: could not determine supertype of: [date, u8] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Array(Int64, 2) | refused schema: could not determine supertype of: [datetime[μs], array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Boolean | refused schema: could not determine supertype of: [datetime[μs], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Date | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Datetime(us, UTC) | refused schema: could not determine supertype of: [datetime[μs], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Decimal(10, 2) | refused schema: could not determine supertype of: [datetime[μs], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Duration(us) | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+Expr.search_sorted | element | Datetime(us) | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Int128 | refused schema: could not determine supertype of: [datetime[μs], i128] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Int16 | refused schema: could not determine supertype of: [datetime[μs], i16] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | Int8 | refused schema: could not determine supertype of: [datetime[μs], i8] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | List(Int64) | refused schema: could not determine supertype of: [datetime[μs], list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | List(String) | refused schema: could not determine supertype of: [datetime[μs], list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Null | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | String | refused schema: got invalid or ambiguous dtypes: '[datetime[μs], str]' in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [datetime[μs], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | Time | refused schema: could not determine supertype of: [datetime[μs], time] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | UInt128 | refused schema: could not determine supertype of: [datetime[μs], u128] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | UInt16 | refused schema: could not determine supertype of: [datetime[μs], u16] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us) | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us) | UInt8 | refused schema: could not determine supertype of: [datetime[μs], u8] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Array(Int64, 2) | refused schema: could not determine supertype of: [datetime[μs, UTC], array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Boolean | refused schema: could not determine supertype of: [datetime[μs, UTC], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Date | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Datetime(us) | refused schema: could not determine supertype of: [datetime[μs, UTC], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Decimal(10, 2) | refused schema: could not determine supertype of: [datetime[μs, UTC], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Duration(us) | refused rows: casting from Duration('μs') to Datetime('μs', 'UTC') not supported
+Expr.search_sorted | element | Datetime(us, UTC) | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Int128 | refused schema: could not determine supertype of: [datetime[μs, UTC], i128] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Int16 | refused schema: could not determine supertype of: [datetime[μs, UTC], i16] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | Int8 | refused schema: could not determine supertype of: [datetime[μs, UTC], i8] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | List(Int64) | refused schema: could not determine supertype of: [datetime[μs, UTC], list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | List(String) | refused schema: could not determine supertype of: [datetime[μs, UTC], list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Null | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | String | refused schema: got invalid or ambiguous dtypes: '[datetime[μs, UTC], str]' in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [datetime[μs, UTC], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | Time | refused schema: could not determine supertype of: [datetime[μs, UTC], time] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | UInt128 | refused schema: could not determine supertype of: [datetime[μs, UTC], u128] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | UInt16 | refused schema: could not determine supertype of: [datetime[μs, UTC], u16] in expression 'search_sorted'
+Expr.search_sorted | element | Datetime(us, UTC) | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Datetime(us, UTC) | UInt8 | refused schema: could not determine supertype of: [datetime[μs, UTC], u8] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Array(Int64, 2) | refused schema: could not determine supertype of: [decimal[10,2], array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Boolean | refused schema: could not determine supertype of: [decimal[10,2], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Date | refused schema: could not determine supertype of: [decimal[10,2], date] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Datetime(us) | refused schema: could not determine supertype of: [decimal[10,2], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Datetime(us, UTC) | refused schema: could not determine supertype of: [decimal[10,2], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Duration(us) | refused schema: could not determine supertype of: [decimal[10,2], duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | List(Int64) | refused schema: could not determine supertype of: [decimal[10,2], list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | List(String) | refused schema: could not determine supertype of: [decimal[10,2], list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Null | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | String | refused schema: got invalid or ambiguous dtypes: '[decimal[10,2], str]' in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [decimal[10,2], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | Time | refused schema: could not determine supertype of: [decimal[10,2], time] in expression 'search_sorted'
+Expr.search_sorted | element | Decimal(10, 2) | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Decimal(10, 2) | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Array(Int64, 2) | refused schema: could not determine supertype of: [duration[μs], array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Boolean | refused schema: could not determine supertype of: [duration[μs], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Date | refused rows: casting from Duration('μs') to Date not supported
+Expr.search_sorted | element | Duration(us) | Datetime(us) | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+Expr.search_sorted | element | Duration(us) | Datetime(us, UTC) | refused rows: casting from Duration('μs') to Datetime('μs', 'UTC') not supported
+Expr.search_sorted | element | Duration(us) | Decimal(10, 2) | refused schema: could not determine supertype of: [duration[μs], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Int128 | refused schema: could not determine supertype of: [duration[μs], i128] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Int16 | refused schema: could not determine supertype of: [duration[μs], i16] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | Int8 | refused schema: could not determine supertype of: [duration[μs], i8] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | List(Int64) | refused schema: could not determine supertype of: [duration[μs], list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | List(String) | refused schema: could not determine supertype of: [duration[μs], list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Null | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | String | refused schema: got invalid or ambiguous dtypes: '[duration[μs], str]' in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [duration[μs], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | Time | refused schema: could not determine supertype of: [duration[μs], time] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | UInt128 | refused schema: could not determine supertype of: [duration[μs], u128] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | UInt16 | refused schema: could not determine supertype of: [duration[μs], u16] in expression 'search_sorted'
+Expr.search_sorted | element | Duration(us) | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Duration(us) | UInt8 | refused schema: could not determine supertype of: [duration[μs], u8] in expression 'search_sorted'
+Expr.search_sorted | element | Float16 | Array(Int64, 2) | refused schema: could not determine supertype of: [f16, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Float16 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Date | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | List(Int64) | refused schema: could not determine supertype of: [f16, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Float16 | List(String) | refused schema: could not determine supertype of: [f16, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Float16 | Null | allowed UInt32 many
+Expr.search_sorted | element | Float16 | String | refused schema: got invalid or ambiguous dtypes: '[f16, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Float16 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Float16 | Time | allowed UInt32 many
+Expr.search_sorted | element | Float16 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Float16 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Array(Int64, 2) | refused schema: could not determine supertype of: [f32, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Float32 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Date | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | List(Int64) | refused schema: could not determine supertype of: [f32, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Float32 | List(String) | refused schema: could not determine supertype of: [f32, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Float32 | Null | allowed UInt32 many
+Expr.search_sorted | element | Float32 | String | refused schema: got invalid or ambiguous dtypes: '[f32, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Float32 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Float32 | Time | allowed UInt32 many
+Expr.search_sorted | element | Float32 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Float32 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Array(Int64, 2) | refused schema: could not determine supertype of: [f64, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Float64 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Date | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | List(Int64) | refused schema: could not determine supertype of: [f64, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Float64 | List(String) | refused schema: could not determine supertype of: [f64, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Float64 | Null | allowed UInt32 many
+Expr.search_sorted | element | Float64 | String | refused schema: got invalid or ambiguous dtypes: '[f64, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Float64 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Float64 | Time | allowed UInt32 many
+Expr.search_sorted | element | Float64 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Float64 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Array(Int64, 2) | refused schema: could not determine supertype of: [i128, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Date | refused schema: could not determine supertype of: [i128, date] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Datetime(us) | refused schema: could not determine supertype of: [i128, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Datetime(us, UTC) | refused schema: could not determine supertype of: [i128, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Duration(us) | refused schema: could not determine supertype of: [i128, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | List(Int64) | refused schema: could not determine supertype of: [i128, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | List(String) | refused schema: could not determine supertype of: [i128, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Null | allowed UInt32 many
+Expr.search_sorted | element | Int128 | String | refused schema: got invalid or ambiguous dtypes: '[i128, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Int128 | Time | refused schema: could not determine supertype of: [i128, time] in expression 'search_sorted'
+Expr.search_sorted | element | Int128 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Int128 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Array(Int64, 2) | refused schema: could not determine supertype of: [i16, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Date | refused schema: could not determine supertype of: [i16, date] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Datetime(us) | refused schema: could not determine supertype of: [i16, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Datetime(us, UTC) | refused schema: could not determine supertype of: [i16, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Duration(us) | refused schema: could not determine supertype of: [i16, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | List(Int64) | refused schema: could not determine supertype of: [i16, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | List(String) | refused schema: could not determine supertype of: [i16, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Null | allowed UInt32 many
+Expr.search_sorted | element | Int16 | String | refused schema: got invalid or ambiguous dtypes: '[i16, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Int16 | Time | refused schema: could not determine supertype of: [i16, time] in expression 'search_sorted'
+Expr.search_sorted | element | Int16 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Int16 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Array(Int64, 2) | refused schema: could not determine supertype of: [i32, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Int32 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Date | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | List(Int64) | refused schema: could not determine supertype of: [i32, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Int32 | List(String) | refused schema: could not determine supertype of: [i32, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Int32 | Null | allowed UInt32 many
+Expr.search_sorted | element | Int32 | String | refused schema: got invalid or ambiguous dtypes: '[i32, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Int32 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Int32 | Time | allowed UInt32 many
+Expr.search_sorted | element | Int32 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Int32 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Array(Int64, 2) | refused schema: could not determine supertype of: [i64, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Int64 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Date | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | List(Int64) | refused schema: could not determine supertype of: [i64, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Int64 | List(String) | refused schema: could not determine supertype of: [i64, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Int64 | Null | allowed UInt32 many
+Expr.search_sorted | element | Int64 | String | refused schema: got invalid or ambiguous dtypes: '[i64, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Int64 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Int64 | Time | allowed UInt32 many
+Expr.search_sorted | element | Int64 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Int64 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Array(Int64, 2) | refused schema: could not determine supertype of: [i8, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Date | refused schema: could not determine supertype of: [i8, date] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Datetime(us) | refused schema: could not determine supertype of: [i8, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Datetime(us, UTC) | refused schema: could not determine supertype of: [i8, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Duration(us) | refused schema: could not determine supertype of: [i8, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | List(Int64) | refused schema: could not determine supertype of: [i8, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | List(String) | refused schema: could not determine supertype of: [i8, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Null | allowed UInt32 many
+Expr.search_sorted | element | Int8 | String | refused schema: got invalid or ambiguous dtypes: '[i8, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Int8 | Time | refused schema: could not determine supertype of: [i8, time] in expression 'search_sorted'
+Expr.search_sorted | element | Int8 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Int8 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | List(Int64) | Array(Int64, 2) | allowed UInt32 many
+Expr.search_sorted | element | List(Int64) | Boolean | refused schema: could not determine supertype of: [list[i64], bool] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Date | refused schema: could not determine supertype of: [list[i64], date] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Datetime(us) | refused schema: could not determine supertype of: [list[i64], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Datetime(us, UTC) | refused schema: could not determine supertype of: [list[i64], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Decimal(10, 2) | refused schema: could not determine supertype of: [list[i64], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Duration(us) | refused schema: could not determine supertype of: [list[i64], duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Float16 | refused schema: could not determine supertype of: [list[i64], f16] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Float32 | refused schema: could not determine supertype of: [list[i64], f32] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Float64 | refused schema: could not determine supertype of: [list[i64], f64] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Int128 | refused schema: could not determine supertype of: [list[i64], i128] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Int16 | refused schema: could not determine supertype of: [list[i64], i16] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Int32 | refused schema: could not determine supertype of: [list[i64], i32] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Int64 | refused schema: could not determine supertype of: [list[i64], i64] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Int8 | refused schema: could not determine supertype of: [list[i64], i8] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | List(Int64) | allowed UInt32 many
+Expr.search_sorted | element | List(Int64) | List(String) | allowed UInt32 many
+Expr.search_sorted | element | List(Int64) | Null | allowed UInt32 many
+Expr.search_sorted | element | List(Int64) | String | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.search_sorted | element | List(Int64) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [list[i64], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | Time | refused schema: could not determine supertype of: [list[i64], time] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | UInt128 | refused schema: could not determine supertype of: [list[i64], u128] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | UInt16 | refused schema: could not determine supertype of: [list[i64], u16] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | UInt32 | refused schema: could not determine supertype of: [list[i64], u32] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | UInt64 | refused schema: could not determine supertype of: [list[i64], u64] in expression 'search_sorted'
+Expr.search_sorted | element | List(Int64) | UInt8 | refused schema: could not determine supertype of: [list[i64], u8] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Array(Int64, 2) | allowed UInt32 many
+Expr.search_sorted | element | List(String) | Boolean | refused schema: could not determine supertype of: [list[str], bool] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Date | refused schema: could not determine supertype of: [list[str], date] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Datetime(us) | refused schema: could not determine supertype of: [list[str], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Datetime(us, UTC) | refused schema: could not determine supertype of: [list[str], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Decimal(10, 2) | refused schema: could not determine supertype of: [list[str], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Duration(us) | refused schema: could not determine supertype of: [list[str], duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Float16 | refused schema: could not determine supertype of: [list[str], f16] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Float32 | refused schema: could not determine supertype of: [list[str], f32] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Float64 | refused schema: could not determine supertype of: [list[str], f64] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Int128 | refused schema: could not determine supertype of: [list[str], i128] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Int16 | refused schema: could not determine supertype of: [list[str], i16] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Int32 | refused schema: could not determine supertype of: [list[str], i32] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Int64 | refused schema: could not determine supertype of: [list[str], i64] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Int8 | refused schema: could not determine supertype of: [list[str], i8] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | List(Int64) | allowed UInt32 many
+Expr.search_sorted | element | List(String) | List(String) | allowed UInt32 many
+Expr.search_sorted | element | List(String) | Null | allowed UInt32 many
+Expr.search_sorted | element | List(String) | String | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.search_sorted | element | List(String) | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [list[str], struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | Time | refused schema: could not determine supertype of: [list[str], time] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | UInt128 | refused schema: could not determine supertype of: [list[str], u128] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | UInt16 | refused schema: could not determine supertype of: [list[str], u16] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | UInt32 | refused schema: could not determine supertype of: [list[str], u32] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | UInt64 | refused schema: could not determine supertype of: [list[str], u64] in expression 'search_sorted'
+Expr.search_sorted | element | List(String) | UInt8 | refused schema: could not determine supertype of: [list[str], u8] in expression 'search_sorted'
+Expr.search_sorted | element | Null | Array(Int64, 2) | allowed UInt32 many
+Expr.search_sorted | element | Null | Boolean | allowed UInt32 many
+Expr.search_sorted | element | Null | Date | allowed UInt32 many
+Expr.search_sorted | element | Null | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | Null | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | Null | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | Null | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | Null | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Null | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Null | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Null | Int128 | allowed UInt32 many
+Expr.search_sorted | element | Null | Int16 | allowed UInt32 many
+Expr.search_sorted | element | Null | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Null | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Null | Int8 | allowed UInt32 many
+Expr.search_sorted | element | Null | List(Int64) | allowed UInt32 many
+Expr.search_sorted | element | Null | List(String) | allowed UInt32 many
+Expr.search_sorted | element | Null | Null | refused rows: `search_sorted` operation not supported for dtype `null`
+Expr.search_sorted | element | Null | String | allowed UInt32 many
+Expr.search_sorted | element | Null | Struct(x: Int64, y: String) | allowed UInt32 many
+Expr.search_sorted | element | Null | Time | allowed UInt32 many
+Expr.search_sorted | element | Null | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | Null | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | Null | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | Null | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | Null | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | String | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.search_sorted | element | String | Boolean | refused schema: got invalid or ambiguous dtypes: '[str, bool]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Date | refused schema: got invalid or ambiguous dtypes: '[str, date]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Datetime(us) | refused schema: got invalid or ambiguous dtypes: '[str, datetime[μs]]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Datetime(us, UTC) | refused schema: got invalid or ambiguous dtypes: '[str, datetime[μs, UTC]]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Decimal(10, 2) | refused schema: got invalid or ambiguous dtypes: '[str, decimal[10,2]]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Duration(us) | refused schema: got invalid or ambiguous dtypes: '[str, duration[μs]]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Float16 | refused schema: got invalid or ambiguous dtypes: '[str, f16]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Float32 | refused schema: got invalid or ambiguous dtypes: '[str, f32]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Float64 | refused schema: got invalid or ambiguous dtypes: '[str, f64]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Int128 | refused schema: got invalid or ambiguous dtypes: '[str, i128]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Int16 | refused schema: got invalid or ambiguous dtypes: '[str, i16]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Int32 | refused schema: got invalid or ambiguous dtypes: '[str, i32]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Int64 | refused schema: got invalid or ambiguous dtypes: '[str, i64]' in expression 'search_sorted'
+Expr.search_sorted | element | String | Int8 | refused schema: got invalid or ambiguous dtypes: '[str, i8]' in expression 'search_sorted'
+Expr.search_sorted | element | String | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.search_sorted | element | String | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.search_sorted | element | String | Null | allowed UInt32 many
+Expr.search_sorted | element | String | String | allowed UInt32 many
+Expr.search_sorted | element | String | Struct(x: Int64, y: String) | refused rows: conversion from `struct[2]` to `str` failed in column 'b' for 1 out of 3 values: [{null,null}]
+Expr.search_sorted | element | String | Time | refused schema: got invalid or ambiguous dtypes: '[str, time]' in expression 'search_sorted'
+Expr.search_sorted | element | String | UInt128 | refused schema: got invalid or ambiguous dtypes: '[str, u128]' in expression 'search_sorted'
+Expr.search_sorted | element | String | UInt16 | refused schema: got invalid or ambiguous dtypes: '[str, u16]' in expression 'search_sorted'
+Expr.search_sorted | element | String | UInt32 | refused schema: got invalid or ambiguous dtypes: '[str, u32]' in expression 'search_sorted'
+Expr.search_sorted | element | String | UInt64 | refused schema: got invalid or ambiguous dtypes: '[str, u64]' in expression 'search_sorted'
+Expr.search_sorted | element | String | UInt8 | refused schema: got invalid or ambiguous dtypes: '[str, u8]' in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Array(Int64, 2) | refused schema: could not determine supertype of: [struct[2], array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Boolean | refused schema: could not determine supertype of: [struct[2], bool] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Date | refused schema: could not determine supertype of: [struct[2], date] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Datetime(us) | refused schema: could not determine supertype of: [struct[2], datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused schema: could not determine supertype of: [struct[2], datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Decimal(10, 2) | refused schema: could not determine supertype of: [struct[2], decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Duration(us) | refused schema: could not determine supertype of: [struct[2], duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Float16 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Float32 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Float64 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Int128 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Int16 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Int32 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Int64 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Int8 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | List(Int64) | refused schema: could not determine supertype of: [struct[2], list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | List(String) | refused schema: could not determine supertype of: [struct[2], list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Null | allowed UInt32 many
+Expr.search_sorted | element | Struct(x: Int64, y: String) | String | refused rows: conversion from `struct[2]` to `str` failed in column 'a' for 1 out of 3 values: [{null,null}]
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | allowed UInt32 many
+Expr.search_sorted | element | Struct(x: Int64, y: String) | Time | refused schema: could not determine supertype of: [struct[2], time] in expression 'search_sorted'
+Expr.search_sorted | element | Struct(x: Int64, y: String) | UInt128 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | UInt16 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | UInt32 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | UInt64 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Struct(x: Int64, y: String) | UInt8 | refused rows: must specify one field in the struct
+Expr.search_sorted | element | Time | Array(Int64, 2) | refused schema: could not determine supertype of: [time, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Boolean | refused schema: could not determine supertype of: [time, bool] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Date | refused schema: could not determine supertype of: [time, date] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Datetime(us) | refused schema: could not determine supertype of: [time, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Datetime(us, UTC) | refused schema: could not determine supertype of: [time, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Decimal(10, 2) | refused schema: could not determine supertype of: [time, decimal[10,2]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Duration(us) | refused schema: could not determine supertype of: [time, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Float16 | allowed UInt32 many
+Expr.search_sorted | element | Time | Float32 | allowed UInt32 many
+Expr.search_sorted | element | Time | Float64 | allowed UInt32 many
+Expr.search_sorted | element | Time | Int128 | refused schema: could not determine supertype of: [time, i128] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Int16 | refused schema: could not determine supertype of: [time, i16] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Int32 | allowed UInt32 many
+Expr.search_sorted | element | Time | Int64 | allowed UInt32 many
+Expr.search_sorted | element | Time | Int8 | refused schema: could not determine supertype of: [time, i8] in expression 'search_sorted'
+Expr.search_sorted | element | Time | List(Int64) | refused schema: could not determine supertype of: [time, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | List(String) | refused schema: could not determine supertype of: [time, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Null | allowed UInt32 many
+Expr.search_sorted | element | Time | String | refused schema: got invalid or ambiguous dtypes: '[time, str]' in expression 'search_sorted'
+Expr.search_sorted | element | Time | Struct(x: Int64, y: String) | refused schema: could not determine supertype of: [time, struct[2]] in expression 'search_sorted'
+Expr.search_sorted | element | Time | Time | allowed UInt32 many
+Expr.search_sorted | element | Time | UInt128 | refused schema: could not determine supertype of: [time, u128] in expression 'search_sorted'
+Expr.search_sorted | element | Time | UInt16 | refused schema: could not determine supertype of: [time, u16] in expression 'search_sorted'
+Expr.search_sorted | element | Time | UInt32 | refused schema: could not determine supertype of: [time, u32] in expression 'search_sorted'
+Expr.search_sorted | element | Time | UInt64 | refused schema: could not determine supertype of: [time, u64] in expression 'search_sorted'
+Expr.search_sorted | element | Time | UInt8 | refused schema: could not determine supertype of: [time, u8] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Array(Int64, 2) | refused schema: could not determine supertype of: [u128, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Date | refused schema: could not determine supertype of: [u128, date] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Datetime(us) | refused schema: could not determine supertype of: [u128, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Datetime(us, UTC) | refused schema: could not determine supertype of: [u128, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Duration(us) | refused schema: could not determine supertype of: [u128, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | List(Int64) | refused schema: could not determine supertype of: [u128, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | List(String) | refused schema: could not determine supertype of: [u128, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Null | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | String | refused schema: got invalid or ambiguous dtypes: '[u128, str]' in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | UInt128 | Time | refused schema: could not determine supertype of: [u128, time] in expression 'search_sorted'
+Expr.search_sorted | element | UInt128 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | UInt128 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Array(Int64, 2) | refused schema: could not determine supertype of: [u16, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Date | refused schema: could not determine supertype of: [u16, date] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Datetime(us) | refused schema: could not determine supertype of: [u16, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Datetime(us, UTC) | refused schema: could not determine supertype of: [u16, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Duration(us) | refused schema: could not determine supertype of: [u16, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | List(Int64) | refused schema: could not determine supertype of: [u16, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | List(String) | refused schema: could not determine supertype of: [u16, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Null | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | String | refused schema: got invalid or ambiguous dtypes: '[u16, str]' in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | UInt16 | Time | refused schema: could not determine supertype of: [u16, time] in expression 'search_sorted'
+Expr.search_sorted | element | UInt16 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | UInt16 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Array(Int64, 2) | refused schema: could not determine supertype of: [u32, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt32 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Date | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | List(Int64) | refused schema: could not determine supertype of: [u32, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt32 | List(String) | refused schema: could not determine supertype of: [u32, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt32 | Null | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | String | refused schema: got invalid or ambiguous dtypes: '[u32, str]' in expression 'search_sorted'
+Expr.search_sorted | element | UInt32 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | UInt32 | Time | refused schema: could not determine supertype of: [u32, time] in expression 'search_sorted'
+Expr.search_sorted | element | UInt32 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | UInt32 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Array(Int64, 2) | refused schema: could not determine supertype of: [u64, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt64 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Date | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Datetime(us) | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Datetime(us, UTC) | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Duration(us) | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | List(Int64) | refused schema: could not determine supertype of: [u64, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt64 | List(String) | refused schema: could not determine supertype of: [u64, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt64 | Null | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | String | refused schema: got invalid or ambiguous dtypes: '[u64, str]' in expression 'search_sorted'
+Expr.search_sorted | element | UInt64 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | UInt64 | Time | refused schema: could not determine supertype of: [u64, time] in expression 'search_sorted'
+Expr.search_sorted | element | UInt64 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | UInt64 | UInt8 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Array(Int64, 2) | refused schema: could not determine supertype of: [u8, array[i64, 2]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Boolean | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Date | refused schema: could not determine supertype of: [u8, date] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Datetime(us) | refused schema: could not determine supertype of: [u8, datetime[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Datetime(us, UTC) | refused schema: could not determine supertype of: [u8, datetime[μs, UTC]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Decimal(10, 2) | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Duration(us) | refused schema: could not determine supertype of: [u8, duration[μs]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Float16 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Float32 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Float64 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Int128 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Int16 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Int32 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Int64 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | Int8 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | List(Int64) | refused schema: could not determine supertype of: [u8, list[i64]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | List(String) | refused schema: could not determine supertype of: [u8, list[str]] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Null | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | String | refused schema: got invalid or ambiguous dtypes: '[u8, str]' in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | Struct(x: Int64, y: String) | refused rows: must specify one field in the struct
+Expr.search_sorted | element | UInt8 | Time | refused schema: could not determine supertype of: [u8, time] in expression 'search_sorted'
+Expr.search_sorted | element | UInt8 | UInt128 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | UInt16 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | UInt32 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | UInt64 | allowed UInt32 many
+Expr.search_sorted | element | UInt8 | UInt8 | allowed UInt32 many
 Expr.shift | - | Array(Int64, 2) | - | allowed Array(Int64, 2) many
 Expr.shift | - | Boolean | - | allowed Boolean many
 Expr.shift | - | Date | - | allowed Date many
