@@ -382,6 +382,21 @@ fn keep<E: Evaluator>(
     })
 }
 
+/// What the run of the property is told: the number of cases, with the cases before the start that
+/// were not counted, how many cases it may draw again, and the seed.
+fn property_config(_target: &AllowedTarget, settings: &Settings) -> PropertyConfig {
+    let passed_over = settings.start - 1;
+    let counted_before = settings.counted.unwrap_or(passed_over);
+    PropertyConfig {
+        cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
+            .expect("the settings were checked"),
+        max_rejections: 1_000_000,
+        // Entropy is not the case: the owner's reduction works on the case.
+        max_shrink_iterations: 0,
+        seed: settings.seed,
+    }
+}
+
 /// Runs the cases `settings` names through `evaluator`, every one whatever the
 /// ones before it did. A case that fails is reduced and kept, and the next is run.
 /// Panics where the run itself cannot be made.
@@ -398,14 +413,7 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     }
     let passed_over = settings.start - 1;
     let counted_before = settings.counted.unwrap_or(passed_over);
-    let config = PropertyConfig {
-        cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
-            .expect("the settings were checked"),
-        max_rejections: 1_000_000,
-        // Entropy is not the case: the owner's reduction works on the case.
-        max_shrink_iterations: 0,
-        seed: settings.seed,
-    };
+    let config = property_config(&target, settings);
     // The case is written down before it is run, so that one that does not
     // return is still found: it is the file `current.case`.
     std::fs::create_dir_all(&settings.keep).expect("a directory for kept evidence");

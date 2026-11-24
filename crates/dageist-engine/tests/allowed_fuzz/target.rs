@@ -53,8 +53,14 @@ impl Default for AllowedTarget {
 
 impl AllowedTarget {
     pub fn new() -> Self {
-        let manifest: FuzzManifest = toml::from_str(include_str!("descriptor.toml"))
-            .expect("the descriptor of the target is valid");
+        Self::described_by(include_str!("descriptor.toml"))
+    }
+
+    /// The target of the descriptor `text` writes, which is `descriptor.toml` for the target a
+    /// campaign runs and another where a test needs a ceiling or a bound of its own.
+    pub fn described_by(text: &str) -> Self {
+        let manifest: FuzzManifest =
+            toml::from_str(text).expect("the descriptor of the target is valid");
         let descriptor = manifest
             .targets
             .into_iter()
@@ -735,18 +741,9 @@ mod tests {
 
     /// The target of the descriptor, admitting cases of up to `bytes` bytes.
     fn target_admitting(bytes: u64) -> AllowedTarget {
-        let text =
-            include_str!("descriptor.toml").replace("bytes = 65536", &format!("bytes = {bytes}"));
-        let manifest: FuzzManifest = toml::from_str(&text).expect("a valid descriptor");
-        let descriptor = manifest
-            .targets
-            .into_iter()
-            .find(|target| target.id().as_str() == TARGET)
-            .expect("the descriptor declares the target");
-        AllowedTarget {
-            descriptor,
-            focus: None,
-        }
+        AllowedTarget::described_by(
+            &include_str!("descriptor.toml").replace("bytes = 65536", &format!("bytes = {bytes}")),
+        )
     }
 
     #[test]
