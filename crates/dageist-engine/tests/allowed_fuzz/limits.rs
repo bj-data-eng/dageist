@@ -5925,6 +5925,39 @@ mod tests {
                 text,
             )
         };
+        // A running maximum or minimum picks one of the values, so the text still reads as a
+        // number.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-date-written-as-digits--kept-by-a-running-maximum.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        for keeping in ["Expr.cum_max", "Expr.cum_min"] {
+            let case = pivot_of(
+                Representative::Date,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        call(
+                            "Expr.dt.to_string",
+                            vec![("format", Value::String("%Y".to_owned()))],
+                        ),
+                        call(keeping, Vec::new()),
+                        call("Expr.skew", Vec::new()),
+                    ],
+                ),
+            );
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &case,
+                    at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                    text
+                ),
+                vec![Limit::AGroupAggregate],
+                "{keeping}"
+            );
+        }
         for entry in ["Expr.dt.to_string", "Expr.dt.strftime"] {
             for format in ["%Y", "%Y%m%d", "%H%M%S", "20%y"] {
                 assert_eq!(
