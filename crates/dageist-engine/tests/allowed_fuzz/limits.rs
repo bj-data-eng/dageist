@@ -10079,6 +10079,11 @@ mod tests {
             kept_cases.push(
                 "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
             );
+            // The control's column is another key's own column, and a join refuses two keys
+            // that are named alike, so the control asks the other column both tables hold too.
+            kept_cases.push(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key-beside-a-key-of-the-same-column.case",
+            );
         }
         for kept in kept_cases {
             assert_eq!(
