@@ -58,23 +58,29 @@ function textOf(literal: LiteralView): string {
 /**
  * Returns `literal` as the argument of a parameter of `kind`: a number for a parameter that takes
  * a number of its type, the text as a duration, a pattern, a path or a time zone where the kind is
- * one, and as the expression of one word where the parameter takes an expression.
+ * one, and as the expression of one word where the parameter takes an expression. It is `null`
+ * where a number is wanted and the literal holds none, text, or a number that is not one: there
+ * is nothing to send, and the slot is left as it was.
  */
-export function literalArgument(kind: KindView, literal: LiteralView): ValueRequest {
+export function literalArgument(kind: KindView, literal: LiteralView): ValueRequest | null {
   const number = literal.kind === 'text' ? Number.NaN : literal.value;
   switch (kind.kind) {
     case 'expression':
       return literalExpression(literal);
     case 'value':
-      if (kind.type === 'float') return { kind: 'float', value: number };
-      if (kind.type === 'integer') return { kind: 'integer', value: number };
       if (kind.type === 'string') return { kind: 'string', value: textOf(literal) };
+      // Text holds no number for a parameter that takes one, and a number that is not one is
+      // nothing the engine could read.
+      if (kind.type === 'integer' || kind.type === 'float') {
+        if (Number.isNaN(number)) return null;
+        return { kind: kind.type, value: number };
+      }
       // A typed value of any type, as `lit` takes: its own kind.
-      return literal.kind === 'text'
-        ? { kind: 'string', value: literal.value }
-        : literal.kind === 'float' || !Number.isSafeInteger(number)
-          ? { kind: 'float', value: number }
-          : { kind: 'integer', value: number };
+      if (literal.kind === 'text') return { kind: 'string', value: literal.value };
+      if (Number.isNaN(number)) return null;
+      return literal.kind === 'float' || !Number.isSafeInteger(number)
+        ? { kind: 'float', value: number }
+        : { kind: 'integer', value: number };
     case 'duration':
       return { kind: 'duration', text: textOf(literal) };
     case 'pattern':

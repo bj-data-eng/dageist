@@ -567,7 +567,8 @@ function TimeZoneDrawing({
         titled(
           'Value',
           literalOffers('timeZone', typed, readings, (literal) => {
-            onPick(literalArgument({ kind: 'timeZone', none }, literal));
+            const request = literalArgument({ kind: 'timeZone', none }, literal);
+            if (request !== null) onPick(request);
           }),
         ),
         ...(none === null
@@ -664,7 +665,8 @@ function OneDrawing({
           type={kind.type}
           value={shownOf(argument)}
           onChange={(literal) => {
-            onSet(literalArgument(kind, literal));
+            const request = literalArgument(kind, literal);
+            if (request !== null) onSet(request);
           }}
         />
       );
@@ -708,7 +710,8 @@ function OneDrawing({
           type={kind.kind}
           value={shownOf(argument)}
           onChange={(literal) => {
-            onSet(literalArgument(kind, literal));
+            const request = literalArgument(kind, literal);
+            if (request !== null) onSet(request);
           }}
         />
       );
