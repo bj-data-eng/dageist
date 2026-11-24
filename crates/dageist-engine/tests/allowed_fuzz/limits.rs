@@ -10192,6 +10192,110 @@ mod tests {
     }
 
     #[test]
+    fn a_part_polars_folds_to_a_null_is_excused_where_removing_the_fold_makes_it_refuse() {
+        // `datetime(year="1d", month=h + null .str.split("a"), day=null, minute=1)`: Polars folds
+        // the sum with a null into a null literal and never meets the list of text the month
+        // would be, which the tables refuse to cast to a whole number. Without the sum Polars
+        // refuses it for the same reason.
+        const SLUG: &str = "a-part-polars-folds-to-a-null";
+        let reason = "cannot cast List type (inner: 'String', to: 'Int8')";
+        assert_eq!(
+            slugs(excused_by_kept(
+                "uncovered-a-part-polars-folds-to-a-null.case"
+            )),
+            vec![SLUG]
+        );
+        let text = |value: &str| {
+            chain_of(
+                call(
+                    "polars.lit",
+                    vec![("value", Value::String(value.to_owned()))],
+                ),
+                Vec::new(),
+            )
+        };
+        let datetime = |month: Expression| {
+            chain_of(
+                call(
+                    "polars.datetime",
+                    vec![
+                        ("year", Value::Expression(text("1d"))),
+                        ("month", Value::Expression(month)),
+                        ("day", Value::Expression(chain(null(), &[]))),
+                        ("minute", Value::Expression(whole(1))),
+                    ],
+                ),
+                Vec::new(),
+            )
+        };
+        let split = || call("Expr.str.split", vec![("by", Value::Expression(text("a")))]);
+        let sum_with_null = || compared_with("Expr.add", chain(null(), &[]));
+        let at_the_start =
+            |item: usize| at(&[parameter("exprs"), Segment::Item(item), Segment::Start]);
+        let asked = |items: Vec<Expression>, item: usize| {
+            slugs(refused_by_the_tables_at(
+                &select(items),
+                at_the_start(item),
+                reason,
+            ))
+        };
+        // The fold, then the part: excused.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    column("h"),
+                    vec![sum_with_null(), split()]
+                ))],
+                0
+            ),
+            vec![SLUG]
+        );
+        // No fold: the control is the case itself, which shows nothing.
+        assert_eq!(
+            asked(vec![datetime(chain_of(column("h"), vec![split()]))], 0),
+            Vec::<&str>::new()
+        );
+        // The fold ends the chain: the month is then a null literal, which is a literal's.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    column("h"),
+                    vec![split(), sum_with_null()]
+                ))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
+        // The fold, but the case is not refused for the tables' reason without it: Polars allows a
+        // month that is a column, so the fold is no reason it allows the step.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(column("k"), vec![sum_with_null()]))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
+        // A call that follows a fold in its own chain, and is given none, is for the probe.
+        assert_eq!(
+            slugs(excused_by_kept(
+                "stricter-a-running-sum-of-a-null-comparison.case"
+            )),
+            Vec::<&str>::new()
+        );
+        // A fold in another expression of the step is no reason Polars allows this one.
+        assert_eq!(
+            asked(
+                vec![
+                    chain_of(column("k"), vec![sum_with_null()]),
+                    datetime(chain_of(column("h"), vec![split()])),
+                ],
+                1
+            ),
+            Vec::<&str>::new()
+        );
+    }
+
+    #[test]
     fn a_null_quantile_is_excused_where_the_column_is_refused_after_it_and_not_before_it() {
         // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
         // refused for the year of a number, which a literal that is no number was not asked, and
