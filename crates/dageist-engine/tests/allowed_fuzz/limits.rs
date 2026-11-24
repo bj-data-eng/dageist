@@ -5717,6 +5717,68 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_aggregate_is_excused_for_a_call_after_a_shift_of_one_value_that_leaves_a_null() {
+        // `from_epoch(1).shift().dt.replace(month=true)`: a moment counted from a literal is one
+        // value, which a shift by one moves away, so the call after it meets a null. The tables
+        // measured the rows of the sample, which hold three.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-shift-that-leaves-nulls--of-a-moment-counted-from-a-literal.case"
+            ),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let reason = "Invalid date components (1970, 0, 1) supplied";
+        let counted = || {
+            call(
+                "polars.from_epoch",
+                vec![(
+                    "column",
+                    Value::Expression(chain_of(
+                        call("polars.lit", vec![("value", Value::Integer(1))]),
+                        Vec::new(),
+                    )),
+                )],
+            )
+        };
+        let replacing = call(
+            "Expr.dt.replace",
+            vec![(
+                "month",
+                Value::Expression(chain_of(
+                    call("polars.lit", vec![("value", Value::Integer(0))]),
+                    Vec::new(),
+                )),
+            )],
+        );
+        let shifted_by = |n: i64| call("Expr.shift", vec![("n", Value::Expression(whole(n)))]);
+        // A shift by none leaves the value, and the call after it meets it, which another limit, for
+        // the parts of a date, may excuse as it does the number 0.
+        for (n, leaves_a_null) in [(1, true), (-1, true), (2, true), (0, false)] {
+            let case = pivot(chain_of(counted(), vec![shifted_by(n), replacing.clone()]));
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &case,
+                    at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                    reason
+                )
+                .contains(&Limit::AShiftThatLeavesNulls),
+                leaves_a_null,
+                "a shift by {n}"
+            );
+        }
+        // No shift leaves the moment as it is.
+        let unshifted = pivot(chain_of(counted(), vec![replacing]));
+        assert!(
+            !refused_by_the_tables_at(
+                &unshifted,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                reason
+            )
+            .contains(&Limit::AShiftThatLeavesNulls)
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_a_cast_of_what_a_column_of_nulls_is_compared_with() {
         // The values of a group of a column of the dtype Null are nulls, which a comparison leaves
         // null and a cast converts, where the tables measured the comparison of a column that holds
