@@ -89,6 +89,7 @@ pub struct Chosen<'a> {
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
+    width: Option<usize>,
     zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
@@ -170,6 +171,14 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following(mut self, unit: Option<TimeUnit>) -> Self {
         self.unit = unit;
+        self
+    }
+
+    /// The width of the array the method follows, where the chain knows it. The tables measured
+    /// arrays at one width, so an array the call gives is written at this one.
+    #[must_use]
+    pub const fn following_width(mut self, width: Option<usize>) -> Self {
+        self.width = width;
         self
     }
 
@@ -926,6 +935,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
     }
+    // What Polars panics on is refused before it is asked, in words that say what the element lacks.
+    if let After::Value { dtype, .. } = place.after
+        && let Some((rule, said)) = Rule::forbids_receiver(id, &dtype.dtype())
+    {
+        return Err(Refusal::rule_because(rule, &said));
+    }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
@@ -1265,6 +1280,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             Outcome::Allowed(_) => Ending::Allowed,
         }
     };
+    // An array is written at the width it has, where the chain knows it.
+    if let (Some(width), Some(found)) = (chosen.width, &result)
+        && matches!(found.class(), Some(Representative::Array(_)))
+    {
+        result = Some(found.of_width(width));
+    }
     Ok(Allowance {
         result,
         shape,
@@ -1294,6 +1315,19 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
             Shape::One => chosen,
         },
     )
+}
+
+/// The refusal of a rule that forbids the method `entry` to follow a value of the dtype
+/// `receiver`, if one does, without the tables: Polars panics on it where the rows run, so a
+/// document that holds it is refused before Polars is asked.
+///
+/// # Errors
+/// The rule that forbids it, with what the element lacks.
+pub fn rule_forbids_a_receiver(entry: &Entry, receiver: &DataType) -> Result<(), Refusal> {
+    match Rule::forbids_receiver(entry.id().as_str(), receiver) {
+        Some((rule, said)) => Err(Refusal::rule_because(rule, &said)),
+        None => Ok(()),
+    }
 }
 
 /// The refusal of a rule that forbids `entry` to start or continue a chain in

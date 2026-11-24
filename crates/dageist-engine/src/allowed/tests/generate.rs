@@ -499,7 +499,26 @@ fn settled(entry: &Entry, options: &[(&str, &str)], outcome: Outcome) -> Outcome
     }
 }
 
+/// What a rule that Polars panics on a receiver says of a call that follows `receiver`: the tables
+/// never run it, and the line says what the rule does.
+fn refused_by_a_rule(entry: &str, receiver: Option<Representative>) -> Option<Outcome> {
+    let (rule, said) = Rule::forbids_receiver(entry, &receiver?.dtype())?;
+    Some(Outcome::Refused(Reason {
+        stage: Stage::Rows,
+        text: format!("{}: {said}", rule.name()),
+    }))
+}
+
 pub(super) fn dtype_line(job: &DtypeJob) -> DtypeLine {
+    if let Some(outcome) = refused_by_a_rule(job.entry.id().as_str(), job.receiver) {
+        return DtypeLine {
+            entry: job.entry.id().as_str(),
+            parameter: job.parameter,
+            receiver: job.receiver,
+            argument: job.argument,
+            outcome,
+        };
+    }
     // A function that starts an expression is measured on columns of the dtype of its argument,
     // beside a column of whole numbers.
     let receiver = job.receiver.unwrap_or(Representative::Int64);
@@ -610,8 +629,9 @@ impl DtypeIndex {
     /// otherwise the first that does.
     fn candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
         let order = std::iter::once(Representative::Int64).chain(
-            Representative::MEASURED
-                .into_iter()
+            measured_classes(entry.id().as_str())
+                .iter()
+                .copied()
                 .filter(|dtype| *dtype != Representative::Int64),
         );
         let required: Vec<&'static str> = expression_parameters(entry)
@@ -1705,6 +1725,17 @@ fn option_line(
 ) -> OptionLine {
     let id = entry.id().as_str();
     let receiver = candidate.map(|candidate| candidate.receiver);
+    if let Some(outcome) = refused_by_a_rule(id, receiver) {
+        return OptionLine {
+            entry: id,
+            receiver,
+            options: set
+                .iter()
+                .map(|(name, text, _)| (*name, text.clone()))
+                .collect(),
+            outcome,
+        };
+    }
     let receiver_dtype = receiver.unwrap_or(Representative::Int64);
     let argument = candidate
         .and_then(|candidate| candidate.arguments.first().map(|(_, dtype)| *dtype))

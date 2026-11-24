@@ -462,7 +462,8 @@ impl Document {
         let mut frame = working.clone().lazy();
         let mut schema = working.schema().clone();
         for (index, step) in self.steps()[..=last].iter().enumerate() {
-            let (next, next_schema) = run_step(index, step, inputs, frame, &schema, false)
+            // Traced, so that what Polars panics on is refused before it is asked.
+            let (next, next_schema) = run_step(index, step, inputs, frame, &schema, true)
                 .result
                 .map_err(|halt| match halt {
                     Halt::Refused(refusal) => RowsError::Refused(refusal),
@@ -524,6 +525,19 @@ fn run_step(
     if let Some(path) = step.first_hole() {
         return StepRun {
             result: Err(Halt::Incomplete(path.into_iter().fold(base, Place::then))),
+            expressions: Vec::new(),
+            walk,
+            written: Vec::new(),
+        };
+    }
+    // What Polars panics on is not run, wherever the probe of the builder could not see it: a pivot's
+    // aggregate starts from the values of a group, whose dtype it has no column for.
+    if let Some(found) = walk.unsafe_to_run() {
+        return StepRun {
+            result: Err(Halt::Refused(StepRefusal {
+                place: found.place().clone(),
+                cause: Box::new(RunCause::NotAllowed(found.refusal().clone())),
+            })),
             expressions: Vec::new(),
             walk,
             written: Vec::new(),
@@ -853,6 +867,14 @@ impl Builder<'_> {
                         return self.built(Err(BuildError::NotADuration { parameter, error }));
                     }
                 }
+            }
+            // What Polars panics on is refused before it is asked, as the rule says, by the dtype
+            // the value before the call has: a panic of its own may not be recovered from.
+            if self.probe.is_some()
+                && let Some(Resolution::Dtype(receiver)) = self.resolve(&state, from_element)
+                && let Err(refusal) = allowed::rule_forbids_a_receiver(link.entry(), &receiver)
+            {
+                return self.stop(RunCause::NotAllowed(refusal));
             }
             let arguments = self.arguments(link)?;
             state = match (link.entry().build(), state) {

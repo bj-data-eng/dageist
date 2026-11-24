@@ -1603,6 +1603,7 @@ and referenced from the lines of the context table they govern:
 | `replacement-values-match-in-number` | A replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one. One value given an operand of many values, or put over a window that does not explode, is as many values, for the window gives each row of its group what it gives the group, while a window that explodes gives one row for each group; what a replacement lists is a table it looks values up in, so it gives as many values as what it follows. A condition whose predicates and values are each one value gives one value, whether or not Polars drops its predicates, so what follows it is counted; where only its values are one, the number depends on what Polars drops, and is not counted. Polars refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of one, when the rows run. The walk finds how many values an expression gives from its shape, and does not judge one that is not walked to its end or whose count Polars's plan decides, as a condition with one expression for all its values. |
 | `parameter-takes-one-value` | A parameter that Polars reads as one value is given one. `shift`'s count of rows and fill and `diff`'s count refuse the rows, a count of values and the one value that a method took of one value, which Polars cannot tell is one before the rows run, with "must be a scalar value", in a select and in a window; a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count, and take that value. A number typed in and an aggregate are one value for all of them. |
 | `values-meet-in-count` | The values a call meets are one value, which is met by each of the others, or as many as one another: the operands of a method, the predicates and values of a condition, and the items of a select. The rows are no count of values that the data or the arguments decide, and two such counts that are fixed and differ are not the same; a step that adds columns meets its items with the rows. Polars refuses them with "zip node received non-equal length inputs" when the rows run, except where the count is by chance the rows. |
+| `element-dtype-is-implemented` | A method of the `list` or the `arr` namespace is run on an element dtype that Polars implements it for. Polars panics where the rows run, on a thread of its own that its streaming executor may not recover from, on `arr.min` and `arr.max` of an array of anything but whole numbers and floats, on `reverse` of one, and on `list.mean` of a list of `Float16`. The tables never run such a combination, a call is refused with what the element lacks before the tables are read, and a document that holds one is refused before Polars is asked, by the dtype that the value before the call has, and by the walk wherever the builder cannot see it, as in a pivot's aggregate. A test runs each combination Polars panics on in a process of its own, and holds the rule to those and no other. The `set_*` methods panic on a list of `Null`, and the rule will name them where they are catalogued. |
 | `window-input-is-not-counted` | A window takes a value as long as its group, which a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, as `head(2)` of a sum is. Polars refuses it with "expressions must have matching group lengths", unless the window joins the values of a group into a list or explodes them. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
@@ -1709,6 +1710,24 @@ are the ones `SENSITIVE` names, which are measured on the lists and the arrays o
 a float, text, a `Boolean`, a `Date` and a `Datetime` as well. A result that is the class that was
 read is written for the class that was asked: the first of a list of `Float64` is a list of
 `Float64` where the table says it is a list of `Int64`.
+
+A method of the `list` or the `arr` namespace is measured on every class, for what it gives is
+the element's: the sum of a list of `Int8` is an `Int64`, of a list of `Boolean` a `UInt32`, the
+mean of a list of `Date` a `Datetime`, and a list of text has no sum. The catalogue holds the 38 of them
+that take no expression argument, as Python Polars 2.1.0 builds them, with the groups `List` and
+`Array` for what they accept: `len`, `sum`, `mean`, `median`, `std`, `var`, `min`, `max`, `first`,
+`last`, `n_unique`, `arg_max`, `arg_min`, `any`, `all`, `sort`, `reverse` and `unique` of each, and
+`list.drop_nulls` and `arr.to_list`. `first` and `last` are the value at the first and the last place,
+which is a null where a list has none, and `n_unique`, `any`, `all`, `reverse` and `unique` are built
+as Python builds them, as an evaluation over the elements of one list. A method gives a value for each
+list, so a column of lists stays as many values as it had rows, and none of them is an aggregate for the
+rules that hold a join's key. An array that a call gives is written at the width the array it follows
+has: `sort` of an array of three is an array of three, which the tables, measured at two, write only as
+the class.
+
+A window that joins the values of a group into a list gives a list of what it follows for every scalar
+element dtype, and a method that follows a list of one dtype gives lists of that dtype, so what comes of
+a column of lists is carried through each call, in each place that holds an expression.
 
 ### What The Tables Are Checked Against
 
@@ -2022,6 +2041,8 @@ gives where the tables and Polars both refuse, and a case in which Polars panics
 not at others moves a case between them. The test
 asserts none of those.
 
+The methods of the `list` and the `arr` namespace are drawn only where `DAGEIST_FUZZ_FOCUS` names one of them,
+and the column under test is then a list or an array of any element dtype.
 The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
 drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
 two kinds that a focused campaign found are now settled: a count that is the table's rows, or one value, by chance

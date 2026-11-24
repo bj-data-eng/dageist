@@ -24,6 +24,7 @@ use polars::prelude::{
 };
 use polars::series::ops::NullBehavior;
 
+use super::nested;
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
     EntryId, Family, Kind, Laziness, OneValue, Parameter, ParameterDefault, PatternMeans, Role,
@@ -34,6 +35,8 @@ const ANY: &[Dtypes] = &[Dtypes::Any];
 const INTEGER: &[Dtypes] = &[Dtypes::Integer];
 const BOOLEAN: &[Dtypes] = &[Dtypes::Boolean];
 const STRING: &[Dtypes] = &[Dtypes::String];
+const LIST: &[Dtypes] = &[Dtypes::List];
+const ARRAY: &[Dtypes] = &[Dtypes::Array];
 
 // What Polars accepts on the receiver, from the functions that run it: `cum_sum` adds
 // numbers, durations and (as counts of true) booleans; `cum_max` orders anything with a
@@ -45,6 +48,15 @@ const CUM_MAX: &[Dtypes] = &[
     Dtypes::Temporal,
     Dtypes::String,
     Dtypes::Boolean,
+];
+// What Polars replaces the values of: every dtype it orders, and an array, whose values it meets one
+// whole. It has no replacement for a list, which it refuses as not yet implemented.
+const REPLACEABLE: &[Dtypes] = &[
+    Dtypes::Numeric,
+    Dtypes::Temporal,
+    Dtypes::String,
+    Dtypes::Boolean,
+    Dtypes::Array,
 ];
 const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
 const DATE_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Date];
@@ -860,7 +872,7 @@ fn cum_prod(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
 }
 
 /// The delta degrees of freedom, which Python's binding takes as an unsigned 8-bit number.
-fn ddof(arguments: &Arguments) -> Result<u8, BuildError> {
+pub(super) fn ddof(arguments: &Arguments) -> Result<u8, BuildError> {
     match arguments.get("ddof") {
         None => Ok(1),
         Some(Argument::Integer(value)) => {
@@ -2608,6 +2620,161 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(arg_unique),
     },
     Entry {
+        id: EntryId("Expr.arr.all"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_all),
+    },
+    Entry {
+        id: EntryId("Expr.arr.any"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_any),
+    },
+    Entry {
+        id: EntryId("Expr.arr.arg_max"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_arg_max),
+    },
+    Entry {
+        id: EntryId("Expr.arr.arg_min"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_arg_min),
+    },
+    Entry {
+        id: EntryId("Expr.arr.first"),
+        family: Family::Rows,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_first),
+    },
+    Entry {
+        id: EntryId("Expr.arr.last"),
+        family: Family::Rows,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_last),
+    },
+    Entry {
+        id: EntryId("Expr.arr.len"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_len),
+    },
+    Entry {
+        id: EntryId("Expr.arr.max"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_max),
+    },
+    Entry {
+        id: EntryId("Expr.arr.mean"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_mean),
+    },
+    Entry {
+        id: EntryId("Expr.arr.median"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_median),
+    },
+    Entry {
+        id: EntryId("Expr.arr.min"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_min),
+    },
+    Entry {
+        id: EntryId("Expr.arr.n_unique"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_n_unique),
+    },
+    Entry {
+        id: EntryId("Expr.arr.reverse"),
+        family: Family::Order,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_reverse),
+    },
+    Entry {
+        id: EntryId("Expr.arr.sort"),
+        family: Family::Order,
+        accepts: ARRAY,
+        parameters: &[
+            flag("descending", "False").keyword_only(),
+            flag("nulls_last", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_sort),
+    },
+    Entry {
+        id: EntryId("Expr.arr.std"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_std),
+    },
+    Entry {
+        id: EntryId("Expr.arr.sum"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_sum),
+    },
+    Entry {
+        id: EntryId("Expr.arr.to_list"),
+        family: Family::Conversion,
+        accepts: ARRAY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_to_list),
+    },
+    Entry {
+        id: EntryId("Expr.arr.unique"),
+        family: Family::Rows,
+        accepts: ARRAY,
+        parameters: &[flag("maintain_order", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_unique),
+    },
+    Entry {
+        id: EntryId("Expr.arr.var"),
+        family: Family::Aggregate,
+        accepts: ARRAY,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::arr_var),
+    },
+    Entry {
         id: EntryId("Expr.backward_fill"),
         family: Family::Nulls,
         accepts: ANY,
@@ -3217,7 +3384,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.ge"),
         family: Family::Compare,
-        accepts: ANY,
+        accepts: CUM_MAX,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(ge),
@@ -3225,7 +3392,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.gt"),
         family: Family::Compare,
-        accepts: ANY,
+        accepts: CUM_MAX,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(gt),
@@ -3388,7 +3555,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.le"),
         family: Family::Compare,
-        accepts: ANY,
+        accepts: CUM_MAX,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(le),
@@ -3412,6 +3579,161 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(head),
     },
     Entry {
+        id: EntryId("Expr.list.all"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_all),
+    },
+    Entry {
+        id: EntryId("Expr.list.any"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_any),
+    },
+    Entry {
+        id: EntryId("Expr.list.arg_max"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_arg_max),
+    },
+    Entry {
+        id: EntryId("Expr.list.arg_min"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_arg_min),
+    },
+    Entry {
+        id: EntryId("Expr.list.drop_nulls"),
+        family: Family::Nulls,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_drop_nulls),
+    },
+    Entry {
+        id: EntryId("Expr.list.first"),
+        family: Family::Rows,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_first),
+    },
+    Entry {
+        id: EntryId("Expr.list.last"),
+        family: Family::Rows,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_last),
+    },
+    Entry {
+        id: EntryId("Expr.list.len"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_len),
+    },
+    Entry {
+        id: EntryId("Expr.list.max"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_max),
+    },
+    Entry {
+        id: EntryId("Expr.list.mean"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_mean),
+    },
+    Entry {
+        id: EntryId("Expr.list.median"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_median),
+    },
+    Entry {
+        id: EntryId("Expr.list.min"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_min),
+    },
+    Entry {
+        id: EntryId("Expr.list.n_unique"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_n_unique),
+    },
+    Entry {
+        id: EntryId("Expr.list.reverse"),
+        family: Family::Order,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_reverse),
+    },
+    Entry {
+        id: EntryId("Expr.list.sort"),
+        family: Family::Order,
+        accepts: LIST,
+        parameters: &[
+            flag("descending", "False").keyword_only(),
+            flag("nulls_last", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_sort),
+    },
+    Entry {
+        id: EntryId("Expr.list.std"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_std),
+    },
+    Entry {
+        id: EntryId("Expr.list.sum"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_sum),
+    },
+    Entry {
+        id: EntryId("Expr.list.unique"),
+        family: Family::Rows,
+        accepts: LIST,
+        parameters: &[flag("maintain_order", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_unique),
+    },
+    Entry {
+        id: EntryId("Expr.list.var"),
+        family: Family::Aggregate,
+        accepts: LIST,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nested::list_var),
+    },
+    Entry {
         id: EntryId("Expr.log"),
         family: Family::Maths,
         accepts: NUMERIC_OR_BOOLEAN,
@@ -3430,7 +3752,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.lt"),
         family: Family::Compare,
-        accepts: ANY,
+        accepts: CUM_MAX,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(lt),
@@ -3589,7 +3911,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.pct_change"),
         family: Family::Rows,
-        accepts: ANY,
+        accepts: CUM_MAX,
         parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
             .with_role(Role::Count)
             .not_broadcasting()
@@ -3655,7 +3977,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.replace"),
         family: Family::Conversion,
-        accepts: ANY,
+        accepts: REPLACEABLE,
         parameters: &[
             required("old", EXPRESSION, Shape::One)
                 .with_role(Role::Bound)
@@ -3672,7 +3994,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     Entry {
         id: EntryId("Expr.replace_strict"),
         family: Family::Conversion,
-        accepts: ANY,
+        accepts: REPLACEABLE,
         parameters: &[
             required("old", EXPRESSION, Shape::One)
                 .with_role(Role::Bound)

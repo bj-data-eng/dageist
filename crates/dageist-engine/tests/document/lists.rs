@@ -16,7 +16,9 @@
 
 use std::collections::BTreeMap;
 
-use dageist_engine::allowed::{After, Inner, RefusalSource, Representative, Shape, dtype_name};
+use dageist_engine::allowed::{
+    After, Count, Inner, RefusalSource, Representative, Shape, dtype_name,
+};
 use dageist_engine::catalog;
 use dageist_engine::document::{
     Document, Inputs, Outcome, Report, Resolution, Segment, StepId, StepRows,
@@ -179,7 +181,9 @@ fn frame() -> DataFrame {
         .into(),
     );
     columns.push(ints("a", [Some(1), Some(2), Some(3)]).into());
-    columns.push(ints("k", [Some(1), Some(1), Some(2)]).into());
+    // One group of all three rows, so that the first two values of it, which a window refuses where
+    // they are not as many as the group, are not by chance as many as the group has.
+    columns.push(ints("k", [Some(1), Some(1), Some(1)]).into());
     columns.push(Series::new("g".into(), ["x", "y", "x"]).into());
     columns.push(Series::new("f".into(), [true, false, true]).into());
     DataFrame::new(3, columns).expect("columns of three rows")
@@ -273,9 +277,12 @@ fn walk_says(report: &Report) -> Said {
 /// What Polars says of the document on a table with no rows, as the tables count a combination.
 fn empty_says(document: &Document) -> Said {
     let empty = frame().clear();
-    match document.run_on(&inputs(), &empty) {
-        Ok(report) => polars_says(&report),
-        Err(error) => Said::Refuses(first_line(&error)),
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        document.run_on(&inputs(), &empty)
+    })) {
+        Ok(Ok(report)) => polars_says(&report),
+        Ok(Err(error)) => Said::Refuses(first_line(&error)),
+        Err(_) => Said::Refuses("Polars panicked".to_owned()),
     }
 }
 
@@ -500,18 +507,64 @@ struct Found {
     walked: Option<After>,
     /// The dtype the walk writes for the result of the last call.
     walked_name: Option<String>,
+    /// How many values the walk says the expression gives, where it says.
+    walked_count: Option<Count>,
 }
 
 fn ask(case: &Case) -> Result<Found, String> {
     let (value, path) = case.document();
     let document =
         Document::read(&document(vec![value])).map_err(|error| format!("unreadable: {error}"))?;
-    let report = document
-        .run_on(&inputs(), &frame())
-        .map_err(|error| format!("no schema: {error}"))?;
-    let mut polars = polars_says(&report);
+    // A panic of Polars' is a refusal where the rows run, as the tables count it.
+    let (report, panicked) = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        document.run_on(&inputs(), &frame())
+    })) {
+        Ok(report) => (
+            report.map_err(|error| format!("no schema: {error}"))?,
+            false,
+        ),
+        Err(_) => (
+            document
+                .run(&inputs(), frame().lazy())
+                .map_err(|error| format!("no schema: {error}"))?,
+            true,
+        ),
+    };
+    let mut polars = if panicked {
+        Said::Refuses("Polars panicked".to_owned())
+    } else {
+        polars_says(&report)
+    };
     if polars == Said::Accepts && empty_says(&document) != Said::Accepts {
         polars = Said::Refuses("the table with no rows".to_owned());
+    }
+    // What the rows give, which the tables count as the dtype when the schema and the rows agree
+    // in class, as Polars gives `std` of a list of text the schema of the text and a float.
+    let rows = (polars == Said::Accepts)
+        .then(|| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                document.rows(
+                    &inputs(),
+                    &frame(),
+                    &StepId::new("s").expect("an identifier"),
+                    10,
+                )
+            }))
+            .ok()
+            .and_then(Result::ok)
+        })
+        .flatten();
+    if let (Some(rows), Some(schema)) = (&rows, report.steps()[0].schema()) {
+        let class = |dtype: &DataType| Representative::of(dtype);
+        let differs = rows.schema().len() != schema.len()
+            || rows
+                .schema()
+                .iter()
+                .zip(schema.iter())
+                .any(|((_, ran), (_, planned))| ran != planned && class(ran) != class(planned));
+        if differs {
+            polars = Said::Refuses("the schema and the rows differ".to_owned());
+        }
     }
     let walk = walk_says(&report);
     let expression = report.steps()[0]
@@ -529,6 +582,12 @@ fn ask(case: &Case) -> Result<Found, String> {
         .find(|expression| expression.place().path() == path)
         .and_then(|expression| expression.places().last().copied().flatten())
         .map(|place| place.after());
+    let walked_count = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|expression| expression.place().path() == path)
+        .and_then(|expression| expression.count());
     let walked_name = report.steps()[0]
         .walk()
         .expressions()
@@ -536,18 +595,8 @@ fn ask(case: &Case) -> Result<Found, String> {
         .find(|expression| expression.place().path() == path)
         .and_then(|expression| expression.calls().last()?.verdict()?.allowance())
         .and_then(|allowance| allowance.result().map(|result| result.name().to_owned()));
-    let polars_values = (case.place == Place::Select && polars == Said::Accepts)
-        .then(|| {
-            document
-                .rows(
-                    &inputs(),
-                    &frame(),
-                    &StepId::new("s").expect("an identifier"),
-                    10,
-                )
-                .ok()
-                .map(|rows| rows.height())
-        })
+    let polars_values = (case.place == Place::Select)
+        .then(|| rows.as_ref().map(|rows| rows.height()))
         .flatten();
     Ok(Found {
         polars,
@@ -556,7 +605,35 @@ fn ask(case: &Case) -> Result<Found, String> {
         polars_values,
         walked,
         walked_name,
+        walked_count,
     })
+}
+
+/// What the walk refuses where Polars runs the document, and why it is right to: the words its
+/// refusal begins with, and the reason.
+const STRICTER: &[(&str, &str)] = &[
+    (
+        "the schema says",
+        "a method whose schema and whose rows differ in dtype is refused wherever it stands, as the \
+         tables count it, though a call after it that reads no dtype hides the difference",
+    ),
+    (
+        "conversion from `str`",
+        "the tables are measured on text that is a duration, which converts to no whole number, and \
+         the text of a column of digits does: what the data decide",
+    ),
+    (
+        "conversion from `i64` to `null`",
+        "the tables stand the number 1 in for a value of the dtype Null where Polars reads one \
+         value, which no number converts to, and a null the column holds is one",
+    ),
+];
+
+/// Whether the walk's refusal `reason` of `case`, which Polars runs, is one that is named.
+fn stricter_on_purpose(case: &Case, reason: &str) -> bool {
+    // Polars drops a sort key of one value without meeting it.
+    (case.place == Place::Sort && case.receiver == Receiver::OneValue)
+        || STRICTER.iter().any(|(words, _)| reason.starts_with(words))
 }
 
 /// A case that is not asked, or that the editor refuses more strictly than Polars on purpose:
@@ -571,27 +648,54 @@ fn excepted(case: &Case) -> bool {
     })
 }
 
-/// The disagreements of `cases`, each with a line that says what differed.
-fn disagreements(cases: &[Case]) -> (Vec<String>, usize) {
-    let mut found = Vec::new();
+/// One disagreement: what kind it is, with the place and the method, and the line that says what
+/// differed in the case.
+type Disagreement = (String, String);
+
+fn kind(case: &Case, kind: &str) -> String {
+    format!("{:?} {}.{}, {kind}", case.place, case.namespace, case.name)
+}
+
+/// The disagreements of `cases`, each of a kind and with a line that says what differed.
+fn disagreements(cases: &[Case]) -> (Vec<Disagreement>, usize) {
+    let mut found: Vec<Disagreement> = Vec::new();
     let mut asked = 0;
     for case in cases.iter().filter(|case| !excepted(case)) {
         asked += 1;
-        let said = match ask(case) {
-            Ok(said) => said,
-            Err(error) => {
-                found.push(format!("{}: {error}", case.label()));
+        let said = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ask(case))) {
+            Ok(Ok(said)) => said,
+            Ok(Err(error)) => {
+                found.push((
+                    kind(case, "unreadable"),
+                    format!("{}: {error}", case.label()),
+                ));
+                continue;
+            }
+            Err(_) => {
+                found.push((kind(case, "Polars panicked"), case.label()));
                 continue;
             }
         };
         let class = |dtype: &DataType| Representative::of(dtype);
         match (&said.polars, &said.walk) {
-            (Said::Accepts, Said::Accepts | Said::NotKnown) => {}
-            (Said::Refuses(_), Said::Refuses(_) | Said::NotKnown) => {}
+            (Said::Accepts, Said::Accepts | Said::NotKnown)
+            | (Said::Refuses(_), Said::Refuses(_) | Said::NotKnown) => {}
+            // The walk is stricter than Polars on purpose, for a reason that is named.
+            (Said::Accepts, Said::Refuses(reason)) if stricter_on_purpose(case, reason) => {
+                continue;
+            }
             (polars, walk) => {
-                found.push(format!(
-                    "{}: Polars {polars:?}, the walk {walk:?}",
-                    case.label()
+                let words = |said: &Said| match said {
+                    Said::Accepts => "accepts".to_owned(),
+                    Said::Refuses(_) => "refuses".to_owned(),
+                    Said::NotKnown => "does not know".to_owned(),
+                };
+                found.push((
+                    kind(
+                        case,
+                        &format!("Polars {}, the walk {}", words(polars), words(walk)),
+                    ),
+                    format!("{}: Polars {polars:?}, the walk {walk:?}", case.label()),
                 ));
                 continue;
             }
@@ -599,45 +703,78 @@ fn disagreements(cases: &[Case]) -> (Vec<String>, usize) {
         if said.walk == Said::NotKnown {
             // Only what has no class is not known.
             if !BEYOND.contains(&case.column.as_str()) {
-                found.push(format!("{}: the walk does not know", case.label()));
+                found.push((kind(case, "the walk does not know"), case.label()));
             }
             continue;
         }
-        if said.polars == Said::Accepts && case.place == Place::Select {
+        // The dtype after the last call, and in a select the number of values; in a window, even one
+        // that joins the values of a group into a list, the dtype it gives.
+        if said.polars == Said::Accepts
+            && matches!(
+                case.place,
+                Place::Select | Place::Window | Place::WindowThatJoins
+            )
+        {
             let dtype = said.polars_dtype.as_ref().and_then(class);
             let walked = said.walked.map(|after| match after {
                 After::Value { dtype, shape } => (Some(dtype), Some(shape)),
                 _ => (None, None),
             });
+            let walked_class = walked.and_then(|(dtype, _)| dtype);
             let shape = said.polars_values.map(|height| match height {
                 1 => Shape::One,
                 3 => Shape::Many,
                 _ => Shape::Counted,
             });
             // An array is written with its own width, which is not the one the tables measured.
+            // What the walk does not know after a window of one value that joins is no claim.
+            let silent = case.place != Place::Select && walked_class.is_none() && dtype.is_some();
             let name_differs = matches!(said.polars_dtype, Some(DataType::Array(..)))
+                && said.walked_name.is_some()
                 && said.walked_name.as_deref()
                     != said.polars_dtype.as_ref().map(dtype_name).as_deref();
             if name_differs {
-                found.push(format!(
-                    "{}: Polars gives {:?}, the walk writes {:?}",
-                    case.label(),
-                    said.polars_dtype,
-                    said.walked_name
+                found.push((
+                    kind(case, "the width of an array"),
+                    format!(
+                        "{}: Polars gives {:?}, the walk writes {:?}",
+                        case.label(),
+                        said.polars_dtype,
+                        said.walked_name
+                    ),
                 ));
-            } else if walked.map(|(dtype, _)| dtype) != Some(dtype) {
-                found.push(format!(
-                    "{}: Polars gives {:?}, the walk {:?}",
-                    case.label(),
-                    said.polars_dtype,
-                    walked
+            } else if !silent && walked_class != dtype {
+                found.push((
+                    kind(case, "the dtype"),
+                    format!(
+                        "{}: Polars gives {:?}, the walk {:?}",
+                        case.label(),
+                        said.polars_dtype,
+                        walked
+                    ),
+                ));
+            } else if case.place == Place::Select
+                && case.receiver == Receiver::Count
+                && said.walked_count != Some(Count::AtMost(2))
+            {
+                found.push((
+                    kind(case, "the count of values"),
+                    format!(
+                        "{}: the first two values give at most two, the walk says {:?}",
+                        case.label(),
+                        said.walked_count
+                    ),
                 ));
             } else if let (Some(shape), Some((_, Some(walked)))) = (shape, walked)
+                && case.place == Place::Select
                 && shape != walked
             {
-                found.push(format!(
-                    "{}: Polars gives {shape:?}, the walk {walked:?}",
-                    case.label()
+                found.push((
+                    kind(case, "the number of values"),
+                    format!(
+                        "{}: Polars gives {shape:?}, the walk {walked:?}",
+                        case.label()
+                    ),
                 ));
             }
         }
@@ -645,15 +782,20 @@ fn disagreements(cases: &[Case]) -> (Vec<String>, usize) {
     (found, asked)
 }
 
-fn report(found: &[String], asked: usize, what: &str) {
+/// Asserts there is no disagreement, listing each kind with how many cases and one of them.
+fn report(found: &[Disagreement], asked: usize, what: &str) {
+    let mut kinds: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
+    for (kind, line) in found {
+        kinds.entry(kind).or_insert((0, line)).0 += 1;
+    }
     assert!(
         found.is_empty(),
-        "{} of {asked} cases of {what} disagree:\n{}",
+        "{} of {asked} cases of {what} disagree, of {} kinds:\n{}",
         found.len(),
-        found
+        kinds.len(),
+        kinds
             .iter()
-            .take(40)
-            .cloned()
+            .map(|(kind, (count, line))| format!("{count} x {kind}, as {line}"))
             .collect::<Vec<_>>()
             .join("\n")
     );
@@ -665,7 +807,7 @@ fn report(found: &[String], asked: usize, what: &str) {
 #[test]
 fn the_catalogue_holds_the_thirty_eight_methods() {
     let ids = identifiers();
-    assert_eq!(ids.len(), 38 - 0, "{ids:?}");
+    assert_eq!(ids.len(), 38, "{ids:?}");
     let missing: Vec<&String> = ids
         .iter()
         .filter(|id| catalog::entry(id).is_none())

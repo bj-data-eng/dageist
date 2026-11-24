@@ -338,7 +338,31 @@ fn methods() -> Vec<&'static Entry> {
 /// until every shape exists. [`Counting`](catalog::Counting) says which methods, and `is_in`, whose
 /// count follows the dtype of the values it is given, is one too.
 fn is_held_back(entry: &Entry) -> bool {
-    catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
+    catalog::Counting::of(entry, &[]).is_some()
+        || entry.id().as_str() == "Expr.is_in"
+        || is_of_nested_dtypes(entry)
+}
+
+/// Whether a method is one of the `list` or the `arr` namespace, which a campaign draws only where a
+/// focus names it, and then on a column of lists or arrays of any element dtype: the tables measure
+/// such a method on every one of them, and the classes the others judge by a sibling are drawn by
+/// the campaigns that focus on these.
+fn is_of_nested_dtypes(entry: &Entry) -> bool {
+    let id = entry.id().as_str();
+    id.starts_with("Expr.list.") || id.starts_with("Expr.arr.")
+}
+
+/// The classes a column under test may have: the measured ones, and where the focus holds a method of
+/// lists or arrays, the lists and arrays of every element dtype too.
+fn receivers(focus: Option<&Focus>) -> Vec<Representative> {
+    if focus.is_some_and(|focus| focus.methods.iter().any(|entry| is_of_nested_dtypes(entry))) {
+        Representative::ALL
+            .into_iter()
+            .filter(|class| class.is_nested())
+            .collect()
+    } else {
+        Representative::MEASURED.to_vec()
+    }
 }
 
 /// The functions that start a chain and take expressions, which a chain may start from besides a
@@ -530,7 +554,7 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         return None;
     }
     let mut draw = Draw::new(bytes);
-    let receiver = draw.pick(&Representative::MEASURED);
+    let receiver = draw.pick(&receivers(focus));
     let argument = draw.pick(&Representative::MEASURED);
     let host = draw.weighted(&Host::ALL);
     // A campaign focused on steps draws one of them for most cases, and nothing more is drawn
@@ -1687,7 +1711,14 @@ impl Gen<'_> {
         class: Representative,
         shape: Shape,
     ) -> Option<(Call, Next)> {
-        let methods = methods();
+        // The methods of lists and arrays are drawn only where a focus names them, and are not in the
+        // pool otherwise, so that the cases of a campaign without one are what they were.
+        let methods: Vec<&Entry> = methods()
+            .into_iter()
+            .filter(|entry| {
+                !is_of_nested_dtypes(entry) || self.focus.is_some_and(|focus| focus.holds(entry))
+            })
+            .collect();
         for attempt in 0..6 {
             let mut chosen = methods[self.draw.below(methods.len())];
             if is_held_back(chosen) && !self.focus.is_some_and(|focus| focus.holds(chosen)) {

@@ -527,6 +527,21 @@ impl ResultDtype {
     }
 }
 
+impl ResultDtype {
+    /// The dtype written for an array of `width`, where this is an array as the tables measured
+    /// it, at the width they measured arrays at; any other dtype as it is.
+    #[must_use]
+    pub(super) fn of_width(&self, width: usize) -> Self {
+        match self.name.strip_suffix(&format!(", {MEASURED_WIDTH})")) {
+            Some(inside) if matches!(self.class, Some(Representative::Array(_))) => Self {
+                name: format!("{inside}, {width})"),
+                class: self.class,
+            },
+            _ => self.clone(),
+        }
+    }
+}
+
 impl fmt::Display for ResultDtype {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.name)

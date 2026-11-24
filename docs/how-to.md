@@ -496,6 +496,16 @@ generator of the tables then writes `counted` for it in the dtype and option tab
 measures its context going on to one value. The fuzz target draws such a method, and such a function, only where
 `DAGEIST_FUZZ_FOCUS` names it: a campaign without a focus that draws them finds counts that no control settles, as
 [the explanation](explanation.md#what-the-tables-are-checked-against) lists.
+A method that follows a list or an array is measured on the classes `measured_classes` in
+`crates/dageist-engine/src/allowed/table.rs` names: the 26 of `Representative::MEASURED`, which a list or an
+array of another element dtype is read as by `Representative::sibling`; those and the lists and arrays of
+the core element dtypes, for a method `SENSITIVE` names, whose answer depends on the element dtype; and every
+class, for a method of the `list` or the `arr` namespace. The test
+`allowed::tests::siblings` runs Polars on every combination that is read as another and fails with the
+methods that need to be named, or that are named and need not be, so a new method is held to the claim by
+running it. A method that Polars panics on for an element dtype says so in `Rule::forbids_receiver`, which
+the tables, the offers and a run of a document read before they ask Polars, and `allowed::tests::panics`
+runs the combination in a process of its own to show it.
 A new step of a table also needs what a new step starts with, in `start_step` in
 `crates/dageist-engine/src/catalog/starting.rs`, and, where it has a flag or a choice, what the generator
 of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.

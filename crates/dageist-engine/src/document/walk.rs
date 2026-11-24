@@ -22,7 +22,8 @@ use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
-    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
+    Place as OfferPlace, Position as Slot, Refusal, RefusalSource, Representative, Rule, Shape,
+    Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -178,6 +179,7 @@ impl WalkRefusal {
 pub struct Walk {
     expressions: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
+    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
 }
 
@@ -194,6 +196,13 @@ impl Walk {
     #[must_use]
     pub const fn refusal(&self) -> Option<&WalkRefusal> {
         self.refusal.as_ref()
+    }
+
+    /// The first call that Polars panics on, which no document may run: refused by a rule
+    /// before Polars is asked. It is the first thing refused only where nothing came before it.
+    #[must_use]
+    pub const fn unsafe_to_run(&self) -> Option<&WalkRefusal> {
+        self.unsafe_to_run.as_ref()
     }
 
     /// Why the tables could not be asked past a point, where they could not.
@@ -230,6 +239,7 @@ impl Step {
             slots: Vec::new(),
             walked: Vec::new(),
             refusal: None,
+            unsafe_to_run: None,
             not_known: None,
         };
         walker.arguments(self.call(), false);
@@ -240,6 +250,7 @@ impl Step {
         Walk {
             expressions: walker.walked,
             refusal: walker.refusal,
+            unsafe_to_run: walker.unsafe_to_run,
             not_known: walker.not_known,
         }
     }
@@ -331,6 +342,8 @@ struct Around {
     receiver_loose: Option<Loose>,
     /// The unit the moment or the length of time the link follows is counted in, where it is known.
     unit: Option<TimeUnit>,
+    /// The width of the array the link follows, where it is known.
+    width: Option<usize>,
     /// Whether the value the link follows is one that a part widened: a value of one row that a method
     /// met with each of the many values of a part, which a window refuses.
     widened: bool,
@@ -390,6 +403,8 @@ struct Walker<'a> {
     slots: Vec<Slot>,
     walked: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
+    /// The first call that Polars panics on, whether or not another was refused before it.
+    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
     /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
     zones: Vec<String>,
@@ -880,6 +895,16 @@ fn unit_after(link: &Call, before: Option<TimeUnit>, standing: &Standing) -> Opt
     before
 }
 
+/// The width of the array the chain gives after a call that follows one of the width `before`: the
+/// same where the call gives an array, as sorting and reversing one does, and none where it gives
+/// anything else.
+fn width_after(before: Option<usize>, standing: &Standing) -> Option<usize> {
+    let result = standing.verdict()?.allowance()?.result()?;
+    matches!(result.class(), Some(Representative::Array(_)))
+        .then_some(before)
+        .flatten()
+}
+
 /// The class a literal has, when its dtype is known without another operand:
 /// one it was given, or text, a flag, or a null, which have one.
 fn literal_class(call: &Call) -> Option<Representative> {
@@ -963,13 +988,21 @@ impl Walker<'_> {
     }
 
     fn refuse_given(&mut self, refusal: &Refusal, at_end: bool, argument_unknown: bool) {
+        let found = WalkRefusal {
+            place: self.here(),
+            refusal: refusal.clone(),
+            at_end,
+            argument_unknown,
+        };
+        if matches!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::ElementDtypeIsImplemented)
+        ) && self.unsafe_to_run.is_none()
+        {
+            self.unsafe_to_run = Some(found.clone());
+        }
         if self.refusal.is_none() {
-            self.refusal = Some(WalkRefusal {
-                place: self.here(),
-                refusal: refusal.clone(),
-                at_end,
-                argument_unknown,
-            });
+            self.refusal = Some(found);
         }
     }
 
@@ -1478,6 +1511,14 @@ impl Walker<'_> {
         unit_of(&self.start_dtype(start)?)
     }
 
+    /// The width of the array a start gives, where its arguments decide it.
+    fn start_width(&self, start: &Call) -> Option<usize> {
+        match self.start_dtype(start)? {
+            DataType::Array(_, width) => Some(width),
+            _ => None,
+        }
+    }
+
     /// The class a start gives, where its arguments decide it.
     fn start_class(&self, start: &Call) -> Option<Representative> {
         match start.entry().id().as_str() {
@@ -1598,7 +1639,8 @@ impl Walker<'_> {
                                 .as_ref()
                                 .map(|(first, second)| (first.as_str(), second.as_str())),
                         )
-                        .following(self.start_unit(start));
+                        .following(self.start_unit(start))
+                        .following_width(self.start_width(start));
                     if counted_by_arguments {
                         // A range or a repeat gives as many values as its arguments fix, which is
                         // neither one value nor as many as the table has rows.
@@ -1757,6 +1799,10 @@ impl Walker<'_> {
             Start::Call(start) => self.start_unit(start),
             _ => None,
         };
+        let mut width = match expression.start() {
+            Start::Call(start) => self.start_width(start),
+            _ => None,
+        };
         let mut zone = match expression.start() {
             Start::Call(start) => self.start_zone(start),
             _ => None,
@@ -1801,12 +1847,14 @@ impl Walker<'_> {
                     branches_are_one,
                     receiver_loose,
                     unit,
+                    width,
                     widened,
                     zone,
                     made_of_literals: literal_prefix,
                 },
             );
             unit = unit_after(link, unit, &standing);
+            width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
             literal_prefix = literal_prefix && call_is_made_of_literals(link);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
@@ -2013,6 +2061,7 @@ impl Walker<'_> {
             branches_are_one,
             receiver_loose,
             unit,
+            width,
             widened,
             zone,
             made_of_literals,
@@ -2306,6 +2355,7 @@ impl Walker<'_> {
                     .with_durations(&durations)
                     .with_time_zones(&time_zones)
                     .following(unit)
+                    .following_width(width)
                     .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
@@ -2410,6 +2460,7 @@ impl Walker<'_> {
             .with_durations(&durations)
             .with_time_zones(&time_zones)
             .following(unit)
+            .following_width(width)
             .in_zone(zone_name.as_deref())
             .with_zone_clash(clash_of_zones);
         let chosen = match gives {

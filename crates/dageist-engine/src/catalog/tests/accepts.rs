@@ -34,10 +34,10 @@ fn group(key: &str) -> Dtypes {
 /// of two whole numbers and one of arrays of two, which it lacks.
 fn typed_sample() -> LazyFrame {
     sample().with_columns([
-        concat_list([col("i"), col("i")])
+        concat_list([col("i"), col("i") * lit(10)])
             .expect("a list of two")
             .alias("l"),
-        concat_list([col("i"), col("i")])
+        concat_list([col("i"), col("i") * lit(10)])
             .expect("a list of two")
             .list()
             .to_array(2)
@@ -236,6 +236,7 @@ fn polars_resolves(expr: Expr) -> PolarsResult<DataType> {
 #[test]
 fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
     let mut checked = 0;
+    let mut refused = Vec::new();
     for entry in entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
@@ -249,18 +250,35 @@ fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
                     .into_iter()
                     .map(|operand| polars_resolves(built(entry, column, operand)))
                     .collect();
-                assert!(
-                    results.iter().any(Result::is_ok),
-                    "{} claims {:?} but Polars refuses it on {column}: {}",
-                    entry.id().as_str(),
-                    entry.accepts(),
-                    results[0].as_ref().unwrap_err()
-                );
+                if !results.iter().any(Result::is_ok) {
+                    refused.push(format!(
+                        "{} claims {:?} but Polars refuses it on {column}: {}",
+                        entry.id().as_str(),
+                        entry.accepts(),
+                        first_line(results[0].as_ref().unwrap_err())
+                    ));
+                }
                 checked += 1;
             }
         }
     }
+    assert!(
+        refused.is_empty(),
+        "{} methods claim a dtype Polars refuses:\n{}",
+        refused.len(),
+        refused.join("\n")
+    );
     assert!(checked > 100, "{checked} method and dtype pairs were built");
+}
+
+/// The first line of what Polars says.
+fn first_line(error: &PolarsError) -> String {
+    error
+        .to_string()
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .to_owned()
 }
 
 #[test]
