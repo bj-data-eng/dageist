@@ -193,3 +193,34 @@ fn a_cast_gives_the_dtype_it_is_given_whichever_list_or_array_it_follows() {
         }
     }
 }
+
+#[test]
+fn a_refusal_read_from_the_class_that_stands_for_a_list_names_the_dtype_that_was_asked() {
+    use crate::allowed::offers::{After, Chosen, Place, Verdict, offer};
+    use crate::allowed::{Context, Outer, Shape};
+    // Polars refuses `approx_n_unique` of an array, in words that name the dtype of the array.
+    let entry = crate::catalog::entry("Expr.approx_n_unique").expect("an entry");
+    for asked in [
+        Representative::Array(Inner::Date),
+        Representative::Array(Inner::DatetimeZoned),
+        Representative::Array(Inner::String),
+    ] {
+        let place = Place::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: asked,
+                shape: Shape::Many,
+            },
+        );
+        let Verdict::Refused(refusal) = offer(entry, &place, &Chosen::default()) else {
+            panic!("Polars refuses it of {asked}");
+        };
+        let measured = Representative::Array(Inner::Int64).dtype().to_string();
+        assert!(
+            refusal.reason().contains(&asked.dtype().to_string())
+                && !refusal.reason().contains(&measured),
+            "the refusal of {asked} names {measured} and not it: {}",
+            refusal.reason()
+        );
+    }
+}
