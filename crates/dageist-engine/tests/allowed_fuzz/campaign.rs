@@ -630,6 +630,22 @@ mod tests {
     }
 
     #[test]
+    fn the_run_may_draw_again_as_many_cases_as_the_target_declares_and_no_more() {
+        // The coverage the target declares and the number of cases the run puts up with are one
+        // value, so they cannot be set apart again and end a run for coverage it was allowed.
+        let described = include_str!("descriptor.toml").replace(
+            "max_generation_rejections = 1000000",
+            "max_generation_rejections = 5000",
+        );
+        let target = AllowedTarget::described_by(&described);
+        assert_eq!(target.descriptor().max_generation_rejections(), 5000);
+        let config = property_config(&target, &settings("campaign-config"));
+        assert_eq!(u64::from(config.max_rejections), 5000);
+        let config = property_config(&AllowedTarget::new(), &settings("campaign-config"));
+        assert_eq!(u64::from(config.max_rejections), 1_000_000);
+    }
+
+    #[test]
     fn a_focused_campaign_may_draw_as_many_cases_again_as_it_is_allowed_to_reject() {
         // A campaign that is focused on few methods draws most of its cases again, as the run
         // is told to put up with up to a million; the coverage the target declares is the same.
