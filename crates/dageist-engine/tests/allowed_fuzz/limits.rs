@@ -95,9 +95,9 @@ pub enum Limit {
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
-    ///   made by a fill with a text literal after the call that counts, which reads as the
-    ///   number, or of what a column of the dtype Null is compared or calculated with, which
-    ///   stays null;
+    ///   made by a fill with a text literal after the call that counts, or of the numbers of a
+    ///   group cast to text by the call before it, which read as the numbers, or of what a column
+    ///   of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -812,6 +812,32 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
         .iter()
         .position(gives_a_number_of_its_own)
         .is_some_and(|counted| links[counted + 1..].iter().any(is_a_fill_with_text))
+}
+
+/// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
+/// group cast to text and nothing else: the values the pivot reads are columns of numbers, and the
+/// one call before it casts them to text. The text reads as the numbers, which the sample's does not.
+fn is_text_of_the_numbers_of_a_group(
+    frames: &Frames,
+    step: &Call,
+    chain: &Expression,
+    at: usize,
+) -> bool {
+    let Some(Value::Columns(values)) = step.argument("values") else {
+        return false;
+    };
+    matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
+        && at == 1
+        && chain.links().first().is_some_and(|cast| {
+            is(cast, "Expr.cast")
+                && matches!(cast.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")
+        })
+        && !values.is_empty()
+        && values.iter().all(|name| {
+            frames
+                .dtype_of(name)
+                .is_some_and(polars::prelude::DataType::is_primitive_numeric)
+        })
 }
 
 /// Whether `call` fills with a text literal, which gives the dtype text to what it fills.
@@ -4324,7 +4350,10 @@ fn applies(
                                             && converts_when_selected(&frames, chain, at + 1))
                                         // The text of a count or a position, which reads as it.
                                         || (is_a_failed_conversion_of_text(&refused.reason)
-                                            && makes_text_of_a_count(&chain.links()[..at]))
+                                            && (makes_text_of_a_count(&chain.links()[..at])
+                                                || is_text_of_the_numbers_of_a_group(
+                                                    &frames, step, chain, at,
+                                                )))
                                         // The values of a column of nulls, which stay null.
                                         || leaves_nulls_of_a_column_of_nulls(
                                             &frames, step, chain, at,
