@@ -931,3 +931,127 @@ fn is_in_meets_an_array_column_row_by_row_as_it_does_a_list() {
         RefusalSource::Rule(Rule::ValuesMeetInCount)
     );
 }
+
+#[test]
+fn a_window_takes_no_value_that_a_method_took_of_one_value_by_whatever_it_meets_it_in() {
+    // Python Polars 2.1.0 refuses each of these windows with "expressions must have matching group
+    // lengths": the one value that `head(1)` took of the sum of `k` is met by a method, a condition
+    // or a fill, and what they give is no more the value of each row of its group than it was.
+    let taken = || on("k", vec![call("Expr.sum", json!({})), head(1)]);
+    let over = call(
+        "Expr.over",
+        json!({ "partition_by": many(vec![field("k")]) }),
+    );
+    let after_the_sum = |link: Value| {
+        select_of(vec![on(
+            "a",
+            vec![call("Expr.sum", json!({})), link, over.clone()],
+        )])
+    };
+    let condition = |predicate: Value, then: Value, otherwise: Value| {
+        select_of(vec![chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![predicate]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": then })),
+                call("Then.otherwise", json!({ "statement": otherwise })),
+                over.clone(),
+            ],
+        )])
+    };
+    let a_sum = || on("a", vec![call("Expr.sum", json!({}))]);
+    let walks = vec![
+        (
+            "sum + take",
+            after_the_sum(call("Expr.add", json!({ "other": taken() }))),
+        ),
+        (
+            "sum * take",
+            after_the_sum(call("Expr.mul", json!({ "other": taken() }))),
+        ),
+        (
+            "sum ** take",
+            after_the_sum(call("Expr.pow", json!({ "exponent": taken() }))),
+        ),
+        (
+            "fill_null take",
+            after_the_sum(call("Expr.fill_null", json!({ "value": taken() }))),
+        ),
+        (
+            "clip take",
+            after_the_sum(call(
+                "Expr.clip",
+                json!({ "lower_bound": taken(), "upper_bound": taken() }),
+            )),
+        ),
+        (
+            "a literal + take",
+            select_of(vec![chain(
+                call("polars.lit", json!({ "value": { "integer": 1 } })),
+                vec![call("Expr.add", json!({ "other": taken() })), over.clone()],
+            )]),
+        ),
+        (
+            "a value of a condition",
+            condition(on("f", Vec::new()), taken(), a_sum()),
+        ),
+        (
+            "a predicate of a condition",
+            condition(
+                on(
+                    "b",
+                    vec![
+                        call("Expr.sum", json!({})),
+                        head(1),
+                        call("Expr.gt", json!({ "other": whole(0) })),
+                    ],
+                ),
+                a_sum(),
+                a_sum(),
+            ),
+        ),
+    ];
+    for (name, walk) in walks {
+        assert_eq!(
+            refusal_source(&walk),
+            RefusalSource::Rule(Rule::WindowInputIsNotCounted),
+            "{name}"
+        );
+    }
+    // What meets only aggregates is the value of each row of its group.
+    for (name, other) in [
+        ("sum + sum", a_sum()),
+        (
+            "sum + the sum of what head took",
+            on("k", vec![head(2), call("Expr.sum", json!({}))]),
+        ),
+        (
+            "sum + the first of what head took",
+            on("k", vec![head(2), call("Expr.first", json!({}))]),
+        ),
+    ] {
+        let walk = after_the_sum(call("Expr.add", json!({ "other": other })));
+        assert_eq!(walk.refusal(), None, "{name}");
+    }
+}
+
+#[test]
+fn a_method_that_is_not_told_how_many_takes_what_python_takes_of_the_rows() {
+    // Python's `head`, `tail` and `limit` take 10 values, and `top_k` and `bottom_k` take 5.
+    for (entry, count) in [
+        ("Expr.head", 10),
+        ("Expr.tail", 10),
+        ("Expr.limit", 10),
+        ("Expr.top_k", 5),
+        ("Expr.bottom_k", 5),
+    ] {
+        let walk = select_of(vec![on("a", vec![call(entry, json!({}))])]);
+        assert_eq!(
+            item(&walk, 0).count(),
+            Some(Count::AtMost(count)),
+            "{entry}"
+        );
+    }
+}
