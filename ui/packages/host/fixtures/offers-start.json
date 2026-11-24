@@ -295,6 +295,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.arg_unique",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.backward_fill",
       "verdict": {
         "kind": "refused",
@@ -431,6 +446,21 @@
     },
     {
       "entry": "Expr.bitwise_xor",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bottom_k",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1465,6 +1495,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.filter",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.first",
       "verdict": {
         "kind": "refused",
@@ -1525,6 +1570,36 @@
       "slots": []
     },
     {
+      "entry": "Expr.gather",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.gather_every",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.ge",
       "verdict": {
         "kind": "refused",
@@ -1556,6 +1631,21 @@
     },
     {
       "entry": "Expr.has_nulls",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.head",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1631,6 +1721,21 @@
     },
     {
       "entry": "Expr.is_first_distinct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.is_in",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1810,6 +1915,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.limit",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.log",
       "verdict": {
         "kind": "refused",
@@ -1916,6 +2036,21 @@
     },
     {
       "entry": "Expr.mod",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.mode",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -2275,6 +2410,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.search_sorted",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.shift",
       "verdict": {
         "kind": "refused",
@@ -2336,6 +2486,21 @@
     },
     {
       "entry": "Expr.skew",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.slice",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -2890,6 +3055,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.tail",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.tan",
       "verdict": {
         "kind": "refused",
@@ -2920,6 +3100,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.top_k",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.truediv",
       "verdict": {
         "kind": "refused",
@@ -2936,6 +3131,36 @@
     },
     {
       "entry": "Expr.truncate",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.unique",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.unique_counts",
       "verdict": {
         "kind": "refused",
         "refusal": {

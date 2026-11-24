@@ -22,6 +22,8 @@ pub(super) const DTYPES: &str = include_str!("../../../../api/catalogue/dtypes.t
 pub(super) const CONTEXTS: &str = include_str!("../../../../api/catalogue/contexts.txt");
 /// The committed option table.
 pub(super) const OPTIONS: &str = include_str!("../../../../api/catalogue/options.txt");
+/// The committed table of counts.
+pub(super) const COUNTS: &str = include_str!("../../../../api/catalogue/counts.txt");
 
 /// How many values a chain gives for the values of one group, or of the whole
 /// table: measured on three rows.
@@ -29,19 +31,33 @@ pub(super) const OPTIONS: &str = include_str!("../../../../api/catalogue/options
 pub enum Shape {
     /// One value: the chain reduces.
     One,
-    /// A value for every row, or any other number of them.
+    /// A value for every row: as many values as the table, or the group, has rows.
     Many,
+    /// Another number of values, which the data or the arguments decide: the rows that pass a
+    /// filter, the first `n` of them, the places of a range. It is neither one value nor the
+    /// table's rows, so a place that takes only those refuses it. [`Count`](super::Count) says what is known
+    /// of the number.
+    Counted,
 }
 
 impl Shape {
     /// Every shape.
-    pub const ALL: [Self; 2] = [Self::One, Self::Many];
+    pub const ALL: [Self; 3] = [Self::One, Self::Many, Self::Counted];
 
-    const fn name(self) -> &'static str {
+    /// The word the tables use.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
         match self {
             Self::One => "one",
             Self::Many => "many",
+            Self::Counted => "counted",
         }
+    }
+
+    /// The shape the tables write as `word`.
+    #[must_use]
+    pub fn from_name(word: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|shape| shape.name() == word)
     }
 }
 
@@ -133,11 +149,8 @@ impl Outcome {
             let (result, shape) = rest
                 .rsplit_once(' ')
                 .ok_or_else(|| format!("{text:?} gives no shape"))?;
-            let shape = match shape {
-                "one" => Shape::One,
-                "many" => Shape::Many,
-                other => return Err(format!("{other:?} is not a shape")),
-            };
+            let shape =
+                Shape::from_name(shape).ok_or_else(|| format!("{shape:?} is not a shape"))?;
             return Ok(Self::Allowed(Some(Produces {
                 result: ResultDtype::from_name(result),
                 shape,
@@ -458,6 +471,43 @@ impl OptionLine {
     }
 }
 
+/// One line of the table of counts: an expression of a [`Shape`] standing in a context, with the
+/// chain ending there.
+///
+/// The context table measures each entry as the entry gives it. How many values a chain gives is
+/// not the entry's alone, since a method that follows a count keeps it, so this table measures
+/// the counts themselves: a chain of one value, of as many as the table has rows and of another
+/// number of them, in each context, where Polars takes one value or the rows and refuses the rest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct CountLine {
+    pub context: Context,
+    pub shape: Shape,
+    pub outcome: Outcome,
+}
+
+impl CountLine {
+    #[cfg(test)]
+    pub(super) fn render(&self) -> String {
+        format!(
+            "{} | {} | {}",
+            self.context,
+            self.shape.name(),
+            self.outcome
+        )
+    }
+
+    pub(super) fn parse(line: &str) -> Result<Self, String> {
+        let fields = fields(line, 3)?;
+        Ok(Self {
+            context: Context::from_name(fields[0])
+                .ok_or_else(|| format!("{:?} is not a context", fields[0]))?,
+            shape: Shape::from_name(fields[1])
+                .ok_or_else(|| format!("{:?} is not a shape", fields[1]))?,
+            outcome: Outcome::parse(fields[2])?,
+        })
+    }
+}
+
 /// The lines of a committed table, header and blank lines left out, each with
 /// its number in the file.
 fn numbered<T>(
@@ -596,6 +646,7 @@ pub(super) struct Tables {
     pub dtypes: HashMap<DtypeKey, Outcome>,
     pub contexts: HashMap<ContextKey, ContextCell>,
     pub options: HashMap<OptionKey, Outcome>,
+    pub counts: HashMap<(Context, Shape), Outcome>,
 }
 
 impl Tables {
@@ -603,6 +654,7 @@ impl Tables {
         dtypes: &'static str,
         contexts: &'static str,
         options: &'static str,
+        counts: &'static str,
     ) -> Result<Self, (&'static str, TableError)> {
         let named = |table: &'static str| move |error| (table, error);
         let dtypes = lines(dtypes, DtypeLine::parse)
@@ -623,10 +675,16 @@ impl Tables {
             .into_iter()
             .map(|line| ((line.entry, line.receiver, line.options), line.outcome))
             .collect();
+        let counts = lines(counts, CountLine::parse)
+            .map_err(named("counts.txt"))?
+            .into_iter()
+            .map(|line| ((line.context, line.shape), line.outcome))
+            .collect();
         Ok(Self {
             dtypes,
             contexts,
             options,
+            counts,
         })
     }
 
@@ -634,7 +692,7 @@ impl Tables {
     /// of the repository, which a test of every table reports.
     pub(super) fn committed() -> &'static Self {
         static TABLES: LazyLock<Tables> =
-            LazyLock::new(|| match Tables::read(DTYPES, CONTEXTS, OPTIONS) {
+            LazyLock::new(|| match Tables::read(DTYPES, CONTEXTS, OPTIONS, COUNTS) {
                 Ok(tables) => tables,
                 Err((table, error)) => {
                     panic!("api/catalogue/{table} does not read, {error}")

@@ -15,6 +15,7 @@
 mod arguments;
 mod comparison;
 mod condition;
+mod counting;
 mod defaults;
 mod duration;
 mod entries;
@@ -29,6 +30,7 @@ mod words;
 pub use arguments::{Argument, Arguments, BuildError, PatternMeans};
 pub use comparison::Comparison;
 pub use condition::Conditional;
+pub use counting::Counting;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use duration::{DurationError, DurationUse, any_moment, check_duration};
 pub use left_out::{LeftOut, Reason, left_out};
@@ -396,6 +398,18 @@ impl Role {
     }
 }
 
+/// How a parameter that Polars reads as one value must be given it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OneValue {
+    /// One value that Polars can tell is one before the rows run: a number typed in or an aggregate,
+    /// and neither the rows, nor a count of values, nor the one value that a method took of one value,
+    /// as the first of them is.
+    Scalar,
+    /// One value of one row: the one value that a method took of one value is, and the rows and a
+    /// count of values are not.
+    SingleRow,
+}
+
 /// What a parameter that gives a number of values is given as many of as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AsManyAs {
@@ -455,6 +469,7 @@ pub struct Parameter {
     duration_string: Option<DurationUse>,
     takes_no_time_zone: bool,
     broadcasts_in_a_window: bool,
+    one_value: Option<OneValue>,
 }
 
 impl Parameter {
@@ -482,6 +497,7 @@ impl Parameter {
             duration_string: None,
             takes_no_time_zone: false,
             broadcasts_in_a_window: true,
+            one_value: None,
         }
     }
 
@@ -637,6 +653,13 @@ impl Parameter {
         self
     }
 
+    /// The same parameter, which Polars reads as one value and refuses to be given anything else, as
+    /// `shift`'s count of rows is.
+    const fn reading_one_value(mut self, how: OneValue) -> Self {
+        self.one_value = Some(how);
+        self
+    }
+
     /// The same parameter, which Python takes only by its name: it follows a
     /// bare `*` or a starred parameter in Python's signature.
     const fn keyword_only(mut self) -> Self {
@@ -660,6 +683,13 @@ impl Parameter {
     #[must_use]
     pub const fn name(&self) -> &'static str {
         self.name
+    }
+
+    /// How the parameter must be one value, where Polars reads it as one: it is refused the rows and
+    /// a count of values.
+    #[must_use]
+    pub const fn one_value(&self) -> Option<OneValue> {
+        self.one_value
     }
 
     /// What the parameter holds.

@@ -462,6 +462,12 @@ parameter of the time zone kind is given the zone `UTC` and a required choice it
 format `iso`, which every dtype takes, wherever the generator builds the call; what the zone a call is given
 decides of what it gives, a moment in it or in none, is the walk's, as is whether a duration typed into a method that
 reads one is a duration Polars reads, which it asks of Polars with the dtype that the method follows.
+A method that takes some of the values it follows, so that the data or the arguments decide how many it
+gives, is named in `Counting::of` in `crates/dageist-engine/src/catalog/counting.rs` with what decides it, and the
+walk works its count out of the arguments in `counted_by` in `crates/dageist-engine/src/document/walk.rs`. The
+generator of the tables then writes `counted` for it in the dtype and option tables, whatever three rows give, and
+measures its context going on to one value. The fuzz target draws such a method only where
+`DAGEIST_FUZZ_FOCUS` names it, until every shape of a count that the catalogue is to have exists.
 A new step of a table also needs what a new step starts with, in `start_step` in
 `crates/dageist-engine/src/catalog/starting.rs`, and, where it has a flag or a choice, what the generator
 of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.
@@ -472,7 +478,7 @@ Last, run the fuzz target for more seeds than the engine's tests do,
 
 ## Refresh The Tables Of Allowed Combinations
 
-The files `dtypes.txt`, `contexts.txt` and `options.txt` in
+The files `counts.txt`, `dtypes.txt`, `contexts.txt` and `options.txt` in
 [api/catalogue/](../api/catalogue/dtypes.txt) hold what Polars does with every
 combination of the catalogue, as
 [the explanation](explanation.md#which-combinations-polars-allows) describes.

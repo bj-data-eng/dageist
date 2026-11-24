@@ -21,7 +21,7 @@
 use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
+    self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
@@ -29,7 +29,7 @@ use crate::allowed::{
     is_count, is_left_unresolved, is_refused_as_a_count, is_required, keeps_its_dtype,
     operand_adapts, receiver_beside,
 };
-use crate::catalog::{self, Applies, AsManyAs, Comparison, Entry, Kind, Role};
+use crate::catalog::{self, Applies, AsManyAs, Comparison, Counting, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -76,6 +76,7 @@ pub struct WalkedExpression {
     calls: Vec<Standing>,
     next: Option<After>,
     ending: Option<Ending>,
+    count: Option<Count>,
 }
 
 impl WalkedExpression {
@@ -120,6 +121,16 @@ impl WalkedExpression {
     #[must_use]
     pub const fn ending(&self) -> Option<&Ending> {
         self.ending.as_ref()
+    }
+
+    /// How many values the expression gives, where that is neither one value nor as many as the
+    /// table has rows: what the arguments fix of it, such as `head(2)` of a column giving at most
+    /// two values, and where they fix nothing, that the count is not known. `None` where the
+    /// expression gives one value or as many as the rows, or where the walk could not say what it
+    /// gives.
+    #[must_use]
+    pub const fn count(&self) -> Option<Count> {
+        self.count
     }
 }
 
@@ -208,6 +219,7 @@ impl Step {
             .and_then(|mut table| table.collect_schema().ok());
         let mut walker = Walker {
             zones: Vec::new(),
+            selected: Vec::new(),
             step: self.call(),
             source,
             inputs,
@@ -220,6 +232,7 @@ impl Step {
             not_known: None,
         };
         walker.arguments(self.call(), false);
+        walker.selected_items_meet();
         walker.step_options(self.call());
         walker.nan_test_columns();
         walker.key_names();
@@ -227,6 +240,42 @@ impl Step {
             expressions: walker.walked,
             refusal: walker.refusal,
             not_known: walker.not_known,
+        }
+    }
+}
+
+/// What a value that a method took of one value is to Polars. It is one value that no row of a group
+/// takes as the value of the group, which a window refuses, and one that Polars cannot tell is one
+/// before the rows run, which the parameters that must be a scalar refuse. The two are carried by
+/// what a call reads, and not by the same parameters of it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Taken {
+    /// Whether a window refuses it.
+    window: bool,
+    /// Whether a parameter that must be a scalar refuses it.
+    scalar: bool,
+}
+
+impl Taken {
+    /// What a method that takes some of the values gives of one value.
+    const ALL: Self = Self {
+        window: true,
+        scalar: true,
+    };
+
+    fn or(self, other: Self) -> Self {
+        Self {
+            window: self.window || other.window,
+            scalar: self.scalar || other.scalar,
+        }
+    }
+
+    /// Only where the value is one: a count and the rows are refused by their shape.
+    fn if_one(self, shape: Shape) -> Self {
+        if shape == Shape::One {
+            self
+        } else {
+            Self::default()
         }
     }
 }
@@ -240,13 +289,20 @@ struct Operand {
     /// the operand it is used with.
     loose: Option<Loose>,
     shape: Shape,
+    /// How many values it gives where its shape is [`Shape::Counted`], as far as the arguments
+    /// fix it.
+    count: Count,
+    /// Where it is one value that a method took of one value, or one that meets such a value (the
+    /// first none or one of it, which no row of a group takes as the value of the group): which a
+    /// window refuses and which a parameter read as one value refuses.
+    taken: Taken,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
-    /// Whether how many values it gives can be counted on: not where a condition has one
+    /// Whether how many values it gives can be relied on: not where a condition has one
     /// expression for all its values, whose predicate Polars drops where it optimizes the plan
     /// and not where a call that is no elementwise one follows it.
-    counted: bool,
+    reliable: bool,
     /// The time zone it is a moment in, where the chain knows it.
     zone: Option<Zone>,
 }
@@ -287,10 +343,20 @@ enum Cur {
     Value {
         dtype: Option<Representative>,
         shape: Shape,
+        count: Count,
+        /// Where it is one value that a method took of one value, or one that meets such a value:
+        /// which a window refuses and which a parameter read as one value refuses.
+        taken: Taken,
     },
     Condition {
         state: ConditionState,
         values: Vec<Valued>,
+        /// What the predicates and values met so far give together: one value meets each of them,
+        /// and the others are as many as one another.
+        meeting: (Shape, Count),
+        /// Where a predicate or a value so far is one that a method took of one value: which a
+        /// window refuses and which a parameter read as one value refuses.
+        taken: Taken,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
         /// Whether every predicate and value so far gives one value, which a
@@ -320,6 +386,9 @@ struct Walker<'a> {
     not_known: Option<String>,
     /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
     zones: Vec<String>,
+    /// The items of a select, where each is, and what it gives: the values of the items are met
+    /// by one another in the table the select gives.
+    selected: Vec<(Place, Shape, Count)>,
 }
 
 /// The output names of a join's keys before the first whose name is not known, in
@@ -841,6 +910,59 @@ impl Walker<'_> {
         }
     }
 
+    /// Meets what parts give together, refusing where they are not as many as one another, and
+    /// giving what they are before the first that is not.
+    fn meet_all(&mut self, parts: impl Iterator<Item = (Shape, Count)>) -> (Shape, Count) {
+        let mut met = (Shape::One, Count::NotKnown);
+        for part in parts {
+            match meet(met, part) {
+                Some(next) => met = next,
+                None => {
+                    if let Err(refusal) = allowed::rule_forbids_values_of_other_counts() {
+                        self.refuse(&refusal, false);
+                    }
+                    return met;
+                }
+            }
+        }
+        met
+    }
+
+    /// Asks whether the items of a select, or of the columns a step adds, are as many as one another:
+    /// one value is met by each of the others, and the others are as many as one another. A step that
+    /// adds columns to a table gives them as many values as the table has rows, so none is a count
+    /// of values that the data or the arguments decide, as the first values of a column are.
+    fn selected_items_meet(&mut self) {
+        let adds = self.step.entry().id().as_str() == "LazyFrame.with_columns";
+        let mut met = (Shape::One, Count::NotKnown);
+        for at in 0..self.selected.len() {
+            let (place, shape, count) = self.selected[at].clone();
+            if shape == Shape::One {
+                continue;
+            }
+            // The table's rows are what the columns of a step that adds them meet.
+            let next = if adds {
+                meet((Shape::Many, Count::NotKnown), (shape, count))
+            } else {
+                meet(met, (shape, count))
+            };
+            match next {
+                Some(next) => met = next,
+                None => {
+                    if let Err(refusal) = allowed::rule_forbids_values_of_other_counts() {
+                        self.refusal.get_or_insert(WalkRefusal {
+                            place,
+                            refusal,
+                            at_end: true,
+                            argument_unknown: false,
+                        });
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
     /// Walks the arguments of `call`, and gives what each expression it holds
     /// has, by the parameter that holds it. `values_end` says whether the values
     /// of a condition that `call` is a link of end the predicate: the condition
@@ -1189,8 +1311,10 @@ impl Walker<'_> {
             dtype: None,
             loose: None,
             shape: Shape::Many,
+            count: Count::NotKnown,
+            taken: Taken::default(),
             known: false,
-            counted: false,
+            reliable: false,
             zone: None,
         };
         let mut calls: Vec<Standing> = Vec::new();
@@ -1213,6 +1337,7 @@ impl Walker<'_> {
                 calls,
                 next: None,
                 ending: None,
+                count: None,
             });
             return unsaid;
         };
@@ -1300,6 +1425,17 @@ impl Walker<'_> {
                             Cur::Condition {
                                 state: ConditionState::When,
                                 values: Vec::new(),
+                                meeting: self.meet_all(
+                                    start_arguments
+                                        .iter()
+                                        .filter(|(_, operand)| operand.known && operand.reliable)
+                                        .map(|(_, operand)| (operand.shape, operand.count)),
+                                ),
+                                taken: start_arguments
+                                    .iter()
+                                    .fold(Taken::default(), |all, (_, operand)| {
+                                        all.or(operand.taken)
+                                    }),
                                 zones: Vec::new(),
                                 single: start_arguments
                                     .iter()
@@ -1311,6 +1447,15 @@ impl Walker<'_> {
                             Cur::Value {
                                 dtype: class,
                                 shape: allowance.shape(),
+                                count: Count::NotKnown,
+                                // A function that makes a value of what it is given gives one that
+                                // was taken where one of them is.
+                                taken: start_arguments
+                                    .iter()
+                                    .fold(Taken::default(), |all, (_, operand)| {
+                                        all.or(operand.taken)
+                                    })
+                                    .if_one(allowance.shape()),
                             }
                         };
                     }
@@ -1327,12 +1472,16 @@ impl Walker<'_> {
                 cur = Cur::Value {
                     dtype: None,
                     shape: Shape::Many,
+                    count: Count::NotKnown,
+                    taken: Taken::default(),
                 };
             }
             Start::Input(name) => {
                 cur = Cur::Value {
                     dtype: None,
                     shape: Shape::Many,
+                    count: Count::NotKnown,
+                    taken: Taken::default(),
                 };
                 let standing = self.input_start(name, context, &mut cur, &mut last_end);
                 calls.push(standing);
@@ -1462,6 +1611,7 @@ impl Walker<'_> {
             Cur::Value {
                 dtype: Some(dtype),
                 shape,
+                ..
             } => Some(After::Value {
                 dtype: *dtype,
                 shape: *shape,
@@ -1469,36 +1619,74 @@ impl Walker<'_> {
             Cur::Condition { state, .. } => Some(After::Condition(*state)),
             _ => None,
         };
+        let count = match &cur {
+            Cur::Value {
+                dtype: Some(_),
+                shape: Shape::Counted,
+                count,
+                ..
+            } => Some(*count),
+            _ => None,
+        };
+        let held_here = held.is_some() && context == Context::step(Outer::Select);
+        let held_place = held_here.then(|| place.clone());
         self.walked.push(WalkedExpression {
             place,
             context: Some(context),
             calls,
             next,
             ending,
+            count,
         });
-        match cur {
-            Cur::Value { dtype, shape } => Operand {
+        let operand = match cur {
+            Cur::Value {
+                dtype,
+                shape,
+                count,
+                taken,
+            } => Operand {
                 dtype,
                 loose: match expression.start() {
                     Start::Call(start) if expression.links().is_empty() => loose_number(start),
                     _ => None,
                 },
                 shape,
+                count,
+                taken,
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
-                counted: dtype.is_some() && !branches_are_one,
+                reliable: dtype.is_some() && !branches_are_one,
                 zone,
             },
-            Cur::Condition { values, .. } => Operand {
+            Cur::Condition {
+                values,
+                meeting,
+                taken,
+                ..
+            } => Operand {
                 dtype: unify(&values),
                 loose: None,
-                shape: Shape::Many,
+                shape: if meeting.0 == Shape::Counted {
+                    Shape::Counted
+                } else {
+                    Shape::Many
+                },
+                count: meeting.1,
+                taken,
                 known: true,
-                counted: !branches_are_one,
+                reliable: !branches_are_one,
                 zone: None,
             },
             Cur::Dead => unsaid,
+        };
+        // What an item of a select gives is met by what the others give.
+        if let Some(place) = held_place
+            && operand.known
+            && operand.reliable
+        {
+            self.selected.push((place, operand.shape, operand.count));
         }
+        operand
     }
 
     /// Asks the tables about a chain that starts from the connected input
@@ -1538,6 +1726,8 @@ impl Walker<'_> {
                 *cur = Cur::Value {
                     dtype: Some(class),
                     shape: allowance.shape(),
+                    count: Count::NotKnown,
+                    taken: Taken::default(),
                 };
             }
         }
@@ -1581,6 +1771,33 @@ impl Walker<'_> {
                 },
             );
         }
+        // A window takes a value as long as its group. One value that a method took of one value is
+        // that of no row of it, where the aggregate of one value is the value of the group, unless
+        // the window joins the values of a group or explodes them.
+        if entry.id().as_str() == "Expr.over"
+            && matches!(
+                &cur,
+                Cur::Value {
+                    shape: Shape::One,
+                    taken: Taken { window: true, .. },
+                    ..
+                }
+            )
+            && !matches!(
+                link.argument("mapping_strategy"),
+                Some(Value::Choice(word)) if word == "join" || word == "explode"
+            )
+            && let Err(refusal) = allowed::rule_forbids_a_window_over_a_count()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         // Moments in two zones that a method is given to compare, subtract, fill or bind by one
         // another have no dtype in common.
         let clash = self
@@ -1602,6 +1819,8 @@ impl Walker<'_> {
             (
                 Cur::Value {
                     shape,
+                    count,
+                    taken,
                     dtype: alone,
                 },
                 Some(number),
@@ -1631,13 +1850,23 @@ impl Walker<'_> {
                             _ => None,
                         })
                 };
-                Cur::Value { dtype, shape }
+                Cur::Value {
+                    dtype,
+                    shape,
+                    count,
+                    taken,
+                }
             }
             (other, _) => other,
         };
         let after = match &cur {
             Cur::Dead => return (Cur::Dead, Standing::not_asked()),
-            Cur::Value { dtype: None, shape } => {
+            Cur::Value {
+                dtype: None,
+                shape,
+                count,
+                taken,
+            } => {
                 self.blind(format!(
                     "the dtype before {} is not known",
                     entry.id().as_str()
@@ -1647,6 +1876,8 @@ impl Walker<'_> {
                     Cur::Value {
                         dtype: None,
                         shape: *shape,
+                        count: *count,
+                        taken: *taken,
                     },
                     Standing::not_asked(),
                 );
@@ -1654,6 +1885,7 @@ impl Walker<'_> {
             Cur::Value {
                 dtype: Some(dtype),
                 shape,
+                ..
             } => After::Value {
                 dtype: *dtype,
                 shape: *shape,
@@ -1823,7 +2055,38 @@ impl Walker<'_> {
                 Some((result, shape)) => (result.class(), shape),
                 None => (None, Shape::Many),
             };
-            return (Cur::Value { dtype, shape }, standing);
+            // What a method that takes some of the values gives of how many is the arguments' to
+            // say, whether or not the dtype of one of them is known.
+            let (option_words, _) = option_words(link);
+            let option_words: Vec<(&str, &str)> = option_words
+                .iter()
+                .map(|(name, word)| (name.as_str(), word.as_str()))
+                .collect();
+            let (shape, count) = match &verdict {
+                Verdict::Allowed(allowance) if Counting::of(entry, &option_words).is_some() => {
+                    let receiver = match &cur {
+                        Cur::Value { shape, count, .. } => (*shape, *count),
+                        _ => (Shape::Many, Count::NotKnown),
+                    };
+                    self.counted_after(link, receiver, arguments, allowance)
+                        .unwrap_or((shape, Count::NotKnown))
+                }
+                _ => (shape, Count::NotKnown),
+            };
+            let receiver_taken = match &cur {
+                Cur::Value { taken, .. } => *taken,
+                _ => Taken::default(),
+            };
+            let taken = taken_after(link, receiver_taken, arguments, shape);
+            return (
+                Cur::Value {
+                    dtype,
+                    shape,
+                    count,
+                    taken,
+                },
+                standing,
+            );
         }
         let statement = arguments
             .iter()
@@ -1877,7 +2140,7 @@ impl Walker<'_> {
             None => chosen,
         };
         let verdict = allowed::offer(entry, &place, &chosen);
-        let standing = Standing {
+        let mut standing = Standing {
             follows: Some(after),
             verdict: Some(verdict.clone()),
         };
@@ -1905,11 +2168,79 @@ impl Walker<'_> {
             );
         }
         *last_end = Some(allowance.can_end().clone());
+        // How many values the call gives is what the shape of the call and the counts of what it
+        // follows and is given make of it, which the tables, measured with columns, do not say. Where
+        // it is not the shape that was offered, the chain may end where it does by the one it is.
+        let receiver = match &cur {
+            Cur::Value { shape, count, .. } => (*shape, *count),
+            _ => (Shape::Many, Count::NotKnown),
+        };
+        // The values a replacement lists and the default it gives are as many as what they meet, or
+        // one, where one of them is a count too.
+        if matches!(cur, Cur::Value { .. })
+            && !branches_are_one
+            && replaces_by_another_count(entry, arguments, receiver)
+            && let Err(refusal) = allowed::rule_forbids_values_of_other_counts()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // A parameter that Polars reads as one value is given one: not the rows, not a count, and, where it
+        // must be one that Polars can tell is one, not one that a method took of one value.
+        if matches!(cur, Cur::Value { .. })
+            && let Some((parameter, given)) = given_other_than_one_value(entry, arguments)
+            && let Err(refusal) =
+                allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter, given)
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        let receiver_taken = match &cur {
+            Cur::Value { taken, .. } => *taken,
+            _ => Taken::default(),
+        };
         let next = match (entry.applies(), cur) {
-            (Applies::Expression, _) => Cur::Value {
-                dtype: allowance.result().and_then(allowed::ResultDtype::class),
-                shape: broadcast(link, arguments, allowance.shape()),
-            },
+            (Applies::Expression, _) => {
+                let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
+                {
+                    Ok(found) => found,
+                    Err(refusal) => {
+                        self.refuse(&refusal, false);
+                        return (
+                            Cur::Dead,
+                            Standing {
+                                follows: standing.follows,
+                                verdict: Some(Verdict::Refused(refusal)),
+                            },
+                        );
+                    }
+                };
+                if shape != allowance.shape() {
+                    let again = allowed::offer(entry, &place, &chosen.giving_shape(shape));
+                    if let Verdict::Allowed(refreshed) = &again {
+                        *last_end = Some(refreshed.can_end().clone());
+                    }
+                    standing.verdict = Some(again);
+                }
+                Cur::Value {
+                    dtype: allowance.result().and_then(allowed::ResultDtype::class),
+                    shape,
+                    count,
+                    taken: taken_after(link, receiver_taken, arguments, shape),
+                }
+            }
             (
                 Applies::Condition,
                 Cur::Condition {
@@ -1918,9 +2249,47 @@ impl Walker<'_> {
                     single,
                     values_single,
                     known,
+                    meeting,
+                    taken,
                     ..
                 },
             ) => {
+                let taken = arguments
+                    .iter()
+                    .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
+                    .fold(taken, |all, (_, operand)| all.or(operand.taken));
+                // The predicates and the values a condition is given are as many as one another,
+                // unless the values are one expression, whose predicates Polars drops.
+                let mut meeting = meeting;
+                if !branches_are_one {
+                    let parts = arguments
+                        .iter()
+                        .filter(|(name, operand)| {
+                            matches!(name.as_str(), "predicates" | "statement")
+                                && operand.known
+                                && operand.reliable
+                        })
+                        .map(|(_, operand)| (operand.shape, operand.count));
+                    for part in parts {
+                        match meet(meeting, part) {
+                            Some(met) => meeting = met,
+                            None => {
+                                let Err(refusal) = allowed::rule_forbids_values_of_other_counts()
+                                else {
+                                    unreachable!("the rule always refuses")
+                                };
+                                self.refuse(&refusal, false);
+                                return (
+                                    Cur::Dead,
+                                    Standing {
+                                        follows: standing.follows,
+                                        verdict: Some(Verdict::Refused(refusal)),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
                 let single = single && given_single;
                 let values_single = values_single && given_values_single;
                 let known = known && given_known;
@@ -1939,6 +2308,26 @@ impl Walker<'_> {
                     _ => {
                         values.push(statement_class);
                         let dtype = if known { unify(&values) } else { None };
+                        let (shape, count) = if meeting.0 == Shape::Counted {
+                            meeting
+                        } else if (branches_are_one && values_single)
+                            || (!branches_are_one && single)
+                        {
+                            (Shape::One, Count::NotKnown)
+                        } else {
+                            // Where the values are one expression the predicates are dropped,
+                            // and the values give the shape.
+                            (Shape::Many, Count::NotKnown)
+                        };
+                        // What the condition gives is not the shape that its last link was offered
+                        // with: a count may not end where the rows do.
+                        if shape != allowance.shape() {
+                            let again = allowed::offer(entry, &place, &chosen.giving_shape(shape));
+                            if let Verdict::Allowed(refreshed) = &again {
+                                *last_end = Some(refreshed.can_end().clone());
+                            }
+                            standing.verdict = Some(again);
+                        }
                         // Numbers typed without a dtype that have no typed value beside them
                         // have none to give, and Polars cannot always resolve them where it
                         // runs, so whether the expression may end here is not known.
@@ -1948,15 +2337,9 @@ impl Walker<'_> {
                         return (
                             Cur::Value {
                                 dtype,
-                                // Where the values are one expression the predicates
-                                // are dropped, and the values give the shape.
-                                shape: if (branches_are_one && values_single)
-                                    || (!branches_are_one && single)
-                                {
-                                    Shape::One
-                                } else {
-                                    Shape::Many
-                                },
+                                shape,
+                                count,
+                                taken: taken.if_one(shape),
                             },
                             standing,
                         );
@@ -1965,6 +2348,8 @@ impl Walker<'_> {
                 Cur::Condition {
                     state,
                     values,
+                    meeting,
+                    taken,
                     zones,
                     single,
                     values_single,
@@ -1974,6 +2359,323 @@ impl Walker<'_> {
             _ => Cur::Dead,
         };
         (next, standing)
+    }
+
+    /// How many values the call of a method gives, from the count of the value it follows, what it
+    /// is given and what the tables offered of it. `receiver` is the shape and the count of what it
+    /// follows. The refusal is where the values it meets are not as many as one another, or the
+    /// window it is cannot be given what it follows.
+    fn counted_after(
+        &self,
+        link: &Call,
+        receiver: (Shape, Count),
+        arguments: &[(String, Operand)],
+        offered: &allowed::Allowance,
+    ) -> Result<(Shape, Count), Refusal> {
+        let entry = link.entry();
+        let (words, _) = option_words(link);
+        let words: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
+        let operand = |name: &str| {
+            arguments
+                .iter()
+                .find(|(given, _)| given == name)
+                .map(|(_, operand)| operand)
+                .filter(|operand| operand.known && operand.reliable)
+        };
+        // The values a method that gives a count meets as it follows them: a test of which hold,
+        // as many as the values it follows, or one.
+        let meets = |receiver: (Shape, Count)| -> Result<(Shape, Count), Refusal> {
+            let mut met = receiver;
+            for (name, given) in arguments {
+                if !(given.known && given.reliable && meets_receiver(entry, name, given)) {
+                    continue;
+                }
+                met = meet(met, (given.shape, given.count)).ok_or_else(|| {
+                    allowed::rule_forbids_values_of_other_counts()
+                        .expect_err("the rule always refuses")
+                })?;
+            }
+            Ok(met)
+        };
+        if let Some(counting) = Counting::of(entry, &words) {
+            if let Counting::TheArgument(parameter) = counting {
+                return Ok(
+                    operand(parameter).map_or((Shape::Many, Count::NotKnown), |given| {
+                        (given.shape, given.count)
+                    }),
+                );
+            }
+            if counting == Counting::TheCondition {
+                // The values it follows and the tests of them are as many as one another, and
+                // what holds is a count, however few values the receiver has: one value is met
+                // by each test.
+                let (shape, _) = meets(receiver)?;
+                let most = match (receiver.0, shape) {
+                    (Shape::One, Shape::One) => Some(1),
+                    (Shape::Counted, _) => receiver.1.most(),
+                    _ => None,
+                };
+                return Ok((Shape::Counted, most.map_or(Count::NotKnown, Count::AtMost)));
+            }
+            let held = match receiver.0 {
+                Shape::One => Some(Count::Exactly(1)),
+                Shape::Counted => Some(receiver.1),
+                Shape::Many => None,
+            };
+            let count = counted_by(link, counting, held);
+            // What is taken of one value is one value where it leaves it, and a count where it
+            // leaves none or does not say.
+            return Ok(if receiver.0 == Shape::One && count == Count::Exactly(1) {
+                (Shape::One, Count::NotKnown)
+            } else {
+                (Shape::Counted, count)
+            });
+        }
+        // A window gives each row of its group the value it gives the group: a count is not as
+        // long as the group, unless the window joins the values of a group or explodes them.
+        if entry.id().as_str() == "Expr.over" && receiver.0 == Shape::Counted {
+            return match link.argument("mapping_strategy") {
+                Some(Value::Choice(word)) if word == "join" => Ok((Shape::Many, Count::NotKnown)),
+                Some(Value::Choice(word)) if word == "explode" => {
+                    Ok((Shape::Counted, Count::NotKnown))
+                }
+                _ => Err(allowed::rule_forbids_a_window_over_a_count()
+                    .expect_err("the rule always refuses")),
+            };
+        }
+        // The offer of a method that follows a count says the count where the tables say a value for
+        // each of the values it follows; a count that the tables themselves say is not that.
+        let table = match (offered.shape(), receiver.0) {
+            (Shape::Counted, Shape::Counted) => Shape::Many,
+            (Shape::Counted, _) => return Ok((Shape::Counted, Count::NotKnown)),
+            (shape, _) => shape,
+        };
+        let widened = broadcast(link, arguments, table);
+        // An aggregate reduces what it follows, wherever the tables measured it, and a method that
+        // gives a value for each of the values it follows keeps them, which one value met by many
+        // widens, and one value met by a count is.
+        if is_one_value(link) || (offered.shape() == Shape::One && receiver.0 != Shape::One) {
+            return Ok((widened, Count::NotKnown));
+        }
+        let start = if receiver.0 == Shape::One && widened == Shape::Many {
+            (Shape::Many, Count::NotKnown)
+        } else {
+            receiver
+        };
+        meets(start)
+    }
+}
+
+/// Whether the one value a call gives is one that a method took of one value, or that meets such a
+/// value: a method that takes some of the values gives one, an aggregate gives one that is not, and
+/// a method that gives a value for each of the values it follows gives one where what it follows, or
+/// an operand it meets, is. No row of a group takes it as the value of the group, so a window
+/// refuses it.
+fn taken_after(
+    link: &Call,
+    receiver_taken: Taken,
+    arguments: &[(String, Operand)],
+    shape: Shape,
+) -> Taken {
+    if shape != Shape::One {
+        return Taken::default();
+    }
+    let read = arguments
+        .iter()
+        .fold(Taken::default(), |all, (name, operand)| {
+            all.or(Taken {
+                window: operand.taken.window && carries_to_a_window(link.entry(), name, operand),
+                scalar: operand.taken.scalar && carries_to_a_scalar(link.entry(), name),
+            })
+        });
+    if is_counting(link) {
+        return Taken::ALL;
+    }
+    // An aggregate reduces what it follows, and keeps what it is given to read, as a statistic its share.
+    if is_one_value(link) {
+        return read;
+    }
+    receiver_taken.or(read)
+}
+
+/// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
+/// what the call gives one that a window refuses. It does wherever the call reads the value, as a part
+/// of a moment, a bound, a fill, a statistic's share or a strict replacement's default, and whether or
+/// not Polars meets it with each of the values the call follows. It does not where the call only
+/// looks up in it or by it: the keys of a sort order the values and are no part of them, what a
+/// replacement lists is a table of values it looks up, and a column of the dtype of the values that
+/// `is_in` is given is their set, whole, which is not read value by value as a list is. The share
+/// of a quantile is read once, before the groups, where an approximate quantile reads it in each.
+fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
+    match (entry.id().as_str(), name) {
+        ("Expr.sort_by", "by" | "more_by")
+        | ("Expr.replace" | "Expr.replace_strict", "old" | "new")
+        | ("Expr.quantile", "quantile") => false,
+        ("Expr.is_in", "other") => is_met_by_its_dtype(entry, name, operand),
+        _ => true,
+    }
+}
+
+/// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
+/// what the call gives one that Polars cannot tell is one before the rows run. It does for every
+/// parameter, the keys of a sort, what a replacement lists and the set `is_in` is given included, for
+/// Polars asks only whether what a call is made of is a scalar. The share of the exact quantile is
+/// the one it reads once, before the rest, and does not count.
+fn carries_to_a_scalar(entry: &Entry, name: &str) -> bool {
+    !(entry.id().as_str() == "Expr.quantile" && name == "quantile")
+}
+
+/// What two values that a call meets give together: one value is met by each of the other, and
+/// the others are as many as one another. `None` where they are not: the table's rows are not a
+/// count, and two counts that are fixed and differ are not the same.
+fn meet(first: (Shape, Count), second: (Shape, Count)) -> Option<(Shape, Count)> {
+    match (first.0, second.0) {
+        (Shape::One, _) => Some(second),
+        (_, Shape::One) | (Shape::Many, Shape::Many) => Some(first),
+        (Shape::Counted, Shape::Counted) => first
+            .1
+            .meeting(second.1)
+            .map(|count| (Shape::Counted, count)),
+        _ => None,
+    }
+}
+
+/// Whether the parameter `name` of the method `entry` is met with the value the method follows, as
+/// the other side of an operation is, and so must give as many values as it, or one. What the
+/// method takes the values of, and what a window keys by, are not.
+fn meets_receiver(entry: &Entry, name: &str, operand: &Operand) -> bool {
+    let id = entry.id().as_str();
+    if id == "Expr.over" {
+        return false;
+    }
+    if let Some(Counting::TheArgument(parameter)) = Counting::of(entry, &[]) {
+        return parameter != name;
+    }
+    is_met_by_its_dtype(entry, name, operand)
+        && entry
+            .parameters()
+            .iter()
+            .any(|parameter| parameter.name() == name)
+}
+
+/// Whether the operand `name` of `entry` is met with each value of the value the method follows, as
+/// the catalogue says of the parameter, except where the dtype of the operand decides it: `is_in` meets
+/// a list column row by row with the values it follows, and takes a column of their own dtype as their
+/// set, whole, so that it gives as many values as they.
+fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
+    if entry.id().as_str() == "Expr.is_in" && name == "other" {
+        return matches!(
+            operand.dtype,
+            Some(
+                Representative::ListOfInteger
+                    | Representative::ListOfString
+                    | Representative::Array
+            )
+        );
+    }
+    broadcasts(entry, name)
+}
+
+/// A whole number the call is given for `parameter`, typed in, where it is one.
+fn whole_number(link: &Call, parameter: &str) -> Option<i64> {
+    match link.argument(parameter)? {
+        Value::Integer(number) => Some(*number),
+        Value::Expression(expression)
+            if expression.links().is_empty()
+                && matches!(expression.start(), Start::Call(start)
+                    if start.entry().id().as_str() == "polars.lit") =>
+        {
+            let Start::Call(start) = expression.start() else {
+                return None;
+            };
+            match start.argument("value")? {
+                Value::Integer(number) => Some(*number),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// How many values a method that takes some of the values it follows gives, from the whole numbers
+/// it is given and, where it follows a count, what that is.
+fn counted_by(link: &Call, counting: Counting, held: Option<Count>) -> Count {
+    let held = held.unwrap_or(Count::NotKnown);
+    // The most that what it follows holds, where that is known.
+    let most = held.most();
+    let at_most = |bound: Option<u64>| match (bound, most) {
+        (Some(bound), Some(most)) => Count::AtMost(bound.min(most)),
+        (Some(bound), None) => Count::AtMost(bound),
+        (None, Some(most)) => Count::AtMost(most),
+        (None, None) => Count::NotKnown,
+    };
+    // A count that was fixed stays fixed where a method takes the first of them.
+    let fixed = |taken: u64| match held {
+        Count::Exactly(count) => Count::Exactly(count.min(taken)),
+        _ => at_most(Some(taken)),
+    };
+    let natural = |number: Option<i64>| number.and_then(|number| u64::try_from(number).ok());
+    // What Python takes where the count is not given: ten values of `head`, `tail` and `limit`, and
+    // five of `top_k` and `bottom_k`.
+    let default_of = |parameter: &str| (parameter == "n").then_some(10).or(Some(5));
+    match counting {
+        Counting::AtMost(parameter) => {
+            let given = if link.argument(parameter).is_none() {
+                default_of(parameter)
+            } else {
+                natural(whole_number(link, parameter))
+            };
+            given.map_or_else(|| at_most(None), fixed)
+        }
+        Counting::FromAPlace => {
+            let offset = natural(whole_number(link, "offset"));
+            let length = natural(whole_number(link, "length"));
+            match (held, offset, length) {
+                (Count::Exactly(count), Some(offset), Some(length)) => {
+                    Count::Exactly(count.saturating_sub(offset).min(length))
+                }
+                (Count::Exactly(count), Some(offset), None)
+                    if link.argument("length").is_none() =>
+                {
+                    Count::Exactly(count.saturating_sub(offset))
+                }
+                (_, _, Some(length)) => at_most(Some(length)),
+                _ => at_most(None),
+            }
+        }
+        Counting::EveryNth => {
+            let every = natural(whole_number(link, "n")).filter(|every| *every > 0);
+            let offset = natural(whole_number(link, "offset")).unwrap_or(0);
+            match (held, every) {
+                (Count::Exactly(count), Some(every)) => {
+                    Count::Exactly(count.saturating_sub(offset).div_ceil(every))
+                }
+                (Count::AtMost(count), Some(every)) => Count::AtMost(count.div_ceil(every)),
+                _ => at_most(None),
+            }
+        }
+        // The different values, the most common and their places and counts of one value are that
+        // value.
+        Counting::TheData if held == Count::Exactly(1) => held,
+        Counting::TheData | Counting::TheCondition => at_most(None),
+        Counting::TheRowsLess(parameter) => {
+            // Python drops one value where it is not told how many.
+            let dropped = if link.argument(parameter).is_none() {
+                Some(1)
+            } else {
+                natural(whole_number(link, parameter))
+            };
+            match (held, dropped) {
+                (Count::Exactly(count), Some(dropped)) => {
+                    Count::Exactly(count.saturating_sub(dropped))
+                }
+                _ => at_most(None),
+            }
+        }
+        Counting::TheArgument(_) => Count::NotKnown,
     }
 }
 
@@ -2006,9 +2708,9 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
     // parameter is: a fact about the method, which the catalogue holds apart from how a number
     // typed without a dtype adapts. What a replacement lists is a table of values, which gives no
     // more values than what it follows, and a shift takes one value only: neither broadcasts.
-    let given_many = arguments
-        .iter()
-        .any(|(name, operand)| operand.shape == Shape::Many && broadcasts(entry, name));
+    let given_many = arguments.iter().any(|(name, operand)| {
+        operand.shape == Shape::Many && is_met_by_its_dtype(entry, name, operand)
+    });
     if shape == Shape::One && given_many {
         Shape::Many
     } else {
@@ -2030,7 +2732,7 @@ fn gives_other_numbers_of_values(
             .iter()
             .find(|(given, _)| given == name)
             .map(|(_, operand)| operand)
-            .filter(|operand| operand.known && operand.counted)
+            .filter(|operand| operand.known && operand.reliable)
     };
     entry.parameters().iter().any(|parameter| {
         let gives_many = parameter.as_many_as().is_some()
@@ -2045,6 +2747,63 @@ fn gives_other_numbers_of_values(
             }
             None => false,
         }
+    })
+}
+
+/// The first parameter of `entry` that Polars reads as one value and is given another, with what it
+/// was given: the rows, a count of values, or, for a parameter that must be a scalar, one value that a
+/// method took of one value. An expression that was not walked to its end is not judged.
+fn given_other_than_one_value<'a>(
+    entry: &'a Entry,
+    arguments: &[(String, Operand)],
+) -> Option<(&'a str, &'static str)> {
+    entry.parameters().iter().find_map(|parameter| {
+        let how = parameter.one_value()?;
+        let operand = arguments
+            .iter()
+            .find(|(name, _)| name == parameter.name())
+            .map(|(_, operand)| operand)
+            .filter(|operand| operand.known && operand.reliable)?;
+        let given = match operand.shape {
+            Shape::Many => "the rows",
+            Shape::Counted => "a count of values",
+            Shape::One if operand.taken.scalar && how == catalog::OneValue::Scalar => {
+                "one value that a method took of one value"
+            }
+            Shape::One => return None,
+        };
+        Some((parameter.name(), given))
+    })
+}
+
+/// Whether the call `entry` is given values for a parameter that gives as many as another, or one,
+/// of a count that is not as many as that: a count is not the rows, and two counts that are fixed and
+/// differ are not the same. Values of one and of many are judged by [`gives_other_numbers_of_values`].
+fn replaces_by_another_count(
+    entry: &Entry,
+    arguments: &[(String, Operand)],
+    receiver: (Shape, Count),
+) -> bool {
+    let operand = |name: &str| {
+        arguments
+            .iter()
+            .find(|(given, _)| given == name)
+            .map(|(_, operand)| operand)
+            .filter(|operand| operand.known && operand.reliable)
+            .map(|operand| (operand.shape, operand.count))
+    };
+    entry.parameters().iter().any(|parameter| {
+        let (Some(mine), Some(as_many)) = (operand(parameter.name()), parameter.as_many_as())
+        else {
+            return false;
+        };
+        let other = match as_many {
+            AsManyAs::TheReceiver => Some(receiver),
+            AsManyAs::Parameter(other) => operand(other),
+        };
+        other.is_some_and(|other| {
+            (mine.0 == Shape::Counted || other.0 == Shape::Counted) && meet(mine, other).is_none()
+        })
     })
 }
 
@@ -2109,6 +2868,18 @@ fn is_one_value(call: &Call) -> bool {
     ONE_VALUE.contains(&call.entry().id().as_str())
 }
 
+/// Whether the call takes some of the values it follows, so that how many it gives is for the data
+/// and the arguments to say: `head`, `filter`, `unique` and the rest that the catalogue says count.
+/// Such a call is not elementwise, whatever it follows.
+fn is_counting(call: &Call) -> bool {
+    let (words, _) = option_words(call);
+    let words: Vec<(&str, &str)> = words
+        .iter()
+        .map(|(name, word)| (name.as_str(), word.as_str()))
+        .collect();
+    Counting::of(call.entry(), &words).is_some()
+}
+
 /// Whether the first `upto` links of `expression` give one value and nothing
 /// beside them does not: an aggregate among them with only single values after
 /// it; with `literals`, a start made of literals too; or a condition whose parts
@@ -2117,15 +2888,17 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
     let single = |call: &Call| {
         // What a replacement lists is a table of values, which gives no more values than what it
-        // follows, and its default is as many as that or one.
-        is_a_replacement(call)
+        // follows, and its default is as many as that or one. A call that takes some of the
+        // values of what it follows is not one value even of a literal: it is not elementwise.
+        !is_counting(call)
+            && (is_a_replacement(call)
             // An interval with a null bound that has no dtype is folded whole into a null, and
             // what its other bound reads is not met.
             || (call.entry().id().as_str() == "Expr.is_between"
                 && operands(call).into_iter().any(is_an_untyped_null))
             || operands(call)
                 .into_iter()
-                .all(|inside| wholly_single(inside, inside.links().len(), true))
+                .all(|inside| wholly_single(inside, inside.links().len(), true)))
     };
     if let Some(last) = links.iter().rposition(is_one_value) {
         return links[last + 1..].iter().all(single);
@@ -2446,6 +3219,7 @@ fn is_not_elementwise(key: &Expression, with_nulls_for_null_columns: &Expression
     !wholly_single(key, key.links().len(), true)
         && !holds_a_comparison_that_polars_may_fold(key)
         && (holds_an_aggregate(key)
+            || holds_what_polars_evaluates(key, &is_counting)
             || holds_a_null_comparison(with_nulls_for_null_columns)
             || holds_a_replacement_of_columns(key))
 }

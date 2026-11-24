@@ -34,6 +34,7 @@
 mod adapt;
 mod candidates;
 mod context;
+mod count;
 mod dtype;
 mod literal;
 mod offers;
@@ -53,15 +54,18 @@ pub use candidates::{
     fit, left_out_at_start, option_offers, slots_at_start,
 };
 pub use context::{Context, Nested, Outer, Position};
+pub use count::Count;
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use literal::Literal;
 pub(crate) use offers::same_for_any_number;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
-    Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options, rule_forbids,
-    rule_forbids_a_folded_function_in_a_join_key, rule_forbids_a_key_known_not_elementwise,
-    rule_forbids_a_repeated_pair_of_key_names, rule_forbids_a_window_over_a_widened_value,
-    rule_forbids_replacement_values_of_other_numbers,
+    Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options,
+    refuse_a_count_that_may_not_end, rule_forbids, rule_forbids_a_folded_function_in_a_join_key,
+    rule_forbids_a_key_known_not_elementwise, rule_forbids_a_parameter_given_more_than_one_value,
+    rule_forbids_a_repeated_pair_of_key_names, rule_forbids_a_window_over_a_count,
+    rule_forbids_a_window_over_a_widened_value, rule_forbids_replacement_values_of_other_numbers,
+    rule_forbids_values_of_other_counts,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

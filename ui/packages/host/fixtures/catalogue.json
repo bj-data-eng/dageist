@@ -6,7 +6,7 @@
     },
     {
       "key": "rows",
-      "title": "Rows · other rows, differences"
+      "title": "Rows · some rows, other rows, differences"
     },
     {
       "key": "order",
@@ -647,6 +647,16 @@
       ]
     },
     {
+      "id": "Expr.arg_unique",
+      "applies": "expression",
+      "family": "rows",
+      "name": "arg_unique",
+      "hint": "the place of the first of each different value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.backward_fill",
       "applies": "expression",
       "family": "nulls",
@@ -764,6 +774,39 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.bottom_k",
+      "applies": "expression",
+      "family": "rows",
+      "name": "bottom_k",
+      "hint": "the k smallest values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "k",
+          "shown": "k",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.cast",
@@ -1151,6 +1194,10 @@
               {
                 "word": "ignore",
                 "shown": "ignore"
+              },
+              {
+                "word": "drop",
+                "shown": "drop"
               }
             ]
           },
@@ -1166,7 +1213,7 @@
             "value": "ignore"
           },
           "position": null,
-          "offered": false
+          "offered": true
         }
       ]
     },
@@ -2586,6 +2633,57 @@
       ]
     },
     {
+      "id": "Expr.filter",
+      "applies": "expression",
+      "family": "rows",
+      "name": "filter",
+      "hint": "the values where a condition holds",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "constraints",
+          "shown": "constraints",
+          "label": "columns equal to",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.first",
       "applies": "expression",
       "family": "rows",
@@ -2685,6 +2783,107 @@
       ]
     },
     {
+      "id": "Expr.gather",
+      "applies": "expression",
+      "family": "rows",
+      "name": "gather",
+      "hint": "the values at the given places",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "indices",
+          "shown": "indices",
+          "label": "places",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "null_on_oob",
+          "shown": "null_on_oob",
+          "label": "empty past the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.gather_every",
+      "applies": "expression",
+      "family": "rows",
+      "name": "gather_every",
+      "hint": "every nth value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "every",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "start at",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.ge",
       "applies": "expression",
       "family": "compare",
@@ -2749,6 +2948,39 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.head",
+      "applies": "expression",
+      "family": "rows",
+      "name": "head",
+      "hint": "the first n values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 10
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 10,
+            "shown": "10"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.is_between",
@@ -2960,6 +3192,55 @@
       "parameters": []
     },
     {
+      "id": "Expr.is_in",
+      "applies": "expression",
+      "family": "compare",
+      "name": "is_in",
+      "hint": "whether the value is among the others",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "among",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "nulls_equal",
+          "shown": "nulls_equal",
+          "label": "empty values equal",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.is_infinite",
       "applies": "expression",
       "family": "checks",
@@ -3153,6 +3434,39 @@
       "parameters": []
     },
     {
+      "id": "Expr.limit",
+      "applies": "expression",
+      "family": "rows",
+      "name": "limit",
+      "hint": "the first n values, as head",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 10
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 10,
+            "shown": "10"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.log",
       "applies": "expression",
       "family": "maths",
@@ -3286,6 +3600,38 @@
             "kind": "required"
           },
           "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.mode",
+      "applies": "expression",
+      "family": "rows",
+      "name": "mode",
+      "hint": "the values that occur most often",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
           "position": null,
           "offered": true
         }
@@ -4103,6 +4449,90 @@
       ]
     },
     {
+      "id": "Expr.search_sorted",
+      "applies": "expression",
+      "family": "order",
+      "name": "search_sorted",
+      "hint": "the place a value would take in the sorted values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "element",
+          "shown": "element",
+          "label": "value",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "side",
+          "shown": "side",
+          "label": "among equal values",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "any",
+                "shown": "any"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "any"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "any"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "largest first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.shift",
       "applies": "expression",
       "family": "rows",
@@ -4209,6 +4639,51 @@
             "kind": "flag",
             "value": true
           },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.slice",
+      "applies": "expression",
+      "family": "rows",
+      "name": "slice",
+      "hint": "the values from a place, for a length",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "start at",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
           "position": null,
           "offered": true
         }
@@ -5583,6 +6058,39 @@
       "parameters": []
     },
     {
+      "id": "Expr.tail",
+      "applies": "expression",
+      "family": "rows",
+      "name": "tail",
+      "hint": "the last n values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 10
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 10,
+            "shown": "10"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.tan",
       "applies": "expression",
       "family": "trigonometry",
@@ -5601,6 +6109,39 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.top_k",
+      "applies": "expression",
+      "family": "rows",
+      "name": "top_k",
+      "hint": "the k largest values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "k",
+          "shown": "k",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.truediv",
@@ -5663,6 +6204,48 @@
           "offered": true
         }
       ]
+    },
+    {
+      "id": "Expr.unique",
+      "applies": "expression",
+      "family": "rows",
+      "name": "unique",
+      "hint": "each different value once",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.unique_counts",
+      "applies": "expression",
+      "family": "rows",
+      "name": "unique_counts",
+      "hint": "how often each different value occurs",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.var",

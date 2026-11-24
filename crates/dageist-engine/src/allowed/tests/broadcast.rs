@@ -5,16 +5,26 @@
 //! many. The catalogue holds that for each parameter, apart from how a number typed without a
 //! dtype adapts, and the walk reads it: a method added without saying so is found here.
 
-use polars::prelude::{DataType, lit};
+use polars::prelude::{DataFrame, DataType, IntoLazy, NamedFrom, Series, lit};
 
 use crate::allowed::dtype::Representative;
 use crate::allowed::table::Shape;
 use crate::allowed::{After, Chosen, Context, Outer, Place, offer};
 use crate::catalog::{self, Applies, Argument, Entry, Kind, Shape as ParameterShape};
 
-use super::build::{column, expression, expressions, method, null_of, one_of, patterns, step};
+use super::build::{
+    column, entry, expression, expressions, integer, method, null_of, one_of, patterns, step,
+};
 use super::probe::measure;
 use super::sample::Frames;
+
+/// Whether the method gives a count of values that the data or its arguments decide, which the walk
+/// states from the arguments and these measurements of one value and many cannot: the count of
+/// `is_in` follows the dtype of the values it is given, a list column's being met row by row and a
+/// column of the values' own dtype being their set.
+fn gives_a_count(entry: &Entry) -> bool {
+    catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
+}
 
 /// A value of `dtype` that is one value: the number 1 where it can be, and a null where not.
 fn literal_of(dtype: &DataType) -> polars::prelude::Expr {
@@ -165,6 +175,10 @@ fn the_catalogue_says_for_each_expression_parameter_whether_polars_meets_a_recei
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
+        // What a method that gives a count of values that the data or the arguments decide gives
+        // is that count, which the walk states from the arguments and these measurements of one
+        // value and many cannot.
+        .filter(|entry| !gives_a_count(entry))
     {
         for parameter in entry
             .parameters()
@@ -215,6 +229,7 @@ fn a_method_given_a_literal_beside_a_column_receiver_gives_what_the_tables_say()
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
+        .filter(|entry| !gives_a_count(entry))
     {
         for parameter in entry
             .parameters()
@@ -251,4 +266,104 @@ fn a_method_given_a_literal_beside_a_column_receiver_gives_what_the_tables_say()
             );
         }
     }
+}
+
+#[test]
+fn the_parameters_of_a_method_that_gives_a_count_say_what_polars_does_with_one_value_and_many() {
+    // `gives_a_count` leaves these methods out of the measurements above, for what they give is
+    // the count their arguments decide and not the one value or the rows those compare. What the
+    // catalogue says of each of their parameters is held to Polars here, by how many values it
+    // gives of a literal receiver, one value, and a column of three rows for the parameter.
+    crate::startup::ensure();
+    let lists = Series::new(
+        "l".into(),
+        [[1_i64, 2], [3, 4], [5, 6]].map(|pair| Series::new("".into(), pair)),
+    );
+    let frame = DataFrame::new(
+        3,
+        vec![
+            Series::new("t".into(), [true, true, true]).into(),
+            Series::new("i".into(), [0_i64, 0, 0]).into(),
+            lists.into(),
+        ],
+    )
+    .expect("columns of three rows");
+    let rows = |id: &str, parameter: &str, given: &str| -> usize {
+        let method_entry = entry(id);
+        let shape = method_entry
+            .parameters()
+            .iter()
+            .find(|candidate| candidate.name() == parameter)
+            .expect("the entry has the parameter")
+            .shape();
+        let value = column(given);
+        let argument = match shape {
+            ParameterShape::Many => expressions(vec![value]),
+            _ => expression(value),
+        };
+        let call = method(
+            method_entry,
+            integer(5),
+            vec![(parameter_name(id, parameter), argument)],
+        )
+        .expect("the call builds");
+        step(
+            "LazyFrame.select",
+            frame.clone().lazy(),
+            vec![("exprs", expressions(vec![call]))],
+        )
+        .expect("a select")
+        .collect()
+        .expect("Polars runs it")
+        .height()
+    };
+    // One value met by the three values of the parameter is three values: it broadcasts.
+    for (id, parameter, given) in [
+        ("Expr.filter", "predicates", "t"),
+        ("Expr.gather", "indices", "i"),
+        ("Expr.search_sorted", "element", "i"),
+        // A list column is met row by row; a column of the value's own dtype is their set, whole,
+        // which is one answer.
+        ("Expr.is_in", "other", "l"),
+    ] {
+        assert_eq!(rows(id, parameter, given), 3, "{id} {parameter}");
+        assert!(
+            entry(id)
+                .parameters()
+                .iter()
+                .find(|candidate| candidate.name() == parameter)
+                .is_some_and(catalog::Parameter::broadcasts),
+            "{id} {parameter} broadcasts"
+        );
+    }
+    assert_eq!(rows("Expr.is_in", "other", "i"), 1);
+    // The counts and the places a method takes are one value, which Polars does not meet a receiver
+    // of one value with each of many for.
+    for method_entry in catalog::entries()
+        .iter()
+        .filter(|candidate| catalog::Counting::of(candidate, &[]).is_some())
+    {
+        for parameter in method_entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.role().is_a_count())
+        {
+            assert!(
+                !parameter.broadcasts(),
+                "{} {} takes one value",
+                method_entry.id().as_str(),
+                parameter.name()
+            );
+        }
+    }
+}
+
+/// The name of the parameter `parameter` of the entry `id`, as the entry holds it.
+fn parameter_name(id: &str, parameter: &str) -> &'static str {
+    entry(id)
+        .parameters()
+        .iter()
+        .find(|candidate| candidate.name() == parameter)
+        .map(catalog::Parameter::name)
+        .expect("the entry has the parameter")
 }

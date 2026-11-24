@@ -2,6 +2,7 @@
 //! and running it on a small claims table.
 
 mod claims;
+mod counted;
 mod counts;
 mod dates;
 mod defaults;
@@ -26,6 +27,7 @@ mod statistics;
 mod summary;
 mod support;
 mod syntax;
+mod taken;
 mod text;
 mod untyped;
 mod walk;

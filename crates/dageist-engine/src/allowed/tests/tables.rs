@@ -228,6 +228,9 @@ fn option_values(entry: &catalog::Entry) -> Vec<(usize, bool, bool)> {
         .iter()
         // The dtype a method converts values to is measured by the cast.
         .filter(|parameter| parameter.converts().is_empty())
+        .filter(|parameter| {
+            !super::generate::NOT_MEASURED.contains(&(entry.id().as_str(), parameter.name()))
+        })
         .filter_map(|parameter| match parameter.kind() {
             Kind::Flag => Some((
                 2 + usize::from(parameter.default() == ParameterDefault::Python("None")),
@@ -398,7 +401,7 @@ fn an_entry_may_stand_in_a_context_where_it_may_not_end_a_chain() {
 #[test]
 fn a_table_that_lacks_one_of_the_two_lines_of_a_cell_does_not_read() {
     let lone = "polars.col | select | continues | - | - | - | allowed Int64 many\n";
-    let error = Tables::read(table::DTYPES, lone, table::OPTIONS)
+    let error = Tables::read(table::DTYPES, lone, table::OPTIONS, table::COUNTS)
         .expect_err("the line that ends is missing");
     assert_eq!(error.0, "contexts.txt");
     assert!(error.1.to_string().contains("lacks"), "{}", error.1);

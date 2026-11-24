@@ -12,7 +12,7 @@ title = "Steps · change the table"
 title = "Aggregate · one value"
 
 [families.rows]
-title = "Rows · other rows, differences"
+title = "Rows · some rows, other rows, differences"
 
 [families.order]
 title = "Order · sort, reverse, rank"
@@ -2029,6 +2029,152 @@ label = "empty values"
 
 [entries."Expr.diff".parameters.null_behavior.choices]
 ignore = "ignore"
+drop = "drop"
+
+[entries."Expr.head"]
+name = "head"
+hint = "the first n values"
+
+[entries."Expr.head".parameters.n]
+name = "n"
+label = "values"
+
+[entries."Expr.limit"]
+name = "limit"
+hint = "the first n values, as head"
+
+[entries."Expr.limit".parameters.n]
+name = "n"
+label = "values"
+
+[entries."Expr.tail"]
+name = "tail"
+hint = "the last n values"
+
+[entries."Expr.tail".parameters.n]
+name = "n"
+label = "values"
+
+[entries."Expr.slice"]
+name = "slice"
+hint = "the values from a place, for a length"
+
+[entries."Expr.slice".parameters.offset]
+name = "offset"
+label = "start at"
+
+[entries."Expr.slice".parameters.length]
+name = "length"
+label = "values"
+
+[entries."Expr.top_k"]
+name = "top_k"
+hint = "the k largest values"
+
+[entries."Expr.top_k".parameters.k]
+name = "k"
+label = "values"
+
+[entries."Expr.bottom_k"]
+name = "bottom_k"
+hint = "the k smallest values"
+
+[entries."Expr.bottom_k".parameters.k]
+name = "k"
+label = "values"
+
+[entries."Expr.gather_every"]
+name = "gather_every"
+hint = "every nth value"
+
+[entries."Expr.gather_every".parameters.n]
+name = "n"
+label = "every"
+
+[entries."Expr.gather_every".parameters.offset]
+name = "offset"
+label = "start at"
+
+[entries."Expr.gather"]
+name = "gather"
+hint = "the values at the given places"
+
+[entries."Expr.gather".parameters.indices]
+name = "indices"
+label = "places"
+
+[entries."Expr.gather".parameters.null_on_oob]
+name = "null_on_oob"
+label = "empty past the end"
+
+[entries."Expr.filter"]
+name = "filter"
+hint = "the values where a condition holds"
+
+[entries."Expr.filter".parameters.predicates]
+name = "predicates"
+label = "conditions"
+
+[entries."Expr.filter".parameters.constraints]
+name = "constraints"
+label = "columns equal to"
+
+[entries."Expr.unique"]
+name = "unique"
+hint = "each different value once"
+
+[entries."Expr.unique".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
+[entries."Expr.mode"]
+name = "mode"
+hint = "the values that occur most often"
+
+[entries."Expr.mode".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
+[entries."Expr.arg_unique"]
+name = "arg_unique"
+hint = "the place of the first of each different value"
+
+[entries."Expr.unique_counts"]
+name = "unique_counts"
+hint = "how often each different value occurs"
+
+[entries."Expr.is_in"]
+name = "is_in"
+hint = "whether the value is among the others"
+
+[entries."Expr.is_in".parameters.other]
+name = "other"
+label = "among"
+
+[entries."Expr.is_in".parameters.nulls_equal]
+name = "nulls_equal"
+label = "empty values equal"
+
+[entries."Expr.search_sorted"]
+name = "search_sorted"
+hint = "the place a value would take in the sorted values"
+
+[entries."Expr.search_sorted".parameters.element]
+name = "element"
+label = "value"
+
+[entries."Expr.search_sorted".parameters.side]
+name = "side"
+label = "among equal values"
+
+[entries."Expr.search_sorted".parameters.side.choices]
+any = "any"
+left = "left"
+right = "right"
+
+[entries."Expr.search_sorted".parameters.descending]
+name = "descending"
+label = "largest first"
 
 [entries."Expr.pct_change"]
 name = "pct_change"

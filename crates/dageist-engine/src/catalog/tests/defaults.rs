@@ -294,7 +294,10 @@ fn only_the_rows_a_method_counts_and_the_base_of_log_are_expressions_with_a_defa
     assert_eq!(
         found,
         [
+            ("Expr.bottom_k", "k", Role::Count, DefaultValue::Integer(5)),
             ("Expr.diff", "n", Role::Count, DefaultValue::Integer(1)),
+            ("Expr.head", "n", Role::Count, DefaultValue::Integer(10)),
+            ("Expr.limit", "n", Role::Count, DefaultValue::Integer(10)),
             (
                 "Expr.log",
                 "base",
@@ -307,7 +310,9 @@ fn only_the_rows_a_method_counts_and_the_base_of_log_are_expressions_with_a_defa
                 Role::Count,
                 DefaultValue::Integer(1)
             ),
-            ("Expr.shift", "n", Role::Count, DefaultValue::Integer(1))
+            ("Expr.shift", "n", Role::Count, DefaultValue::Integer(1)),
+            ("Expr.tail", "n", Role::Count, DefaultValue::Integer(10)),
+            ("Expr.top_k", "k", Role::Count, DefaultValue::Integer(5))
         ]
     );
 }

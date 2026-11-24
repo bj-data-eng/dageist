@@ -41,6 +41,10 @@ pub enum Rule {
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
+    /// A parameter that Polars reads as one value is given one: not the rows, not a count of values
+    /// that the data or the arguments decide, and, for the places a shift and a difference look back
+    /// by and the value a shift fills with, not one value that a method took of one value.
+    ParameterTakesOneValue,
     /// A pattern is a regular expression Polars can compile, unless the text is plain text by a
     /// flag such as `literal`.
     PatternIsValid,
@@ -53,6 +57,14 @@ pub enum Rule {
     /// a condition, and the new values of a replacement and its default, where they are moments, are in
     /// one time zone: Polars finds no dtype that two zones have in common.
     MomentsShareAZone,
+    /// The values a call meets are one value, which meets each of the others, or as many as one
+    /// another: a count that the data or the arguments decide is not the table's rows, and not
+    /// another such count it is not known to equal.
+    ValuesMeetInCount,
+    /// A window is given a value as long as its group, which a count that the data or the
+    /// arguments decide is not, nor the one value that a method took of one value, unless the window
+    /// joins the values of a group or explodes them.
+    WindowInputIsNotCounted,
     /// A window is given a value as long as its input, which a value of one row that a part widens is
     /// not.
     WindowInputIsNotWidened,
@@ -60,7 +72,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 16] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -69,10 +81,13 @@ impl Rule {
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
+        Self::ParameterTakesOneValue,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
         Self::TimeZoneIsValid,
+        Self::ValuesMeetInCount,
+        Self::WindowInputIsNotCounted,
         Self::WindowInputIsNotWidened,
     ];
 
@@ -89,9 +104,12 @@ impl Rule {
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
+            Self::ParameterTakesOneValue => "parameter-takes-one-value",
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::ValuesMeetInCount => "values-meet-in-count",
+            Self::WindowInputIsNotCounted => "window-input-is-not-counted",
             Self::WindowInputIsNotWidened => "window-input-is-not-widened",
         }
     }
@@ -121,15 +139,24 @@ impl Rule {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::ValuesMeetInCount => {
+                "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
+            }
+            Self::WindowInputIsNotCounted => {
+                "a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, unless the window joins the values of a group into a list or explodes them"
+            }
             Self::WindowInputIsNotWidened => {
                 "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
             }
             Self::MomentsShareAZone => {
                 "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
+            }
+            Self::ParameterTakesOneValue => {
+                "a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run"
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
@@ -155,9 +182,12 @@ impl Rule {
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
             | Self::MomentsShareAZone
+            | Self::ParameterTakesOneValue
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::TimeZoneIsValid
+            | Self::ValuesMeetInCount
+            | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
@@ -267,7 +297,10 @@ impl Rule {
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
+            | Self::ParameterTakesOneValue
             | Self::TimeZoneIsValid
+            | Self::ValuesMeetInCount
+            | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened => false,
         }
     }

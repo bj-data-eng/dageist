@@ -16,16 +16,16 @@ use polars::prelude::{
     AnyValue, ApproxQuantileMethod, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr,
     FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
     MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError, QuantileMethod,
-    RankMethod, RankOptions, RoundMode, Scalar, Selector, Series, SortMultipleOptions, SortOptions,
-    TimeUnit, TimeZone, WindowMapping, all, all_horizontal, binary_expr, by_name, col, cols,
-    datetime, duration, element, lit, when,
+    RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
+    SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal,
+    binary_expr, by_name, col, cols, datetime, duration, element, lit, when,
 };
 use polars::series::ops::NullBehavior;
 
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
-    EntryId, Family, Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape,
-    ValueType, Variadic, Writes,
+    EntryId, Family, Kind, Laziness, OneValue, Parameter, ParameterDefault, PatternMeans, Role,
+    Shape, ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -188,11 +188,13 @@ const APPROX_QUANTILE_METHOD: &[&str] = &["auto", "kll", "req_lo", "req_hi", "re
 // The words Python's `approx_quantile` takes for `error_tightness`: `formal` is Polars'
 // `use_formal_bound`.
 const ERROR_TIGHTNESS: &[&str] = &["empirical", "formal"];
+// The words Python's `search_sorted` takes for `side`: which place among values that are equal to the one
+// looked for, the first, the last or any.
+const SEARCH_SIDE: &[&str] = &["any", "left", "right"];
 // Python's `diff` takes `ignore` and `drop` for `null_behavior`. `drop` leaves out the values that
-// have none before them, as many as `n` says, so it gives fewer values than the table has rows, a
-// number of values the tables cannot state, and it is left out until a shape for it exists. The
-// editor does not offer the parameter, so a step always takes `ignore`.
-const NULL_BEHAVIOR: &[&str] = &["ignore"];
+// have none before them, as many as `n` says, so it gives as many values as the rows less `n`, a
+// count the data decide.
+const NULL_BEHAVIOR: &[&str] = &["ignore", "drop"];
 
 /// A method of the `dt` namespace: it takes the dates, times and lengths of time it `accepts` and
 /// is swapped for the others of its family.
@@ -651,8 +653,11 @@ fn sort_by(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
 
 fn diff(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     let n = arguments.expression("n")?.unwrap_or_else(|| lit(1));
-    arguments.choice("null_behavior", NULL_BEHAVIOR, "ignore")?;
-    Ok(expr.diff(n, NullBehavior::Ignore))
+    let null_behavior = match arguments.choice("null_behavior", NULL_BEHAVIOR, "ignore")? {
+        "drop" => NullBehavior::Drop,
+        _ => NullBehavior::Ignore,
+    };
+    Ok(expr.diff(n, null_behavior))
 }
 
 fn pct_change(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -684,6 +689,120 @@ fn rank(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
         descending: arguments.flag("descending", false)?,
     };
     Ok(expr.rank(options, seed))
+}
+
+/// The count of values a method that cuts a column takes, as Python passes it on: an expression
+/// that is a number typed in or another one, and 10 where it is not given.
+fn cut_by(
+    arguments: &Arguments,
+    parameter: &'static str,
+    default: i32,
+) -> Result<Expr, BuildError> {
+    Ok(arguments
+        .expression(parameter)?
+        .unwrap_or_else(|| lit(default)))
+}
+
+fn head(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.slice(lit(0), cut_by(arguments, "n", 10)?))
+}
+
+/// Python takes `tail` of an expression as a slice that starts as many values before the end as
+/// the count is, which it makes an unsigned count signed to negate.
+fn tail(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let n = cut_by(arguments, "n", 10)?;
+    let offset = -n
+        .clone()
+        .cast_with_options(DataType::Int64, CastOptions::Overflowing);
+    Ok(expr.slice(offset, n))
+}
+
+fn slice(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(offset) = arguments.expression("offset")? else {
+        return Err(BuildError::Missing {
+            parameter: "offset",
+        });
+    };
+    let length = arguments.expression("length")?.unwrap_or_else(|| lit(NULL));
+    Ok(expr.slice(offset, length))
+}
+
+fn top_k(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.top_k(cut_by(arguments, "k", 5)?))
+}
+
+fn bottom_k(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.bottom_k(cut_by(arguments, "k", 5)?))
+}
+
+fn gather_every(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    if arguments.get("n").is_none() {
+        return Err(BuildError::Missing { parameter: "n" });
+    }
+    Ok(expr.gather_every(index(arguments, "n", 0)?, index(arguments, "offset", 0)?))
+}
+
+fn gather(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(indices) = arguments.expression("indices")? else {
+        return Err(BuildError::Missing {
+            parameter: "indices",
+        });
+    };
+    Ok(expr.gather(indices, arguments.flag("null_on_oob", false)?))
+}
+
+fn arg_unique(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.arg_unique())
+}
+
+fn unique(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(if arguments.flag("maintain_order", false)? {
+        expr.unique_stable()
+    } else {
+        expr.unique()
+    })
+}
+
+fn mode(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.mode(arguments.flag("maintain_order", false)?))
+}
+
+fn unique_counts(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.unique_counts())
+}
+
+/// Python makes one predicate of the several it is given, which hold all together, and of each
+/// constraint a comparison of the column with the value.
+fn expr_filter(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let mut predicates = predicates_and_constraints(arguments)?;
+    match predicates.len() {
+        0 => Err(BuildError::Missing {
+            parameter: "predicates",
+        }),
+        1 => Ok(expr.filter(predicates.remove(0))),
+        _ => Ok(expr.filter(all_horizontal(&predicates)?)),
+    }
+}
+
+fn is_in(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(other) = arguments.expression("other")? else {
+        return Err(BuildError::Missing { parameter: "other" });
+    };
+    Ok(expr.is_in(other, arguments.flag("nulls_equal", false)?))
+}
+
+fn search_sorted(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let Some(element) = arguments.expression("element")? else {
+        return Err(BuildError::Missing {
+            parameter: "element",
+        });
+    };
+    let side = match arguments.choice("side", SEARCH_SIDE, "any")? {
+        "left" => SearchSortedSide::Left,
+        "right" => SearchSortedSide::Right,
+        _ => SearchSortedSide::Any,
+    };
+    Ok(expr.search_sorted(element, side, arguments.flag("descending", false)?))
 }
 
 fn sum(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -2340,6 +2459,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(arg_sort),
     },
     Entry {
+        id: EntryId("Expr.arg_unique"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arg_unique),
+    },
+    Entry {
         id: EntryId("Expr.backward_fill"),
         family: Family::Nulls,
         accepts: ANY,
@@ -2418,6 +2545,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(bitwise_xor),
+    },
+    Entry {
+        id: EntryId("Expr.bottom_k"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
+            .with_role(Role::Count)
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bottom_k),
     },
     Entry {
         id: EntryId("Expr.cast"),
@@ -2542,14 +2680,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             optional("n", Kind::Expression(INTEGER), Shape::One, "1")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "null_behavior",
                 Kind::Choice(NULL_BEHAVIOR),
                 Shape::One,
                 "'ignore'",
-            )
-            .not_offered(),
+            ),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(diff),
@@ -2874,6 +3012,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(fill_null),
     },
     Entry {
+        id: EntryId("Expr.filter"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[PREDICATES.with_at_least_one(), CONSTRAINTS],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(expr_filter),
+    },
+    Entry {
         id: EntryId("Expr.first"),
         family: Family::Rows,
         accepts: ANY,
@@ -2906,6 +3052,28 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(forward_fill),
     },
     Entry {
+        id: EntryId("Expr.gather"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[
+            required("indices", Kind::Expression(INTEGER), Shape::One),
+            flag("null_on_oob", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(gather),
+    },
+    Entry {
+        id: EntryId("Expr.gather_every"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[
+            required("n", Kind::Value(ValueType::Integer), Shape::One),
+            optional("offset", Kind::Value(ValueType::Integer), Shape::One, "0"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(gather_every),
+    },
+    Entry {
         id: EntryId("Expr.ge"),
         family: Family::Compare,
         accepts: ANY,
@@ -2928,6 +3096,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(has_nulls),
+    },
+    Entry {
+        id: EntryId("Expr.head"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "10")
+            .with_role(Role::Count)
+            .not_broadcasting()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(head),
     },
     Entry {
         id: EntryId("Expr.is_between"),
@@ -2979,6 +3157,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(is_first_distinct),
+    },
+    Entry {
+        id: EntryId("Expr.is_in"),
+        family: Family::Compare,
+        accepts: ANY,
+        parameters: &[
+            required("other", EXPRESSION, Shape::One),
+            flag("nulls_equal", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_in),
     },
     Entry {
         id: EntryId("Expr.is_infinite"),
@@ -3072,6 +3261,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(len),
     },
     Entry {
+        id: EntryId("Expr.limit"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "10")
+            .with_role(Role::Count)
+            .not_broadcasting()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(head),
+    },
+    Entry {
         id: EntryId("Expr.log"),
         family: Family::Maths,
         accepts: NUMERIC_OR_BOOLEAN,
@@ -3134,6 +3333,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(modulo),
+    },
+    Entry {
+        id: EntryId("Expr.mode"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[flag("maintain_order", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(mode),
     },
     Entry {
         id: EntryId("Expr.mul"),
@@ -3244,7 +3451,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: ANY,
         parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
             .with_role(Role::Count)
-            .not_broadcasting()],
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pct_change),
     },
@@ -3271,7 +3479,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("quantile", Kind::Expression(NUMERIC), Shape::One)
                 .with_role(Role::Share)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::SingleRow),
             optional(
                 "interpolation",
                 Kind::Choice(QUANTILE_METHOD),
@@ -3389,17 +3598,31 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(round_sig_figs),
     },
     Entry {
+        id: EntryId("Expr.search_sorted"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            required("element", EXPRESSION, Shape::One),
+            optional("side", Kind::Choice(SEARCH_SIDE), Shape::One, "'any'"),
+            flag("descending", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(search_sorted),
+    },
+    Entry {
         id: EntryId("Expr.shift"),
         family: Family::Rows,
         accepts: ANY,
         parameters: &[
             optional("n", Kind::Expression(INTEGER), Shape::One, "1")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional("fill_value", EXPRESSION, Shape::One, "None")
                 .keyword_only()
                 .with_role(Role::Filler)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),
@@ -3435,6 +3658,21 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[flag("bias", "True").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(skew),
+    },
+    Entry {
+        id: EntryId("Expr.slice"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[
+            required("offset", Kind::Expression(INTEGER), Shape::One)
+                .with_role(Role::Count)
+                .not_broadcasting(),
+            optional("length", Kind::Expression(INTEGER), Shape::One, "None")
+                .with_role(Role::Count)
+                .not_broadcasting(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(slice),
     },
     Entry {
         id: EntryId("Expr.sort"),
@@ -3766,6 +4004,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(sum),
     },
     Entry {
+        id: EntryId("Expr.tail"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "10")
+            .with_role(Role::Count)
+            .not_broadcasting()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(tail),
+    },
+    Entry {
         id: EntryId("Expr.tan"),
         family: Family::Trigonometry,
         accepts: NUMERIC,
@@ -3782,6 +4030,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(tanh),
     },
     Entry {
+        id: EntryId("Expr.top_k"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
+            .with_role(Role::Count)
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(top_k),
+    },
+    Entry {
         id: EntryId("Expr.truediv"),
         family: Family::Arithmetic,
         accepts: SCALABLE,
@@ -3796,6 +4055,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[DECIMALS],
         laziness: Laziness::Lazy,
         build: Build::Expression(truncate),
+    },
+    Entry {
+        id: EntryId("Expr.unique"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[flag("maintain_order", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(unique),
+    },
+    Entry {
+        id: EntryId("Expr.unique_counts"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(unique_counts),
     },
     Entry {
         id: EntryId("Expr.var"),

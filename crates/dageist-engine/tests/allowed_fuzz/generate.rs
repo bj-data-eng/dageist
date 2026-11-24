@@ -332,6 +332,15 @@ fn methods() -> Vec<&'static Entry> {
         .collect()
 }
 
+/// Whether a method gives a count of values that the data or the arguments decide, which a
+/// campaign draws only where a focus names it: the shape of such a count is the first of several
+/// that the catalogue gains, and the campaigns that check them are not a gate of the engine's tests
+/// until every shape exists. [`Counting`](catalog::Counting) says which methods, and `is_in`, whose
+/// count follows the dtype of the values it is given, is one too.
+fn is_held_back(entry: &Entry) -> bool {
+    catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
+}
+
 /// The functions that start a chain and take expressions, which a chain may start from besides a
 /// column, a literal, `element` and a condition: the ones that make a date, a time, a moment, a
 /// length of time or a range of them.
@@ -863,7 +872,18 @@ impl Gen<'_> {
         chosen.sort_unstable();
         for at in chosen {
             let parameter = parameters[at];
-            given.push((parameter.name(), self.option_value(parameter)));
+            let value = self.option_value(parameter);
+            // A difference that drops the values it has none before is a count that the data
+            // decide, which a campaign draws only where a focus names the method.
+            let held_back = entry.id().as_str() == "Expr.diff"
+                && matches!(&value, Value::Choice(word) if word == "drop")
+                && !self.focus.is_some_and(|focus| focus.holds(entry));
+            let value = if held_back {
+                Value::Choice("ignore".to_owned())
+            } else {
+                value
+            };
+            given.push((parameter.name(), value));
         }
         given
     }
@@ -1038,6 +1058,32 @@ impl Gen<'_> {
             } else {
                 Representative::Boolean
             }),
+        }
+    }
+
+    /// What `parameter` of `method` that cuts a column is given: a count or a place, as a number
+    /// typed in without a dtype or with one. A place may be counted from the end, which a
+    /// signed dtype takes.
+    fn cut(&mut self, method: &str, parameter: &str) -> Built {
+        let from_the_end = method == "Expr.slice" && parameter == "offset";
+        let number = if from_the_end && self.draw.chance(25) {
+            -1
+        } else {
+            self.draw.pick(&[0_i64, 1, 1, 2, 2, 3, 5])
+        };
+        let typed = !from_the_end || number >= 0;
+        let class = self.draw.pick(&NUMBERED[..4]);
+        let literal = match dtype_value(class) {
+            Some(dtype) if typed && self.draw.chance(50) => call(
+                "polars.lit",
+                vec![("value", Value::Integer(number)), ("dtype", dtype)],
+            ),
+            _ => call("polars.lit", vec![("value", Value::Integer(number))]),
+        };
+        let has_a_dtype = literal.argument("dtype").is_some();
+        Built {
+            expression: Expression::new(Start::Call(literal), Vec::new()).expect("a start"),
+            class: has_a_dtype.then_some(class),
         }
     }
 
@@ -1387,6 +1433,9 @@ impl Gen<'_> {
         let methods = methods();
         for attempt in 0..6 {
             let mut chosen = methods[self.draw.below(methods.len())];
+            if is_held_back(chosen) && !self.focus.is_some_and(|focus| focus.holds(chosen)) {
+                continue;
+            }
             // Without a focus, or with the method drawn in it, nothing more is drawn: the case is
             // the one drawn without a focus.
             if let Some(focus) = self.focus
@@ -1545,6 +1594,13 @@ impl Gen<'_> {
                 ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
                     vec![self.scalar(name == "n")]
                 }
+                // How many values a method keeps, or where it starts: a number typed in, of a
+                // dtype or not, which fixes the count that the walk states for the call.
+                (
+                    "Expr.head" | "Expr.limit" | "Expr.tail" | "Expr.top_k" | "Expr.bottom_k"
+                    | "Expr.slice",
+                    _,
+                ) => vec![self.cut(id, name)],
                 // A quantile is one share from 0 to 1, which Polars refuses a column of for the
                 // exact quantile, and a column of numbers outside the range or holding a null for
                 // the approximate one: it is a number, and the tables measure it as one.
@@ -1781,6 +1837,13 @@ impl Gen<'_> {
                 // The index of the group `extract` takes: the whole match, a group, or one the
                 // pattern lacks, which Polars gives a null for.
                 "group_index" => Value::Integer(self.draw.pick(&[0, 1, 2, 5])),
+                // Every nth value from a place that `gather_every` takes: Polars refuses every 0th.
+                "n" if entry.id().as_str() == "Expr.gather_every" => {
+                    Value::Integer(self.draw.pick(&[1, 2, 2, 3, 5]))
+                }
+                "offset" if entry.id().as_str() == "Expr.gather_every" => {
+                    Value::Integer(self.draw.pick(&[0, 0, 1, 2, 4]))
+                }
                 // How many matches `replace` replaces: none, some, or all of them below zero.
                 "n" => Value::Integer(self.draw.pick(&[-1, 0, 1, 1, 2, 3])),
                 // The seed of a random rank: Polars takes any unsigned number.
@@ -2358,21 +2421,67 @@ mod tests {
 
     #[test]
     fn a_focus_on_every_method_leaves_each_case_as_it_is_drawn_without_one() {
-        let every = ids_beginning("")
+        // A method held back is drawn only where it is named, so a focus on it is not as none, and
+        // nor is a case that calls `diff`, whose form that drops values is held back too.
+        let drawn: Vec<&'static str> = ids_beginning("")
+            .into_iter()
+            .filter(|id| !is_held_back(entry(id)))
+            .collect();
+        let every = drawn
             .iter()
             .map(|id| id.strip_prefix("Expr.").unwrap_or(id))
             .collect::<Vec<_>>()
             .join(",");
         let every = Focus::parse(&every).unwrap().unwrap();
-        assert_eq!(focused_ids(&every), ids_beginning(""));
+        assert_eq!(focused_ids(&every), drawn);
         let mut compared = 0;
         for offset in 0..2000_u64 {
             let bytes = entropy(offset);
             let unfocused = generate(&bytes, None);
-            assert_eq!(generate(&bytes, Some(&every)), unfocused, "offset {offset}");
-            compared += usize::from(unfocused.is_some());
+            let diffs = unfocused
+                .as_ref()
+                .is_some_and(|case| case.document.write().contains("Expr.diff"));
+            if !diffs {
+                assert_eq!(generate(&bytes, Some(&every)), unfocused, "offset {offset}");
+            }
+            compared += usize::from(unfocused.is_some() && !diffs);
         }
-        assert_eq!(compared, 2000);
+        assert!(compared > 1800, "{compared} cases compared");
+    }
+
+    #[test]
+    fn a_method_that_gives_a_count_the_data_decide_is_drawn_only_where_a_focus_names_it() {
+        let held_back: Vec<&'static str> = ids_beginning("")
+            .into_iter()
+            .filter(|id| is_held_back(entry(id)))
+            .collect();
+        assert!(held_back.len() >= 10, "{held_back:?}");
+        let calls = |written: &str, id: &str| written.contains(&format!("\"entry\":\"{id}\""));
+        let focus = Focus::parse("head,filter").unwrap().unwrap();
+        let (mut without, mut with) = (0, 0);
+        for offset in 0..3000_u64 {
+            let bytes = entropy(offset);
+            if let Some(case) = generate(&bytes, None) {
+                let written = case.document.write();
+                without += held_back.iter().filter(|id| calls(&written, id)).count();
+            }
+            if let Some(case) = generate(&bytes, Some(&focus)) {
+                let written = case.document.write();
+                with += usize::from(calls(&written, "Expr.head") || calls(&written, "Expr.filter"));
+                // Only the methods named are drawn of those held back.
+                for id in held_back
+                    .iter()
+                    .filter(|id| !matches!(**id, "Expr.head" | "Expr.filter"))
+                {
+                    assert!(!calls(&written, id), "{id} drawn at offset {offset}");
+                }
+            }
+        }
+        assert_eq!(without, 0, "a method held back was drawn without a focus");
+        assert!(
+            with > 100,
+            "{with} cases draw a method that the focus names"
+        );
     }
 
     /// The identifiers of the steps drawn for themselves.

@@ -398,8 +398,11 @@ export interface ExpressionDtypesView {
   readonly links: readonly ResolutionView[];
 }
 
-/** How many values a chain gives, mirroring `Shape` in the engine: `one` as an aggregate does, or `many`. */
-export const VALUE_SHAPES = ['one', 'many'] as const;
+/**
+ * How many values a chain gives, mirroring `Shape` in the engine: `one` as an aggregate does, `many` as
+ * the table has rows, or `counted`, another number that the data or the arguments decide.
+ */
+export const VALUE_SHAPES = ['one', 'many', 'counted'] as const;
 
 /** How many values a chain gives. */
 export type ValueShapeView = (typeof VALUE_SHAPES)[number];
@@ -472,9 +475,12 @@ export const RULE_NAMES = [
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
   'moments-share-a-zone',
+  'parameter-takes-one-value',
   'pattern-is-valid',
   'replacement-values-match-in-number',
   'time-zone-is-valid',
+  'values-meet-in-count',
+  'window-input-is-not-counted',
   'window-input-is-not-widened',
 ] as const;
 

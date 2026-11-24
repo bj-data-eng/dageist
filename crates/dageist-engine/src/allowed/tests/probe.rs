@@ -8,7 +8,7 @@ use crate::allowed::dtype::{Representative, ResultDtype, dtype_name};
 use crate::allowed::table::{Outcome, Produces, Reason, Shape, Stage};
 use crate::catalog::BuildError;
 
-use super::sample::Frames;
+use super::sample::{Frames, SAMPLE_ROWS};
 
 /// `text` without the number Polars counts its temporary columns by:
 /// `_POLARS_TMP_PHYS_2512` is `_POLARS_TMP_PHYS_`.
@@ -80,10 +80,12 @@ impl Measured {
         };
         Some(Produces {
             result: ResultDtype::from_name(&dtype_name(dtype)),
-            shape: if self.rows.height() == 1 {
-                Shape::One
-            } else {
-                Shape::Many
+            // The sample's tables have three rows. Another number of values than one or those is
+            // a count that the data or the arguments decide.
+            shape: match self.rows.height() {
+                1 => Shape::One,
+                SAMPLE_ROWS => Shape::Many,
+                _ => Shape::Counted,
             },
         })
     }

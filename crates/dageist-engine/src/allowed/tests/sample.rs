@@ -20,6 +20,9 @@ use polars::prelude::{
 
 use super::super::dtype::Representative;
 
+/// How many rows the sample's tables have.
+pub(super) const SAMPLE_ROWS: usize = 3;
+
 fn ints(name: &str) -> Series {
     Series::new(name.into(), [Some(1_i64), None, Some(3)])
 }

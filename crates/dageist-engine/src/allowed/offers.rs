@@ -196,8 +196,17 @@ impl<'a> Chosen<'a> {
     /// are, and not one as a literal's is. An entry that makes a value gives
     /// one unless told so; a method's shape is the table's.
     #[must_use]
-    pub const fn giving_many(mut self) -> Self {
-        self.shape = Some(Shape::Many);
+    pub const fn giving_many(self) -> Self {
+        self.giving_shape(Shape::Many)
+    }
+
+    /// That the values the call gives are of `shape`, where the arguments it is given decide it
+    /// and the tables, which measured one receiver and arguments of columns, do not: a method that
+    /// is given an operand of many values gives many of one, and one that takes the values of its
+    /// argument gives as many as it does. It decides whether the chain may end where it does.
+    #[must_use]
+    pub const fn giving_shape(mut self, shape: Shape) -> Self {
+        self.shape = Some(shape);
         self
     }
 
@@ -206,9 +215,8 @@ impl<'a> Chosen<'a> {
     /// expressions gives as many values as its widest argument, which the tables, measured with
     /// columns, do not say.
     #[must_use]
-    pub const fn giving_one(mut self) -> Self {
-        self.shape = Some(Shape::One);
-        self
+    pub const fn giving_one(self) -> Self {
+        self.giving_shape(Shape::One)
     }
 }
 
@@ -286,6 +294,27 @@ impl Refusal {
             source: RefusalSource::Rule(rule),
             reason: format!("{}: {said}", rule.statement()),
         }
+    }
+
+    /// The refusal of a chain that gives a count of values other than one or the table's rows
+    /// where `context` takes only those, in the words of the table of counts: what Polars says of
+    /// such a chain there, after the count it is.
+    fn count(context: Context, shape: Shape) -> Option<Self> {
+        if shape != Shape::Counted {
+            return None;
+        }
+        let Some(Outcome::Refused(reason)) = Tables::committed().counts.get(&(context, shape))
+        else {
+            return None;
+        };
+        Some(Self {
+            source: RefusalSource::Polars(reason.stage),
+            reason: format!(
+                "a count of values that the data or the arguments decide, which is neither one \
+                 value nor the table's rows, may not end an expression in {context}: {}",
+                reason.text
+            ),
+        })
     }
 
     /// Who refused it.
@@ -1128,22 +1157,41 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
         ends = cell.ends.clone();
     }
-    if let Some(given) = chosen.shape
-        && !is_method(entry)
-    {
+    // A method that follows one value gives one: the aggregate of a value is that value, and a
+    // method that takes some of the values of one keeps it. One that follows a count that the
+    // data or the arguments decide, and gives a value for each of them, gives that count.
+    match place.after {
+        After::Value {
+            shape: Shape::One, ..
+        } => shape = Shape::One,
+        After::Value {
+            shape: Shape::Counted,
+            ..
+        } if shape == Shape::Many && is_method(entry) => shape = Shape::Counted,
+        _ => {}
+    }
+    // What the arguments given decide, which the tables, measured with columns, do not say.
+    if let Some(given) = chosen.shape {
         shape = given;
     }
-    if let After::Value {
-        shape: Shape::One, ..
-    } = place.after
+    // What a method that takes some of the values says of how it ends is what the table of counts
+    // says of the count it gives, which it is not where what it follows is one value: the first of
+    // one value is that value, which ends where one value does.
+    if shape != Shape::Counted
+        && matches!(
+            catalog::Counting::of(entry, chosen.options),
+            Some(counting) if !matches!(counting, catalog::Counting::TheArgument(_))
+        )
     {
-        shape = Shape::One;
+        ends = Outcome::Allowed(None);
     }
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
     let boolean_needed = Rule::boolean_needed(place.context);
     let ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
         Ending::Refused(Refusal::rule(rule))
+    } else if let Some(refusal) = Refusal::count(place.context, shape) {
+        Ending::Refused(refusal)
     } else if entry.applies() == Applies::Function {
         // The table measured a start with one argument, and what its arguments
         // decide is the dtype of the value: a column's own, a literal's. Told
@@ -1189,7 +1237,7 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
         literal,
         place,
         &match shape {
-            Shape::Many => chosen.giving_many(),
+            Shape::Many | Shape::Counted => chosen.giving_many(),
             Shape::One => chosen,
         },
     )
@@ -1251,6 +1299,55 @@ pub fn rule_forbids_a_folded_function_in_a_join_key(context: Context) -> Result<
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_a_window_over_a_widened_value() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::WindowInputIsNotWidened))
+}
+
+/// The refusal of a parameter that Polars reads as one value and is given another, which the caller
+/// has found: `given` says what it was given, as `the rows`, `a count of values` or `one value that
+/// a method took of one value`.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words and what the parameter was given.
+pub fn rule_forbids_a_parameter_given_more_than_one_value(
+    parameter: &str,
+    given: &str,
+) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::ParameterTakesOneValue,
+        &format!("{parameter} was given {given}"),
+    ))
+}
+
+/// The refusal of a window given a count of values that the data or the arguments decide, which the
+/// caller has found: the window gives each row of its group the value it gives the group, so it
+/// takes a value as long as the group, unless it joins the values of a group or explodes them.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_window_over_a_count() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::WindowInputIsNotCounted))
+}
+
+/// The refusal of a call that meets values of other counts than it takes, which the caller has
+/// found: one value meets each of the others, and others are as many as one another.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_values_of_other_counts() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::ValuesMeetInCount))
+}
+
+/// The refusal of a chain that gives a count of values that the data or the arguments decide, which
+/// the caller has found, where `context` takes only one value or the table's rows: a chain of
+/// another count may not end an expression there. Polars' own words follow the count's.
+///
+/// # Errors
+///
+/// The refusal, in the words of the table of counts.
+pub fn refuse_a_count_that_may_not_end(context: Context) -> Result<(), Refusal> {
+    Refusal::count(context, Shape::Counted).map_or(Ok(()), Err)
 }
 
 /// The refusal of a key that the caller has already found repeats a pair of

@@ -103,6 +103,14 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Expression(&[Dtypes::String]) => expression_arg(lit("1d")),
                 // The time of day `combine` puts on a date or a moment.
                 Kind::Expression(&[Dtypes::Time]) => expression_arg(col("tm")),
+                // What the method keeps is chosen by a test that holds for some of the values.
+                Kind::Expression(&[Dtypes::Boolean]) => expression_arg(col("b")),
+                // The first place of what a method gathers, which Polars takes of any column.
+                Kind::Expression(&[Dtypes::Integer]) if parameter.name() == "indices" => {
+                    expression_arg(lit(0))
+                }
+                // The values `top_k` and `bottom_k` take are one count, and Polars refuses a column.
+                Kind::Expression(_) if matches!(parameter.name(), "k") => expression_arg(lit(1)),
                 // The length or the count of characters of a method of text is a whole number.
                 Kind::Expression(_) if parameter.role().is_a_count() => expression_arg(col("i")),
                 // A quantile is a share from 0 to 1, and a single value, which Polars refuses a
