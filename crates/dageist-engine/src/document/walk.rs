@@ -458,6 +458,21 @@ fn key_name(key: &Expression) -> Option<String> {
             first_part_name(start, "year", &PARTS_OF_A_MOMENT, !zoned)
         }
         "polars.duration" => first_part_name(start, "weeks", &PARTS_OF_A_LENGTH, true),
+        // A range is named as the first of the expressions it is given, which Python makes of
+        // 0 where `int_range` is given one bound and where a bound is left to its default: `literal`.
+        "polars.int_range" if start.argument("end").is_none() => Some("literal".to_owned()),
+        "polars.int_range"
+        | "polars.date_range"
+        | "polars.datetime_range"
+        | "polars.time_range"
+        | "polars.linear_space" => match start.argument("start") {
+            Some(Value::Expression(first)) => key_name(first),
+            _ => Some("literal".to_owned()),
+        },
+        "polars.repeat" => match start.argument("value") {
+            Some(Value::Expression(value)) => key_name(value),
+            _ => None,
+        },
         "polars.when" => key
             .links()
             .iter()
