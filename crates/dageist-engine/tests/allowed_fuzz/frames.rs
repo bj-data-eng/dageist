@@ -256,3 +256,41 @@ pub fn column_class(
         _ => return None,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use polars::prelude::{DataType, UnknownKind};
+
+    use super::*;
+
+    #[test]
+    fn a_key_column_of_every_dtype_a_key_may_have_is_made_of_nulls() {
+        // The dtypes of a join's keys are what Polars gives them, and a list of text is one:
+        // making the column of nulls of such a dtype must not end the process.
+        let keys = [
+            DataType::List(Box::new(DataType::String)),
+            DataType::List(Box::new(DataType::Boolean)),
+            DataType::List(Box::new(DataType::Float32)),
+            DataType::List(Box::new(DataType::Null)),
+            DataType::List(Box::new(DataType::Unknown(UnknownKind::Any))),
+            DataType::List(Box::new(DataType::List(Box::new(DataType::String)))),
+            DataType::List(Box::new(DataType::Int64)),
+            DataType::Array(Box::new(DataType::Int64), 2),
+            DataType::String,
+            DataType::Null,
+        ];
+        let frames = Frames::new(Representative::Int64, Representative::Int64, &keys);
+        for (at, key) in keys.iter().enumerate() {
+            let column = frames.rows.column(&key_column(at)).expect("a key column");
+            // A dtype that Polars has not worked out is a list of nothing, of nulls.
+            let made = match key {
+                DataType::List(inner) if matches!(**inner, DataType::Unknown(_)) => {
+                    DataType::List(Box::new(DataType::Null))
+                }
+                other => other.clone(),
+            };
+            assert_eq!(column.dtype(), &made);
+            assert_eq!(column.null_count(), 3);
+        }
+    }
+}
