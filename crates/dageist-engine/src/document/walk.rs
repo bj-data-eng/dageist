@@ -336,10 +336,12 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
-    /// Whether the chain starts at a range or a repeat: Polars cannot extract the length that cuts
-    /// it from a number below nothing, after any link that the optimizer does not fold the cut
-    /// into, which the engines do not agree on, so the editor refuses it after every one.
-    after_a_range: bool,
+    /// Whether what the link follows starts at a range or a repeat, or is made of literals and
+    /// ranges alone, with no column anywhere in it: Polars' slice of a series of literals cannot
+    /// extract the length that cuts it from a number below nothing, where the optimizer does not
+    /// fold the cut into it, which the engines do not agree on, so the editor refuses it after
+    /// every link.
+    of_literals_or_a_range: bool,
 }
 
 /// What a chain has so far.
@@ -1759,6 +1761,11 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
+        let starts_at_a_range = matches!(expression.start(), Start::Call(start)
+            if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments));
+        // Whether the chain so far has no column in it anywhere: a start and arguments of literals.
+        let mut literal_prefix = matches!(expression.start(), Start::Call(start)
+            if call_is_made_of_literals(start));
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -1795,12 +1802,12 @@ impl Walker<'_> {
                     unit,
                     widened,
                     zone,
-                    after_a_range: matches!(expression.start(), Start::Call(start)
-                        if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments)),
+                    of_literals_or_a_range: starts_at_a_range || literal_prefix,
                 },
             );
             unit = unit_after(link, unit, &standing);
             zone = self.zone_after(link, zone, &standing);
+            literal_prefix = literal_prefix && call_is_made_of_literals(link);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
@@ -2007,7 +2014,7 @@ impl Walker<'_> {
             unit,
             widened,
             zone,
-            after_a_range,
+            of_literals_or_a_range,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2015,6 +2022,21 @@ impl Walker<'_> {
         if widened
             && entry.id().as_str() == "Expr.over"
             && let Err(refusal) = allowed::rule_forbids_a_window_over_a_widened_value()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // Polars cannot extract the length that cuts a range, a repeat or a value of literals alone
+        // from a number below nothing, whatever the dtype of what it cuts is, so it is said first.
+        if of_literals_or_a_range
+            && let Some(said) = cut_below_nothing(link)
+            && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
         {
             self.refuse(&refusal, false);
             return (
@@ -2461,20 +2483,6 @@ impl Walker<'_> {
                 },
             );
         }
-        // Polars cannot extract the length that cuts a range or a repeat from a number below nothing.
-        if after_a_range
-            && let Some(said) = cut_below_nothing(link)
-            && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
-        {
-            self.refuse(&refusal, false);
-            return (
-                Cur::Dead,
-                Standing {
-                    follows: standing.follows,
-                    verdict: Some(Verdict::Refused(refusal)),
-                },
-            );
-        }
         let receiver_taken = match &cur {
             Cur::Value { taken, .. } => *taken,
             _ => Taken::default(),
@@ -2847,8 +2855,30 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     broadcasts(entry, name)
 }
 
-/// Why a method that cuts the values it follows may not cut a range or a repeat by what it is
-/// given, where it is a number typed in below nothing: how many values the first, the last and
+/// Whether `expression` has no column anywhere in it: a start of literals, ranges and the functions
+/// that make a value of them, and arguments that are made so too.
+fn is_made_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if call_is_made_of_literals(start))
+        && expression.links().iter().all(call_is_made_of_literals)
+}
+
+/// Whether the arguments of `call` hold no column, and the call is none that reads one.
+fn call_is_made_of_literals(call: &Call) -> bool {
+    fn value(given: &Value) -> bool {
+        match given {
+            Value::Expression(expression) => is_made_of_literals(expression),
+            Value::Many(items) => items.iter().all(value),
+            Value::Pairs(pairs) => pairs.iter().all(|(key, held)| value(key) && value(held)),
+            Value::Columns(_) | Value::Table(_) | Value::Path(_) => false,
+            _ => true,
+        }
+    }
+    !matches!(call.entry().id().as_str(), "polars.col" | "polars.element")
+        && call.arguments().iter().all(|given| value(given.value()))
+}
+
+/// Why a method that cuts the values it follows may not cut a range, a repeat or a value of
+/// literals alone by what it is given, where it is a number typed in below nothing: how many values the first, the last and
 /// `limit` keep, and the length of a slice.
 fn cut_below_nothing(link: &Call) -> Option<String> {
     let parameter = match link.entry().id().as_str() {
@@ -2858,7 +2888,7 @@ fn cut_below_nothing(link: &Call) -> Option<String> {
     };
     let number = whole_number(link, parameter).filter(|number| *number < 0)?;
     Some(format!(
-        "a range or a repeat cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from it"
+        "a range, a repeat or a value of literals alone cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from it"
     ))
 }
 
