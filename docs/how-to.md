@@ -517,15 +517,16 @@ under one line that names the dtypes, so a case is plain text:
 {"version":1,"steps":[{"id":"s","call":{ … }}]}
 ```
 
-To run more, name the seed and the number of cases. A campaign stops at the
-first disagreement, reduces it to the smallest case that disagrees in the same
-way, writes that to `target/tmp/allowed-fuzz/` (or the directory
-`DAGEIST_FUZZ_KEEP` names) and prints it, and prints how many cases ended each
-way. Run it alone, since a case that runs Polars is heavy:
+To run more, name the seed and the number of cases. A campaign runs every case its
+seed makes, whatever the cases before it did. It reduces each one that disagrees to the
+smallest case that disagrees in the same way, writes that to `target/tmp/allowed-fuzz/`
+(or the directory `DAGEIST_FUZZ_KEEP` names) as `<seed>-<its place in the campaign>-<its
+length>.case`, and prints them all at the end with how many cases ended each way. Run it
+alone, since a case that runs Polars is heavy:
 
 ```sh
 DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked -p dageist-engine \
-  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1
+  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A campaign draws its methods evenly, so the more methods the catalogue holds, the
@@ -551,7 +552,7 @@ makes a moment is refused, and the refusal names it. A campaign focused on the m
 ```sh
 DAGEIST_FUZZ_FOCUS=dt.,replace_strict DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 \
   cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
-  -- --ignored --nocapture --test-threads=1
+  -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A batch of new methods lands when focused campaigns on them agree: fresh seeds
@@ -561,9 +562,76 @@ some parts differently on fewer threads. A broad campaign, with no focus, runs
 apart from the focused ones, once for each batch or on a schedule. A disagreement it
 finds outside the batch is filed as an issue and does not hold the batch back.
 
+Each case is timed. A case that has not ended in `DAGEIST_FUZZ_DEADLINE_MS`
+milliseconds, 15000 unless set, ends the campaign: it exits at once with status 75,
+which `cargo test` passes on, after it has kept the case as
+`<seed>-<place>-timeout.case`, kept the last case in which any thread panicked, which is
+the likely cause when a panic of Polars' streaming executor has left it unable to finish
+a query (#102), as `<seed>-<place>-panicked.case`, and printed the findings so far, the
+number of the case that did not end and the settings to go on from the next one. The
+same settings are in `timeout.env` in the kept directory:
+
+```text
+the case 4012 did not end in 15000 ms
+the case 4012 is kept as target/tmp/allowed-fuzz/00000000002c402a-4012-timeout.case
+likely cause: a thread panicked in the case 4009, an earlier case, kept as …-4009-panicked.case
+findings so far: 0
+to go on from the next case, run again with
+DAGEIST_FUZZ_START=4013 DAGEIST_FUZZ_COUNTED=3980
+```
+
+Read the two kept cases, replay them if you like, and run again from the next case.
+A case's number counts every case the seed makes that is run, including ones that checked
+nothing; the cases a focused campaign draws again for holding no method in focus are not
+cases and have no number. `DAGEIST_FUZZ_COUNTED` counts only the cases that checked something,
+so it is below the number of the case that did not end: in the example 32 of the 4011 cases
+before it checked nothing. A case that did not end counts as one that was checked. `DAGEIST_FUZZ_START` makes the cases before it and
+passes them over without running them, so the cases from it on are those of a run that began
+at the first, and `DAGEIST_FUZZ_COUNTED` makes the run end where that run would have;
+without it every case before the start counts, so the run ends earlier than the one it goes
+on from by the cases before the start that checked nothing, and a start that is past the end of
+the campaign's cases, which would make none, is refused. `--exact` keeps the other tests whose
+names contain `a_campaign` out of the run. A
+setting that is no whole number (the seed and the number of cases too), a number of cases of
+0, a deadline of 0, a count above the cases before the start or above the number of cases,
+and a start that makes more cases than a campaign counts are refused, with the variable
+named. A timed campaign removes a `timeout.env` that an earlier run left in the kept directory
+when it starts, so one that is there after a timed run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
+from the root of the repository, which is where these commands are run, and not from the
+engine's directory that the tests run in.
+
+A timeout that happens while a case that disagrees is being reduced is kept as
+`<seed>-<place>-reduction-timeout.case`, with the case that disagreed kept as it was,
+as `<seed>-<place>-unreduced.case`, and told of in the findings so far.
+
+This loop goes on until a campaign ends by itself. It runs in a subshell, so the settings
+do not stay in yours, and it follows `DAGEIST_FUZZ_KEEP` if that is set. It stops at any end
+that leaves no `timeout.env`, which is a campaign that ran to its last case or one that failed
+for another reason, such as a case that disagrees, and leaves every timeout in the kept
+directory:
+
+```sh
+(
+  keep=${DAGEIST_FUZZ_KEEP:-target/tmp/allowed-fuzz}
+  case $keep in /*) ;; *) keep=$PWD/$keep ;; esac
+  export DAGEIST_FUZZ_KEEP=$keep DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000
+  rm -f "$keep/timeout.env"
+  while :; do
+    if [ -f "$keep/timeout.env" ]; then
+      set -a; . "$keep/timeout.env"; set +a
+      mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
+    fi
+    cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
+      -- --ignored --nocapture --test-threads=1 --exact
+    [ -f "$keep/timeout.env" ] || break
+  done
+)
+```
+
 The case that is about to run is written to `current.case` in that directory
-first, so a case that does not return is found. To run one kept case again, and
-see what the tables predicted and Polars did, name its file:
+first. To run one kept case again, and see what the tables predicted and Polars did,
+name its file. A kept timeout is timed in the same way and ends the replay with the same
+status:
 
 ```sh
 DAGEIST_FUZZ_REPLAY=$PWD/target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \

@@ -16,6 +16,7 @@
 //! on request, focused on chosen methods where it is asked to be, and
 //! [`replay_a_case`] replays one kept case; the how-to guide says how.
 
+mod campaign;
 mod case;
 mod frames;
 mod generate;
@@ -27,66 +28,54 @@ mod predict;
 mod probe;
 mod reduce;
 mod target;
+mod timeout;
+mod watchdog;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use dageist_fuzz::engine::{PropertyConfig, replay, run_property};
-use dageist_fuzz::generation::property;
-use dageist_fuzz::reduction::{ReductionLimits, reduce_direct};
-use dageist_fuzz::{CaseOutcome, CaseTarget, OutcomeKind};
+use dageist_fuzz::engine::replay;
+use dageist_fuzz::{CaseTarget, OutcomeKind};
 
+use campaign::{InProcess, Report, Settings, detail_of};
 use case::Case;
 use generate::Focus;
 use limits::Limit;
-use target::{AllowedTarget, take_tally};
+use target::AllowedTarget;
 
 /// The seed and size of the run that goes with the engine's tests.
 const SEED: u64 = 0x00d4_6e15_7a11_0001;
 const CASES: u32 = 1000;
 
-/// Where kept evidence of a disagreement is written, unless a directory is
-/// named by `DAGEIST_FUZZ_KEEP`.
+/// How long a case of a campaign is given, in milliseconds, unless `DAGEIST_FUZZ_DEADLINE_MS`
+/// says another. A case that has not ended by then ends the campaign.
+const DEADLINE_MS: u64 = 15_000;
+
+/// `path` where it is absolute, and where it is relative the path from the root of the
+/// repository, which is where the commands that run a campaign are run from, not the
+/// directory of the engine that the tests run in.
+fn from_the_root(root: &Path, path: PathBuf) -> PathBuf {
+    if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
+    }
+}
+
+/// Where kept evidence of a failing case is written, unless a directory is named by
+/// `DAGEIST_FUZZ_KEEP`, which is taken from the root of the repository if it is relative.
 fn keep_directory() -> PathBuf {
     std::env::var_os("DAGEIST_FUZZ_KEEP").map_or_else(
         || PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("allowed-fuzz"),
-        PathBuf::from,
+        |path| {
+            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+            from_the_root(&root, PathBuf::from(path))
+        },
     )
 }
 
 fn regressions() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/allowed_fuzz/regressions")
-}
-
-/// What a disagreement came to: the case, reduced, and what disagreed.
-struct Finding {
-    kept: PathBuf,
-    reduced: Vec<u8>,
-    detail: String,
-}
-
-impl std::fmt::Display for Finding {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "the tables and Polars disagree: {}\nthe smallest case found, kept as {}:\n{}",
-            self.detail,
-            self.kept.display(),
-            String::from_utf8_lossy(&self.reduced)
-        )
-    }
-}
-
-fn detail_of(outcome: &CaseOutcome) -> String {
-    format!(
-        "{}: {}",
-        outcome
-            .failure_key()
-            .and_then(|key| key.discriminator())
-            .unwrap_or("?"),
-        outcome.detail().unwrap_or_default()
-    )
 }
 
 /// Runs `work` on a thread with a stack large enough for Polars to build and
@@ -104,75 +93,6 @@ fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
     })
 }
 
-/// Runs `cases` cases made from `seed`, focused on `focus` if it is one. When one
-/// disagrees, reduces it and keeps the result under the directory for kept evidence.
-fn campaign(seed: u64, cases: u32, focus: Option<Focus>) -> (Result<u64, Finding>, Vec<String>) {
-    let target = AllowedTarget::new().with_focus(focus);
-    // A draw reads more than a byte where a count needs more, and again where it rejects what it
-    // read, so a case that is made from entropy of up to this many bytes runs out of it about as
-    // seldom as one did of 512 when each draw was one byte.
-    let strategy = property::bytes(1024, target.descriptor().limits());
-    let config = PropertyConfig {
-        cases,
-        max_rejections: 1_000_000,
-        // Entropy is not the case: the owner's reduction works on the case.
-        max_shrink_iterations: 0,
-        seed,
-    };
-    // The case is written down before it is run, so that one that does not
-    // return is still found: it is the file `current.case`.
-    let directory = keep_directory();
-    std::fs::create_dir_all(&directory).expect("a directory for kept evidence");
-    let current = directory.join("current.case");
-    let mut capture = |bytes: &[u8]| {
-        std::fs::write(&current, bytes).map_err(|error| {
-            dageist_fuzz::FuzzError::with_source(
-                dageist_fuzz::FuzzErrorKind::Io,
-                "capture the case",
-                "write the case about to run",
-                error,
-            )
-        })
-    };
-    let report = run_property(&target, &strategy, config, &mut capture)
-        .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
-    // The tally is of the run, not of the reduction of what it found.
-    let tally = take_tally();
-    let Some(found) = report.failure else {
-        return (Ok(report.counts.evaluated()), tally);
-    };
-    let key = found
-        .outcome
-        .failure_key()
-        .expect("a failure has its key")
-        .clone();
-    let limits = ReductionLimits::new(400, Duration::from_secs(600), 1 << 24, 2)
-        .expect("limits of a reduction");
-    let reduction = reduce_direct(
-        &target,
-        &found.canonical,
-        &key,
-        limits,
-        &AtomicBool::new(false),
-    )
-    .unwrap_or_else(|error| panic!("the reduction could not be run: {error:?}"));
-    let reduced = reduction
-        .canonical_input()
-        .unwrap_or_else(|| reduction.best_input())
-        .to_vec();
-    let outcome = target
-        .evaluate(&target.decode(&reduced).expect("a reduced case is a case"))
-        .expect("a reduced case is evaluated");
-    let kept = directory.join(format!("{seed:016x}-{}.case", reduced.len()));
-    std::fs::write(&kept, &reduced).expect("evidence is kept");
-    let finding = Finding {
-        kept,
-        reduced,
-        detail: detail_of(&outcome),
-    };
-    (Err(finding), tally)
-}
-
 /// The methods `DAGEIST_FUZZ_FOCUS` names, which a campaign focuses on. Unset or
 /// empty, it names none.
 fn env_focus() -> Option<Focus> {
@@ -184,67 +104,142 @@ fn env_focus() -> Option<Focus> {
     Focus::parse(&text).unwrap_or_else(|refusal| panic!("{refusal}"))
 }
 
-fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
-    std::env::var(name)
-        .ok()
-        .and_then(|text| text.trim().replace('_', "").parse().ok())
-        .unwrap_or(default)
-}
-
 #[test]
 fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(SEED, CASES, None));
+    let report = on_a_large_stack(|| {
+        let target = AllowedTarget::new();
+        campaign::run(
+            &Settings::new(SEED, CASES, None, keep_directory()),
+            &InProcess::new(&target),
+        )
+    });
     eprintln!(
         "{CASES} cases of seed {SEED:#x} took {:.1?}\n{}",
         started.elapsed(),
-        tally.join("\n")
+        report.tally.join("\n")
     );
-    match result {
-        Ok(evaluated) => assert!(
-            evaluated >= u64::from(CASES) / 2,
-            "only {evaluated} of {CASES} cases checked something"
-        ),
-        Err(finding) => panic!("{finding}"),
+    assert_no_findings(&report);
+    assert!(
+        report.evaluated >= u64::from(CASES) / 2,
+        "only {} of {CASES} cases checked something",
+        report.evaluated
+    );
+}
+
+/// Panics with every finding of `report`.
+fn assert_no_findings(report: &Report) {
+    if !report.findings.is_empty() {
+        let findings: Vec<String> = report.findings.iter().map(ToString::to_string).collect();
+        panic!("{}", findings.join("\n\n"));
     }
 }
 
+/// The whole number that `text` says `name` is, or why it is not one.
+fn whole_number(name: &str, text: &str) -> Result<u64, String> {
+    text.trim()
+        .replace('_', "")
+        .parse()
+        .map_err(|_| format!("{name} is {text:?}, which is not a whole number"))
+}
+
+/// The whole number `name` is set to, if it is set. A setting that is no number is refused
+/// rather than ignored.
+fn env_whole(name: &str) -> Option<u64> {
+    let text = match std::env::var(name) {
+        Ok(text) => text,
+        Err(std::env::VarError::NotPresent) => return None,
+        Err(std::env::VarError::NotUnicode(_)) => panic!("{name} is not text"),
+    };
+    Some(whole_number(name, &text).unwrap_or_else(|refusal| panic!("{refusal}")))
+}
+
+/// How long a case of a campaign is given: `DAGEIST_FUZZ_DEADLINE_MS` milliseconds.
+fn env_deadline() -> std::time::Duration {
+    let milliseconds = env_whole("DAGEIST_FUZZ_DEADLINE_MS").unwrap_or(DEADLINE_MS);
+    assert!(
+        milliseconds > 0,
+        "DAGEIST_FUZZ_DEADLINE_MS is 0, and no case ends in no time"
+    );
+    std::time::Duration::from_millis(milliseconds)
+}
+
 /// A longer run: `DAGEIST_FUZZ_CASES` cases from `DAGEIST_FUZZ_SEED`, focused on the
-/// methods `DAGEIST_FUZZ_FOCUS` names, if it names any.
+/// methods `DAGEIST_FUZZ_FOCUS` names, if it names any, each given `DAGEIST_FUZZ_DEADLINE_MS`
+/// milliseconds. It goes on from the case `DAGEIST_FUZZ_START`, with `DAGEIST_FUZZ_COUNTED`
+/// of the cases before it counted, which is what a run that a case did not end says.
 #[test]
 #[ignore = "a campaign, run on request with DAGEIST_FUZZ_CASES, DAGEIST_FUZZ_SEED and DAGEIST_FUZZ_FOCUS"]
 fn a_campaign() {
-    let seed: u64 = env_number("DAGEIST_FUZZ_SEED", SEED);
-    let cases: u32 = env_number("DAGEIST_FUZZ_CASES", 5_000);
+    let seed = env_whole("DAGEIST_FUZZ_SEED").unwrap_or(SEED);
+    let cases = env_whole("DAGEIST_FUZZ_CASES").map_or(5_000, |cases| {
+        u32::try_from(cases).unwrap_or_else(|_| {
+            panic!(
+                "DAGEIST_FUZZ_CASES is {cases}, more than a campaign counts, {}",
+                u32::MAX
+            )
+        })
+    });
     let focus = env_focus();
     let focused = focus
         .as_ref()
         .map(|focus| format!(" focused on {}", focus.names()))
         .unwrap_or_default();
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(seed, cases, focus));
+    let report = on_a_large_stack(|| {
+        let target = AllowedTarget::new();
+        let mut settings = Settings::new(seed, cases, focus, keep_directory());
+        settings.deadline = Some(env_deadline());
+        settings.start = env_whole("DAGEIST_FUZZ_START").unwrap_or(1);
+        settings.counted = env_whole("DAGEIST_FUZZ_COUNTED");
+        if let Err(refusal) = settings.check() {
+            panic!("{refusal}");
+        }
+        campaign::run(&settings, &InProcess::new(&target))
+    });
     eprintln!(
         "{cases} cases of seed {seed:#x}{focused} took {:.1?}\n{}",
         started.elapsed(),
-        tally.join("\n")
+        report.tally.join("\n")
     );
-    if let Err(finding) = result {
-        panic!("{finding}");
-    }
+    assert_no_findings(&report);
 }
 
-/// Replays the case in the file `DAGEIST_FUZZ_REPLAY` names.
+/// Runs `work` on the case written as `bytes`, which ends the process with the status of a
+/// campaign whose case did not end if it takes longer than `deadline`.
+fn replayed_in_time<T>(
+    replaying: &str,
+    bytes: &[u8],
+    deadline: std::time::Duration,
+    work: impl FnOnce() -> T,
+) -> T {
+    let watchdog = watchdog::Watchdog::start(watchdog::Context {
+        seed: 0,
+        keep: None,
+        deadline,
+        replaying: Some(replaying.to_owned()),
+    });
+    watchdog.timing(1, bytes, work)
+}
+
+/// Replays the case in the file `DAGEIST_FUZZ_REPLAY` names, as long as
+/// `DAGEIST_FUZZ_DEADLINE_MS` allows a case.
 #[test]
 #[ignore = "replays one kept case, named by DAGEIST_FUZZ_REPLAY"]
 fn replay_a_case() {
     let path = std::env::var_os("DAGEIST_FUZZ_REPLAY")
         .expect("DAGEIST_FUZZ_REPLAY names the file of a kept case");
     let bytes = std::fs::read(&path).expect("the file of the case is read");
-    let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
-        .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
-    let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
+    let (evaluation, described) =
+        replayed_in_time(&path.to_string_lossy(), &bytes, env_deadline(), || {
+            let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
+                .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
+            let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
+            let described = on_a_large_stack(|| target::describe(&case));
+            (evaluation, described)
+        });
     println!("{}", String::from_utf8_lossy(&evaluation.canonical));
-    println!("{}", on_a_large_stack(|| target::describe(&case)));
+    println!("{described}");
     println!("{:?}", evaluation.outcome);
     assert_ne!(
         evaluation.outcome.kind(),
@@ -446,4 +441,28 @@ fn a_case_of_another_revision_or_not_written_canonically_is_refused() {
     let unknown = String::from_utf8_lossy(kept).replace("\"Int64\",\"b\"", "\"Int65\",\"b\"");
     assert!(target.decode(unknown.as_bytes()).is_err());
     let _: Case = target.decode(kept).unwrap();
+}
+
+#[test]
+fn a_setting_that_is_no_number_is_refused_and_says_which() {
+    assert_eq!(whole_number("DAGEIST_FUZZ_START", " 1_235 "), Ok(1235));
+    let refusal = whole_number("DAGEIST_FUZZ_COUNTED", "12 cases").unwrap_err();
+    assert!(
+        refusal.starts_with("DAGEIST_FUZZ_COUNTED is \"12 cases\""),
+        "{refusal}"
+    );
+    assert!(whole_number("DAGEIST_FUZZ_START", "-1").is_err());
+}
+
+#[test]
+fn a_relative_directory_for_kept_evidence_is_from_the_root_of_the_repository() {
+    let root = Path::new("/the/repository");
+    assert_eq!(
+        from_the_root(root, PathBuf::from("target/tmp/kept")),
+        Path::new("/the/repository/target/tmp/kept")
+    );
+    assert_eq!(
+        from_the_root(root, PathBuf::from("/elsewhere/kept")),
+        Path::new("/elsewhere/kept")
+    );
 }

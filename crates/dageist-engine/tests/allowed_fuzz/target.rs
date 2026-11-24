@@ -87,12 +87,25 @@ fn tally(what: impl Into<String>) {
     TALLY.with(|tally| *tally.borrow_mut().entry(what.into()).or_default() += 1);
 }
 
+/// How many cases ended each way, and why not when they did not check one.
+pub type Tally = BTreeMap<String, u64>;
+
+/// What was tallied on this thread since the last call, which a campaign adds to what
+/// the cases it ran in other processes tallied.
+pub fn take_counts() -> Tally {
+    TALLY.with(|tally| std::mem::take(&mut *tally.borrow_mut()))
+}
+
 /// What was tallied on this thread since the last call, one line each, and the
 /// totals of cases that agreed, that both refused for another reason than each
 /// other's, that a limit excused, that a named rule was stricter in, and that were
 /// disagreements.
 pub fn take_tally() -> Vec<String> {
-    let tallied = TALLY.with(|tally| std::mem::take(&mut *tally.borrow_mut()));
+    tally_lines(&take_counts())
+}
+
+/// `tallied` as lines: one for each way a case ended, then the totals.
+pub fn tally_lines(tallied: &Tally) -> Vec<String> {
     let total = |prefix: &str| -> u64 {
         tallied
             .iter()

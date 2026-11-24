@@ -377,7 +377,7 @@ fn plain_steps() -> Vec<&'static Entry> {
 /// a chain draws a method that is not one of them, it draws one that is, one time in four, as it
 /// does where it draws a start, and the rest of the case is drawn as without a focus. A focus on
 /// every method changes nothing. The target draws again a case that holds none of them.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Focus {
     /// In the catalogue's order, each once.
     methods: Vec<&'static Entry>,

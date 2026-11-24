@@ -1488,6 +1488,20 @@ a batch of new methods checked against the rest as deeply however many the catal
 holds. The [how-to](how-to.md#check-the-tables-against-polars) says how to run it for
 longer, to focus it and to replay a case.
 
+Each case of a campaign is timed, in the campaign's own process, because a case that Polars
+never returns from cannot be ended from inside: nothing unwinds a thread that waits for
+ever. A panic of one of Polars' own tasks inside a streaming query leaves its executor
+broken for every query after it, which is how the cases after the panic stall (#102), and
+the `catch_unwind` of the target does not see a panic on a thread of Polars', so a hook notes
+the case in which any thread panicked. A timer thread looks at the case in progress and, when
+it is late, keeps it, keeps the last case that a panic was seen in as its likely cause, says
+what the campaign found, and ends the process with a status of its own, which no case ends
+with. The campaign then goes on from the case after it in a new process: the cases are those
+of the seed, so a run that starts there makes the ones an uninterrupted run would, and the
+process the panic broke is not the one they run in. A campaign that is run in a loop
+therefore always ends: each case has its deadline, and a campaign can end early at most once
+for each case.
+
 A disagreement is either a defect of dageist, a combination the tables were not
 measured on, or a part of an expression that Polars does not evaluate. The first
 found while building the target was `offer` giving a `shift` the dtype of what it
