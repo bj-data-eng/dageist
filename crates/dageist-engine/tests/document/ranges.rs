@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use dageist_engine::allowed::{Count, RefusalSource};
 use dageist_engine::catalog::{self, Applies};
 use dageist_engine::document::{
-    Document, Inputs, Outcome, Report, Segment, StepRows, WalkedExpression,
+    Document, Inputs, ListOrigin, Outcome, Report, Segment, StepRows, WalkedExpression,
 };
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -71,6 +71,17 @@ fn frame() -> DataFrame {
 /// A table that a join takes: `rk` holds whole numbers.
 fn inputs() -> Inputs {
     let mut inputs = Inputs::new();
+    // A connected value and a connected list, which Polars meets as literals of their dtype.
+    inputs
+        .add_value("v", Scalar::new(DataType::Int64, AnyValue::Int64(5)))
+        .expect("a value");
+    inputs
+        .add_list(
+            "lst",
+            ListOrigin::Parameter,
+            Series::new("lst".into(), [3_i64, 1, 2, 5]),
+        )
+        .expect("a list");
     inputs
         .add_table(
             "other",
@@ -2401,6 +2412,7 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
     let ten = || int_range(vec![("start", whole(0)), ("end", whole(10))]);
     let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
     let on = |start: Value, links: Vec<Value>| chain(start, links);
+    let input = |name: &str| json!({ "input": name });
     let literal = |number: i64| call("polars.lit", json!({ "value": { "integer": number } }));
     let with = |id: &str, parameter: &str, other: Value| call(id, json!({ parameter: other }));
     let cum = || call("Expr.cum_sum", json!({}));
@@ -2497,6 +2509,29 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
         ),
         ("a number", on(literal(5), vec![])),
         ("a number, accumulated", on(literal(5), vec![cum()])),
+        // A connected value and a connected list are literals of their dtype to Polars.
+        ("a connected value", on(input("v"), vec![])),
+        (
+            "a connected value, accumulated",
+            on(input("v"), vec![cum()]),
+        ),
+        (
+            "a connected value, summed",
+            on(input("v"), vec![call("Expr.sum", json!({}))]),
+        ),
+        (
+            "a connected value and a range",
+            on(input("v"), vec![with("Expr.add", "other", ten())]),
+        ),
+        ("a connected list", on(input("lst"), vec![])),
+        (
+            "a connected list, accumulated",
+            on(input("lst"), vec![cum()]),
+        ),
+        (
+            "a connected list, summed",
+            on(input("lst"), vec![call("Expr.sum", json!({}))]),
+        ),
         (
             "a number and one",
             on(literal(5), vec![with("Expr.add", "other", whole(1))]),
@@ -2509,7 +2544,10 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
             let (polars, walk) = (polars_says(&report), walk_says(&report));
             // The one value for each value that a number and a range make is folded into, where the
             // cut is by the first values, as it is of the chains pinned above.
-            let folded = *name == "a number and a range" && cut_name != "tail";
+            let folded = matches!(
+                *name,
+                "a number and a range" | "a connected value and a range"
+            ) && cut_name != "tail";
             if polars.accepts() != folded || walk.accepts() {
                 found.push(format!(
                     "{cut_name} of {name}: Polars says {polars:?}, the walk says {walk:?}"
@@ -2551,6 +2589,30 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
             ),
         ),
     ];
+    // A range that starts the chain and a column that is added to it: a column is in the value, and
+    // the engine of steps runs the cut.
+    let mut controls = controls;
+    for (cut_name, cut) in cuts() {
+        let name = match cut_name {
+            "head" => "a range and some values of a column, cut by head",
+            "tail" => "a range and some values of a column, cut by tail",
+            _ => "a range and some values of a column, cut by a slice",
+        };
+        controls.push((
+            name,
+            then(
+                &on_start(
+                    &four(),
+                    vec![with(
+                        "Expr.add",
+                        "other",
+                        on_column("a", vec![call("Expr.head", json!({ "n": whole(4) }))]),
+                    )],
+                ),
+                vec![cut],
+            ),
+        ));
+    }
     for (name, expression) in &controls {
         let report = select_of(vec![expression.clone()]);
         let (polars, walk) = (polars_says(&report), walk_says(&report));
