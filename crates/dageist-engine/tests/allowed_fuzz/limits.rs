@@ -5256,6 +5256,154 @@ mod tests {
         );
     }
 
+    /// `datetime(2000, 1, 1, time_zone=zone)`, a moment of one value.
+    fn a_moment_in(zone: &str) -> Call {
+        let part = |number: i64| {
+            Value::Expression(chain_of(
+                call("polars.lit", vec![("value", Value::Integer(number))]),
+                Vec::new(),
+            ))
+        };
+        call(
+            "polars.datetime",
+            vec![
+                ("year", part(2000)),
+                ("month", part(1)),
+                ("day", part(1)),
+                ("time_zone", Value::TimeZone(Some(zone.to_owned()))),
+            ],
+        )
+    }
+
+    /// The number 1 as a moment in UTC, a fill for a shift.
+    fn a_fill_in_utc() -> Value {
+        let dtype: Dtype = "Datetime(time_unit='us', time_zone='UTC')"
+            .parse()
+            .expect("a dtype");
+        Value::Expression(chain_of(
+            call(
+                "polars.lit",
+                vec![("value", Value::Integer(1)), ("dtype", Value::Dtype(dtype))],
+            ),
+            Vec::new(),
+        ))
+    }
+
+    fn shifted_with(fill: Value) -> Call {
+        call("Expr.shift", vec![("fill_value", fill)])
+    }
+
+    fn convert_to(zone: &str) -> Call {
+        call(
+            "Expr.dt.convert_time_zone",
+            vec![("time_zone", Value::TimeZone(Some(zone.to_owned())))],
+        )
+    }
+
+    fn slugs(limits: Vec<Limit>) -> Vec<&'static str> {
+        limits.into_iter().map(Limit::slug).collect()
+    }
+
+    #[test]
+    fn a_shift_of_one_moment_filled_in_another_zone_is_excused_and_a_shift_of_rows_is_not() {
+        // Polars shifts one moment with the number it is filled with, whatever zone the fill is
+        // in, where it panics for a column of moments, so the rule that the zones be one is
+        // stricter than it for a receiver of one value.
+        const SLUG: &str = "a-moment-of-one-value-filled-in-another-zone";
+        let reason = "Etc/GMT-1 and UTC";
+        for kept in [
+            "uncovered-a-moment-of-one-value-filled-in-another-zone.case",
+            "uncovered-a-moment-of-one-value-filled-in-another-zone--in-a-select.case",
+        ] {
+            assert_eq!(slugs(excused_by_kept(kept)), vec![SLUG], "{kept}");
+        }
+        let refused = |chain: Expression, at: usize| {
+            rule_refuses(
+                &select(vec![chain]),
+                link_of("exprs", 0, at),
+                "moments-share-a-zone",
+                reason,
+            )
+        };
+        // A moment made of literals, and the one value that an aggregate of a column gives.
+        assert_eq!(
+            slugs(refused(
+                chain_of(a_moment_in("+01:00"), vec![shifted_with(a_fill_in_utc())]),
+                0
+            )),
+            vec![SLUG]
+        );
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    column("b"),
+                    vec![
+                        convert_to("Europe/Berlin"),
+                        call("Expr.max", Vec::new()),
+                        shifted_with(a_fill_in_utc()),
+                    ]
+                ),
+                2
+            )),
+            vec![SLUG]
+        );
+        // A column of moments is panicked on by Polars, which the rule is right to refuse.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    column("b"),
+                    vec![convert_to("Europe/Berlin"), shifted_with(a_fill_in_utc())]
+                ),
+                1
+            )),
+            Vec::<&str>::new()
+        );
+        // Many values from a literal are no one value either.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    a_moment_in("+01:00"),
+                    vec![
+                        compared_with("Expr.add", chain(column("b"), &[])),
+                        shifted_with(a_fill_in_utc()),
+                    ]
+                ),
+                1
+            )),
+            Vec::<&str>::new()
+        );
+        // Another call that meets two zones is refused by Polars, and so is no shift.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    a_moment_in("+01:00"),
+                    vec![compared_with(
+                        "Expr.eq",
+                        match a_fill_in_utc() {
+                            Value::Expression(fill) => fill,
+                            other => panic!("{other:?}"),
+                        }
+                    )]
+                ),
+                0
+            )),
+            Vec::<&str>::new()
+        );
+        // Another rule that refuses a shift is no zone rule.
+        assert_eq!(
+            slugs(rule_refuses(
+                &select(vec![chain_of(
+                    a_moment_in("+01:00"),
+                    vec![shifted_with(a_fill_in_utc())]
+                )]),
+                link_of("exprs", 0, 0),
+                "pivot-aggregate-gives-one-value",
+                reason
+            )),
+            Vec::<&str>::new()
+        );
+    }
+
     #[test]
     fn a_text_literal_beside_another_literal_is_a_part_polars_converts_and_a_column_beside_it_is_not()
      {
