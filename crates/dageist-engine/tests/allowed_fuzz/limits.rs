@@ -93,9 +93,9 @@ pub enum Limit {
     ///   the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
-    ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
-    ///   what they follow to a float as a cast does, and of the text of a count or a position,
-    ///   made by a fill with a text literal after the call that counts, or of the numbers of a
+    ///   arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or
+    ///   a kurtosis in the same places, which convert what they follow to a float as a cast
+    ///   does, and of the text of a count or a position, made by a fill with a text literal after the call that counts, or of the numbers of a
     ///   group cast or filled to text by the first call, which a fill, a reverse, a sort, a drop
     ///   of the nulls or one value picked may follow, and which read as the numbers, or of the
     ///   values of a group written by a first call with a format of digits alone, as the year,
@@ -995,6 +995,25 @@ fn compares_with_a_null(call: &Call) -> bool {
         && operands(call)
             .into_iter()
             .any(|(_, operand)| is_the_bare_null_literal(operand))
+}
+
+/// Whether a link of `chain`, which is at `place`, before the call at `at` is a bitwise call given
+/// the null literal that follows whole numbers, as the tables say: the bitwise call of a whole
+/// number with a null is a null in each row, where one of a `Boolean` is not (a null with a true
+/// is a true).
+fn gives_a_null_of_whole_numbers(
+    prediction: &Prediction,
+    chain: &Expression,
+    place: &Place,
+    at: usize,
+) -> bool {
+    chain.links()[..at].iter().enumerate().any(|(link, call)| {
+        is_a_bitwise_call(call)
+            && operands(call)
+                .into_iter()
+                .any(|(_, operand)| is_the_bare_null_literal(operand))
+            && class_after(prediction, place, link).is_some_and(|class| class.dtype().is_integer())
+    })
 }
 
 /// Whether `expression` is the null literal and no more.
@@ -4777,6 +4796,11 @@ fn applies(
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
+                                        || locus.places.last().is_some_and(|held| {
+                                            gives_a_null_of_whole_numbers(
+                                                prediction, chain, held, at,
+                                            )
+                                        })
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
                                         // The text of a count or a position, which reads as it.
