@@ -507,22 +507,6 @@
       "slots": []
     },
     {
-      "entry": "Expr.arr.reverse",
-      "verdict": {
-        "kind": "refused",
-        "refusal": {
-          "source": {
-            "by": "polars",
-            "stage": "schema"
-          },
-          "reason": "expected Array datatype for array operation, got: Datetime('μs')"
-        }
-      },
-      "argument": null,
-      "leftOut": null,
-      "slots": []
-    },
-    {
       "entry": "Expr.arr.sort",
       "verdict": {
         "kind": "refused",

@@ -821,16 +821,6 @@
       "parameters": []
     },
     {
-      "id": "Expr.arr.reverse",
-      "applies": "expression",
-      "family": "order",
-      "name": "arr.reverse",
-      "hint": "the values of each array in reverse order",
-      "head": null,
-      "lazy": true,
-      "parameters": []
-    },
-    {
       "id": "Expr.arr.sort",
       "applies": "expression",
       "family": "order",

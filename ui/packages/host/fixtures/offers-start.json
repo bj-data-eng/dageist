@@ -490,21 +490,6 @@
       "slots": []
     },
     {
-      "entry": "Expr.arr.reverse",
-      "verdict": {
-        "kind": "refused",
-        "refusal": {
-          "source": {
-            "by": "structure"
-          },
-          "reason": "a method needs the value it applies to before it"
-        }
-      },
-      "argument": null,
-      "leftOut": null,
-      "slots": []
-    },
-    {
       "entry": "Expr.arr.sort",
       "verdict": {
         "kind": "refused",
