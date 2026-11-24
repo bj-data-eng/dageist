@@ -70,7 +70,7 @@
 //! and Polars never evaluates, because a call after its condition makes it one value that Polars
 //! drops or folds, is asked in [`settle_by_evaluating_the_condition`]: the condition alone, in the
 //! place of the expression that holds it, with what follows it removed and its last value made to
-//! differ. Polars refusing that in the predicate, and allowing it with the predicate made `true`,
+//! differ. Polars refusing that in the predicate, and allowing it with that predicate made `false`,
 //! shows that it is the predicate Polars refuses once nothing hides it
 //! ([`Showing::WhereTheConditionIsEvaluated`]).
 //!
@@ -123,7 +123,7 @@ pub enum Showing {
     /// because it never evaluates it: a call that follows the condition makes it one value that
     /// Polars drops or folds. The condition standing alone, with what follows it removed and its
     /// values made to differ, is refused by Polars, and the same condition with the predicate
-    /// made `true` is allowed, so it is the predicate that Polars refuses once it evaluates it.
+    /// made `false` is allowed, so it is the predicate that Polars refuses once it evaluates it.
     WhereTheConditionIsEvaluated,
 }
 
@@ -1731,7 +1731,8 @@ const CONDITION_RULE: &str = "condition-predicate-is-boolean";
 /// the place of the expression that holds it, with what follows it removed and its last value made
 /// to differ from the others, which removes what Polars folds or drops it for. Polars refusing it
 /// shows that Polars evaluates the predicate and refuses it once nothing hides it. That it is the
-/// predicate is shown by a control: the same condition with the predicate made `true` is allowed.
+/// predicate is shown by a control: the same condition with that predicate made `false` is allowed,
+/// which drops its branch and leaves the other predicates evaluated, as a `true` would not.
 ///
 /// The refusal may be in the rule's words, or in other words for what the predicate holds, which
 /// Polars meets before it judges the dtype. Both are a refusal of the predicate once it is
@@ -1755,15 +1756,17 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
     let held = place_of_the_part(&found, false);
     // Where the predicate stands in the probe: in the condition that stands alone.
     let predicate_place = inner.iter().cloned().fold(held, Place::then);
-    let truth = Expression::new(
+    // Made `false` the branch the predicate guards is dropped, and the predicates after it are
+    // still evaluated, which a `true` would leave unevaluated where Polars takes its branch.
+    let falsity = Expression::new(
         Start::Call(call(
             "polars.lit",
-            vec![("value", Value::Flag(Some(true)))],
+            vec![("value", Value::Flag(Some(false)))],
         )?),
         Vec::new(),
     )
     .ok()?;
-    let with_truth = replaced_through(&alone, inner, &truth)?;
+    let with_falsity = replaced_through(&alone, inner, &falsity)?;
     let run = |part: Expression| {
         Some(Case {
             receiver: case.receiver,
@@ -1772,7 +1775,7 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
         })
     };
     let probed = run(alone)?;
-    let control = run(with_truth)?;
+    let control = run(with_falsity)?;
     let tables = tables_of(&found, None);
     let refusal = (0..RUNS).find_map(|_| {
         observe_probe(&probed, tables)
@@ -3423,7 +3426,7 @@ mod tests {
     #[test]
     fn a_condition_that_is_refused_for_what_is_not_its_predicate_settles_nothing() {
         // The value is refused whatever the predicate is: the same condition with the predicate
-        // made `true` is refused too, so the refusal is no evidence about the predicate.
+        // made `false` is refused too, so the refusal is no evidence about the predicate.
         let dt_date_of_text = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}"#;
         let case = sorted_by_a_condition(
             &a_comparison_of_text_with_a_number(),
