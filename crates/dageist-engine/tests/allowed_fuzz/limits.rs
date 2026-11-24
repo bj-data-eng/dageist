@@ -252,7 +252,10 @@ pub enum Limit {
     /// whose numbers every number dtype holds. Polars refusing the rows, with a failed
     /// conversion that has no place, in a case whose refusal is the bound's or the listed
     /// value's: the case run again with the bounds of every `clip` undone and the values of
-    /// every replacement made null is not refused for a failed conversion.
+    /// every replacement made null is not refused for a failed conversion. A table with no rows
+    /// holds no value to convert, except for a bound that holds an aggregate, whose value of
+    /// nothing, as the not-a-number of an entropy, is there: the empty table is asked for a `clip`
+    /// so bounded.
     ABoundTheDtypeCannotHold,
     /// Polars casts a bound of `clip` to the dtype it clips, and a count of characters that a
     /// method of text takes to a whole number, and a bound or a count whose values that dtype
@@ -3593,6 +3596,15 @@ fn has_a_bound(call: &Call) -> bool {
             .any(|value| is_a_replaced_value(call, value) && call.argument(value).is_some())
 }
 
+/// Whether the call is a `clip` that has a bound which holds an aggregate: one value, which is
+/// there when the table has no rows, where a column has none.
+fn is_a_clip_bounded_by_an_aggregate(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && operands(call)
+            .into_iter()
+            .any(|(_, bound)| any_call(bound, &is_one_value))
+}
+
 /// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
 /// key, and each of `more_exprs`, starts from a literal and reads no column, as a running sum of
 /// a literal does not.
@@ -4938,11 +4950,16 @@ fn applies(
                     ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::ABoundTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
-            // The rows hold the value; a table with no rows holds none to convert. The bound is
-            // the cause where Polars stops refusing for a failed conversion when no `clip` has
-            // one.
+            // The rows hold the value, and so may a table with no rows, where an aggregate of
+            // nothing, as the entropy, is a value of its own for the bound to be cast from. The
+            // bound is the cause where Polars stops refusing for a failed conversion when no
+            // `clip` has one.
             unplaced(refusal)
-                && refusal.stage == Stage::Rows
+                && (refusal.stage == Stage::Rows
+                    || (refusal.stage == Stage::Empty
+                        && held
+                            .iter()
+                            .any(|(_, held)| any_call(held, &is_a_clip_bounded_by_an_aggregate))))
                 && is_a_failed_conversion(&refusal.reason)
                 && held.iter().any(|(_, held)| any_call(held, &has_a_bound))
                 && refused_for_a_failed_conversion_without_bounds(case) == Some(false)
