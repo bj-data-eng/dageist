@@ -54,6 +54,13 @@ describe('a typed literal as the argument of a parameter', () => {
     expect(literalArgument(valueOf('any'), float(Number.NaN))).toBeNull();
   });
 
+  it('is no request for a number that is not finite', () => {
+    // JSON has no infinity, so it would reach the host as null.
+    expect(literalArgument(valueOf('float'), float(Number.POSITIVE_INFINITY))).toBeNull();
+    expect(literalArgument(valueOf('integer'), integer(Number.NEGATIVE_INFINITY))).toBeNull();
+    expect(literalArgument(valueOf('any'), float(Number.POSITIVE_INFINITY))).toBeNull();
+  });
+
   it('is text where the parameter takes a string, written as the literal shows it if it is a number', () => {
     expect(literalArgument(valueOf('string'), text('Company A'))).toEqual({
       kind: 'string',
