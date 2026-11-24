@@ -95,11 +95,11 @@ pub enum Limit {
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or
     ///   a kurtosis in the same places, which convert what they follow to a float as a cast
-    ///   does, and of the text of a count or a position, made by a fill with a text literal after the call that counts, or of the numbers of a
-    ///   group cast or filled to text by the first call, which a fill, a reverse, a sort, a drop
-    ///   of the nulls or one value picked may follow, and which read as the numbers, or of the
-    ///   values of a group written by a first call with a format of digits alone, as the year,
-    ///   which read as numbers, or of what
+    ///   does, and of the text of a count or a position, made by a fill with a text literal after
+    ///   the call that counts, or of the numbers of a group cast or filled to text by the first
+    ///   call, which a fill, a reverse, a sort, a drop of the nulls or one value picked may
+    ///   follow, and which read as the numbers, or of the values of a group written by a first
+    ///   call with a format of digits alone, as the year, which read as numbers, or of what
     ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -440,10 +440,12 @@ pub enum Limit {
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
     /// `dt.replace`, and the functions that make a date, a moment, a time or a length of time of
-    /// parts, convert each part they are given to a whole number of the width of the part and refuse a value outside
-    /// the calendar's range, and one that does not convert, when the rows run, so what they do
-    /// with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
-    /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
+    /// parts, convert each part they are given to a whole number of the width of the part and
+    /// refuse a value outside the calendar's range, and one that does not convert, when the rows
+    /// run, so what they do with a part that is no number written in depends on the values of
+    /// the rows. The tables measured the column that stands for an argument, whose values are 1
+    /// and 3, or true and false, of which false is a day of 0 that no date has. Polars refusing
+    /// the rows or the
     /// empty table with the refusal that the components of a date or a time are invalid, or that a
     /// value does not convert, which has no place, in a case with a call given a part: the
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
@@ -462,9 +464,10 @@ pub enum Limit {
     AMomentBeyondTheRangeOfAUnit,
     /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
     /// literals alone make, or of a value that it folds into a null literal (a comparison or an
-    /// arithmetic given the null literal, such as `mean() >= null`), which is one value, where it stands in a value of a branch of a
-    /// condition, or in the predicate of a `when` after the first, with the reason that the
-    /// quantile holds a null. It meets it in a select, a filter, a sort key, a join key, a window,
+    /// arithmetic given the null literal, such as `mean() >= null`), which is one value, where it
+    /// stands in a value of a branch of a condition, or in the predicate of a `when` after the
+    /// first, with the reason that the quantile holds a null. It meets it in a select, a filter,
+    /// a sort key, a join key, a window,
     /// the predicate of the first `when`, and on a column in the condition. The tables measured the
     /// call in a condition on columns. Polars refusing the rows or the empty table with that
     /// refusal, which has no place, in a case with a condition that holds in a value or in a later
