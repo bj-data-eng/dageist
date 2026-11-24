@@ -458,7 +458,8 @@ pub enum Limit {
     /// predicate a chain that starts from a literal, or from a function that makes a date, a time,
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
-    /// follows the quantile, cut after the quantile it is allowed. The cut control leaves a gap: a
+    /// follows the quantile, cut after the quantile it is allowed, or with a column of the
+    /// literal's own dtype, which a filter's rule asks for. The cut control leaves a gap: a
     /// refusal of a call after the quantile that Polars would give the case once the quantile is
     /// no longer refused is not seen, for what follows the quantile is not asked of the column.
     AnApproximateQuantileOfALiteralInACondition,
@@ -2908,29 +2909,52 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
+/// The column that stands in for the literal an approximate quantile starts from, of the literal's
+/// own dtype: `f`, which holds booleans, for a `Boolean`, and `g`, which holds text, for text.
+/// `None` for another dtype, where the column `k` of numbers stands in.
+fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
+    if !is(start, "polars.lit") {
+        return None;
+    }
+    match (start.argument("value"), start.argument("dtype")) {
+        (_, Some(Value::Dtype(dtype))) => match dtype.to_string().as_str() {
+            "Boolean" => Some("f"),
+            "String" => Some("g"),
+            _ => None,
+        },
+        (Some(Value::Flag(Some(_))), None) => Some("f"),
+        (Some(Value::String(_)), None) => Some("g"),
+        _ => None,
+    }
+}
+
 /// Whether Polars refuses the case, for any reason, still when each approximate quantile that
 /// starts from literals alone is a column's: the literals are then no cause, or not shown to be.
 /// `Some(false)` is a control that is allowed every time it runs. The case with the column in the
 /// literal's place is asked first, and where that is refused for what follows the quantile, which
 /// a column of numbers may not be given where a literal of text was, the case is asked again cut
 /// after the quantile, so that the column stands in for the literal and not for the dtype of what
-/// follows it. A join's keys read the column both tables hold, and other places the column `k`.
+/// follows it; and again with a column of the literal's own dtype, which a filter reads as a
+/// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A join's keys
+/// read the column both tables hold, and other places the column `k`. The cut control leaves a
+/// gap: a refusal of a call after the quantile that Polars would give is not seen.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
-    let column = if is(step.call(), "LazyFrame.join") {
-        "u"
-    } else {
-        "k"
+    let joins = is(step.call(), "LazyFrame.join");
+    let own = std::cell::Cell::new(None);
+    let recording = |expression: &Expression| {
+        let found = is_an_approximate_quantile_of_literals(expression);
+        if found && own.get().is_none() {
+            if let Start::Call(start) = expression.start() {
+                own.set(column_of_the_dtype_of(start));
+            }
+        }
+        found
     };
-    let control = |cut_after: &dyn Fn(&Call) -> bool| {
+    let control = |column: &str, cut_after: &dyn Fn(&Call) -> bool| {
         let rebuilt = Step::new(
             step.id().clone(),
-            call_with_columns_cut_for(
-                step.call(),
-                &is_an_approximate_quantile_of_literals,
-                column,
-                cut_after,
-            )?,
+            call_with_columns_cut_for(step.call(), &recording, column, cut_after)?,
         )
         .ok()?;
         let control = Case {
@@ -2941,11 +2965,23 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
         changed(Some(control), case)
             .map(|control| (0..RUNS).any(|_| observe(&control).refusal.is_some()))
     };
-    let whole = control(&|_| false)?;
-    if !whole {
-        return Some(false);
+    let never = |_: &Call| false;
+    let after_the_quantile = |link: &Call| is(link, "Expr.approx_quantile");
+    let numbers = if joins { "u" } else { "k" };
+    let mut refused = control(numbers, &never)?;
+    if refused {
+        refused = control(numbers, &after_the_quantile)?;
     }
-    control(&|link| is(link, "Expr.approx_quantile"))
+    if refused
+        && !joins
+        && let Some(own) = own.get()
+    {
+        refused = control(own, &never)?;
+        if refused {
+            refused = control(own, &after_the_quantile)?;
+        }
+    }
+    Some(refused)
 }
 
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
