@@ -9,7 +9,7 @@ use dageist_engine::document::{
     Call, Document, EditError, Expression, Place, Segment, Start, Value,
 };
 
-use super::{parameter, step_at};
+use super::{json_of, parameter, step_at};
 
 fn columns() -> Vec<String> {
     vec!["a".to_owned(), "b".to_owned()]
@@ -227,6 +227,151 @@ fn items_of(document: &Document, place: &Place) -> Vec<Value> {
     }
 }
 
+type Json = serde_json::Value;
+
+/// Follows `place` through the JSON of a document by what the document format says each segment
+/// is, as nothing of the engine's edits does.
+fn json_node<'a>(json: &'a mut Json, place: &Place) -> Option<&'a mut Json> {
+    let mut node = json
+        .get_mut("steps")?
+        .get_mut(place.step_index()?)?
+        .get_mut("call")?;
+    let mut in_call = true;
+    for segment in place.path() {
+        node = match (in_call, segment) {
+            (true, Segment::Parameter(name)) => {
+                in_call = false;
+                node.get_mut("arguments")?.get_mut(name.as_str())?
+            }
+            (false, Segment::Item(at)) => node.get_mut("many")?.get_mut(*at)?,
+            (false, Segment::Key(at)) => node.get_mut("pairs")?.get_mut(*at)?.get_mut(0)?,
+            (false, Segment::Value(at)) => node.get_mut("pairs")?.get_mut(*at)?.get_mut(1)?,
+            (false, Segment::Start) => {
+                in_call = true;
+                node.get_mut("expression")?.get_mut("start")?
+            }
+            (false, Segment::Link(at)) => {
+                in_call = true;
+                node.get_mut("expression")?.get_mut("then")?.get_mut(*at)?
+            }
+            _ => return None,
+        };
+    }
+    Some(node)
+}
+
+fn array_in<'a>(node: &'a mut Json, keys: &[&str]) -> Option<&'a mut Vec<Json>> {
+    let mut node = node;
+    for key in keys {
+        node = node.get_mut(*key)?;
+    }
+    node.as_array_mut()
+}
+
+/// The place of the call or value that holds the one at `place`.
+fn parent_of(place: &Place) -> Place {
+    let path = place.path();
+    let kept = path.len().saturating_sub(1);
+    path[..kept].iter().fold(
+        Place::of_step(place.step_index().unwrap_or_default(), None),
+        |parent, segment| parent.then(segment.clone()),
+    )
+}
+
+/// Whether what is at `place` is in a call that keeps a value for each key beside what it holds,
+/// which edits of the keys change too, so that more than the part at `place` can differ.
+fn syncs(document: &Document, place: &Place) -> bool {
+    let path = place.path();
+    (0..=path.len()).rev().find_map(|kept| {
+        let prefix = path[..kept].iter().fold(
+            Place::of_step(place.step_index()?, None),
+            |parent, segment| parent.then(segment.clone()),
+        );
+        match node_at(document, &prefix)? {
+            Node::Call(call) => Some(
+                call.entry()
+                    .parameters()
+                    .iter()
+                    .any(|parameter| matches!(parameter.shape(), Shape::PerItem(_))),
+            ),
+            Node::Value(_) => None,
+        }
+    }) == Some(true)
+}
+
+/// Asserts that `after` is `before` but for what is at `place`: everything else is as it was.
+fn assert_only_replaced(before: &Document, after: &Document, place: &Place) {
+    if syncs(before, place) {
+        return;
+    }
+    let mut expected = json_of(before);
+    let mut actual = json_of(after);
+    let new = json_node(&mut actual, place)
+        .expect("the part that was set")
+        .clone();
+    if let Some(old) = json_node(&mut expected, place) {
+        *old = new;
+    } else if let Some(Segment::Parameter(name)) = place.path().last() {
+        // A parameter that was not given before: what it was given is all there is to take out.
+        json_node(&mut actual, &parent_of(place))
+            .and_then(|call| call.get_mut("arguments"))
+            .and_then(Json::as_object_mut)
+            .expect("the arguments")
+            .remove(name);
+    }
+    assert_eq!(expected, actual, "more than {place} changed");
+}
+
+/// Asserts that `after` is `before` but for a parameter that is no longer given.
+fn assert_only_cleared(before: &Document, after: &Document, place: &Place) {
+    if syncs(before, place) {
+        return;
+    }
+    let mut expected = json_of(before);
+    if let (Some(Segment::Parameter(name)), Some(call)) = (
+        place.path().last(),
+        json_node(&mut expected, &parent_of(place)),
+    ) {
+        call.get_mut("arguments")
+            .and_then(Json::as_object_mut)
+            .expect("the arguments")
+            .remove(name);
+    }
+    assert_eq!(expected, json_of(after), "more than {place} changed");
+}
+
+/// Asserts that `after` is `before` but for the array at `keys` inside what is at `container`,
+/// which `change` makes of the array there was, given the array there is.
+fn assert_only_array_changed(
+    before: &Document,
+    after: &Document,
+    container: &Place,
+    keys: &[&str],
+    change: &dyn Fn(&mut Vec<Json>, &[Json]),
+) {
+    if syncs(before, container) {
+        return;
+    }
+    let mut expected = json_of(before);
+    let mut actual = json_of(after);
+    let theirs = array_in(
+        json_node(&mut actual, container).expect("the container"),
+        keys,
+    )
+    .expect("the array")
+    .clone();
+    let ours = array_in(
+        json_node(&mut expected, container).expect("the container"),
+        keys,
+    )
+    .expect("the array");
+    change(ours, &theirs);
+    assert_eq!(
+        expected, actual,
+        "more than the array at {container} changed"
+    );
+}
+
 /// A generator of numbers that is the same on every run.
 struct Dice(u64);
 
@@ -366,6 +511,13 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     let mut expected = links_of(&before, &expression);
                     expected.insert(at, id);
                     assert_eq!(links_of(after, &expression), expected);
+                    assert_only_array_changed(
+                        &before,
+                        after,
+                        &expression,
+                        &["expression", "then"],
+                        &|array, theirs| array.insert(at, theirs[at].clone()),
+                    );
                 },
             ))
         }
@@ -378,6 +530,11 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     let mut expected = links_of(&before, &expression);
                     expected[at] = id;
                     assert_eq!(links_of(after, &expression), expected);
+                    assert_only_replaced(
+                        &before,
+                        after,
+                        &expression.clone().then(Segment::Link(at)),
+                    );
                 },
             ))
         }
@@ -389,6 +546,15 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     let mut expected = links_of(&before, &expression);
                     expected.remove(at);
                     assert_eq!(links_of(after, &expression), expected);
+                    assert_only_array_changed(
+                        &before,
+                        after,
+                        &expression,
+                        &["expression", "then"],
+                        &|array, _| {
+                            array.remove(at);
+                        },
+                    );
                 },
             ))
         }
@@ -402,6 +568,16 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     let moved = expected.remove(at);
                     expected.insert(to, moved);
                     assert_eq!(links_of(after, &expression), expected);
+                    assert_only_array_changed(
+                        &before,
+                        after,
+                        &expression,
+                        &["expression", "then"],
+                        &|array, _| {
+                            let moved = array.remove(at);
+                            array.insert(to, moved);
+                        },
+                    );
                 },
             ))
         }
@@ -420,6 +596,7 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     assert_eq!(held.start(), &given);
                     let kept = expression_at(&before, &expression).expect("an expression");
                     assert_eq!(held.links(), kept.links());
+                    assert_only_replaced(&before, after, &expression.clone().then(Segment::Start));
                 },
             ))
         }
@@ -457,6 +634,9 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     expected.insert(at, item.clone());
                 }
                 assert_eq!(made, expected);
+                assert_only_array_changed(&before, after, &list, &["many"], &|array, theirs| {
+                    array.insert(at, theirs[at].clone());
+                });
             }))
         }
         13 => {
@@ -469,6 +649,9 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     expected.remove(at);
                     // A per-item parameter that moves with the keys is not among the items.
                     assert_eq!(items_of(after, &list), expected);
+                    assert_only_array_changed(&before, after, &list, &["many"], &|array, _| {
+                        array.remove(at);
+                    });
                 },
             ))
         }
@@ -482,6 +665,11 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                         panic!("a call");
                     };
                     assert!(held.argument(parameter).is_some());
+                    assert_only_replaced(
+                        &before,
+                        after,
+                        &call.clone().then(parameter_segment(parameter)),
+                    );
                 },
             ))
         }
@@ -491,6 +679,7 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
             let place = call.then(parameter_segment(parameter));
             Some(attempt(document.clear_argument(&place), move |after| {
                 assert!(value_at(after, &place).is_none());
+                assert_only_cleared(&before, after, &place);
             }))
         }
         16 | 17 => {
@@ -506,7 +695,10 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
             let given = value.clone();
             Some(attempt(
                 document.set_argument(&place, value),
-                move |after| assert_eq!(value_at(after, &place), Some(&given)),
+                move |after| {
+                    assert_eq!(value_at(after, &place), Some(&given));
+                    assert_only_replaced(&before, after, &place);
+                },
             ))
         }
         18 | 19 => {
@@ -517,7 +709,10 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
             let given = value.clone();
             Some(attempt(
                 document.set_argument(&place, value),
-                move |after| assert_eq!(value_at(after, &place), Some(&given)),
+                move |after| {
+                    assert_eq!(value_at(after, &place), Some(&given));
+                    assert_only_replaced(&before, after, &place);
+                },
             ))
         }
         20 => {
@@ -534,6 +729,15 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     };
                     assert_eq!(held.len(), len + 1);
                     assert_eq!(held[at], entry);
+                    assert_only_array_changed(
+                        &before,
+                        after,
+                        &pairs,
+                        &["pairs"],
+                        &|array, theirs| {
+                            array.insert(at, theirs[at].clone());
+                        },
+                    );
                 },
             ))
         }
@@ -556,6 +760,9 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                     let mut expected = old.clone();
                     expected.remove(at);
                     assert_eq!(held, &expected);
+                    assert_only_array_changed(&before, after, &pairs, &["pairs"], &|array, _| {
+                        array.remove(at);
+                    });
                 },
             ))
         }
@@ -587,6 +794,11 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
                         panic!("a value for each item");
                     };
                     assert_eq!(values[item], Value::Flag(Some(flag)));
+                    assert_only_replaced(
+                        &before,
+                        after,
+                        &call.clone().then(parameter_segment(name)),
+                    );
                 },
             ))
         }
