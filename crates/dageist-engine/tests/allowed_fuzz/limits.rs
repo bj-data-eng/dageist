@@ -12617,6 +12617,24 @@ mod tests {
     }
 
     #[test]
+    fn a_call_after_a_function_given_a_drop_of_nans_is_excused_and_one_given_none_is_not() {
+        // `time(second=h.is_last_distinct().entropy().drop_nans()).cbrt()`: the drop of the NaN
+        // leaves the time no rows, so the rows do not show that the cube root of a time is a float
+        // where its plan says the dtype Time. The drop is in what the start is given.
+        let name = "uncovered-a-drop-leaves-no-rows--a-drop-of-nans-in-what-a-start-is-given.case";
+        assert_eq!(excused_by_kept(name), vec![Limit::ADropLeavesNoRows]);
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions")
+            .join(name);
+        let text = std::fs::read_to_string(path).expect("a kept case");
+        // The same without the drop: Polars refuses the cube root of a time as the tables do.
+        let without = text.replace(r#",{"entry":"Expr.drop_nans","arguments":{}}"#, "");
+        assert_ne!(without, text);
+        let case = Case::decode(without.as_bytes()).expect("a case");
+        assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
+    }
+
+    #[test]
     fn a_call_before_a_drop_of_a_null_is_not_excused_by_the_drop() {
         // The drop follows the cube root, so it leaves no rows of what the root gave and the
         // call before it is no call after a drop: the limit is no cause of what Polars shows.
