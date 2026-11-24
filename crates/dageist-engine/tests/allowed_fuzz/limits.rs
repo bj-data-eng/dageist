@@ -10060,6 +10060,94 @@ mod tests {
     }
 
     #[test]
+    fn a_null_quantile_asks_each_literal_for_a_column_of_its_own_dtype_in_either_order() {
+        // A case with the quantile of a `Boolean` literal in a branch and one of a literal of
+        // another dtype: each is made a column of its own literal's dtype, the `Boolean` one `f`,
+        // the text one `g`, the number `k`, whichever comes first. A column of the first one's dtype
+        // for all of them gave the number `f`, which `is_nan` refuses, and the text `f`, which a
+        // method of text refuses, and the same column twice, which a select refuses for the name
+        // of its two items, so the answer was the order's and not the case's.
+        let quantile = || {
+            call(
+                "Expr.approx_quantile",
+                vec![(
+                    "quantile",
+                    Value::Expression(chain_of(
+                        call("polars.lit", vec![("value", Value::Float(0.9))]),
+                        Vec::new(),
+                    )),
+                )],
+            )
+        };
+        let literal_true = || call("polars.lit", vec![("value", Value::Flag(Some(true)))]);
+        let literal_number = || call("polars.lit", vec![("value", Value::Float(2.0))]);
+        let literal_text = || {
+            call(
+                "polars.lit",
+                vec![("value", Value::String("1d".to_owned()))],
+            )
+        };
+        let boolean_in_a_branch = || {
+            chain_of(
+                call(
+                    "polars.when",
+                    vec![("predicates", many(vec![chain(column("f"), &[])]))],
+                ),
+                vec![
+                    call(
+                        "When.then",
+                        vec![(
+                            "statement",
+                            Value::Expression(chain_of(literal_true(), vec![quantile()])),
+                        )],
+                    ),
+                    call(
+                        "Then.otherwise",
+                        vec![("statement", Value::Expression(chain(column("f"), &[])))],
+                    ),
+                ],
+            )
+        };
+        let with_after = |start: Call, after: Call| chain_of(start, vec![quantile(), after]);
+        let asked = |first: Expression, second: Expression, in_order: bool| {
+            let items = if in_order {
+                vec![first, second]
+            } else {
+                vec![second, first]
+            };
+            let case = select(items);
+            std::thread::scope(|scope| {
+                std::thread::Builder::new()
+                    .stack_size(256 << 20)
+                    .spawn_scoped(scope, || refused_with_columns_for_a_quantile(&case))
+                    .expect("a thread")
+                    .join()
+                    .expect("asked")
+            })
+        };
+        for in_order in [true, false] {
+            assert_eq!(
+                asked(
+                    boolean_in_a_branch(),
+                    with_after(literal_number(), call("Expr.is_nan", Vec::new())),
+                    in_order
+                ),
+                Some(false),
+                "a number, in order {in_order}"
+            );
+            assert_eq!(
+                asked(
+                    boolean_in_a_branch(),
+                    with_after(literal_text(), call("Expr.str.to_uppercase", Vec::new())),
+                    in_order
+                ),
+                Some(false),
+                "a text, in order {in_order}"
+            );
+        }
+    }
+
+    #[test]
     fn a_null_quantile_is_excused_where_the_column_is_refused_after_it_and_not_before_it() {
         // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
         // refused for the year of a number, which a literal that is no number was not asked, and
