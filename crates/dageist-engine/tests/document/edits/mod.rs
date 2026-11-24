@@ -7,6 +7,7 @@ mod chains;
 mod refusals;
 mod round_trip;
 mod steps;
+mod values;
 
 use dageist_engine::document::{Document, EditError, Place, Segment};
 use serde_json::{Value, json};
