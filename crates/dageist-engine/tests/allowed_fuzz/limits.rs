@@ -10915,6 +10915,36 @@ mod tests {
             ),
             vec![SLUG]
         );
+        // The null first, as the receiver of the sum: Polars folds that the same, and the control
+        // puts the other operand in the null's place.
+        assert_eq!(
+            slugs(excused_by_kept(
+                "uncovered-a-part-polars-folds-to-a-null--a-null-receiver.case"
+            )),
+            vec![SLUG]
+        );
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    null(),
+                    vec![compared_with("Expr.add", chain(column("h"), &[])), split()]
+                ))],
+                0
+            ),
+            vec![SLUG]
+        );
+        // The null is no receiver where something comes before it, and a null that the sum ends
+        // the chain with is still a literal's.
+        assert_eq!(
+            asked(
+                vec![datetime(chain_of(
+                    null(),
+                    vec![compared_with("Expr.add", chain(column("h"), &[]))]
+                ))],
+                0
+            ),
+            Vec::<&str>::new()
+        );
         // No fold: the control is the case itself, which shows nothing.
         assert_eq!(
             asked(vec![datetime(chain_of(column("h"), vec![split()]))], 0),
