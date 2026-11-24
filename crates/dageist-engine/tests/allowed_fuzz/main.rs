@@ -253,7 +253,9 @@ fn replay_a_case() {
 /// `fixed-*.case` was a disagreement the tables or a named rule now settle,
 /// and replays as checked; a file named `stricter-<what it shows>.case` is a
 /// case where the tables refuse a part Polars does not evaluate, and a probe of
-/// that part shows the tables right; a file named `uncovered-<limit>.case` is a case the
+/// that part shows the tables right; a file named `by-design-<what it shows>.case` is a case
+/// where the tables refuse a count that Polars allows because the count is the table's rows, or
+/// one value, by chance, which the case on more rows shows; a file named `uncovered-<limit>.case` is a case the
 /// tables state they do not cover, and replays as excused by that limit, and
 /// every limit has one. A limit may have others, named
 /// `uncovered-<limit>--<what it shows>.case`.
@@ -307,6 +309,7 @@ fn kept_cases_replay_as_settled() {
     files.sort();
     let mut fixed = 0;
     let mut stricter = 0;
+    let mut by_design = 0;
     let mut excused = std::collections::BTreeSet::new();
     for path in files {
         let bytes = std::fs::read(&path).expect("a kept case is read");
@@ -355,6 +358,16 @@ fn kept_cases_replay_as_settled() {
                 );
             }
             fixed += 1;
+        } else if name.starts_with("by-design-") {
+            assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
+            assert!(
+                outcome
+                    .detail()
+                    .is_some_and(|detail| detail.starts_with("stricter by design")),
+                "{name} is stricter by design where a count is the rows by chance: {}",
+                detail_of(outcome)
+            );
+            by_design += 1;
         } else if name.starts_with("stricter-") {
             assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
             assert!(
@@ -403,11 +416,12 @@ fn kept_cases_replay_as_settled() {
             );
             excused.insert(slugs[0].to_owned());
         } else {
-            panic!("{name} is neither fixed-* nor uncovered-*");
+            panic!("{name} is neither fixed-*, stricter-*, by-design-* nor uncovered-*");
         }
     }
     assert!(fixed > 0, "a disagreement that was settled is kept");
     assert!(stricter > 0, "a part Polars does not evaluate is kept");
+    assert!(by_design > 0, "a count that is the rows by chance is kept");
     for limit in Limit::ALL {
         assert!(
             excused.contains(limit.slug()),
