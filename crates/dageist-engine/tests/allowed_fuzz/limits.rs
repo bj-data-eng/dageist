@@ -12242,6 +12242,52 @@ mod tests {
     }
 
     #[test]
+    fn a_default_of_another_length_than_the_input_is_a_refusal_about_lengths_a_drop_causes() {
+        // `lit(1).replace_strict(u, b, default=b.nan_max().drop_nulls())`: the default of a
+        // replacement must have as many values as the input or one, and a drop leaves none where
+        // the aggregate of no rows is a null.
+        let reason = "`default` input for `replace_strict` must have the same length as the input or have length 1";
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-drop-changes-the-lengths--the-default-of-a-replacement.case"
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
+        let replaced = |default: Expression| {
+            select(vec![chain_of(
+                call("polars.lit", vec![("value", Value::Integer(1))]),
+                vec![call(
+                    "Expr.replace_strict",
+                    vec![
+                        ("old", Value::Expression(chain(column("u"), &[]))),
+                        ("new", Value::Expression(chain(column("b"), &[]))),
+                        ("default", Value::Expression(default)),
+                    ],
+                )],
+            )])
+        };
+        assert_eq!(
+            refused_for_a_bound(
+                &replaced(chain(column("b"), &["Expr.nan_max", "Expr.drop_nulls"])),
+                None,
+                Stage::Empty,
+                reason
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
+        // Without a drop the lengths are the rows' own.
+        assert_eq!(
+            refused_for_a_bound(
+                &replaced(chain(column("b"), &["Expr.nan_max"])),
+                None,
+                Stage::Empty,
+                reason
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn an_exponent_of_another_length_than_its_base_is_a_refusal_about_lengths() {
         // A power given an exponent of as many values as the table has rows, after a drop that
         // left its base fewer, is refused for the lengths, as a window or another call is.
