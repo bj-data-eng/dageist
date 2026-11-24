@@ -545,7 +545,7 @@ of the method of an expression. A campaign focused on steps draws one of them fo
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the
 rest of the case is drawn as without a focus. A case that still holds none is drawn again, and the tally
-counts how many were. Unset or empty, the variable names no focus, and a seed makes the
+counts how many were, and so is a case whose text is longer than the 65536 bytes the target admits. Unset or empty, the variable names no focus, and a seed makes the
 same cases as without it. A name that is no method of an expression and no function that
 makes a moment is refused, and the refusal names it. A campaign focused on the methods of `dt` and on `replace_strict`:
 
@@ -596,7 +596,9 @@ setting that is no whole number (the seed and the number of cases too), a number
 0, a deadline of 0, a count above the cases before the start or above the number of cases,
 and a start that makes more cases than a campaign counts are refused, with the variable
 named. A timed campaign removes a `timeout.env` that an earlier run left in the kept directory
-when it starts, so one that is there after a timed run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
+when it starts, so one that is there after a timed run is that run's. A campaign that draws more
+than a million cases again, as one focused on very few methods does, ends as insufficient coverage, which it says, and still tells
+what it found. A relative `DAGEIST_FUZZ_KEEP` is
 from the root of the repository, which is where these commands are run, and not from the
 engine's directory that the tests run in.
 
@@ -627,6 +629,10 @@ directory:
   done
 )
 ```
+
+A case that disagrees is kept in the directory as `<seed>-<place>-<length>.case` when the run that
+found it goes on, so a run that ended at a timeout after one has told it in its findings so far, and the runs
+after it end without a failure: list the directory for such files, not only the last status.
 
 The case that is about to run is written to `current.case` in that directory
 first. To run one kept case again, and see what the tables predicted and Polars did,
@@ -674,12 +680,13 @@ Polars by hand, and decide which it is:
   has an `otherwise`, which Polars drops where the values of the condition are one
   expression, the case with the last value of each condition made a fill forward of what
   it was, where Polars refusing it for the tables' reason shows that the predicate is one
-  it skips; and, for a predicate that the rule that a condition's predicate be a `Boolean`
+  it skips, and, for a call judged by its parts as below, refusing it for any reason, with the
+  same case allowed once the predicate that holds the refused call is made `true`; and, for a predicate that the rule that a condition's predicate be a `Boolean`
   refused where no column of its dtype can be asked or no column is to be had, as in a
   pivot's aggregate, the condition alone with what follows it removed, where Polars refusing
   it in the predicate, and allowing it with the predicate made `true`, shows that a sort key
   of one value or a fold to `true` is why Polars never evaluated it. A call that the tables
-  judge by each of its values beside a companion, `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
+  judge by each of its values beside a companion, `replace`, `replace_strict`, `is_between`, `is_close` and `dt.replace`, counts when Polars refuses
   the part at the call, or in what the call is given, whatever words it uses, for the
   value the tables refused first is not always the one Polars meets; the limit for a
   literal asks the same of the case run again with columns, and for a comparison that

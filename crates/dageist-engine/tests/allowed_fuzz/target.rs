@@ -53,8 +53,14 @@ impl Default for AllowedTarget {
 
 impl AllowedTarget {
     pub fn new() -> Self {
-        let manifest: FuzzManifest = toml::from_str(include_str!("descriptor.toml"))
-            .expect("the descriptor of the target is valid");
+        Self::described_by(include_str!("descriptor.toml"))
+    }
+
+    /// The target of the descriptor `text` writes, which is `descriptor.toml` for the target a
+    /// campaign runs and another where a test needs a ceiling or a bound of its own.
+    pub fn described_by(text: &str) -> Self {
+        let manifest: FuzzManifest =
+            toml::from_str(text).expect("the descriptor of the target is valid");
         let descriptor = manifest
             .targets
             .into_iter()
@@ -481,6 +487,14 @@ impl CaseTarget for AllowedTarget {
                 "the case holds no method in focus",
             )?));
         }
+        // The engine ends the whole run for an input over the ceiling the descriptor declares,
+        // so a case that long is drawn again, as one that holds no method in focus is.
+        if case.encode().len() as u64 > self.descriptor.limits().bytes() {
+            tally("drawn again: longer than the target admits");
+            return Ok(Generation::Rejected(GenerationRejection::new(
+                "the case is longer than the target admits",
+            )?));
+        }
         Ok(Generation::Generated(case))
     }
 
@@ -613,6 +627,11 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
                             return outcome;
                         }
+                        // What Polars does with the part that the tables did not measure, which a
+                        // limit names, as a rule is the tables' own.
+                        if let Some(outcome) = excused("refused by a rule, Polars allows") {
+                            return outcome;
+                        }
                         // A predicate the rule refuses may hold a call Polars refuses first,
                         // or may not be evaluated, so it is asked on a column of its dtype.
                         if is_a_predicate_rule(rule)
@@ -718,6 +737,43 @@ mod tests {
             .expect("a thread")
             .join()
             .expect("the case is evaluated")
+    }
+
+    /// The target of the descriptor, admitting cases of up to `bytes` bytes.
+    fn target_admitting(bytes: u64) -> AllowedTarget {
+        AllowedTarget::described_by(
+            &include_str!("descriptor.toml").replace("bytes = 65536", &format!("bytes = {bytes}")),
+        )
+    }
+
+    #[test]
+    fn a_case_longer_than_the_target_admits_is_drawn_again_and_never_made() {
+        // The engine stops a run for an input over the ceiling, which would end a campaign after
+        // hours of cases and lose what it found, so the target draws such a case again.
+        let ceiling = 700;
+        let target = target_admitting(ceiling);
+        let (mut made, mut again, mut longest) = (0, 0, 0);
+        for offset in 0..300_u64 {
+            let entropy: Vec<u8> = (0..1024_u64)
+                .map(|at| {
+                    let mut mixed = (offset << 16 | at).wrapping_add(0x9e37_79b9_7f4a_7c15);
+                    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                    (mixed ^ (mixed >> 31)) as u8
+                })
+                .collect();
+            match target.generate(&entropy).expect("a generation") {
+                Generation::Generated(case) => {
+                    longest = longest.max(case.encode().len() as u64);
+                    made += 1;
+                }
+                Generation::Rejected(_) => again += 1,
+            }
+        }
+        assert!(made > 20, "only {made} cases were made");
+        assert!(again > 20, "only {again} cases were drawn again");
+        assert!(longest <= ceiling, "a case of {longest} bytes was made");
+        take_counts();
     }
 
     fn counted(tally: &[String], what: &str) -> Option<u64> {

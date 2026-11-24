@@ -713,6 +713,70 @@ fn the_values_of_a_condition_and_a_fill_value_are_moments_in_one_zone() {
     refused_for_the_zones(&report, "shift", &["Europe/Berlin", "UTC"]);
 }
 
+#[test]
+fn the_values_of_a_chained_condition_are_moments_in_one_zone_whether_or_not_it_has_an_otherwise() {
+    // Polars meets the values of a condition where it works out the schema, so a `then` of a chain
+    // that has another zone than the values before it is refused, with an `otherwise` after it or not.
+    let berlin = || {
+        let mut links = in_utc();
+        links.push(in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")));
+        moments_then_all(links)
+    };
+    let utc = || moments_then_all(in_utc());
+    let predicate = || {
+        crate::support::many(vec![field_then(
+            "owner",
+            vec![call("Expr.is_null", json!({}))],
+        )])
+    };
+    let chained = |values: Vec<Value>, otherwise: Option<Value>| {
+        let mut values = values.into_iter();
+        let mut links = vec![call(
+            "When.then",
+            json!({ "statement": values.next().expect("a first value") }),
+        )];
+        for (at, value) in values.enumerate() {
+            let when = if at == 0 {
+                "Then.when"
+            } else {
+                "ChainedThen.when"
+            };
+            links.push(call(when, json!({ "predicates": predicate() })));
+            links.push(call("ChainedWhen.then", json!({ "statement": value })));
+        }
+        if let Some(value) = otherwise {
+            let id = if links.len() > 1 {
+                "ChainedThen.otherwise"
+            } else {
+                "Then.otherwise"
+            };
+            links.push(call(id, json!({ "statement": value })));
+        }
+        selecting(chain(
+            call("polars.when", json!({ "predicates": predicate() })),
+            links,
+        ))
+    };
+    // The second value, and a later one, and with an `otherwise` that agrees.
+    for (values, otherwise) in [
+        (vec![berlin(), utc()], None),
+        (vec![utc(), utc(), berlin()], None),
+        (vec![berlin(), utc()], Some(utc())),
+    ] {
+        let report = report_of(&chained(values, otherwise));
+        refused_for_the_zones(&report, "a chained condition", &["Europe/Berlin", "UTC"]);
+    }
+    // The same zone is one dtype, and a condition that stops at its first `then` has one value.
+    for (values, otherwise) in [
+        (vec![utc(), utc()], None),
+        (vec![berlin(), berlin(), berlin()], None),
+        (vec![berlin()], None),
+    ] {
+        let report = report_of(&chained(values, otherwise));
+        assert_eq!(report.steps()[0].walk().refusal(), None);
+    }
+}
+
 fn berlin_links() -> Vec<Value> {
     let mut links = in_utc();
     links.push(in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")));

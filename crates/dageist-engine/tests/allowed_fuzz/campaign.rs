@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-use dageist_fuzz::engine::{PropertyConfig, run_property};
+use dageist_fuzz::engine::{PropertyConfig, PropertyReport, run_property};
 use dageist_fuzz::generation::property;
 use dageist_fuzz::reduction::{
     ReductionEvaluation, ReductionLimits, ReductionReport, ReductionStatus, reduce_with,
@@ -382,6 +382,23 @@ fn keep<E: Evaluator>(
     })
 }
 
+/// What the run of the property is told: the number of cases, with the cases before the start that
+/// were not counted, how many cases it may draw again, and the seed.
+fn property_config(target: &AllowedTarget, settings: &Settings) -> PropertyConfig {
+    let passed_over = settings.start - 1;
+    let counted_before = settings.counted.unwrap_or(passed_over);
+    PropertyConfig {
+        cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
+            .expect("the settings were checked"),
+        // The coverage the target declares allows as many, so the two cannot differ.
+        max_rejections: u32::try_from(target.descriptor().max_generation_rejections())
+            .expect("the target declares a bound that a run is told"),
+        // Entropy is not the case: the owner's reduction works on the case.
+        max_shrink_iterations: 0,
+        seed: settings.seed,
+    }
+}
+
 /// Runs the cases `settings` names through `evaluator`, every one whatever the
 /// ones before it did. A case that fails is reduced and kept, and the next is run.
 /// Panics where the run itself cannot be made.
@@ -398,14 +415,7 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     }
     let passed_over = settings.start - 1;
     let counted_before = settings.counted.unwrap_or(passed_over);
-    let config = PropertyConfig {
-        cases: u32::try_from(u64::from(settings.cases) + (passed_over - counted_before))
-            .expect("the settings were checked"),
-        max_rejections: 1_000_000,
-        // Entropy is not the case: the owner's reduction works on the case.
-        max_shrink_iterations: 0,
-        seed: settings.seed,
-    };
+    let config = property_config(&target, settings);
     // The case is written down before it is run, so that one that does not
     // return is still found: it is the file `current.case`.
     std::fs::create_dir_all(&settings.keep).expect("a directory for kept evidence");
@@ -446,8 +456,9 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
         tally: RefCell::new(Tally::new()),
         findings: RefCell::new(Vec::new()),
     };
-    let report = run_property(&observing, &strategy, config, &mut capture)
-        .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
+    let result = run_property(&observing, &strategy, config, &mut capture);
+    let findings = observing.findings.into_inner();
+    let evaluated = evaluated_by(result, findings.len());
     // The tally is of the run, not of the reduction of what it found. What the thread tallied
     // since its last evaluation is of the cases made after it.
     let mut tally = observing.tally.into_inner();
@@ -455,9 +466,33 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
         *tally.entry(what).or_default() += count;
     }
     Report {
-        evaluated: report.counts.evaluated(),
-        findings: observing.findings.into_inner(),
+        evaluated,
+        findings,
         tally: tally_lines(&tally),
+    }
+}
+
+/// How many cases the run of the property checked something in, or the panic that says why it
+/// could not be run.
+///
+/// A run ends as insufficient coverage after every case was run, where too few checked something
+/// or too many were drawn again, which a campaign focused on few methods does. What it found is
+/// what it is run for, so where it found something the run is no failure, and the counts, which
+/// the run does not give then, are not known: the campaign tells what it found, and what it
+/// could not count.
+fn evaluated_by(result: Result<PropertyReport>, findings: usize) -> u64 {
+    match result {
+        Ok(report) => report.counts.evaluated(),
+        Err(error)
+            if error.kind() == dageist_fuzz::FuzzErrorKind::InsufficientCoverage
+                && findings > 0 =>
+        {
+            eprintln!(
+                "the coverage the target declares was not met, and the cases are not counted: {error:?}"
+            );
+            0
+        }
+        Err(error) => panic!("the property could not be run: {error:?}"),
     }
 }
 
@@ -556,6 +591,72 @@ mod tests {
         // The cases are the ones the seed makes, whatever failed before them.
         assert_eq!(failing.evaluated, clean.evaluated);
         assert_eq!(failing.tally, clean.tally);
+    }
+
+    fn insufficient() -> FuzzError {
+        FuzzError::new(
+            dageist_fuzz::FuzzErrorKind::InsufficientCoverage,
+            "run fuzz engine",
+            "owner-declared coverage was not met",
+        )
+    }
+
+    #[test]
+    fn a_campaign_that_found_something_and_drew_too_many_cases_again_still_says_what_it_found() {
+        // The findings are what a campaign is run for, and they are told after every case has
+        // been run, so coverage that is not met must not take them from the run that made them.
+        assert_eq!(evaluated_by(Err(insufficient()), 1), 0);
+        assert_eq!(evaluated_by(Err(insufficient()), 3), 0);
+        // Where it found nothing, a run that could not be made is no run: it is said so.
+        let nothing = std::panic::catch_unwind(|| evaluated_by(Err(insufficient()), 0));
+        assert!(nothing.is_err(), "no finding excuses insufficient coverage");
+        // A failure that is not of coverage is no run, whatever was found before it.
+        let broken = FuzzError::new(
+            dageist_fuzz::FuzzErrorKind::Harness,
+            "run fuzz engine",
+            "owner adapter error",
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| evaluated_by(
+                Err(broken),
+                2
+            )))
+            .is_err()
+        );
+        let report = PropertyReport {
+            counts: dageist_fuzz::ExecutionCounts::new(7, 0),
+            assessment: dageist_fuzz::CoverageAssessment::Sufficient,
+            failure: None,
+        };
+        assert_eq!(evaluated_by(Ok(report), 0), 7);
+    }
+
+    #[test]
+    fn the_run_may_draw_again_as_many_cases_as_the_target_declares_and_no_more() {
+        // The coverage the target declares and the number of cases the run puts up with are one
+        // value, so they cannot be set apart again and end a run for coverage it was allowed.
+        let described = include_str!("descriptor.toml").replace(
+            "max_generation_rejections = 1000000",
+            "max_generation_rejections = 5000",
+        );
+        let target = AllowedTarget::described_by(&described);
+        assert_eq!(target.descriptor().max_generation_rejections(), 5000);
+        let config = property_config(&target, &settings("campaign-config"));
+        assert_eq!(u64::from(config.max_rejections), 5000);
+        let config = property_config(&AllowedTarget::new(), &settings("campaign-config"));
+        assert_eq!(u64::from(config.max_rejections), 1_000_000);
+    }
+
+    #[test]
+    fn a_focused_campaign_may_draw_as_many_cases_again_as_it_is_allowed_to_reject() {
+        // A campaign that is focused on few methods draws most of its cases again, as the run
+        // is told to put up with up to a million; the coverage the target declares is the same.
+        let target = AllowedTarget::new();
+        assert_eq!(
+            target.descriptor().max_generation_rejections(),
+            1_000_000,
+            "the run rejects up to a million cases"
+        );
     }
 
     #[test]

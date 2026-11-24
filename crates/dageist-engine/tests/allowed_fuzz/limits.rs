@@ -94,7 +94,9 @@ pub enum Limit {
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
-    ///   what they follow to a float as a cast does;
+    ///   what they follow to a float as a cast does, and of the text of a count or a position,
+    ///   which reads as the number, or of what a column of the dtype Null is compared or
+    ///   calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -445,21 +447,32 @@ pub enum Limit {
     /// `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds,
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
-    /// Polars' streaming engine refuses the approximate quantile of a literal, which is one value,
-    /// where it stands in a value of a branch of a condition, or in the predicate of a `when` after
-    /// the first, with the reason that the quantile holds a null. It meets it in a select, a
-    /// filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column
-    /// in the condition. The tables measured the call in a condition on columns. Polars refusing
-    /// the rows or the empty table with that refusal, which has no place, in a case with a
-    /// condition that holds in a value or in a later predicate a chain that starts from a literal
-    /// and takes an approximate quantile: the case run again with each such literal a column is not
-    /// refused for it.
+    /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
+    /// literals alone make, which is one value, where it stands in a value of a branch of a
+    /// condition, or in the predicate of a `when` after the first, with the reason that the quantile
+    /// holds a null. It meets it in a select, a filter, a sort key, a join key, a window, the
+    /// predicate of the first `when`, and on a column in the condition. The tables measured the call
+    /// in a condition on columns. Polars refusing the rows or the empty table with that refusal,
+    /// which has no place, in a case with a condition that holds in a value or in a later predicate
+    /// a chain that starts from a literal, or from a function that makes a date, a time, a moment or
+    /// a length of time and reads no column, and takes an approximate quantile: the case run again
+    /// with each such start a column is allowed.
     AnApproximateQuantileOfALiteralInACondition,
+    /// Polars shifts a moment that is one value, which a function of literals alone or an
+    /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
+    /// the fill: it takes the number as it is. Its schema names the zone of the receiver and so do
+    /// the rows in memory; the streaming engine gives rows in the zone of the fill for an aggregate
+    /// and for a moment of literals in `with_columns`, and the zone of the receiver for a moment of
+    /// literals in a `select`. It panics when the same shift follows a column of moments, which the tables record
+    /// and the named rule that moments share a zone refuses for every receiver. The rule is the
+    /// tables' own, so the disagreement is of a rule that refuses what Polars allows, at a shift
+    /// that is filled, whose receiver gives one value.
+    AMomentOfOneValueFilledInAnotherZone,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 37] = [
+    pub const ALL: [Self; 38] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -497,6 +510,7 @@ impl Limit {
         Self::APartOfADateThatDependsOnTheRows,
         Self::AMomentBeyondTheRangeOfAUnit,
         Self::AnApproximateQuantileOfALiteralInACondition,
+        Self::AMomentOfOneValueFilledInAnotherZone,
     ];
 
     /// The name a kept case is filed under.
@@ -550,6 +564,9 @@ impl Limit {
             Self::AMomentBeyondTheRangeOfAUnit => "a-moment-beyond-the-range-of-a-unit",
             Self::AnApproximateQuantileOfALiteralInACondition => {
                 "an-approximate-quantile-of-a-literal-in-a-condition"
+            }
+            Self::AMomentOfOneValueFilledInAnotherZone => {
+                "a-moment-of-one-value-filled-in-another-zone"
             }
         }
     }
@@ -636,7 +653,10 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::AnApproximateQuantileOfALiteralInACondition => {
-                "Polars reads the quantile of an approximate quantile of a literal as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+            }
+            Self::AMomentOfOneValueFilledInAnotherZone => {
+                "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where it panics for a column of moments, which the tables measured"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -762,6 +782,82 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` gives numbers whatever the values it follows hold: a count, or the positions
+/// or the runs of the values. Where the numbers are turned to text, the text reads as the numbers
+/// again, which the sample's text, as a duration, does not.
+fn gives_a_number_of_its_own(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.count"
+            | "Expr.len"
+            | "Expr.n_unique"
+            | "Expr.null_count"
+            | "Expr.approx_n_unique"
+            | "Expr.arg_sort"
+            | "Expr.arg_max"
+            | "Expr.arg_min"
+            | "Expr.rle_id"
+            | "Expr.cum_count"
+    )
+}
+
+/// Whether `links` give numbers of their own and then turn them to text: a call that gives a count
+/// or positions, and after it a fill with a text literal, which makes the numbers the text of
+/// themselves. The text then reads as the numbers, which the sample's text does not.
+fn makes_text_of_a_count(links: &[Call]) -> bool {
+    links
+        .iter()
+        .position(gives_a_number_of_its_own)
+        .is_some_and(|counted| links[counted + 1..].iter().any(is_a_fill_with_text))
+}
+
+/// Whether `call` fills with a text literal, which gives the dtype text to what it fills.
+fn is_a_fill_with_text(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.fill_null" | "Expr.fill_nan"
+    ) && matches!(call.argument("value"), Some(Value::Expression(value))
+        if is_a_literal_of_text(value))
+}
+
+/// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
+/// columns that are all of the dtype Null and only compare them, do arithmetic with them, pick one
+/// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables measured the
+/// values of a column that holds some.
+fn leaves_nulls_of_a_column_of_nulls(
+    frames: &Frames,
+    step: &Call,
+    chain: &Expression,
+    upto: usize,
+) -> bool {
+    let Some(Value::Columns(values)) = step.argument("values") else {
+        return false;
+    };
+    matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
+        && upto > 0
+        && !values.is_empty()
+        && values.iter().all(|name| {
+            frames
+                .dtype_of(name)
+                .is_some_and(|dtype| *dtype == polars::prelude::DataType::Null)
+        })
+        && chain.links()[..upto].iter().all(|link| {
+            let id = link.entry().id().as_str();
+            // A comparison or an arithmetic leaves a null for each null, and a call that picks
+            // one of the values or orders them leaves nothing else.
+            carries_nulls(id)
+                || matches!(
+                    id,
+                    "Expr.first"
+                        | "Expr.last"
+                        | "Expr.min"
+                        | "Expr.max"
+                        | "Expr.reverse"
+                        | "Expr.sort"
+                )
+        })
 }
 
 /// Whether `call` is a comparison or an arithmetic given the null literal, which is a null in each
@@ -961,23 +1057,61 @@ fn reached_by_an_explode(holder: &Expression, reach: Reach) -> bool {
 /// are single.
 fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
-    let single = |call: &Call| {
-        // What a replacement lists is a table of values, which gives no more values than what it
-        // follows.
-        is(call, "Expr.replace")
-            || is(call, "Expr.replace_strict")
-            || operands(call)
-                .into_iter()
-                .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
-    };
     if let Some(last) = links.iter().rposition(is_one_value) {
-        return links[last + 1..].iter().all(single);
+        return links[last + 1..].iter().all(is_single);
     }
     match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => literals && links.iter().all(single),
-        Start::Call(start) if is(start, "polars.when") => single(start) && links.iter().all(single),
+        Start::Call(start) if is(start, "polars.lit") => literals && links.iter().all(is_single),
+        Start::Call(start) if is(start, "polars.when") => {
+            is_single(start) && links.iter().all(is_single)
+        }
         _ => false,
     }
+}
+
+/// Whether `call` gives no more values than what it follows: what a replacement lists is a table
+/// of values, and any other call is given nothing but single values.
+fn is_single(call: &Call) -> bool {
+    is(call, "Expr.replace")
+        || is(call, "Expr.replace_strict")
+        || operands(call)
+            .into_iter()
+            .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
+}
+
+/// Whether the first `upto` links of `expression` give one value, that a literal, an aggregate or
+/// a function that makes a date, a time, a moment or a length of time of literals alone makes: the
+/// chain is [`wholly_single`], or starts from such a function and gives no more values after it.
+fn gives_one_value_of_literals(expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    wholly_single(expression, upto, true)
+        || (matches!(expression.start(), Start::Call(start) if is_a_value_of_literals_alone(start))
+            && links.iter().all(is_single))
+}
+
+/// The functions that start a chain and give one value of what they are given, which a column
+/// does not stand in for: the literal, and the ones that make a date, a time, a moment, a length
+/// of time or a moment from a count since 1970. A function is no value of literals alone until it
+/// is named here; the catalogue's functions are checked against this list, so that a new one is
+/// decided when it is added and not excused for what it gives many values of.
+const FUNCTIONS_OF_LITERALS: [&str; 6] = [
+    "polars.date",
+    "polars.datetime",
+    "polars.duration",
+    "polars.from_epoch",
+    "polars.lit",
+    "polars.time",
+];
+
+/// Whether the start `start` makes one value of literals alone: one of the
+/// [`FUNCTIONS_OF_LITERALS`] that is given no column and no group's values.
+fn is_a_value_of_literals_alone(start: &Call) -> bool {
+    FUNCTIONS_OF_LITERALS.contains(&start.entry().id().as_str())
+        && !operands(start).into_iter().any(|(_, operand)| {
+            any_call(operand, &|call| {
+                is(call, "polars.col") || is(call, "polars.element")
+            })
+        })
 }
 
 /// Where a place is in an expression that holds it: in what the chain starts
@@ -1018,15 +1152,19 @@ enum Node<'a> {
 }
 
 /// Whether the call at `place` is one that the tables judge by its values apart, each beside a
-/// companion that stands for the others: a replacement, an interval, and a test of closeness,
-/// which they judge by what it follows and by what it is given. Polars refuses the call for any
-/// of them, so what it says of the part is not the reason the tables gave for the first they
-/// refused.
+/// companion that stands for the others: a replacement, an interval, a test of closeness and a
+/// replacement of the parts of a date, which they judge by what it follows and by what it is
+/// given. Polars refuses the call for any of them, so what it says of the part is not the reason
+/// the tables gave for the first they refused.
 pub fn judges_its_values_apart(case: &Case, place: &Place) -> bool {
     locate(case, place).call.is_some_and(|call| {
         matches!(
             call.entry().id().as_str(),
-            "Expr.replace" | "Expr.replace_strict" | "Expr.is_between" | "Expr.is_close"
+            "Expr.replace"
+                | "Expr.replace_strict"
+                | "Expr.is_between"
+                | "Expr.is_close"
+                | "Expr.dt.replace"
         )
     })
 }
@@ -1117,6 +1255,8 @@ enum Disagreement<'a> {
     PolarsRefuses(&'a Refusal),
     /// The tables refuse it, here, and Polars allows it.
     PolarsAllows(&'a Refused),
+    /// A named rule refuses it, here, and Polars allows it.
+    RuleRefuses(&'a Refused),
 }
 
 fn is_lengths(reason: &str) -> bool {
@@ -2674,9 +2814,12 @@ fn call_with_columns_for(
 /// What Polars says of a quantile that holds a null.
 const A_NULL_QUANTILE: &str = "`quantile` should not contain null values";
 
-/// Whether the chain starts from a literal and takes an approximate quantile.
-fn is_a_literal_approximate_quantile(expression: &Expression) -> bool {
-    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+/// Whether the chain starts from a value that literals alone make, a literal or a function that
+/// makes a date, a time, a moment or a length of time and reads no column, and takes an
+/// approximate quantile.
+fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+    if is(start, "polars.lit") || is_a_value_of_literals_alone(start))
         && expression
             .links()
             .iter()
@@ -2707,14 +2850,14 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
-/// Whether Polars refuses the case for a null quantile still when the receiver of each
-/// approximate quantile that starts from a literal is the column `k`: the literal is then no
-/// cause.
-fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
+/// Whether Polars refuses the case, for any reason, still when the receiver of each approximate
+/// quantile that starts from literals alone is the column `k`: the literals are then no cause, or
+/// not shown to be. `Some(false)` is a control that is allowed every time it runs.
+fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let rebuilt = Step::new(
         step.id().clone(),
-        call_with_columns_for(step.call(), &is_a_literal_approximate_quantile, "k")?,
+        call_with_columns_for(step.call(), &is_an_approximate_quantile_of_literals, "k")?,
     )
     .ok()?;
     let control = Case {
@@ -2722,13 +2865,8 @@ fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
         argument: case.argument,
         document: Document::new(vec![rebuilt]).ok()?,
     };
-    changed(Some(control), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control)
-                .refusal
-                .is_some_and(|refusal| refusal.reason.contains(A_NULL_QUANTILE))
-        })
-    })
+    changed(Some(control), case)
+        .map(|control| (0..RUNS).any(|_| observe(&control).refusal.is_some()))
 }
 
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
@@ -3896,15 +4034,16 @@ fn applies(
             Limit::AnApproximateQuantileOfALiteralInACondition,
             Disagreement::PolarsRefuses(refusal),
         ) => {
-            // The literal is the cause where Polars stops refusing the quantile as null once the
-            // receiver of each such approximate quantile is a column.
+            // The literal, or the value literals alone make, is the cause where Polars stops
+            // refusing the quantile as null once the receiver of each such approximate quantile is
+            // a column.
             unplaced(refusal)
                 && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains(A_NULL_QUANTILE)
-                && held
-                    .iter()
-                    .any(|(_, held)| holds_in_a_branch(held, &is_a_literal_approximate_quantile))
-                && refused_for_a_null_quantile_with_columns(case) == Some(false)
+                && held.iter().any(|(_, held)| {
+                    holds_in_a_branch(held, &is_an_approximate_quantile_of_literals)
+                })
+                && refused_with_columns_for_a_quantile(case) == Some(false)
         }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
             // The unit is the cause where Polars stops refusing the conversion once each cast is to
@@ -4182,6 +4321,13 @@ fn applies(
                                         || chain.links()[..at].iter().any(compares_with_a_null)
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
+                                        // The text of a count or a position, which reads as it.
+                                        || (is_a_failed_conversion_of_text(&refused.reason)
+                                            && makes_text_of_a_count(&chain.links()[..at]))
+                                        // The values of a column of nulls, which stay null.
+                                        || leaves_nulls_of_a_column_of_nulls(
+                                            &frames, step, chain, at,
+                                        )
                                 }))
                         })
                     })
@@ -4431,6 +4577,17 @@ fn applies(
                 && refusal.reason.contains("aggregation context")
                 && held.iter().any(|(_, held)| window_over_a_window(held))
         }
+        (Limit::AMomentOfOneValueFilledInAnotherZone, Disagreement::RuleRefuses(refused)) => {
+            // The rule that moments share a zone refuses the fill of a shift, and what the shift
+            // follows is one value, which Polars shifts as it does not a column.
+            let locus = locate(case, &refused.place);
+            matches!(refused.source, Source::Rule(rule) if rule == "moments-share-a-zone")
+                && locus.call.is_some_and(|call| is(call, "Expr.shift"))
+                && locus
+                    .chain
+                    .zip(locus.index)
+                    .is_some_and(|(chain, at)| gives_one_value_of_literals(chain, at))
+        }
         _ => false,
     }
 }
@@ -4448,6 +4605,9 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
         (Verdict::Allows, Some(refusal)) => Disagreement::PolarsRefuses(refusal),
         (Verdict::Refuses(refused), None) if matches!(refused.source, Source::Polars) => {
             Disagreement::PolarsAllows(refused)
+        }
+        (Verdict::Refuses(refused), None) if matches!(refused.source, Source::Rule(_)) => {
+            Disagreement::RuleRefuses(refused)
         }
         _ => return Vec::new(),
     };
@@ -5007,6 +5167,477 @@ mod tests {
         assert_eq!(
             refused_by_the_tables_at(&running, at_the_call(), text),
             vec![]
+        );
+    }
+
+    /// A pivot of the column `a`, of dtype `receiver`, whose aggregate is `aggregate`.
+    fn pivot_of(receiver: Representative, aggregate: Expression) -> Case {
+        Case {
+            receiver,
+            ..pivot(aggregate)
+        }
+    }
+
+    fn text_of(text: &str) -> Call {
+        call(
+            "polars.lit",
+            vec![("value", Value::String(text.to_owned()))],
+        )
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_the_text_of_numbers_a_group_makes_and_for_no_other_text() {
+        // A count or a position is a number whatever the group holds, which a fill with text turns
+        // to the text of the number, and the text reads as the number it converts to, where the
+        // tables measured the sample's text, which no number reads.
+        for kept in [
+            "uncovered-a-group-aggregate--text-made-of-a-count.case",
+            "uncovered-a-group-aggregate--text-made-of-positions.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(kept),
+                vec![Limit::AGroupAggregate],
+                "{kept}"
+            );
+        }
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let filled = |making: &str| {
+            vec![
+                call(making, Vec::new()),
+                call(
+                    "Expr.fill_null",
+                    vec![(
+                        "value",
+                        Value::Expression(chain_of(text_of("1d"), Vec::new())),
+                    )],
+                ),
+                call("Expr.skew", Vec::new()),
+            ]
+        };
+        let at_the_skew = || at(&[parameter("aggregate_function"), Segment::Link(2)]);
+        let at_the_call = |link: usize| at(&[parameter("aggregate_function"), Segment::Link(link)]);
+        for making in [
+            "Expr.count",
+            "Expr.len",
+            "Expr.n_unique",
+            "Expr.null_count",
+            "Expr.arg_sort",
+            "Expr.arg_max",
+            "Expr.rle_id",
+        ] {
+            let case = pivot(chain_of(call("polars.element", Vec::new()), filled(making)));
+            assert_eq!(
+                refused_by_the_tables_at(&case, at_the_skew(), text),
+                vec![Limit::AGroupAggregate],
+                "{making}"
+            );
+        }
+        // The text of the values themselves is the sample's, which the tables measured.
+        let values = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            filled("Expr.reverse"),
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&values, at_the_skew(), text),
+            vec![]
+        );
+        // The text must be made of the count: a count that no fill with text follows, a fill with
+        // text that comes before the count, and a fill with a number are the sample's text, or no
+        // text, still.
+        let skewed = |links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(call("Expr.skew", Vec::new()));
+            (
+                pivot(chain_of(call("polars.element", Vec::new()), all)),
+                at_the_call(at),
+            )
+        };
+        let fill_with = |value: Call| {
+            call(
+                "Expr.fill_null",
+                vec![("value", Value::Expression(chain_of(value, Vec::new())))],
+            )
+        };
+        let one = || call("polars.lit", vec![("value", Value::Integer(1))]);
+        for (what, links) in [
+            ("a count and no fill", vec![call("Expr.count", Vec::new())]),
+            (
+                "a fill with text before the count",
+                vec![fill_with(text_of("1d")), call("Expr.count", Vec::new())],
+            ),
+            (
+                "a fill with a number after the count",
+                vec![call("Expr.count", Vec::new()), fill_with(one())],
+            ),
+            (
+                "a count, a calculation, and no fill",
+                vec![
+                    call("Expr.count", Vec::new()),
+                    compared_with("Expr.add", chain_of(one(), Vec::new())),
+                ],
+            ),
+        ] {
+            let (case, place) = skewed(links);
+            assert_eq!(
+                refused_by_the_tables_at(&case, place, text),
+                vec![],
+                "{what}"
+            );
+        }
+        // A count, a fill with text and then another call that keeps the text, is still the count's.
+        let (kept_on, place) = skewed(vec![
+            call("Expr.count", Vec::new()),
+            fill_with(text_of("1d")),
+            call("Expr.reverse", Vec::new()),
+        ]);
+        assert_eq!(
+            refused_by_the_tables_at(&kept_on, place, text),
+            vec![Limit::AGroupAggregate]
+        );
+        // A count after the conversion makes nothing that is converted.
+        let after = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                call("Expr.skew", Vec::new()),
+                call("Expr.count", Vec::new()),
+            ],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(
+                &after,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                text
+            ),
+            vec![]
+        );
+        // Only a failed conversion of text is this: a count is no cause of another refusal.
+        let other = "conversion from `bool` to `f64` failed in column 'a' for 2 out of 3 values: [true, false]";
+        let counted = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            filled("Expr.count"),
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&counted, at_the_skew(), other),
+            vec![]
+        );
+        // A select has no group whose kernels read the text.
+        let selected = select(vec![chain_of(column("a"), filled("Expr.count"))]);
+        assert_eq!(
+            refused_by_the_tables_at(
+                &selected,
+                at(&[parameter("exprs"), Segment::Item(0), Segment::Link(2)]),
+                text
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_what_a_column_of_nulls_is_compared_with() {
+        // The values of a group of a column of the dtype Null are nulls, which a comparison leaves
+        // null and a cast converts, where the tables measured the comparison of a column that holds
+        // values, whose booleans cannot become nulls.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-cast-of-a-comparison-of-nulls.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let reason = "conversion from `bool` to `null` failed in column 'a' for 2 out of 3 values: [true, false]";
+        let at_the_cast = || at(&[parameter("aggregate_function"), Segment::Link(1)]);
+        let cast_after = |link: Call, receiver: Representative| {
+            pivot_of(
+                receiver,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![link, cast_to(Representative::Null, Vec::new())],
+                ),
+            )
+        };
+        for id in ["Expr.ne", "Expr.eq", "Expr.lt", "Expr.add", "Expr.sub"] {
+            let compared = || compared_with(id, chain_of(text_of("1d"), Vec::new()));
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &cast_after(compared(), Representative::Null),
+                    at_the_cast(),
+                    reason
+                ),
+                vec![Limit::AGroupAggregate],
+                "{id}"
+            );
+            // A column that holds values has the booleans the tables measured.
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &cast_after(compared(), Representative::Date),
+                    at_the_cast(),
+                    reason
+                ),
+                vec![],
+                "{id} of dates"
+            );
+        }
+        // What picks or orders the nulls leaves nulls: the first or the last of them, the smallest
+        // or the largest, and the nulls in another order.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--a-cast-of-a-comparison-of-nulls--through-a-last.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        for id in [
+            "Expr.first",
+            "Expr.last",
+            "Expr.min",
+            "Expr.max",
+            "Expr.reverse",
+            "Expr.sort",
+        ] {
+            let case = pivot_of(
+                Representative::Null,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        compared_with("Expr.ne", chain_of(text_of("1d"), Vec::new())),
+                        call(id, Vec::new()),
+                        cast_to(Representative::Null, Vec::new()),
+                    ],
+                ),
+            );
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &case,
+                    at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                    reason
+                ),
+                vec![Limit::AGroupAggregate],
+                "{id}"
+            );
+        }
+        // A call that counts them leaves a number, which is no null to keep.
+        let counted = pivot_of(
+            Representative::Null,
+            chain_of(
+                call("polars.element", Vec::new()),
+                vec![
+                    compared_with("Expr.ne", chain_of(text_of("1d"), Vec::new())),
+                    call("Expr.count", Vec::new()),
+                    cast_to(Representative::Null, Vec::new()),
+                ],
+            ),
+        );
+        assert_eq!(
+            refused_by_the_tables_at(
+                &counted,
+                at(&[parameter("aggregate_function"), Segment::Link(2)]),
+                reason
+            ),
+            vec![]
+        );
+        // A call that gives a value for a null, as the test for one, leaves booleans to cast.
+        assert_eq!(
+            refused_by_the_tables_at(
+                &cast_after(call("Expr.is_null", Vec::new()), Representative::Null),
+                at_the_cast(),
+                reason
+            ),
+            vec![]
+        );
+        // The cast is the first call: there is no comparison that leaves the nulls null.
+        let bare = pivot_of(
+            Representative::Null,
+            chain_of(
+                call("polars.element", Vec::new()),
+                vec![cast_to(Representative::Null, Vec::new())],
+            ),
+        );
+        assert_eq!(
+            refused_by_the_tables_at(
+                &bare,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                reason
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn the_functions_that_make_one_value_of_literals_are_the_ones_the_catalogue_holds_and_named() {
+        // A function that gives many values of literals, as a range of dates would, must not be
+        // excused as one value: a new function of the catalogue fails here until it is decided.
+        let mut functions: Vec<&str> = catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == catalog::Applies::Function)
+            .map(|entry| entry.id().as_str())
+            .filter(|id| !matches!(*id, "polars.col" | "polars.element"))
+            .collect();
+        functions.sort_unstable();
+        assert_eq!(
+            functions,
+            [
+                "polars.date",
+                "polars.datetime",
+                "polars.duration",
+                "polars.from_epoch",
+                "polars.lit",
+                "polars.time",
+            ]
+        );
+        assert_eq!(functions, FUNCTIONS_OF_LITERALS);
+        // The value is of literals alone where no column is given to the function.
+        let part = |start: Call| Value::Expression(chain_of(start, Vec::new()));
+        let one = || call("polars.lit", vec![("value", Value::Integer(1))]);
+        let of_literals = call("polars.datetime", vec![("year", part(one()))]);
+        let of_a_column = call("polars.datetime", vec![("year", part(column("a")))]);
+        assert!(is_a_value_of_literals_alone(&of_literals));
+        assert!(!is_a_value_of_literals_alone(&of_a_column));
+        // A column and a condition are no function of literals.
+        assert!(!is_a_value_of_literals_alone(&column("a")));
+    }
+
+    /// `datetime(2000, 1, 1, time_zone=zone)`, a moment of one value.
+    fn a_moment_in(zone: &str) -> Call {
+        let part = |number: i64| {
+            Value::Expression(chain_of(
+                call("polars.lit", vec![("value", Value::Integer(number))]),
+                Vec::new(),
+            ))
+        };
+        call(
+            "polars.datetime",
+            vec![
+                ("year", part(2000)),
+                ("month", part(1)),
+                ("day", part(1)),
+                ("time_zone", Value::TimeZone(Some(zone.to_owned()))),
+            ],
+        )
+    }
+
+    /// The number 1 as a moment in UTC, a fill for a shift.
+    fn a_fill_in_utc() -> Value {
+        let dtype: Dtype = "Datetime(time_unit='us', time_zone='UTC')"
+            .parse()
+            .expect("a dtype");
+        Value::Expression(chain_of(
+            call(
+                "polars.lit",
+                vec![("value", Value::Integer(1)), ("dtype", Value::Dtype(dtype))],
+            ),
+            Vec::new(),
+        ))
+    }
+
+    fn shifted_with(fill: Value) -> Call {
+        call("Expr.shift", vec![("fill_value", fill)])
+    }
+
+    fn convert_to(zone: &str) -> Call {
+        call(
+            "Expr.dt.convert_time_zone",
+            vec![("time_zone", Value::TimeZone(Some(zone.to_owned())))],
+        )
+    }
+
+    fn slugs(limits: Vec<Limit>) -> Vec<&'static str> {
+        limits.into_iter().map(Limit::slug).collect()
+    }
+
+    #[test]
+    fn a_shift_of_one_moment_filled_in_another_zone_is_excused_and_a_shift_of_rows_is_not() {
+        // Polars shifts one moment with the number it is filled with, whatever zone the fill is
+        // in, where it panics for a column of moments, so the rule that the zones be one is
+        // stricter than it for a receiver of one value.
+        const SLUG: &str = "a-moment-of-one-value-filled-in-another-zone";
+        let reason = "Etc/GMT-1 and UTC";
+        for kept in [
+            "uncovered-a-moment-of-one-value-filled-in-another-zone.case",
+            "uncovered-a-moment-of-one-value-filled-in-another-zone--in-a-select.case",
+        ] {
+            assert_eq!(slugs(excused_by_kept(kept)), vec![SLUG], "{kept}");
+        }
+        let refused = |chain: Expression, at: usize| {
+            rule_refuses(
+                &select(vec![chain]),
+                link_of("exprs", 0, at),
+                "moments-share-a-zone",
+                reason,
+            )
+        };
+        // A moment made of literals, and the one value that an aggregate of a column gives.
+        assert_eq!(
+            slugs(refused(
+                chain_of(a_moment_in("+01:00"), vec![shifted_with(a_fill_in_utc())]),
+                0
+            )),
+            vec![SLUG]
+        );
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    column("b"),
+                    vec![
+                        convert_to("Europe/Berlin"),
+                        call("Expr.max", Vec::new()),
+                        shifted_with(a_fill_in_utc()),
+                    ]
+                ),
+                2
+            )),
+            vec![SLUG]
+        );
+        // A column of moments is panicked on by Polars, which the rule is right to refuse.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    column("b"),
+                    vec![convert_to("Europe/Berlin"), shifted_with(a_fill_in_utc())]
+                ),
+                1
+            )),
+            Vec::<&str>::new()
+        );
+        // Many values from a literal are no one value either.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    a_moment_in("+01:00"),
+                    vec![
+                        compared_with("Expr.add", chain(column("b"), &[])),
+                        shifted_with(a_fill_in_utc()),
+                    ]
+                ),
+                1
+            )),
+            Vec::<&str>::new()
+        );
+        // Another call that meets two zones is refused by Polars, and so is no shift.
+        assert_eq!(
+            slugs(refused(
+                chain_of(
+                    a_moment_in("+01:00"),
+                    vec![compared_with(
+                        "Expr.eq",
+                        match a_fill_in_utc() {
+                            Value::Expression(fill) => fill,
+                            other => panic!("{other:?}"),
+                        }
+                    )]
+                ),
+                0
+            )),
+            Vec::<&str>::new()
+        );
+        // Another rule that refuses a shift is no zone rule.
+        assert_eq!(
+            slugs(rule_refuses(
+                &select(vec![chain_of(
+                    a_moment_in("+01:00"),
+                    vec![shifted_with(a_fill_in_utc())]
+                )]),
+                link_of("exprs", 0, 0),
+                "pivot-aggregate-gives-one-value",
+                reason
+            )),
+            Vec::<&str>::new()
         );
     }
 
@@ -8716,11 +9347,23 @@ mod tests {
     /// a plain chain in a select, `start` being the chain's own start and `share` the share it is
     /// given.
     fn branch_with_a_quantile(start: Call, share: Expression, in_a_branch: bool) -> Case {
+        branch_with_a_quantile_and(start, share, in_a_branch, Vec::new())
+    }
+
+    /// As [`branch_with_a_quantile`], with the calls `after` following the approximate quantile.
+    fn branch_with_a_quantile_and(
+        start: Call,
+        share: Expression,
+        in_a_branch: bool,
+        after: Vec<Call>,
+    ) -> Case {
         let quantile = call(
             "Expr.approx_quantile",
             vec![("quantile", Value::Expression(share))],
         );
-        let quantiled = chain_of(start, vec![quantile]);
+        let mut links = vec![quantile];
+        links.extend(after);
+        let quantiled = chain_of(start, links);
         if !in_a_branch {
             return select(vec![quantiled]);
         }
@@ -8893,6 +9536,30 @@ mod tests {
     }
 
     #[test]
+    fn a_null_quantile_is_not_excused_where_the_case_with_a_column_is_refused_for_another_reason() {
+        // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is no
+        // longer refused for the quantile, and is refused for the year of a number. The literal is
+        // then no more shown to be the cause than the call after it, so the case is excused of
+        // nothing.
+        let case = branch_with_a_quantile_and(
+            a_literal_true(),
+            a_share_of_one(),
+            true,
+            vec![call("Expr.dt.year", Vec::new())],
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NULL_QUANTILE),
+            vec![]
+        );
+        // Without the call after it the case with a column is allowed, and the literal is the cause.
+        let plain = branch_with_a_quantile(a_literal_true(), a_share_of_one(), true);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Rows, NULL_QUANTILE),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+    }
+
+    #[test]
     fn a_null_quantile_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
         // The approximate quantile stands in a select, where Polars meets it: no branch holds it.
         assert_eq!(
@@ -8941,6 +9608,96 @@ mod tests {
         );
         assert_eq!(
             refused_for_a_bound(&case, None, Stage::Schema, NULL_QUANTILE),
+            vec![]
+        );
+    }
+
+    /// A moment counted from 1970 that is made of the number 1, one that is made of a null, or a
+    /// time of the day made of nothing: a value that literals alone make.
+    fn made_of_literals(which: &str) -> Call {
+        match which {
+            "from_epoch" => call(
+                "polars.from_epoch",
+                vec![(
+                    "column",
+                    Value::Expression(chain(
+                        call("polars.lit", vec![("value", Value::Integer(1))]),
+                        &[],
+                    )),
+                )],
+            ),
+            "from_epoch of a null" => call(
+                "polars.from_epoch",
+                vec![("column", Value::Expression(chain(null(), &[])))],
+            ),
+            "time" => call("polars.time", Vec::new()),
+            "from_epoch of a column" => call(
+                "polars.from_epoch",
+                vec![("column", Value::Expression(chain(column("k"), &[])))],
+            ),
+            other => panic!("{other}"),
+        }
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_value_that_literals_alone_make_and_for_none_that_reads_a_column()
+     {
+        for kept in [
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-moment-made-from-a-literal.case",
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-time-made-of-nothing.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(kept),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{kept}"
+            );
+        }
+        for which in ["from_epoch", "from_epoch of a null", "time"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), a_share_of_one(), true),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{which}"
+            );
+            // Where the approximate quantile stands in a select, Polars does not read it as null.
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), a_share_of_one(), false),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{which} in a select"
+            );
+            // A share that is a null is refused for a column as well: the value is no cause.
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), chain(null(), &[]), true),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{which} with a null share"
+            );
+        }
+        // A function that reads a column makes values of the column's rows, which are no literal.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(
+                    made_of_literals("from_epoch of a column"),
+                    a_share_of_one(),
+                    true
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
             vec![]
         );
     }
