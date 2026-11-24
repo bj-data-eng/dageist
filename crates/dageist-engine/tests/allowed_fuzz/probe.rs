@@ -61,9 +61,9 @@
 //! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
 //! value of each condition is made a fill forward of what it was, so that the values differ, and
 //! Polars refusing that case for the tables' reason, or, for a call the tables judge by its parts,
-//! for any reason where the same case with the predicate that holds the refused call made `true` is allowed, shows the
-//! predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
-//! of it may be refused first.
+//! for any reason where the same case with the predicate that holds the refused call made `true`
+//! is allowed, shows the predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe
+//! of the part alone is no better, for an argument of it may be refused first.
 //!
 //! A predicate that the rule that it be a `Boolean` refused where no column of its dtype can be
 //! asked (Polars refuses it on its own for another call it holds, or it is in a pivot's aggregate)
@@ -1526,11 +1526,14 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
 /// holds `place` made `true`, and no other: that predicate is why it is refused.
 fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
     let path = place.path();
-    // The predicate is the item after the last `predicates` the place goes through.
+    // The predicate is the item after the last `predicates` the place goes through, and that is a
+    // condition's where a call of an expression holds it, the start or a link, and not the
+    // step's own, which a filter holds.
     let Some(at) = path
         .iter()
         .rposition(|segment| matches!(segment, Segment::Parameter(name) if name == "predicates"))
         .filter(|at| matches!(path.get(at + 1), Some(Segment::Item(_))))
+        .filter(|at| *at > 0 && matches!(path[at - 1], Segment::Start | Segment::Link(_)))
     else {
         return false;
     };
