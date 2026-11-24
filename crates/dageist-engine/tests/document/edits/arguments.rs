@@ -237,6 +237,87 @@ fn a_key_taken_from_a_sort_takes_its_per_key_option_with_it() {
     );
 }
 
+/// A sort by `a`, then `more_by` the fields `b`, with `extra` arguments.
+fn sort_with_more_keys(extra: Json) -> Json {
+    let mut arguments = json!({
+        "by": many(vec![field("a")]),
+        "more_by": many(vec![field("b")]),
+    });
+    for (name, value) in extra.as_object().expect("an object") {
+        arguments[name] = value.clone();
+    }
+    step("order", "LazyFrame.sort", arguments)
+}
+
+#[test]
+fn a_key_added_to_the_more_keys_of_a_sort_gets_the_default_after_the_keys_before_it() {
+    // The keys are `a` then `b`, so `descending` holds a value for each.
+    let document = read(vec![sort_with_more_keys(
+        json!({ "descending": many(vec![flag(true), flag(false)]) }),
+    )]);
+    let edited = document
+        .insert_item(
+            &inside(0, "order", vec![parameter("more_by")]),
+            1,
+            Value::Expression(Expression::field("c").expect("c")),
+        )
+        .expect("added");
+    // `c` is the third key, so the new default goes after the two there are.
+    let written = super::json_of(&edited);
+    let arguments = &written["steps"][0]["call"]["arguments"];
+    assert_eq!(arguments["more_by"], many(vec![field("b"), field("c")]));
+    assert_eq!(
+        arguments["descending"],
+        many(vec![flag(true), flag(false), flag(false)])
+    );
+}
+
+#[test]
+fn a_key_added_to_the_first_keys_of_a_sort_goes_before_the_more_keys_in_the_per_key_option() {
+    let document = read(vec![sort_with_more_keys(
+        json!({ "descending": many(vec![flag(true), flag(false)]) }),
+    )]);
+    let edited = document
+        .insert_item(
+            &inside(0, "order", vec![parameter("by")]),
+            0,
+            Value::Expression(Expression::field("c").expect("c")),
+        )
+        .expect("added");
+    let written = super::json_of(&edited);
+    assert_eq!(
+        written["steps"][0]["call"]["arguments"]["descending"],
+        many(vec![flag(false), flag(true), flag(false)])
+    );
+}
+
+#[test]
+fn a_key_taken_from_the_more_keys_of_a_sort_takes_its_value_of_the_per_key_option_with_it() {
+    let document = read(vec![sort_with_more_keys(
+        json!({ "descending": many(vec![flag(true), flag(false)]) }),
+    )]);
+    let edited = document
+        .remove_item(&inside(
+            0,
+            "order",
+            vec![parameter("more_by"), Segment::Item(0)],
+        ))
+        .expect("removed");
+    // `b` was the second key, whose value is the second.
+    assert_steps(
+        &edited,
+        vec![step(
+            "order",
+            "LazyFrame.sort",
+            json!({
+                "by": many(vec![field("a")]),
+                "more_by": many(vec![]),
+                "descending": many(vec![flag(true)]),
+            }),
+        )],
+    );
+}
+
 #[test]
 fn a_per_key_option_is_set_for_one_key_and_the_other_keys_keep_the_default() {
     let edited = read(vec![sort(json!({}))])
