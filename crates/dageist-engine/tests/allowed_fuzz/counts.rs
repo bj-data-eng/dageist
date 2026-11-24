@@ -104,12 +104,12 @@ fn a_whole_number(call: &Call, name: &str, whole: i64) -> Option<Value> {
 
 /// The call of a method that gives the first, the last or every nth values, or the values from a
 /// place, with the number that decides the count made one that is neither one value nor three
-/// rows: 2 values.
+/// rows: 2 values, from the first row.
 fn with_another_count(call: &Call) -> Option<Call> {
     let entry = catalog::entry(call.entry().id().as_str())?;
     let made: Vec<(&str, i64)> = match Counting::of(entry, &[])? {
         Counting::AtMost(name) => vec![(name, 2)],
-        Counting::EveryNth => vec![("n", 2)],
+        Counting::EveryNth => vec![("n", 2), ("offset", 0)],
         Counting::FromAPlace => vec![("offset", 0), ("length", 2)],
         _ => return None,
     };

@@ -508,11 +508,18 @@ pub enum Limit {
     /// in its own chain is a probe's, which asks it of a value of its dtype. A panic is the panic
     /// limit's, whatever its control shows.
     APartPolarsFoldsToANull,
+    /// A place that a gather takes beyond what it follows is refused by Polars when the rows run,
+    /// and every place is where the table has none, where the tables measured a gather that gives
+    /// a null for it. Polars refusing the rows or the empty table with the words for a place out of
+    /// bounds, which have no place, in a case with a gather that is not told to give a null, where
+    /// the case run again with each gather told to is no longer refused for them: the places the
+    /// rows leave it are why.
+    AGatherBeyondTheRows,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 40] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -552,6 +559,7 @@ impl Limit {
         Self::AnApproximateQuantileOfALiteralInACondition,
         Self::AMomentOfOneValueFilledInAnotherZone,
         Self::APartPolarsFoldsToANull,
+        Self::AGatherBeyondTheRows,
     ];
 
     /// The name a kept case is filed under.
@@ -610,6 +618,7 @@ impl Limit {
                 "a-moment-of-one-value-filled-in-another-zone"
             }
             Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
+            Self::AGatherBeyondTheRows => "a-gather-beyond-the-rows",
         }
     }
 
@@ -699,6 +708,9 @@ impl Limit {
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
+            }
+            Self::AGatherBeyondTheRows => {
+                "a gather refuses a place beyond the rows it follows when they run, and every place where the table has none, where the tables measured a gather that gives a null for it"
             }
             Self::APartPolarsFoldsToANull => {
                 "Polars folds a comparison or an arithmetic with a null literal into a null before it runs what that call followed, so a part inside it is never met, where the tables judged the part as written"
@@ -5147,8 +5159,60 @@ fn applies(
                 })
                 && refused_without_folds(case, refused) == Some(true)
         }
+        (Limit::AGatherBeyondTheRows, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the places a gather is given, and a table with no rows has none that
+            // is within them. The gather is the cause where Polars stops refusing for a place out
+            // of bounds once each gather is told to give a null for one, as the tables measured it.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_PLACE_OUT_OF_BOUNDS)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_gather_that_may_refuse))
+                && refused_for_a_place_out_of_bounds_with_gathers_that_give_nulls(case)
+                    == Some(false)
+        }
         _ => false,
     }
+}
+
+/// What Polars refuses a gather with when a place is beyond what it follows.
+const A_PLACE_OUT_OF_BOUNDS: &str = "gather indices are out of bounds";
+
+/// Whether the call is a gather that is not told to give a null for a place out of bounds.
+fn is_a_gather_that_may_refuse(call: &Call) -> bool {
+    is(call, "Expr.gather")
+        && !matches!(call.argument("null_on_oob"), Some(Value::Flag(Some(true))))
+}
+
+/// The case with each gather told to give a null for a place out of bounds, as the tables
+/// measured it.
+fn case_with_gathers_that_give_nulls(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_gather_that_may_refuse(call) {
+            return None;
+        }
+        let mut given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != "null_on_oob")
+            .map(|given| (given.parameter(), given.value().clone()))
+            .collect();
+        given.push(("null_on_oob", Value::Flag(Some(true))));
+        Call::new(catalog::entry("Expr.gather")?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a place out of bounds still when each gather gives a null
+/// for one: the gather is then no cause of the refusal. `None` where no gather can be told to.
+fn refused_for_a_place_out_of_bounds_with_gathers_that_give_nulls(case: &Case) -> Option<bool> {
+    changed(case_with_gathers_that_give_nulls(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_PLACE_OUT_OF_BOUNDS))
+        })
+    })
 }
 
 /// The limits that excuse the disagreement of `prediction` and `observed` for
@@ -12919,5 +12983,79 @@ mod tests {
         // the table has: nothing is refused.
         let by_a_column = r#""order_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}]}"#;
         assert_eq!(excused_by(&replace_by_a_window(by_a_column)), vec![]);
+    }
+
+    // ----- A gather beyond the rows
+
+    const A_PLACE_OUT_OF_BOUNDS_SAID: &str = "gather indices are out of bounds";
+
+    #[test]
+    fn a_place_out_of_bounds_is_excused_where_each_gather_is_why_in_a_select_a_filter_and_a_pivot()
+    {
+        for name in [
+            "uncovered-a-gather-beyond-the-rows.case",
+            "uncovered-a-gather-beyond-the-rows--in-a-filter.case",
+            "uncovered-a-gather-beyond-the-rows--in-a-pivot-aggregate.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AGatherBeyondTheRows],
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_place_out_of_bounds_is_not_excused_where_nothing_gathers_nor_where_it_is_another_refusal()
+    {
+        let no_gather = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            polars_refuses(
+                &no_gather,
+                None,
+                Stage::Rows,
+                A_PLACE_OUT_OF_BOUNDS_SAID,
+                Vec::new()
+            ),
+            Vec::<Limit>::new()
+        );
+        let gather = select(vec![chain_of(
+            column("g"),
+            vec![call(
+                "Expr.gather",
+                vec![("indices", Value::Expression(chain(column("b"), &[])))],
+            )],
+        )]);
+        for reason in [
+            "dtype `null` has no time unit",
+            "invalid series dtype: expected `UInt32`, got `str`",
+        ] {
+            assert_eq!(
+                polars_refuses(&gather, None, Stage::Rows, reason, Vec::new()),
+                Vec::<Limit>::new(),
+                "{reason}"
+            );
+        }
+        // A gather that is already told to give a null cannot be why, and is no control.
+        let telling = select(vec![chain_of(
+            column("g"),
+            vec![call(
+                "Expr.gather",
+                vec![
+                    ("indices", Value::Expression(chain(column("b"), &[]))),
+                    ("null_on_oob", Value::Flag(Some(true))),
+                ],
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &telling,
+                None,
+                Stage::Rows,
+                A_PLACE_OUT_OF_BOUNDS_SAID,
+                Vec::new()
+            ),
+            Vec::<Limit>::new()
+        );
     }
 }
