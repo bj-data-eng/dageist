@@ -10072,10 +10072,10 @@ mod tests {
     fn a_null_quantile_asks_each_literal_for_a_column_of_its_own_dtype_in_either_order() {
         // A case with the quantile of a `Boolean` literal in a branch and one of a literal of
         // another dtype: each is made a column of its own literal's dtype, the `Boolean` one `f`,
-        // the text one `g`, the number `k`, whichever comes first. A column of the first one's dtype
-        // for all of them gave the number `f`, which `is_nan` refuses, and the text `f`, which a
-        // method of text refuses, and the same column twice, which a select refuses for the name
-        // of its two items, so the answer was the order's and not the case's.
+        // the text one `g`, the number `k`, whichever comes first. A column of the first one's
+        // dtype for all of them gave the number `f`, which `is_nan` refuses, and the text `f`,
+        // which a method of text refuses, and the same column twice, which a select refuses for
+        // the name of its two items, so the answer was the order's and not the case's.
         let quantile = || {
             call(
                 "Expr.approx_quantile",
