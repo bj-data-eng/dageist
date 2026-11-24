@@ -7146,6 +7146,34 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_conversion_is_excused_in_the_empty_table_where_an_aggregate_is_a_bound() {
+        // `lit(1, Datetime).clip(lower_bound=k.entropy())`: the entropy of no rows is a NaN, a
+        // value of its own that the bound is cast to the dtype from, where a column of no rows has
+        // none to convert.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-bound-the-dtype-cannot-hold--an-aggregate-in-the-empty-table.case"
+            ),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+        let held = "conversion from `f64` to `datetime[μs, UTC]` failed in column 'k' for 1 out of 1 values: [NaN]";
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("k"), &["Expr.entropy"])), None)],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Empty, held),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+        // A clip with no bound is no cause of a failed conversion.
+        let unbounded = select(vec![chain_of(column("a"), vec![clip_with(None, None)])]);
+        assert_eq!(
+            refused_for_a_bound(&unbounded, None, Stage::Empty, held),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_failed_conversion_that_remains_without_the_bounds_is_not_a_bounds() {
         // A negative exponent fails to become a `u32` whether or not a clip has a bound, so the
         // bound is no cause, and the power's limit excuses it alone.
