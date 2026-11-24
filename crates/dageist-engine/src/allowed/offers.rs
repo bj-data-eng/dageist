@@ -775,6 +775,11 @@ fn read_options(
     let Some(read_receiver) = read_as_of(id, receiver) else {
         return OptionsGive::Nothing;
     };
+    // A call given the dtype it gives, as a cast is, gives that dtype whatever it follows, so what
+    // it gives is not the class the line was read for that it merely equals.
+    let by_a_word = changed
+        .iter()
+        .any(|(name, _)| parameter(name).is_some_and(|found| found.kind() == Kind::Dtype));
     let mut gives: Vec<Produces> = Vec::new();
     for ((line_id, line_receiver, line), outcome) in &tables.options {
         let bears = match changed.as_slice() {
@@ -790,8 +795,11 @@ fn read_options(
         if *line_id == id
             && *line_receiver == read_receiver
             && bears
-            && let Outcome::Allowed(Some(produces)) =
+            && let Outcome::Allowed(Some(produces)) = if by_a_word {
+                outcome.clone()
+            } else {
                 restored(outcome, &[receiver], &[read_receiver])
+            }
         {
             gives.push(produces);
         }
