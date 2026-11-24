@@ -2819,7 +2819,7 @@ const A_NULL_QUANTILE: &str = "`quantile` should not contain null values";
 /// approximate quantile.
 fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
     matches!(expression.start(), Start::Call(start)
-    if is(start, "polars.lit") || is_a_value_of_literals_alone(start))
+    if is_a_value_of_literals_alone(start))
         && expression
             .links()
             .iter()
