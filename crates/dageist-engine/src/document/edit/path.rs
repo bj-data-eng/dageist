@@ -10,6 +10,8 @@
 use super::super::error::{Place, Refusal, Segment};
 use super::super::model::{Call, Expression, Start, Value};
 use super::error::{EditError, EditProblem, Thing, Wanted};
+use super::starting::default_value;
+use crate::catalog::Shape;
 
 /// An edit that could not be made, before it is given the place it was made
 /// at.
@@ -93,9 +95,44 @@ pub(super) enum Leaf<'a> {
 }
 
 /// `call` with the argument for `parameter` set to `value`, or taken away when
-/// that is `None`. A new argument goes where the entry's parameters put it,
-/// among the ones already given.
+/// that is `None`, as [`with_given_alone`] does, and the values that a parameter holds
+/// for each key kept as many as the keys when this changes how many there are: a
+/// value for each new key is the parameter's default, those for keys that are gone
+/// go, and one value for every key stays as it is.
 pub(super) fn with_given(
+    call: &Call,
+    parameter: &str,
+    value: Option<Value>,
+) -> Result<Call, Fault> {
+    let mut made = with_given_alone(call, parameter, value)?;
+    for follower in call.entry().parameters() {
+        let Shape::PerItem(of) = follower.shape() else {
+            continue;
+        };
+        let keys = made.key_count(of);
+        if call.key_count(of) == keys {
+            continue;
+        }
+        let Some(Value::Many(values)) = made.argument(follower.name()) else {
+            continue;
+        };
+        let mut values = values.clone();
+        values.truncate(keys);
+        if values.len() < keys {
+            let Some(default) = default_value(follower) else {
+                continue;
+            };
+            values.resize(keys, default);
+        }
+        made = with_given_alone(&made, follower.name(), Some(Value::Many(values)))?;
+    }
+    Ok(made)
+}
+
+/// `call` with the argument for `parameter` set to `value`, or taken away when
+/// that is `None`. A new argument goes where the entry's parameters put it,
+/// among the ones already given. Nothing else changes.
+pub(super) fn with_given_alone(
     call: &Call,
     parameter: &str,
     value: Option<Value>,

@@ -10,7 +10,7 @@ use crate::catalog::{BuildError, Shape};
 use super::super::error::{Cause, Place, Segment};
 use super::super::model::{Call, Document, Value};
 use super::error::{EditError, EditProblem, Thing, Wanted};
-use super::path::{Fault, Leaf, with_given};
+use super::path::{Fault, Leaf, with_given, with_given_alone};
 use super::starting::{default_value, option_start, started_test};
 
 /// What a list, or pairs, is changed by.
@@ -28,6 +28,12 @@ impl Document {
     /// of pairs, which are replaced. Setting an option, a list of columns, a
     /// literal or a condition is setting the argument of its parameter, or of
     /// an item of it.
+    ///
+    /// Where this changes how many keys a call has, as setting the list `by` of a
+    /// sort does, a parameter that holds a value for each key, as `descending`
+    /// does, keeps one for each: a new key holds the default, those of keys that
+    /// are gone go, and one value shared by every key stays. So do
+    /// [`clear_argument`](Self::clear_argument) and [`add_option`](Self::add_option).
     ///
     /// # Errors
     ///
@@ -312,7 +318,7 @@ impl Document {
                     .argument(&name)
                     .ok_or_else(|| Fault::beyond(1, EditProblem::Nothing))?;
                 let items = changed(held, change).map_err(|fault| fault.shifted(1))?;
-                let mut made = with_given(call, &name, Some(items))?;
+                let mut made = with_given_alone(call, &name, Some(items))?;
                 for follower in call.entry().parameters() {
                     // The values go with the keys: those of the list, and, for the list that
                     // holds the first keys, the ones that follow.
@@ -340,7 +346,7 @@ impl Document {
                             }
                         }
                     }
-                    made = with_given(&made, follower.name(), Some(Value::Many(values)))?;
+                    made = with_given_alone(&made, follower.name(), Some(Value::Many(values)))?;
                 }
                 Ok(made)
             }),
