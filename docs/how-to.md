@@ -591,12 +591,12 @@ at the first, and `DAGEIST_FUZZ_COUNTED` makes the run end where that run would 
 without it every case before the start counts, so the run ends earlier than the one it goes
 on from by the cases before the start that checked nothing, and a start that is past the end of
 the campaign's cases, which would make none, is refused. `--exact` keeps the other tests whose
-names begin with `a_campaign` out of the run. A
+names contain `a_campaign` out of the run. A
 setting that is no whole number (the seed and the number of cases too), a number of cases of
 0, a deadline of 0, a count above the cases before the start or above the number of cases,
 and a start that makes more cases than a campaign counts are refused, with the variable
-named. A campaign removes a `timeout.env` that an earlier run left in the kept directory when
-it starts, so one that is there after a run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
+named. A timed campaign removes a `timeout.env` that an earlier run left in the kept directory
+when it starts, so one that is there after a timed run is that run's. A relative `DAGEIST_FUZZ_KEEP` is
 from the root of the repository, which is where these commands are run, and not from the
 engine's directory that the tests run in.
 
