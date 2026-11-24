@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 11646 combinations: 6105 allowed; 3655 refused when Polars resolved the schema, 1886 when it ran the rows, 0 when it ran the empty table.
+# 11817 combinations: 6199 allowed; 3655 refused when Polars resolved the schema, 1963 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -2556,8 +2556,18 @@ Expr.cum_sum | UInt64 | reverse=false | allowed UInt64 many
 Expr.cum_sum | UInt64 | reverse=true | allowed UInt64 many
 Expr.cum_sum | UInt8 | reverse=false | allowed Int64 many
 Expr.cum_sum | UInt8 | reverse=true | allowed Int64 many
+Expr.diff | Array(Boolean, 2) | null_behavior=drop | refused rows: the schema says Array(Boolean, 2) and the rows give Array(UInt32, 2)
+Expr.diff | Array(Boolean, 2) | null_behavior=ignore | refused rows: the schema says Array(Boolean, 2) and the rows give Array(UInt32, 2)
+Expr.diff | Array(Date, 2) | null_behavior=drop | refused rows: cannot sub non-numeric inner dtypes: (left: date, right: date)
+Expr.diff | Array(Date, 2) | null_behavior=ignore | refused rows: cannot sub non-numeric inner dtypes: (left: date, right: date)
+Expr.diff | Array(Datetime(us), 2) | null_behavior=drop | refused rows: cannot sub non-numeric inner dtypes: (left: datetime[μs], right: datetime[μs])
+Expr.diff | Array(Datetime(us), 2) | null_behavior=ignore | refused rows: cannot sub non-numeric inner dtypes: (left: datetime[μs], right: datetime[μs])
+Expr.diff | Array(Float64, 2) | null_behavior=drop | allowed Array(Float64, 2) counted
+Expr.diff | Array(Float64, 2) | null_behavior=ignore | allowed Array(Float64, 2) many
 Expr.diff | Array(Int64, 2) | null_behavior=drop | allowed Array(Int64, 2) counted
 Expr.diff | Array(Int64, 2) | null_behavior=ignore | allowed Array(Int64, 2) many
+Expr.diff | Array(String, 2) | null_behavior=drop | refused rows: cannot sub non-numeric inner dtypes: (left: str, right: str)
+Expr.diff | Array(String, 2) | null_behavior=ignore | refused rows: cannot sub non-numeric inner dtypes: (left: str, right: str)
 Expr.diff | Boolean | null_behavior=drop | refused rows: `subtract` operation not supported for dtype `bool`
 Expr.diff | Boolean | null_behavior=ignore | refused rows: `subtract` operation not supported for dtype `bool`
 Expr.diff | Date | null_behavior=drop | allowed Duration(us) counted
@@ -2586,6 +2596,14 @@ Expr.diff | Int64 | null_behavior=drop | allowed Int64 counted
 Expr.diff | Int64 | null_behavior=ignore | allowed Int64 many
 Expr.diff | Int8 | null_behavior=drop | allowed Int8 counted
 Expr.diff | Int8 | null_behavior=ignore | allowed Int8 many
+Expr.diff | List(Boolean) | null_behavior=drop | refused rows: the schema says List(Boolean) and the rows give List(UInt32)
+Expr.diff | List(Boolean) | null_behavior=ignore | refused rows: the schema says List(Boolean) and the rows give List(UInt32)
+Expr.diff | List(Date) | null_behavior=drop | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[date], right: list[date])
+Expr.diff | List(Date) | null_behavior=ignore | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[date], right: list[date])
+Expr.diff | List(Datetime(us)) | null_behavior=drop | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[datetime[μs]], right: list[datetime[μs]])
+Expr.diff | List(Datetime(us)) | null_behavior=ignore | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[datetime[μs]], right: list[datetime[μs]])
+Expr.diff | List(Float64) | null_behavior=drop | allowed List(Float64) counted
+Expr.diff | List(Float64) | null_behavior=ignore | allowed List(Float64) many
 Expr.diff | List(Int64) | null_behavior=drop | allowed List(Int64) counted
 Expr.diff | List(Int64) | null_behavior=ignore | allowed List(Int64) many
 Expr.diff | List(String) | null_behavior=drop | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[str], right: list[str])
@@ -3752,6 +3770,34 @@ Expr.entropy | UInt64 | normalize=false | allowed Float64 one
 Expr.entropy | UInt64 | normalize=true | allowed Float64 one
 Expr.entropy | UInt8 | normalize=false | allowed Float64 one
 Expr.entropy | UInt8 | normalize=true | allowed Float64 one
+Expr.fill_null | Array(Boolean, 2) | strategy=backward | allowed Array(Boolean, 2) many
+Expr.fill_null | Array(Boolean, 2) | strategy=forward | allowed Array(Boolean, 2) many
+Expr.fill_null | Array(Boolean, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[bool, 2]
+Expr.fill_null | Array(Boolean, 2) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: array[bool, 2]
+Expr.fill_null | Array(Boolean, 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[bool, 2]
+Expr.fill_null | Array(Boolean, 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[bool, 2]
+Expr.fill_null | Array(Boolean, 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[bool, 2]
+Expr.fill_null | Array(Date, 2) | strategy=backward | allowed Array(Date, 2) many
+Expr.fill_null | Array(Date, 2) | strategy=forward | allowed Array(Date, 2) many
+Expr.fill_null | Array(Date, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[i32, 2]
+Expr.fill_null | Array(Date, 2) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: array[i32, 2]
+Expr.fill_null | Array(Date, 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[i32, 2]
+Expr.fill_null | Array(Date, 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[i32, 2]
+Expr.fill_null | Array(Date, 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[i32, 2]
+Expr.fill_null | Array(Datetime(us), 2) | strategy=backward | allowed Array(Datetime(us), 2) many
+Expr.fill_null | Array(Datetime(us), 2) | strategy=forward | allowed Array(Datetime(us), 2) many
+Expr.fill_null | Array(Datetime(us), 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(Datetime(us), 2) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(Datetime(us), 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(Datetime(us), 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(Datetime(us), 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(Float64, 2) | strategy=backward | allowed Array(Float64, 2) many
+Expr.fill_null | Array(Float64, 2) | strategy=forward | allowed Array(Float64, 2) many
+Expr.fill_null | Array(Float64, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[f64, 2]
+Expr.fill_null | Array(Float64, 2) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: array[f64, 2]
+Expr.fill_null | Array(Float64, 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[f64, 2]
+Expr.fill_null | Array(Float64, 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[f64, 2]
+Expr.fill_null | Array(Float64, 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[f64, 2]
 Expr.fill_null | Array(Int64, 2) | strategy=backward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=forward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
@@ -3759,6 +3805,13 @@ Expr.fill_null | Array(Int64, 2) | strategy=mean | refused rows: fill null strat
 Expr.fill_null | Array(Int64, 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
 Expr.fill_null | Array(Int64, 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
 Expr.fill_null | Array(Int64, 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
+Expr.fill_null | Array(String, 2) | strategy=backward | allowed Array(String, 2) many
+Expr.fill_null | Array(String, 2) | strategy=forward | allowed Array(String, 2) many
+Expr.fill_null | Array(String, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[str, 2]
+Expr.fill_null | Array(String, 2) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: array[str, 2]
+Expr.fill_null | Array(String, 2) | strategy=min | refused rows: fill null strategy not yet supported for dtype: array[str, 2]
+Expr.fill_null | Array(String, 2) | strategy=one | refused rows: fill null strategy not yet supported for dtype: array[str, 2]
+Expr.fill_null | Array(String, 2) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: array[str, 2]
 Expr.fill_null | Boolean | strategy=backward | allowed Boolean many
 Expr.fill_null | Boolean | strategy=forward | allowed Boolean many
 Expr.fill_null | Boolean | strategy=max | allowed Boolean many
@@ -3857,6 +3910,34 @@ Expr.fill_null | Int8 | strategy=mean | allowed Int8 many
 Expr.fill_null | Int8 | strategy=min | allowed Int8 many
 Expr.fill_null | Int8 | strategy=one | allowed Int8 many
 Expr.fill_null | Int8 | strategy=zero | allowed Int8 many
+Expr.fill_null | List(Boolean) | strategy=backward | allowed List(Boolean) many
+Expr.fill_null | List(Boolean) | strategy=forward | allowed List(Boolean) many
+Expr.fill_null | List(Boolean) | strategy=max | refused rows: fill null strategy not yet supported for dtype: list[bool]
+Expr.fill_null | List(Boolean) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: list[bool]
+Expr.fill_null | List(Boolean) | strategy=min | refused rows: fill null strategy not yet supported for dtype: list[bool]
+Expr.fill_null | List(Boolean) | strategy=one | refused rows: fill null strategy not yet supported for dtype: list[bool]
+Expr.fill_null | List(Boolean) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: list[bool]
+Expr.fill_null | List(Date) | strategy=backward | allowed List(Date) many
+Expr.fill_null | List(Date) | strategy=forward | allowed List(Date) many
+Expr.fill_null | List(Date) | strategy=max | refused rows: fill null strategy not yet supported for dtype: list[i32]
+Expr.fill_null | List(Date) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: list[i32]
+Expr.fill_null | List(Date) | strategy=min | refused rows: fill null strategy not yet supported for dtype: list[i32]
+Expr.fill_null | List(Date) | strategy=one | refused rows: fill null strategy not yet supported for dtype: list[i32]
+Expr.fill_null | List(Date) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: list[i32]
+Expr.fill_null | List(Datetime(us)) | strategy=backward | allowed List(Datetime(us)) many
+Expr.fill_null | List(Datetime(us)) | strategy=forward | allowed List(Datetime(us)) many
+Expr.fill_null | List(Datetime(us)) | strategy=max | refused rows: fill null strategy not yet supported for dtype: list[i64]
+Expr.fill_null | List(Datetime(us)) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: list[i64]
+Expr.fill_null | List(Datetime(us)) | strategy=min | refused rows: fill null strategy not yet supported for dtype: list[i64]
+Expr.fill_null | List(Datetime(us)) | strategy=one | refused rows: fill null strategy not yet supported for dtype: list[i64]
+Expr.fill_null | List(Datetime(us)) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: list[i64]
+Expr.fill_null | List(Float64) | strategy=backward | allowed List(Float64) many
+Expr.fill_null | List(Float64) | strategy=forward | allowed List(Float64) many
+Expr.fill_null | List(Float64) | strategy=max | refused rows: fill null strategy not yet supported for dtype: list[f64]
+Expr.fill_null | List(Float64) | strategy=mean | refused rows: fill null strategy not yet supported for dtype: list[f64]
+Expr.fill_null | List(Float64) | strategy=min | refused rows: fill null strategy not yet supported for dtype: list[f64]
+Expr.fill_null | List(Float64) | strategy=one | refused rows: fill null strategy not yet supported for dtype: list[f64]
+Expr.fill_null | List(Float64) | strategy=zero | refused rows: fill null strategy not yet supported for dtype: list[f64]
 Expr.fill_null | List(Int64) | strategy=backward | allowed List(Int64) many
 Expr.fill_null | List(Int64) | strategy=forward | allowed List(Int64) many
 Expr.fill_null | List(Int64) | strategy=max | refused rows: fill null strategy not yet supported for dtype: list[i64]
@@ -4090,8 +4171,18 @@ Expr.is_between | UInt8 | closed=both | allowed Boolean many
 Expr.is_between | UInt8 | closed=left | allowed Boolean many
 Expr.is_between | UInt8 | closed=none | allowed Boolean many
 Expr.is_between | UInt8 | closed=right | allowed Boolean many
+Expr.is_close | Array(Boolean, 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[bool, 2]`
+Expr.is_close | Array(Boolean, 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[bool, 2]`
+Expr.is_close | Array(Date, 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[date, 2]`
+Expr.is_close | Array(Date, 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[date, 2]`
+Expr.is_close | Array(Datetime(us), 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[datetime[μs], 2]`
+Expr.is_close | Array(Datetime(us), 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[datetime[μs], 2]`
+Expr.is_close | Array(Float64, 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[f64, 2]`
+Expr.is_close | Array(Float64, 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[f64, 2]`
 Expr.is_close | Array(Int64, 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[i64, 2]`
 Expr.is_close | Array(Int64, 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[i64, 2]`
+Expr.is_close | Array(String, 2) | nans_equal=false | refused rows: is_close operation not supported for dtype `array[str, 2]`
+Expr.is_close | Array(String, 2) | nans_equal=true | refused rows: is_close operation not supported for dtype `array[str, 2]`
 Expr.is_close | Boolean | nans_equal=false | allowed Boolean many
 Expr.is_close | Boolean | nans_equal=true | allowed Boolean many
 Expr.is_close | Date | nans_equal=false | allowed Boolean many
@@ -4120,6 +4211,14 @@ Expr.is_close | Int64 | nans_equal=false | allowed Boolean many
 Expr.is_close | Int64 | nans_equal=true | allowed Boolean many
 Expr.is_close | Int8 | nans_equal=false | allowed Boolean many
 Expr.is_close | Int8 | nans_equal=true | allowed Boolean many
+Expr.is_close | List(Boolean) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[bool]`
+Expr.is_close | List(Boolean) | nans_equal=true | refused rows: is_close operation not supported for dtype `list[bool]`
+Expr.is_close | List(Date) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[date]`
+Expr.is_close | List(Date) | nans_equal=true | refused rows: is_close operation not supported for dtype `list[date]`
+Expr.is_close | List(Datetime(us)) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[datetime[μs]]`
+Expr.is_close | List(Datetime(us)) | nans_equal=true | refused rows: is_close operation not supported for dtype `list[datetime[μs]]`
+Expr.is_close | List(Float64) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[f64]`
+Expr.is_close | List(Float64) | nans_equal=true | refused rows: is_close operation not supported for dtype `list[f64]`
 Expr.is_close | List(Int64) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[i64]`
 Expr.is_close | List(Int64) | nans_equal=true | refused rows: is_close operation not supported for dtype `list[i64]`
 Expr.is_close | List(String) | nans_equal=false | refused rows: is_close operation not supported for dtype `list[str]`
@@ -4142,8 +4241,18 @@ Expr.is_close | UInt64 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt64 | nans_equal=true | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=true | allowed Boolean many
+Expr.is_in | Array(Boolean, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(Boolean, 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Array(Date, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(Date, 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Array(Datetime(us), 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(Datetime(us), 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Array(Float64, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(Float64, 2) | nulls_equal=true | allowed Boolean many
 Expr.is_in | Array(Int64, 2) | nulls_equal=false | allowed Boolean many
 Expr.is_in | Array(Int64, 2) | nulls_equal=true | allowed Boolean many
+Expr.is_in | Array(String, 2) | nulls_equal=false | allowed Boolean many
+Expr.is_in | Array(String, 2) | nulls_equal=true | allowed Boolean many
 Expr.is_in | Boolean | nulls_equal=false | allowed Boolean many
 Expr.is_in | Boolean | nulls_equal=true | allowed Boolean many
 Expr.is_in | Date | nulls_equal=false | allowed Boolean many
@@ -4172,6 +4281,14 @@ Expr.is_in | Int64 | nulls_equal=false | allowed Boolean many
 Expr.is_in | Int64 | nulls_equal=true | allowed Boolean many
 Expr.is_in | Int8 | nulls_equal=false | allowed Boolean many
 Expr.is_in | Int8 | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(Boolean) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(Boolean) | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(Date) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(Date) | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(Datetime(us)) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(Datetime(us)) | nulls_equal=true | allowed Boolean many
+Expr.is_in | List(Float64) | nulls_equal=false | allowed Boolean many
+Expr.is_in | List(Float64) | nulls_equal=true | allowed Boolean many
 Expr.is_in | List(Int64) | nulls_equal=false | allowed Boolean many
 Expr.is_in | List(Int64) | nulls_equal=true | allowed Boolean many
 Expr.is_in | List(String) | nulls_equal=false | allowed Boolean many
@@ -5338,12 +5455,42 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.search_sorted | Array(Boolean, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Boolean, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Boolean, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Boolean, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Boolean, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Boolean, 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Date, 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Datetime(us), 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(Float64, 2) | side=right, descending=true | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=any, descending=false | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=any, descending=true | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=left, descending=false | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=left, descending=true | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=right, descending=false | allowed UInt32 many
 Expr.search_sorted | Array(Int64, 2) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | Array(String, 2) | side=right, descending=true | allowed UInt32 many
 Expr.search_sorted | Boolean | side=any, descending=false | allowed UInt32 many
 Expr.search_sorted | Boolean | side=any, descending=true | allowed UInt32 many
 Expr.search_sorted | Boolean | side=left, descending=false | allowed UInt32 many
@@ -5428,6 +5575,30 @@ Expr.search_sorted | Int8 | side=left, descending=false | allowed UInt32 many
 Expr.search_sorted | Int8 | side=left, descending=true | allowed UInt32 many
 Expr.search_sorted | Int8 | side=right, descending=false | allowed UInt32 many
 Expr.search_sorted | Int8 | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Boolean) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Date) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Datetime(us)) | side=right, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=any, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=any, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=left, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=left, descending=true | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=right, descending=false | allowed UInt32 many
+Expr.search_sorted | List(Float64) | side=right, descending=true | allowed UInt32 many
 Expr.search_sorted | List(Int64) | side=any, descending=false | allowed UInt32 many
 Expr.search_sorted | List(Int64) | side=any, descending=true | allowed UInt32 many
 Expr.search_sorted | List(Int64) | side=left, descending=false | allowed UInt32 many

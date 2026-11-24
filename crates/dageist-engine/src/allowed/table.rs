@@ -13,7 +13,7 @@ use std::sync::LazyLock;
 use crate::catalog::{self, Applies};
 
 use super::context::Context;
-use super::dtype::{Representative, ResultDtype};
+use super::dtype::{Inner, Representative, ResultDtype};
 use super::rules::Rule;
 
 /// The committed dtype table.
@@ -726,16 +726,96 @@ pub(super) const fn is_a_list(class: Representative) -> bool {
     class.is_nested()
 }
 
+/// The methods whose answer depends on the element dtype of a list or an array, where Polars
+/// meets it with another operand or fills, orders or compares by it: arithmetic finds the
+/// supertype of the elements and the other operand, a comparison of lists compares elements that
+/// may have no common supertype, and a fill, a replacement, a search and a shift meet the
+/// elements with the value they are given. A test that runs Polars on every class holds this list
+/// to the methods that need it: a method that is not here judges a list or an array as the class
+/// that stands for it does, and one that is here is measured on [`CORE_NESTED`] as well.
+pub(super) const SENSITIVE: [&str; 22] = [
+    "Expr.add",
+    "Expr.and_",
+    "Expr.diff",
+    "Expr.eq",
+    "Expr.eq_missing",
+    "Expr.fill_nan",
+    "Expr.fill_null",
+    "Expr.floordiv",
+    "Expr.is_close",
+    "Expr.is_in",
+    "Expr.mod",
+    "Expr.mul",
+    "Expr.ne",
+    "Expr.ne_missing",
+    "Expr.or_",
+    "Expr.replace",
+    "Expr.replace_strict",
+    "Expr.reverse",
+    "Expr.search_sorted",
+    "Expr.sub",
+    "Expr.truediv",
+    "Expr.xor",
+];
+
+/// The lists and arrays of the core element dtypes besides those the tables hold lines for: a
+/// whole number, a float, text, a `Boolean`, a `Date` and a `Datetime`. A method that
+/// [depends on the element dtype](SENSITIVE) is measured on them, and a call that follows another
+/// list or array is not judged.
+pub(super) const CORE_NESTED: [Representative; 9] = [
+    Representative::List(Inner::Float64),
+    Representative::List(Inner::Boolean),
+    Representative::List(Inner::Date),
+    Representative::List(Inner::Datetime),
+    Representative::Array(Inner::Float64),
+    Representative::Array(Inner::String),
+    Representative::Array(Inner::Boolean),
+    Representative::Array(Inner::Date),
+    Representative::Array(Inner::Datetime),
+];
+
+/// The classes a method that [depends on the element dtype](SENSITIVE) is measured on.
+const MEASURED_AND_CORE: [Representative; 35] = {
+    let mut all = [Representative::Int8; 35];
+    let mut at = 0;
+    while at < Representative::MEASURED.len() {
+        all[at] = Representative::MEASURED[at];
+        at += 1;
+    }
+    let mut core = 0;
+    while core < CORE_NESTED.len() {
+        all[at] = CORE_NESTED[core];
+        at += 1;
+        core += 1;
+    }
+    all
+};
+
+/// The classes the tables hold lines for `entry` on, as the receiver and as an argument.
+pub(super) fn measured_classes(entry: &str) -> &'static [Representative] {
+    if is_of_nested_dtypes(entry) {
+        &Representative::ALL
+    } else if SENSITIVE.contains(&entry) {
+        &MEASURED_AND_CORE
+    } else {
+        &Representative::MEASURED
+    }
+}
+
 /// How a class is read in the tables for an entry: the class whose lines say what the entry does
 /// of it, or none where the tables do not judge it.
 ///
-/// The tables hold lines for every class the entry is measured on, which for an ordinary method
-/// is [`Representative::MEASURED`] and for a method of the `list` or the `arr` namespace every
-/// class. A list or an array of another element dtype has no lines of its own for an ordinary
-/// method, and is not judged: nothing is said of what the method does with it.
+/// An entry has lines for the classes it is measured on. A list or an array of another element
+/// dtype is read as the class that stands for it, [`Representative::sibling`], where the method
+/// does not tell them apart, and is not judged where it does.
 pub(super) fn read_as(entry: &str, class: Representative) -> Option<Representative> {
-    (Representative::MEASURED.contains(&class) || !class.is_nested() || is_of_nested_dtypes(entry))
-        .then_some(class)
+    if measured_classes(entry).contains(&class) {
+        Some(class)
+    } else if SENSITIVE.contains(&entry) {
+        None
+    } else {
+        Some(class.sibling())
+    }
 }
 
 /// Whether the entry is a method of the `list` or the `arr` namespace, which the tables measure on
@@ -758,7 +838,6 @@ pub(super) fn restored(
     };
     for (asked, read) in asked.iter().zip(read) {
         if let (Some(asked), Some(read)) = (asked, read)
-            && asked != read
             && produces.result.name() == read.name()
         {
             return Outcome::Allowed(Some(Produces {

@@ -9,6 +9,7 @@ use crate::allowed::dtype::{Representative, dtype_name};
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
     self, ContextLine, DtypeLine, OptionLine, Outcome, Shape, Stage, Tables, lines,
+    measured_classes,
 };
 use crate::catalog::{self, Applies, Kind, ParameterDefault};
 
@@ -165,7 +166,7 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
             .parameters()
             .iter()
             .any(|p| p.is_needed() && matches!(p.kind(), Kind::Expression(_)));
-        let n = Representative::MEASURED.len();
+        let n = measured_classes(entry.id().as_str()).len();
         let receivers = if entry.applies() == Applies::Expression {
             n
         } else {
@@ -285,7 +286,7 @@ fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on
         // step on none.
         let receivers =
             if entry.applies() == Applies::Expression || entry.applies() == Applies::Function {
-                Representative::MEASURED.len()
+                measured_classes(entry.id().as_str()).len()
             } else {
                 1
             };

@@ -15,7 +15,7 @@ use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
     Chain, ContextLine, CountLine, DtypeKey, DtypeLine, LIST_FORM, OptionLine, OptionValue,
-    Outcome, Produces, Reason, Shape, Stage, subject_of,
+    Outcome, Produces, Reason, Shape, Stage, measured_classes, subject_of,
 };
 use crate::catalog::{
     self, Applies, Argument, BuildError, Counting, Entry, Kind, Parameter, ParameterDefault,
@@ -387,7 +387,7 @@ fn has_dtype_lines(entry: &'static Entry) -> bool {
 }
 
 fn dtype_jobs() -> Vec<DtypeJob> {
-    dtype_jobs_over(|_| Representative::MEASURED.to_vec())
+    dtype_jobs_over(|entry| measured_classes(entry.id().as_str()).to_vec())
 }
 
 /// The jobs of the dtype table for the receivers, and the arguments, that `classes` gives for
@@ -1789,9 +1789,9 @@ fn option_lines(index: &DtypeIndex) -> Vec<OptionLine> {
         // takes expressions is measured on each dtype of its subject, as a count since 1970 is
         // read as a date for days and refused for a date in seconds.
         let candidates: Vec<Option<Candidate>> = if entry.applies() == Applies::Expression {
-            Representative::MEASURED
-                .into_iter()
-                .map(|receiver| Some(option_candidate(entry, receiver, index)))
+            measured_classes(entry.id().as_str())
+                .iter()
+                .map(|receiver| Some(option_candidate(entry, *receiver, index)))
                 .collect()
         } else if entry.applies() == Applies::Function {
             Representative::MEASURED

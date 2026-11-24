@@ -1533,7 +1533,14 @@ for the three rows, `many` or `counted`.
 
 The representative dtypes are every integer and float width, `String`,
 `Boolean`, `Date`, `Time`, `Datetime` with and without a zone, `Duration`,
-`Null`, `List` of an integer and of `String`, `Struct`, `Array` and `Decimal`.
+`Null`, `Decimal` and `Struct`, and a `List` and an `Array` of each of those that is not a
+`Struct`: 22 scalar dtypes, so 67 classes. A list or an array of a list, an array or a
+struct is no class, and the walk says nothing of what follows one, as it says nothing of a dtype
+the tables do not cover. A dtype of a class is any member of it: an array of any width
+is its class, and the tables measure arrays at width 2, which the walk carries as it carries the
+unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which of the
+classes each method is measured on.
+
 The contexts are a `select` item, a filter's predicate, a sort key, a join key
 on each side, and a pivot's aggregate, each also with, inside the expression
 that stands there, `over`'s `partition_by` or `order_by` or a condition's
@@ -1668,14 +1675,40 @@ the receiver that fits it best, so a table cannot say that a predicate must be
 varied one parameter at a time, so a method with two expression parameters has
 each judged apart, and what the arguments given decide is what the method gives:
 a `fill_value` of text makes a `shift` give text, and where two arguments give
-different results the result is not known. A `Struct` is two fields, an `Array`
-of two, and a `Decimal` of ten digits: the tables say nothing of other sizes.
+different results the result is not known. A `Struct` is two fields and a `Decimal` of ten digits: the tables say nothing of other sizes
+of them, and an array is of two, though the walk writes the width of the one it follows.
 
 Where a method is given an argument, the line of the call that has it says what Polars does of the call, and
 that is the refusal told when the argument is refused, before the line of the method with none of its
 arguments, which is told when none is given. The two can refuse for different reasons: `dt.replace`
 converts a part it is given before it meets the value it follows, so text given text as the month is
 refused for the failed conversion, and the call with no part is refused for the text being no moment.
+
+### Lists And Arrays
+
+A list and an array are classes of their own for each scalar element dtype, so a step can follow
+a column of lists of dates as it follows a column of dates, and every call carries the element
+dtype through: what `first` gives of a list of `Date` is a `Date`. The tables do not hold a line
+for each of the 67 classes of every method, which would be 67 receivers by 67 arguments for a
+method that takes an operand. They hold lines for the 26 classes of
+`Representative::MEASURED`, which are the scalar dtypes, `Struct`, the list of `Int64`, the list of
+`String` and the array of `Int64`, and read the others by the class that stands for them:
+
+| A call follows or is given | The tables read | Because |
+| --- | --- | --- |
+| a list of text | the list of `String` | Polars judges every method that is not named below alike for two element dtypes. |
+| any other list | the list of `Int64` | The same. |
+| any array | the array of `Int64` | The same. |
+| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders and replaces by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `is_in`, `diff`, `replace`, `replace_strict`, `search_sorted` and `reverse`, which `SENSITIVE` names. |
+| any other list or array, of those | nothing | The call may stand, and the walk says that the dtype after it is not known. |
+
+A method that is not named is held to the claim by a test that runs every combination of every
+class that is read as another, in Polars, on one thread: it finds the methods Polars judges
+differently for the element dtype than for the class that stands for it, and fails unless they
+are the ones `SENSITIVE` names, which are measured on the lists and the arrays of a whole number,
+a float, text, a `Boolean`, a `Date` and a `Datetime` as well. A result that is the class that was
+read is written for the class that was asked: the first of a list of `Float64` is a list of
+`Float64` where the table says it is a list of `Int64`.
 
 ### What The Tables Are Checked Against
 
