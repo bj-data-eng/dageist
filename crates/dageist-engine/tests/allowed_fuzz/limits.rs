@@ -176,9 +176,9 @@ pub enum Limit {
     /// run: the number is a value, which the tables measured as the dtype and the
     /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
     /// has no place, in a case that holds a `pow` whose exponent is a whole number
-    /// typed below zero or holds a subtraction, a negation or a not, which can take the
-    /// values of a column below zero; the sample's rows are 1, a null and 3, which a sum
-    /// or a product of them does not.
+    /// typed below zero or holds a subtraction, a negation, a not or a difference, which can
+    /// take the values of a column below zero; the sample's rows are 1, a null and 3, which a
+    /// sum or a product of them does not.
     ANegativeExponent,
     /// A value of the dtype Null, a column or a literal, typed as it or not, or what a call
     /// gives that dtype, is an operand of `and`, `or` and `xor` that the tables allow,
@@ -1045,7 +1045,7 @@ fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
             is_a_whole_number_below_zero(inner)
                 || matches!(
                     inner.entry().id().as_str(),
-                    "Expr.sub" | "Expr.neg" | "Expr.not_"
+                    "Expr.sub" | "Expr.neg" | "Expr.not_" | "Expr.diff"
                 )
         }))
 }
