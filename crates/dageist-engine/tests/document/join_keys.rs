@@ -479,3 +479,103 @@ fn a_key_refused_for_another_reason_keeps_its_refusal_when_it_repeats_a_pair() {
         other => panic!("the key does not end refused: {other:?}"),
     }
 }
+
+/// A table with a column of lists of whole numbers and one of arrays of two, beside whole numbers
+/// `a` and the Booleans `f`.
+fn with_lists() -> DataFrame {
+    let lists = Series::new(
+        "l".into(),
+        [vec![1_i64, 2], vec![3], vec![4, 5]].map(|values| Series::new("".into(), values)),
+    );
+    let arrays = Series::new(
+        "arr".into(),
+        [[1_i64, 2], [3, 4], [5, 6]].map(|pair| Series::new("".into(), pair)),
+    )
+    .cast(&DataType::Array(Box::new(DataType::Int64), 2))
+    .expect("lists of two cast to arrays of two");
+    df!("a" => [1_i64, 2, 3], "f" => [true, false, true])
+        .expect("the table")
+        .hstack(&[lists.into(), arrays.into()])
+        .expect("columns of three rows")
+}
+
+fn is_in(receiver: &str, other: Value) -> Value {
+    field_then(
+        receiver,
+        vec![call("Expr.is_in", json!({ "other": other }))],
+    )
+}
+
+#[test]
+fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
+    // Python Polars 2.1.0: `a.is_in(l)` of a column of lists or of arrays is met row by row, so
+    // a join may key on it and on what follows it, where a plain column, which is a set, and one
+    // list that an aggregate gives, are no key. Each case is asked of Polars by running the join.
+    let keyed = |left_on: Value| keys(vec![left_on], vec![field("rf")]);
+    let cases = [
+        ("a list column", keyed(is_in("a", field("l"))), true),
+        ("an array column", keyed(is_in("a", field("arr"))), true),
+        (
+            "a list column and a test of the result",
+            keyed(field_then(
+                "a",
+                vec![
+                    call("Expr.is_in", json!({ "other": field("l") })),
+                    call("Expr.not_", json!({})),
+                ],
+            )),
+            true,
+        ),
+        ("a plain column", keyed(is_in("a", field("a"))), false),
+        ("the first list", keyed(is_in("a", first("l"))), false),
+        (
+            "a list column of an aggregate",
+            keyed(field_then(
+                "a",
+                vec![
+                    call("Expr.sum", json!({})),
+                    call("Expr.is_in", json!({ "other": field("l") })),
+                ],
+            )),
+            false,
+        ),
+    ];
+    let mut disagreements = Vec::new();
+    for (name, arguments, allowed) in cases {
+        let report = join_of(with_lists(), right(), arguments);
+        let polars_allows = matches!(outcome(&report), Outcome::Valid { .. });
+        let walk_allows = refused(walk(&report)).is_none();
+        if polars_allows != allowed {
+            disagreements.push(format!(
+                "{name}: Polars does {polars_allows}, the case says {allowed}"
+            ));
+        }
+        if walk_allows != polars_allows {
+            disagreements.push(format!(
+                "{name}: Polars allows it: {polars_allows}, the walk allows it: {walk_allows}, {:?}",
+                refused(walk(&report))
+            ));
+        }
+    }
+    assert!(
+        disagreements.is_empty(),
+        "{} cases disagree:\n{}",
+        disagreements.len(),
+        disagreements.join("\n")
+    );
+}
+
+#[test]
+fn a_right_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
+    let report = join_of(
+        right(),
+        with_lists(),
+        keys(vec![field("rf")], vec![is_in("a", field("l"))]),
+    );
+    assert!(
+        matches!(outcome(&report), Outcome::Valid { .. }),
+        "Polars allows it: {:?}",
+        outcome(&report)
+    );
+    assert_eq!(refused(walk(&report)), None);
+}
