@@ -681,7 +681,7 @@ Polars by hand, and decide which it is:
   expression, the case with the last value of each condition made a fill forward of what
   it was, where Polars refusing it for the tables' reason shows that the predicate is one
   it skips, and, for a call judged by its parts as below, refusing it for any reason, with the
-  same case allowed once each predicate is made `true`; and, for a predicate that the rule that a condition's predicate be a `Boolean`
+  same case allowed once the predicate that holds the refused call is made `true`; and, for a predicate that the rule that a condition's predicate be a `Boolean`
   refused where no column of its dtype can be asked or no column is to be had, as in a
   pivot's aggregate, the condition alone with what follows it removed, where Polars refusing
   it in the predicate, and allowing it with the predicate made `true`, shows that a sort key

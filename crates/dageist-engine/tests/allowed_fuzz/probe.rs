@@ -61,7 +61,7 @@
 //! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
 //! value of each condition is made a fill forward of what it was, so that the values differ, and
 //! Polars refusing that case for the tables' reason, or, for a call the tables judge by its parts,
-//! for any reason where the same case with each predicate made `true` is allowed, shows the
+//! for any reason where the same case with the predicate that holds the refused call made `true` is allowed, shows the
 //! predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
 //! of it may be refused first.
 //!
@@ -1506,13 +1506,13 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
     let control = changed(case_with_values_that_differ(case), case)?;
     // A call that the tables judge by its parts is refused by Polars for the first it meets, which
     // is not always the one the tables refused first, so a refusal of the case where the values
-    // differ is the part's where it is the predicates that Polars refuses: with each predicate made
-    // `true` the same case is allowed.
+    // differ is the part's where it is the predicate that holds it that Polars refuses: with that
+    // predicate made `true`, and no other, the same case is allowed.
     let by_parts = judges_its_values_apart(case, &refused.place);
     let refusal = (0..RUNS).find_map(|_| {
         observe(&control).refusal.filter(|refusal| {
             refusal.reason == refused.reason
-                || (by_parts && is_refused_for_its_predicates(&control))
+                || (by_parts && is_refused_for_its_predicates(&control, &refused.place))
         })
     })?;
     Some(Settled {
@@ -1522,28 +1522,116 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
     })
 }
 
-/// Whether `case`, which Polars refuses, is allowed every time it is run with each predicate of
-/// each condition made `true`: the predicates are why it is refused.
-fn is_refused_for_its_predicates(case: &Case) -> bool {
+/// Whether `case`, which Polars refuses, is allowed every time it is run with the predicate that
+/// holds `place` made `true`, and no other: that predicate is why it is refused.
+fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
+    let path = place.path();
+    // The predicate is the item after the last `predicates` the place goes through.
+    let Some(at) = path
+        .iter()
+        .rposition(|segment| matches!(segment, Segment::Parameter(name) if name == "predicates"))
+        .filter(|at| matches!(path.get(at + 1), Some(Segment::Item(_))))
+    else {
+        return false;
+    };
     let Some(truth) = call("polars.lit", vec![("value", Value::Flag(Some(true)))])
         .and_then(|truth| Expression::new(Start::Call(truth), Vec::new()).ok())
     else {
         return false;
     };
-    let made_true = case_changed(case, &|made| {
-        let id = made.entry().id().as_str();
-        if !matches!(id, "polars.when" | "Then.when" | "ChainedThen.when") {
-            return None;
-        }
-        call(
-            id,
-            vec![(
-                "predicates",
-                Value::Many(vec![Value::Expression(truth.clone())]),
-            )],
-        )
-    });
+    let step = case.document.steps()[0].call();
+    let Some((Segment::Parameter(parameter), inside)) = path[..=at + 1].split_first() else {
+        return false;
+    };
+    let given: Option<Vec<(&str, Value)>> = step
+        .arguments()
+        .iter()
+        .map(|argument| {
+            let value = if argument.parameter() == parameter {
+                replaced_deep_in_value(argument.value(), inside, &truth)?
+            } else {
+                argument.value().clone()
+            };
+            Some((argument.parameter(), value))
+        })
+        .collect();
+    let made_true = given
+        .and_then(|given| call(step.entry().id().as_str(), given))
+        .and_then(|rebuilt| Step::new(case.document.steps()[0].id().clone(), rebuilt).ok())
+        .and_then(|rebuilt| Document::new(vec![rebuilt]).ok())
+        .map(|document| Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document,
+        });
     made_true.is_some_and(|made_true| (0..RUNS).all(|_| observe(&made_true).refusal.is_none()))
+}
+
+/// `value` with the expression that `path` leads to, through the arguments of the calls of the
+/// expressions on the way, replaced by `with`.
+fn replaced_deep_in_value(value: &Value, path: &[Segment], with: &Expression) -> Option<Value> {
+    match (value, path) {
+        (Value::Expression(_), []) => Some(Value::Expression(with.clone())),
+        (Value::Expression(expression), _) => {
+            Some(Value::Expression(replaced_deep(expression, path, with)?))
+        }
+        (Value::Many(items), [Segment::Item(at), rest @ ..]) => {
+            let mut items = items.clone();
+            *items.get_mut(*at)? = replaced_deep_in_value(items.get(*at)?, rest, with)?;
+            Some(Value::Many(items))
+        }
+        (Value::Pairs(pairs), [Segment::Key(at), rest @ ..]) => {
+            let mut pairs = pairs.clone();
+            pairs.get_mut(*at)?.0 = replaced_deep_in_value(&pairs.get(*at)?.0, rest, with)?;
+            Some(Value::Pairs(pairs))
+        }
+        (Value::Pairs(pairs), [Segment::Value(at), rest @ ..]) => {
+            let mut pairs = pairs.clone();
+            pairs.get_mut(*at)?.1 = replaced_deep_in_value(&pairs.get(*at)?.1, rest, with)?;
+            Some(Value::Pairs(pairs))
+        }
+        _ => None,
+    }
+}
+
+/// `expression` with the expression that `path` leads to, from its start or one of its links and
+/// through the arguments of that call, however deep, replaced by `with`.
+fn replaced_deep(
+    expression: &Expression,
+    path: &[Segment],
+    with: &Expression,
+) -> Option<Expression> {
+    let rebuilt = |held: &Call, name: &str, rest: &[Segment]| {
+        let mut given: Vec<(&str, Value)> = Vec::new();
+        for argument in held.arguments() {
+            let value = if argument.parameter() == name {
+                replaced_deep_in_value(argument.value(), rest, with)?
+            } else {
+                argument.value().clone()
+            };
+            given.push((argument.parameter(), value));
+        }
+        call(held.entry().id().as_str(), given)
+    };
+    match path {
+        [Segment::Start, Segment::Parameter(name), rest @ ..] => {
+            let Start::Call(start) = expression.start() else {
+                return None;
+            };
+            Expression::new(
+                Start::Call(rebuilt(start, name, rest)?),
+                expression.links().to_vec(),
+            )
+            .ok()
+        }
+        [Segment::Link(link), Segment::Parameter(name), rest @ ..] => {
+            let mut links = expression.links().to_vec();
+            let held = links.get(*link)?;
+            *links.get_mut(*link)? = rebuilt(held, name, rest)?;
+            Expression::new(expression.start().clone(), links).ok()
+        }
+        _ => None,
+    }
 }
 
 /// The entries that end a condition, or give a value: `then` and `otherwise` of each state.
