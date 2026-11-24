@@ -336,12 +336,12 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
-    /// Whether what the link follows starts at a range or a repeat, or is made of literals and
-    /// ranges alone, with no column anywhere in it: Polars' slice of a series of literals cannot
+    /// Whether what the link follows is made of literals, ranges and connected inputs alone, with no
+    /// column anywhere in it: Polars' slice of a series of literals cannot
     /// extract the length that cuts it from a number below nothing, where the optimizer does not
     /// fold the cut into it, which the engines do not agree on, so the editor refuses it after
     /// every link.
-    of_literals_or_a_range: bool,
+    made_of_literals: bool,
 }
 
 /// What a chain has so far.
@@ -1761,11 +1761,12 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
-        let starts_at_a_range = matches!(expression.start(), Start::Call(start)
-            if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments));
         // Whether the chain so far has no column in it anywhere: a start and arguments of literals.
-        let mut literal_prefix = matches!(expression.start(), Start::Call(start)
-            if call_is_made_of_literals(start));
+        let mut literal_prefix = match expression.start() {
+            Start::Call(start) => call_is_made_of_literals(start),
+            Start::Input(_) => true,
+            Start::Hole => false,
+        };
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -1802,7 +1803,7 @@ impl Walker<'_> {
                     unit,
                     widened,
                     zone,
-                    of_literals_or_a_range: starts_at_a_range || literal_prefix,
+                    made_of_literals: literal_prefix,
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2014,7 +2015,7 @@ impl Walker<'_> {
             unit,
             widened,
             zone,
-            of_literals_or_a_range,
+            made_of_literals,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2034,7 +2035,7 @@ impl Walker<'_> {
         }
         // Polars cannot extract the length that cuts a range, a repeat or a value of literals alone
         // from a number below nothing, whatever the dtype of what it cuts is, so it is said first.
-        if of_literals_or_a_range
+        if made_of_literals
             && let Some(said) = cut_below_nothing(link)
             && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
         {
@@ -2858,8 +2859,13 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
 /// Whether `expression` has no column anywhere in it: a start of literals, ranges and the functions
 /// that make a value of them, and arguments that are made so too.
 fn is_made_of_literals(expression: &Expression) -> bool {
-    matches!(expression.start(), Start::Call(start) if call_is_made_of_literals(start))
-        && expression.links().iter().all(call_is_made_of_literals)
+    // A connected value or list is a literal of its dtype to Polars.
+    let start_is = match expression.start() {
+        Start::Call(start) => call_is_made_of_literals(start),
+        Start::Input(_) => true,
+        Start::Hole => false,
+    };
+    start_is && expression.links().iter().all(call_is_made_of_literals)
 }
 
 /// Whether the arguments of `call` hold no column, and the call is none that reads one.
