@@ -2972,15 +2972,20 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// after the quantile, so that the column stands in for the literal and not for the dtype of what
 /// follows it; and again with a column of the literal's own dtype, which a filter reads as a
 /// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
-/// join's keys read the column both tables hold, and other places the column `k`. The cut control
-/// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
+/// join's keys read the columns both tables hold, `u` and `key`, either of which the control may
+/// be, for a join refuses two keys named alike, and other places read the column `k`. The cut
+/// control leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
 /// column of the literal's own dtype is chosen for each quantile from its own literal, a `Boolean`
 /// one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case start
 /// from, and so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
-    let numbers = if joins { "u" } else { "k" };
+    // The columns of numbers that stand in: a join's keys read the columns both tables hold, `u`
+    // and `key`, and the other keys of the join may be named for one of them, which a join
+    // refuses twice, so each is asked; other places read `k`.
+    let columns: &[&str] = if joins { &["u", "key"] } else { &["k"] };
+    let numbers = columns[0];
     // Whether some quantile starts from a literal that has a column of its own dtype.
     let owned = std::cell::Cell::new(false);
     let recording = |expression: &Expression| {
@@ -3009,16 +3014,20 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     };
     let never = |_: &Call| false;
     let after_the_quantile = |link: &Call| is(link, "Expr.approx_quantile");
-    let numeric = |_: &Expression| numbers.to_owned();
     // Each quantile's own column: the one of the dtype its literal has, and the numbers where it
     // has none, whatever the other quantiles of the case start from.
     let own = |expression: &Expression| match expression.start() {
         Start::Call(start) => column_of_the_dtype_of(start).unwrap_or(numbers).to_owned(),
         Start::Input(_) | Start::Hole => numbers.to_owned(),
     };
-    let mut refused = control(&numeric, &never)?;
-    if refused {
-        refused = control(&numeric, &after_the_quantile)?;
+    let mut refused = true;
+    for column in columns {
+        let numeric = |_: &Expression| (*column).to_owned();
+        let mut refused_here = control(&numeric, &never)?;
+        if refused_here {
+            refused_here = control(&numeric, &after_the_quantile)?;
+        }
+        refused = refused && refused_here;
     }
     if refused && !joins && owned.get() {
         refused = control(&own, &never)?;
