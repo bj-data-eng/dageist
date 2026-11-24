@@ -1450,6 +1450,55 @@ fn a_range_of_more_values_than_polars_holds_is_refused_where_the_step_is_walked(
 }
 
 #[test]
+fn a_join_pairs_the_output_names_of_two_ranges_as_polars_names_them() {
+    // Python Polars 2.1.0 names what a range gives by the first expression it is given, `literal`
+    // where that is a number typed in or none is given, and what `repeat` gives by its value. A join
+    // refuses a pair of names made twice: "joining with repeated key names". A key of a count is
+    // not elementwise, so each key goes on to an aggregate of the values, which is one value.
+    let minimum = |start: &Value| on_start(start, vec![call("Expr.arg_min", json!({}))]);
+    let first = |name: &str| field_then(name, vec![call("Expr.first", json!({}))]);
+    let cases = [
+        ("int_range of nothing", int_range(vec![])),
+        ("int_range of an end", int_range(vec![("start", whole(2))])),
+        (
+            "int_range of a column",
+            int_range(vec![("start", first("a")), ("end", whole(9))]),
+        ),
+        (
+            "linear_space of numbers",
+            linear_space(vec![
+                ("start", whole(0)),
+                ("end", whole(1)),
+                ("num_samples", whole(3)),
+            ]),
+        ),
+        (
+            "repeat of a column",
+            repeat(vec![("value", first("a")), ("n", whole(3))]),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, range) in cases {
+        let key = minimum(&range);
+        let report = run(
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "other" },
+                "left_on": many(vec![key.clone(), key]),
+                "right_on": many(vec![field("rk"), field("rk")]),
+            }),
+        );
+        let (polars, walk) = (polars_says(&report), walk_says(&report));
+        if polars.accepts() || walk != Said::Refuses("join-key-names-are-not-repeated".to_owned()) {
+            found.push(format!(
+                "{name}: Polars says {polars:?}, the walk says {walk:?}"
+            ));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+#[test]
 fn a_range_is_always_lazy_and_never_offers_eager() {
     // Polars' `eager` makes a series where the engine's steps make plans: the flag is in the
     // signature, which the catalogue holds as Python writes it, and a step that sets it is
