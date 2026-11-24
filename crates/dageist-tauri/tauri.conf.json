@@ -15,7 +15,12 @@
         "height": 900,
         "minWidth": 960,
         "minHeight": 600,
-        "theme": "Dark"
+        "theme": "Dark",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 20, "y": 28 },
+        "acceptFirstMouse": true,
+        "allowLinkPreview": false
       }
     ],
     "security": {

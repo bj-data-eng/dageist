@@ -72,6 +72,11 @@ pub fn open_view_window<R: Runtime>(app: AppHandle<R>, name: ViewWindow) -> Resu
             .inner_size(1180.0, 820.0)
             .min_inner_size(820.0, 520.0)
             .theme(Some(Theme::Dark))
+            // As for the main window in tauri.conf.json: the first click on the window, while
+            // another is in front, reaches what it lands on, and a long press on a link shows no
+            // preview, as in a native application.
+            .accept_first_mouse(true)
+            .allow_link_preview(false)
             .build()
     })
 }

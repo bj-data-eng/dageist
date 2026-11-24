@@ -143,3 +143,45 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/*
+ * The window behaves like an application, not a web page. The edges do not
+ * stretch and spring back when scrolled past. Words and pictures are not
+ * selected or dragged when clicked or dragged, so a drag moves what the
+ * application moves. The pointer is an arrow over words, not a text cursor.
+ * Text is drawn as macOS draws it on a dark ground. `native-feel.ts` turns off
+ * the browser's own menu and keys in the application's window.
+ */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+img,
+svg,
+a {
+  -webkit-user-drag: none;
+}
+
+/* What is typed, and what is marked as for copying, can still be selected. */
+input,
+textarea,
+[contenteditable='true'],
+[data-selectable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  cursor: text;
+}
