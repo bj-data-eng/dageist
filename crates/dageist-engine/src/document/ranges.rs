@@ -214,27 +214,48 @@ fn built(entry: &'static Entry, given: Vec<(&str, Argument)>) -> Option<Expr> {
     }
 }
 
-/// The nanoseconds from the start of 1970 or of the day that a value of a moment is, where it is
-/// one.
-fn nanoseconds(value: &AnyValue<'_>) -> Option<i128> {
+/// What a bound of a range is.
+enum Bound {
+    /// The nanoseconds from the start of 1970 or of the day that it is, where it is a moment, a time
+    /// of day or a number that a range of times reads so.
+    At(i128),
+    /// A null, which Polars refuses at once.
+    Null,
+    /// A value that is not read: no range is made of it.
+    Unread,
+}
+
+fn bound_of(value: &AnyValue<'_>) -> Bound {
     const DAY: i128 = 86_400_000_000_000;
-    Some(match value {
-        AnyValue::Date(days) => i128::from(*days) * DAY,
-        AnyValue::Datetime(count, unit, _) | AnyValue::DatetimeOwned(count, unit, _) => {
+    let whole = |count: i128| Bound::At(count);
+    match value {
+        AnyValue::Null => Bound::Null,
+        AnyValue::Date(days) => whole(i128::from(*days) * DAY),
+        AnyValue::Datetime(count, unit, _) | AnyValue::DatetimeOwned(count, unit, _) => whole(
             i128::from(*count)
                 * match unit {
                     TimeUnit::Nanoseconds => 1,
                     TimeUnit::Microseconds => 1_000,
                     TimeUnit::Milliseconds => 1_000_000,
-                }
-        }
-        AnyValue::Time(count) => i128::from(*count),
-        AnyValue::Int8(count) => i128::from(*count),
-        AnyValue::Int16(count) => i128::from(*count),
-        AnyValue::Int32(count) => i128::from(*count),
-        AnyValue::Int64(count) => i128::from(*count),
-        _ => return None,
-    })
+                },
+        ),
+        AnyValue::Time(count) | AnyValue::Int64(count) => whole(i128::from(*count)),
+        AnyValue::Int8(count) => whole(i128::from(*count)),
+        AnyValue::Int16(count) => whole(i128::from(*count)),
+        AnyValue::Int32(count) => whole(i128::from(*count)),
+        AnyValue::Int128(count) => whole(*count),
+        AnyValue::UInt8(count) => whole(i128::from(*count)),
+        AnyValue::UInt16(count) => whole(i128::from(*count)),
+        AnyValue::UInt32(count) => whole(i128::from(*count)),
+        AnyValue::UInt64(count) => whole(i128::from(*count)),
+        AnyValue::UInt128(count) => i128::try_from(*count).map_or(Bound::Unread, whole),
+        // A float that is a number is read as the nanoseconds it counts, as far as an `i128` holds.
+        #[allow(clippy::cast_possible_truncation)]
+        AnyValue::Float64(number) if number.is_finite() => whole(*number as i128),
+        #[allow(clippy::cast_possible_truncation)]
+        AnyValue::Float32(number) if number.is_finite() => whole(*number as i128),
+        _ => Bound::Unread,
+    }
 }
 
 /// The shortest step an interval makes, in nanoseconds: a month is 28 days, a day 23 hours.
@@ -360,19 +381,27 @@ fn moments(call: &Call) -> Made {
         return Made::Counts(Count::NotKnown);
     };
     // How many values it can give at the most, from how far apart the ends are.
-    let ends = match asked(vec![start.alias("start"), end.alias("end")]) {
-        Asked::Made(frame) => (|| {
-            let first = frame.column("start").ok()?.get(0).ok()?;
-            let last = frame.column("end").ok()?.get(0).ok()?;
-            Some((nanoseconds(&first)?, nanoseconds(&last)?))
-        })(),
+    // The walk runs on every edit: it makes no range of which it has not read how long it can be.
+    let (first, last) = match asked(vec![start.alias("start"), end.alias("end")]) {
+        Asked::Made(frame) => {
+            let read = |name: &str| frame.column(name).ok()?.get(0).ok().map(|v| bound_of(&v));
+            match (read("start"), read("end")) {
+                (Some(Bound::At(first)), Some(Bound::At(last))) => (first, last),
+                // A null is refused at once, by whichever bound holds it.
+                (Some(Bound::Null), _) | (_, Some(Bound::Null)) => {
+                    return match asked(vec![range]) {
+                        Asked::Refused(reason) => Made::Refused(reason),
+                        _ => Made::Counts(Count::NotKnown),
+                    };
+                }
+                _ => return Made::Counts(Count::NotKnown),
+            }
+        }
         Asked::Refused(reason) => return Made::Refused(reason),
         Asked::Panicked => return Made::Counts(Count::NotKnown),
     };
     let step = shortest_step(&interval).max(1);
-    if let Some((first, last)) = ends
-        && (last - first).abs() / step + 2 > MOST_ASKED
-    {
+    if (last - first).abs() / step + 2 > MOST_ASKED {
         return Made::Counts(Count::NotKnown);
     }
     match asked(vec![range]) {

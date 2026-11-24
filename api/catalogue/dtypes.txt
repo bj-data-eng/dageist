@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 59856 combinations: 23048 allowed; 11706 refused when Polars resolved the schema, 25102 when it ran the rows, 0 when it ran the empty table.
+# 59856 combinations: 23052 allowed; 11702 refused when Polars resolved the schema, 25102 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -59706,7 +59706,7 @@ polars.repeat | n | - | UInt16 | allowed Int32 counted
 polars.repeat | n | - | UInt32 | allowed Int32 counted
 polars.repeat | n | - | UInt64 | allowed Int32 counted
 polars.repeat | n | - | UInt8 | allowed Int32 counted
-polars.repeat | value | - | Array(Int64, 2) | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.repeat | value | - | Array(Int64, 2) | allowed Array(Int64, 2) counted
 polars.repeat | value | - | Boolean | allowed Boolean counted
 polars.repeat | value | - | Date | allowed Date counted
 polars.repeat | value | - | Datetime(us) | allowed Datetime(us) counted
@@ -59721,11 +59721,11 @@ polars.repeat | value | - | Int16 | allowed Int16 counted
 polars.repeat | value | - | Int32 | allowed Int32 counted
 polars.repeat | value | - | Int64 | allowed Int64 counted
 polars.repeat | value | - | Int8 | allowed Int8 counted
-polars.repeat | value | - | List(Int64) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | value | - | List(String) | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | value | - | List(Int64) | allowed List(Int64) counted
+polars.repeat | value | - | List(String) | allowed List(String) counted
 polars.repeat | value | - | Null | allowed Null counted
 polars.repeat | value | - | String | allowed String counted
-polars.repeat | value | - | Struct(x: Int64, y: String) | refused schema: must specify one field in the struct
+polars.repeat | value | - | Struct(x: Int64, y: String) | allowed Struct(x: Int64, y: String) counted
 polars.repeat | value | - | Time | allowed Time counted
 polars.repeat | value | - | UInt128 | allowed UInt128 counted
 polars.repeat | value | - | UInt16 | allowed UInt16 counted

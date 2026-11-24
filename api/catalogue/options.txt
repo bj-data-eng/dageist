@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 11646 combinations: 6098 allowed; 3747 refused when Polars resolved the schema, 1801 when it ran the rows, 0 when it ran the empty table.
+# 11646 combinations: 6105 allowed; 3655 refused when Polars resolved the schema, 1886 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -10276,52 +10276,52 @@ polars.linear_space | UInt8 | closed=none, eager=false | allowed Float64 counted
 polars.linear_space | UInt8 | closed=none, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.linear_space | UInt8 | closed=right, eager=false | allowed Float64 counted
 polars.linear_space | UInt8 | closed=right, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
-polars.repeat | Array(Int64, 2) | dtype=Boolean, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Boolean, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Date, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Date, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Datetime(us), eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Datetime(us), eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Datetime(us, UTC), eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Datetime(us, UTC), eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Duration(us), eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Duration(us), eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float16, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float16, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float32, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float32, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float64, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Float64, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int128, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int128, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int16, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int16, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int32, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int32, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int64, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int64, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int8, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Int8, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=List(Int64), eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=List(Int64), eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=List(String), eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=List(String), eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Null, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Null, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=String, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=String, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Time, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=Time, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt128, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt128, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt16, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt16, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt32, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt32, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt64, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt64, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt8, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-polars.repeat | Array(Int64, 2) | dtype=UInt8, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+polars.repeat | Array(Int64, 2) | dtype=Boolean, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
+polars.repeat | Array(Int64, 2) | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Date, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Date')
+polars.repeat | Array(Int64, 2) | dtype=Date, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Datetime(us), eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+polars.repeat | Array(Int64, 2) | dtype=Datetime(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Datetime(us, UTC), eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs', 'UTC')')
+polars.repeat | Array(Int64, 2) | dtype=Datetime(us, UTC), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Duration(us), eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Duration('μs')')
+polars.repeat | Array(Int64, 2) | dtype=Duration(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Float16, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float16')
+polars.repeat | Array(Int64, 2) | dtype=Float16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Float32, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float32')
+polars.repeat | Array(Int64, 2) | dtype=Float32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Float64, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+polars.repeat | Array(Int64, 2) | dtype=Float64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Int128, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int128')
+polars.repeat | Array(Int64, 2) | dtype=Int128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Int16, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int16')
+polars.repeat | Array(Int64, 2) | dtype=Int16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Int32, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.repeat | Array(Int64, 2) | dtype=Int32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Int64, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int64')
+polars.repeat | Array(Int64, 2) | dtype=Int64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Int8, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.repeat | Array(Int64, 2) | dtype=Int8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=List(Int64), eager=false | allowed List(Int64) counted
+polars.repeat | Array(Int64, 2) | dtype=List(Int64), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=List(String), eager=false | allowed List(String) counted
+polars.repeat | Array(Int64, 2) | dtype=List(String), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Null, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Null')
+polars.repeat | Array(Int64, 2) | dtype=Null, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=String, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+polars.repeat | Array(Int64, 2) | dtype=String, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=Time, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Time')
+polars.repeat | Array(Int64, 2) | dtype=Time, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=UInt128, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'UInt128')
+polars.repeat | Array(Int64, 2) | dtype=UInt128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=UInt16, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'UInt16')
+polars.repeat | Array(Int64, 2) | dtype=UInt16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=UInt32, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'UInt32')
+polars.repeat | Array(Int64, 2) | dtype=UInt32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=UInt64, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'UInt64')
+polars.repeat | Array(Int64, 2) | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Array(Int64, 2) | dtype=UInt8, eager=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'UInt8')
+polars.repeat | Array(Int64, 2) | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Boolean | dtype=Boolean, eager=false | allowed Boolean counted
 polars.repeat | Boolean | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Boolean | dtype=Date, eager=false | allowed Date counted
@@ -10966,98 +10966,98 @@ polars.repeat | Int8 | dtype=UInt64, eager=false | allowed UInt64 counted
 polars.repeat | Int8 | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Int8 | dtype=UInt8, eager=false | allowed UInt8 counted
 polars.repeat | Int8 | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
-polars.repeat | List(Int64) | dtype=Boolean, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Boolean, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Date, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Date, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Datetime(us), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Datetime(us), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Datetime(us, UTC), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Datetime(us, UTC), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Duration(us), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Duration(us), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Float64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int128, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int128, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int8, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Int8, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=List(Int64), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=List(Int64), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=List(String), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=List(String), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Null, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Null, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=String, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=String, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Time, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=Time, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt128, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt128, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt8, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(Int64) | dtype=UInt8, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Boolean, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Boolean, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Date, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Date, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Datetime(us), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Datetime(us), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Datetime(us, UTC), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Datetime(us, UTC), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Duration(us), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Duration(us), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Float64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int128, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int128, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int8, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Int8, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=List(Int64), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=List(Int64), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=List(String), eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=List(String), eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Null, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Null, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=String, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=String, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Time, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=Time, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt128, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt128, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt16, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt16, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt32, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt32, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt64, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt64, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt8, eager=false | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-polars.repeat | List(String) | dtype=UInt8, eager=true | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | List(Int64) | dtype=Boolean, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Boolean')
+polars.repeat | List(Int64) | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Date, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Date')
+polars.repeat | List(Int64) | dtype=Date, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Datetime(us), eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+polars.repeat | List(Int64) | dtype=Datetime(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Datetime(us, UTC), eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs', 'UTC')')
+polars.repeat | List(Int64) | dtype=Datetime(us, UTC), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Duration(us), eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Duration('μs')')
+polars.repeat | List(Int64) | dtype=Duration(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Float16, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float16')
+polars.repeat | List(Int64) | dtype=Float16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Float32, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float32')
+polars.repeat | List(Int64) | dtype=Float32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Float64, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+polars.repeat | List(Int64) | dtype=Float64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Int128, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Int128')
+polars.repeat | List(Int64) | dtype=Int128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Int16, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Int16')
+polars.repeat | List(Int64) | dtype=Int16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Int32, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.repeat | List(Int64) | dtype=Int32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Int64, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Int64')
+polars.repeat | List(Int64) | dtype=Int64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Int8, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.repeat | List(Int64) | dtype=Int8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=List(Int64), eager=false | allowed List(Int64) counted
+polars.repeat | List(Int64) | dtype=List(Int64), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=List(String), eager=false | allowed List(String) counted
+polars.repeat | List(Int64) | dtype=List(String), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Null, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Null')
+polars.repeat | List(Int64) | dtype=Null, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=String, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+polars.repeat | List(Int64) | dtype=String, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=Time, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Time')
+polars.repeat | List(Int64) | dtype=Time, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=UInt128, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'UInt128')
+polars.repeat | List(Int64) | dtype=UInt128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=UInt16, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'UInt16')
+polars.repeat | List(Int64) | dtype=UInt16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=UInt32, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'UInt32')
+polars.repeat | List(Int64) | dtype=UInt32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=UInt64, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'UInt64')
+polars.repeat | List(Int64) | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(Int64) | dtype=UInt8, eager=false | refused rows: cannot cast List type (inner: 'Int64', to: 'UInt8')
+polars.repeat | List(Int64) | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Boolean, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Boolean')
+polars.repeat | List(String) | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Date, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Date')
+polars.repeat | List(String) | dtype=Date, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Datetime(us), eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+polars.repeat | List(String) | dtype=Datetime(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Datetime(us, UTC), eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs', 'UTC')')
+polars.repeat | List(String) | dtype=Datetime(us, UTC), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Duration(us), eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Duration('μs')')
+polars.repeat | List(String) | dtype=Duration(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Float16, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Float16')
+polars.repeat | List(String) | dtype=Float16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Float32, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Float32')
+polars.repeat | List(String) | dtype=Float32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Float64, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+polars.repeat | List(String) | dtype=Float64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Int128, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Int128')
+polars.repeat | List(String) | dtype=Int128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Int16, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Int16')
+polars.repeat | List(String) | dtype=Int16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Int32, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.repeat | List(String) | dtype=Int32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Int64, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+polars.repeat | List(String) | dtype=Int64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Int8, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.repeat | List(String) | dtype=Int8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=List(Int64), eager=false | allowed List(Int64) counted
+polars.repeat | List(String) | dtype=List(Int64), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=List(String), eager=false | allowed List(String) counted
+polars.repeat | List(String) | dtype=List(String), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Null, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Null')
+polars.repeat | List(String) | dtype=Null, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=String, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'String')
+polars.repeat | List(String) | dtype=String, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=Time, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'Time')
+polars.repeat | List(String) | dtype=Time, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=UInt128, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'UInt128')
+polars.repeat | List(String) | dtype=UInt128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=UInt16, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'UInt16')
+polars.repeat | List(String) | dtype=UInt16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=UInt32, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'UInt32')
+polars.repeat | List(String) | dtype=UInt32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=UInt64, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'UInt64')
+polars.repeat | List(String) | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | List(String) | dtype=UInt8, eager=false | refused rows: cannot cast List type (inner: 'String', to: 'UInt8')
+polars.repeat | List(String) | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Null | dtype=Boolean, eager=false | allowed Boolean counted
 polars.repeat | Null | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Null | dtype=Date, eager=false | allowed Date counted
@@ -11150,52 +11150,52 @@ polars.repeat | String | dtype=UInt64, eager=false | allowed UInt64 counted
 polars.repeat | String | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | String | dtype=UInt8, eager=false | allowed UInt8 counted
 polars.repeat | String | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
-polars.repeat | Struct(x: Int64, y: String) | dtype=Boolean, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Boolean, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Date, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Date, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us), eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us), eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us, UTC), eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us, UTC), eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Duration(us), eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Duration(us), eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float16, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float16, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float32, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float32, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float64, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Float64, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int128, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int128, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int16, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int16, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int32, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int32, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int64, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int64, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int8, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Int8, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=List(Int64), eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=List(Int64), eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=List(String), eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=List(String), eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Null, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Null, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=String, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=String, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Time, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=Time, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt128, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt128, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt16, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt16, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt32, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt32, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt64, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt64, eager=true | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt8, eager=false | refused schema: must specify one field in the struct
-polars.repeat | Struct(x: Int64, y: String) | dtype=UInt8, eager=true | refused schema: must specify one field in the struct
+polars.repeat | Struct(x: Int64, y: String) | dtype=Boolean, eager=false | refused rows: casting from Utf8View to Boolean not supported
+polars.repeat | Struct(x: Int64, y: String) | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Date, eager=false | refused rows: casting from string to date is not supported. It was removed in Polars 2.0. Use `str.to_date()` instead.
+polars.repeat | Struct(x: Int64, y: String) | dtype=Date, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us), eager=false | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us, UTC), eager=false | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime(..., "time_zone=UTC")` instead.
+polars.repeat | Struct(x: Int64, y: String) | dtype=Datetime(us, UTC), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Duration(us), eager=false | refused rows: the schema says Duration(us) and the rows give Struct(x: Duration(us), y: Duration(us))
+polars.repeat | Struct(x: Int64, y: String) | dtype=Duration(us), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float16, eager=false | refused rows: the schema says Float16 and the rows give Struct(x: Float16, y: Float16)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float32, eager=false | refused rows: the schema says Float32 and the rows give Struct(x: Float32, y: Float32)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float64, eager=false | refused rows: the schema says Float64 and the rows give Struct(x: Float64, y: Float64)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Float64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int128, eager=false | refused rows: the schema says Int128 and the rows give Struct(x: Int128, y: Int128)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int16, eager=false | refused rows: the schema says Int16 and the rows give Struct(x: Int16, y: Int16)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int32, eager=false | refused rows: the schema says Int32 and the rows give Struct(x: Int32, y: Int32)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int64, eager=false | refused rows: the schema says Int64 and the rows give Struct(x: Int64, y: Int64)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int8, eager=false | refused rows: the schema says Int8 and the rows give Struct(x: Int8, y: Int8)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Int8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=List(Int64), eager=false | refused rows: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | Struct(x: Int64, y: String) | dtype=List(Int64), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=List(String), eager=false | refused rows: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+polars.repeat | Struct(x: Int64, y: String) | dtype=List(String), eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Null, eager=false | refused rows: the schema says Null and the rows give Struct(x: Null, y: Null)
+polars.repeat | Struct(x: Int64, y: String) | dtype=Null, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=String, eager=false | allowed String counted
+polars.repeat | Struct(x: Int64, y: String) | dtype=String, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=Time, eager=false | refused rows: casting from string to time is not supported. It was removed in Polars 2.0. Use `str.to_time()` instead.
+polars.repeat | Struct(x: Int64, y: String) | dtype=Time, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt128, eager=false | refused rows: the schema says UInt128 and the rows give Struct(x: UInt128, y: UInt128)
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt128, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt16, eager=false | refused rows: the schema says UInt16 and the rows give Struct(x: UInt16, y: UInt16)
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt16, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt32, eager=false | refused rows: the schema says UInt32 and the rows give Struct(x: UInt32, y: UInt32)
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt32, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt64, eager=false | refused rows: the schema says UInt64 and the rows give Struct(x: UInt64, y: UInt64)
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt8, eager=false | refused rows: the schema says UInt8 and the rows give Struct(x: UInt8, y: UInt8)
+polars.repeat | Struct(x: Int64, y: String) | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Time | dtype=Boolean, eager=false | refused schema: casting from Time to Boolean not supported
 polars.repeat | Time | dtype=Boolean, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | Time | dtype=Date, eager=false | refused schema: casting from Time to Date not supported

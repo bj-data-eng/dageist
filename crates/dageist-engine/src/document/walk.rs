@@ -336,6 +336,9 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
+    /// Whether the link follows a range or a repeat and nothing else: Polars cannot extract the
+    /// length that cuts it from a number below nothing.
+    after_a_range: bool,
 }
 
 /// What a chain has so far.
@@ -1738,8 +1741,14 @@ impl Walker<'_> {
                 _ => None,
             })
             .collect();
-        let mut branches_are_one =
-            statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
+        // Where both values are the same one value Polars may drop the predicate, which is then
+        // met by it. Where they are the same rows or the same count it does not, and a predicate
+        // that is not as many refuses the condition as it would two values that differ.
+        let mut branches_are_one = statements.len() > 1
+            && statements.windows(2).all(|pair| pair[0] == pair[1])
+            && statements
+                .iter()
+                .all(|statement| wholly_single(statement, statement.links().len(), true));
         let mut widened = false;
         let mut unit = match expression.start() {
             Start::Call(start) => self.start_unit(start),
@@ -1785,6 +1794,9 @@ impl Walker<'_> {
                     unit,
                     widened,
                     zone,
+                    after_a_range: at == 0
+                        && matches!(expression.start(), Start::Call(start)
+                            if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments)),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -1995,6 +2007,7 @@ impl Walker<'_> {
             unit,
             widened,
             zone,
+            after_a_range,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2448,6 +2461,20 @@ impl Walker<'_> {
                 },
             );
         }
+        // Polars cannot extract the length that cuts a range or a repeat from a number below nothing.
+        if after_a_range
+            && let Some(said) = cut_below_nothing(link)
+            && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         let receiver_taken = match &cur {
             Cur::Value { taken, .. } => *taken,
             _ => Taken::default(),
@@ -2820,6 +2847,21 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     broadcasts(entry, name)
 }
 
+/// Why a method that cuts the values it follows may not cut a range or a repeat by what it is
+/// given, where it is a number typed in below nothing: how many values the first, the last and
+/// `limit` keep, and the length of a slice.
+fn cut_below_nothing(link: &Call) -> Option<String> {
+    let parameter = match link.entry().id().as_str() {
+        "Expr.head" | "Expr.limit" | "Expr.tail" => "n",
+        "Expr.slice" => "length",
+        _ => return None,
+    };
+    let number = whole_number(link, parameter).filter(|number| *number < 0)?;
+    Some(format!(
+        "a range or a repeat cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from it"
+    ))
+}
+
 /// A whole number the call is given for `parameter`, typed in, where it is one.
 fn whole_number(link: &Call, parameter: &str) -> Option<i64> {
     match link.argument(parameter)? {
@@ -3150,6 +3192,10 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
         }
         Start::Call(start) if start.entry().id().as_str() == "polars.when" => {
             single(start) && links.iter().all(single)
+        }
+        // A range or a repeat is a count of values, and is none of one value whatever it is given.
+        Start::Call(start) if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments) => {
+            false
         }
         // A function that makes a moment of what it is given is one value where each of them is.
         Start::Call(start) if takes_expressions(start) => single(start) && links.iter().all(single),

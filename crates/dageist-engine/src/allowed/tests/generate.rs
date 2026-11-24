@@ -219,6 +219,22 @@ fn argument_expression(
     } else if (entry, parameter) == ("polars.repeat", "value") && dtype == Representative::Null {
         // A null is the one value of the dtype Null, which no number casts to.
         null_of(&dtype.dtype())
+    } else if (entry, parameter) == ("polars.repeat", "value")
+        && matches!(
+            dtype,
+            Representative::ListOfInteger
+                | Representative::ListOfString
+                | Representative::Array
+                | Representative::Struct
+        )
+    {
+        // No number casts to a list, an array or a struct, and Polars repeats a value of each: the
+        // first value of a column of the dtype is one value of it.
+        method(
+            super::build::entry("Expr.first"),
+            column(scope.argument),
+            Vec::new(),
+        )
     } else if SCALAR_ONLY.contains(&(entry, parameter))
         || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
     {

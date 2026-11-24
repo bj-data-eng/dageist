@@ -56,7 +56,7 @@
 #   parameter-takes-one-value: a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
-#   range-is-valid: a range or a repeat typed in must be one Polars can make: a step above nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, and a number of values that is not below nothing.
+#   range-is-valid: a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and no length below nothing to cut it by.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #   time-zone-is-valid: a time zone must be one Polars reads.
 #   values-meet-in-count: the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal.

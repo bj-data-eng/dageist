@@ -704,8 +704,8 @@ Every bound, the number of samples, the value and the number of times are read b
 is one before the rows run: the rows, a count of values and the one value that `head` took of one value are all refused
 with "non-scalar start passed" or "must be a scalar value", which the rule `parameter-takes-one-value` says. The tables
 measure each with the number 1 of its dtype, as they do `shift`'s count. A range takes the numbers and, where Polars does,
-the dates, moments and times of day; `repeat` takes a value of any dtype that one number casts to, and the tables refuse a
-list, an array and a struct, which they cannot make of a number, though Polars repeats them.
+the dates, moments and times of day; `repeat` takes a value of any dtype, a list, an array and a struct included, which
+the tables measure with the first value of a column of that dtype where no number casts to it.
 
 How many values the call gives is worked out where the arguments that decide it are typed in: a whole number written
 out, or a date, a moment or a time of day made of numbers written out with `polars.date`, `datetime` and `time`. A
@@ -716,7 +716,8 @@ column, an aggregate or any other chain is not, and the count is then not known.
   its step is none, and a step past the end is one. A step of nothing is refused, and so is a bound that the dtype does not
   hold: 300 is no `UInt8`, and Polars refuses it of a range that is empty too.
 - `linear_space` and `repeat` give as many values as the number of samples and the number of times: none for 0, and a
-  number below nothing is refused.
+  number below nothing is refused. A range or a repeat that is cut by `head`, `tail`, `limit` or a slice's length of a number below
+  nothing is refused too, for Polars cannot extract the length from it: "unable to extract length".
 - The dates, moments and times of day of `date_range`, `datetime_range` and `time_range` are counted by Polars, which the
   engine asks with the arguments typed in, as it asks of a duration: how many months fit between two dates, the last day
   of a month, a clock put back or forward in a time zone and a range counted in nanoseconds are Polars' to say. A range of
@@ -736,11 +737,16 @@ Some of what the editor refuses Polars takes, on purpose:
 
 - An interval of nothing or below nothing is refused whatever the bounds are, though Polars gives no values where the end is
   before the start and refuses it only where it is not: the editor is strict where the data decide.
-- A count of exactly one beside the rows is refused, as `values-meet-in-count` says of every count. The streaming engine,
-  which a step runs on, broadcasts it where Python's in-memory engine refuses it.
+- A count of exactly one beside the rows, an operand, a fill, an exponent or a share is refused, as `values-meet-in-count`
+  and `parameter-takes-one-value` say of every count. The streaming engine, which a step runs on, broadcasts it where
+  Python's in-memory engine refuses it. A test pins one case of each.
 
 What the rows hold is not known to the editor: a bound that holds a null, a text that is no number given as the number of
 samples, and a number below nothing that a time of day is made of are refused when the rows run.
+
+A condition whose two values are the same one value may have its predicate dropped by Polars, so it is not judged; where they
+are the same rows or the same count, as a range is, the predicate is met by them as by any two values, and a condition
+whose predicate is not as many is refused.
 
 A range is a count and not one value: the rule `window-input-is-not-counted` refuses it in a window, and a join's key or a
 sort key takes it only where the table of counts says so. Python's `*_ranges` functions, which give a list for each row,
