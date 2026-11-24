@@ -5457,6 +5457,38 @@ mod tests {
         }
         // The text is the cast's only where it follows the values: another call between them, or
         // before the cast, or another cast, is the sample's.
+        // A fill with a null of text gives the numbers the dtype text as a cast does.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--text-made-of-the-numbers-of-a-group--by-a-fill.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        let fill_text = || {
+            call(
+                "Expr.fill_nan",
+                vec![(
+                    "value",
+                    Value::Expression(chain_of(text_of("1d"), Vec::new())),
+                )],
+            )
+        };
+        let filled = chain_after(
+            Representative::Int8,
+            vec![fill_text(), call("Expr.skew", Vec::new())],
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&filled, at_the_call(1), text),
+            vec![Limit::AGroupAggregate]
+        );
+        let filled_dates = chain_after(
+            Representative::Date,
+            vec![fill_text(), call("Expr.skew", Vec::new())],
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&filled_dates, at_the_call(1), text),
+            vec![]
+        );
         let numbers = Representative::Int8;
         let reversed = chain_after(
             numbers,
