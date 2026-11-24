@@ -111,6 +111,9 @@ fn with_another_count(call: &Call) -> Option<Call> {
         Counting::AtMost(name) => vec![(name, 2)],
         Counting::EveryNth => vec![("n", 2), ("offset", 0)],
         Counting::FromAPlace => vec![("offset", 0), ("length", 2)],
+        // A value repeated the number of times it is told to: the other ranges are made by bounds
+        // and a step, which a typed number alone does not make another.
+        Counting::TheArguments if entry.id().as_str() == "polars.repeat" => vec![("n", 2)],
         _ => return None,
     };
     let mut given: Vec<(&str, Value)> = call
@@ -304,6 +307,14 @@ mod tests {
             (
                 "by-design-a-count-by-chance-in-a-sort-key-that-is-one-value.case",
                 "on twelve rows",
+            ),
+            (
+                "by-design-an-every-nth-value-from-a-place-by-chance.case",
+                "with the number of each count made 2",
+            ),
+            (
+                "by-design-a-value-repeated-once.case",
+                "with the number of each count made 2",
             ),
         ] {
             let case = kept(name);
