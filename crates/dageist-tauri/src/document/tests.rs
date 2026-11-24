@@ -569,3 +569,27 @@ fn two_writers_on_one_revision_make_one_edit_and_the_other_is_stale() {
     assert_eq!(held["revision"], 2);
     assert_eq!(held["document"]["steps"].as_array().map(Vec::len), Some(1));
 }
+
+#[test]
+fn a_host_starts_at_a_revision_that_no_other_lifetime_of_it_does() {
+    // A page that outlives its host holds a revision of that host. If every host started at the
+    // same revision, the next one could be at it, and an edit made on the old document would
+    // land on the new one as if nothing had changed.
+    let first = Documents::sample().expect("the sample's documents");
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let second = Documents::sample().expect("the sample's documents");
+
+    let (first, second) = (
+        state(&first)["revision"].as_u64(),
+        state(&second)["revision"].as_u64(),
+    );
+
+    let (first, second) = (
+        first.expect("a whole number"),
+        second.expect("a whole number"),
+    );
+    assert_ne!(first, second);
+    assert!(first > 1 && second > first);
+    // A number the view can hold exactly.
+    assert!(second < 1 << 53);
+}
