@@ -2965,19 +2965,20 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// a column of numbers may not be given where a literal of text was, the case is asked again cut
 /// after the quantile, so that the column stands in for the literal and not for the dtype of what
 /// follows it; and again with a column of the literal's own dtype, which a filter reads as a
-/// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A join's keys
-/// read the column both tables hold, and other places the column `k`. The cut control leaves a
-/// gap: a refusal of a call after the quantile that Polars would give is not seen.
+/// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
+/// join's keys read the column both tables hold, and other places the column `k`. The cut control
+/// leaves a gap: a refusal of a call after the quantile that Polars would give is not seen.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
     let own = std::cell::Cell::new(None);
     let recording = |expression: &Expression| {
         let found = is_an_approximate_quantile_of_literals(expression);
-        if found && own.get().is_none() {
-            if let Start::Call(start) = expression.start() {
-                own.set(column_of_the_dtype_of(start));
-            }
+        if found
+            && own.get().is_none()
+            && let Start::Call(start) = expression.start()
+        {
+            own.set(column_of_the_dtype_of(start));
         }
         found
     };
@@ -5766,8 +5767,8 @@ mod tests {
             )],
         );
         let shifted_by = |n: i64| call("Expr.shift", vec![("n", Value::Expression(whole(n)))]);
-        // A shift by none leaves the value, and the call after it meets it, which another limit, for
-        // the parts of a date, may excuse as it does the number 0.
+        // A shift by none leaves the value, and the call after it meets it, which another limit,
+        // for the parts of a date, may excuse as it does the number 0.
         for (n, leaves_a_null) in [(1, true), (-1, true), (2, true), (0, false)] {
             let case = pivot(chain_of(counted(), vec![shifted_by(n), replacing.clone()]));
             assert_eq!(
