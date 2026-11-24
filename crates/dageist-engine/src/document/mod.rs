@@ -39,10 +39,8 @@
 //! says so.
 //!
 //! An edit names where it is made by a [`Place`], as reports and offers name
-//! places: a step by its number and, if it has one, its identifier, which an
-//! edit checks against the step, so that a place made for an earlier document
-//! is refused and not applied to another step; then the way down through the
-//! step's arguments. The segments mean:
+//! places: a step by its number and, if it has one, its identifier; then the
+//! way down through the step's arguments. The segments mean:
 //!
 //! - [`Segment::Parameter`]: the argument given for a parameter of the call
 //!   the way has come to, which is the step's own at first;
@@ -51,6 +49,44 @@
 //!   of pairs;
 //! - [`Segment::Start`] and [`Segment::Link`]: the call an expression starts
 //!   with, and one of the links after it.
+//!
+//! ## What a place does not guard against
+//!
+//! An edit checks the identifier a place carries against the step at the
+//! place's number, and refuses a place made for another document with
+//! [`EditProblem::StepChanged`] when they differ. That catches a step that was
+//! moved, or taken away so that another took its number. It does not catch:
+//!
+//! - **A reused identifier.** An identifier is made from the entry's name, and
+//!   a name is free again once a step is taken away: a document where a `sort`
+//!   was removed and another added gives the new step the identifier `sort`. A
+//!   place made for the old step then names the new one, and the check passes.
+//! - **A place with no identifier.** [`Place::of_step`] given `None` is checked
+//!   against the step's number alone.
+//! - **A way that leads somewhere else.** The way down through the arguments is
+//!   followed as it stands. It is refused where it leads nowhere
+//!   ([`EditProblem::Nothing`], [`EditProblem::DoesNotFit`]), but not where
+//!   what it leads to is another item, argument or link than the one it was
+//!   made for.
+//!
+//! A host guards against stale places by keeping a revision of the document
+//! with each edit it makes, and refusing an edit that was made against an older
+//! revision, before it asks the engine for the edit. The identifier check is a
+//! second guard, not a replacement for it.
+//!
+//! ## Edits that go together
+//!
+//! One action of a view can be more than one edit, made one after another on
+//! the document each gives: picking another table for a join is
+//! [`set_argument`](Document::set_argument) of `other` and then of `right_on`,
+//! which starts from a field of the new table, and a switch of the comparison
+//! of a test that also changes what it is compared with is
+//! [`swap_link`](Document::swap_link) and then [`set_argument`](Document::set_argument)
+//! of the link's `other`. Each edit is checked on its own, so a document
+//! between two of them is a document the reader reads, with a step that the
+//! report may say is incomplete or refused.
+//!
+//! ## The edits
 //!
 //! | Edit | Methods |
 //! | --- | --- |

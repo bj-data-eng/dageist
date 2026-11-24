@@ -1193,8 +1193,11 @@ made on the model: the calls, expressions and steps on the way to what is change
 are made again with their constructors, so the model checks an edit as it is made
 and the document an edit gives reads back as the same document. An edit names where
 it is made as offers and reports name places, a step by its number and its
-identifier, which an edit checks so that a place from an earlier document is refused,
-then the way through the step's arguments. What the engine decides a new part starts
+identifier, then the way through the step's arguments. The check of the identifier
+refuses a place whose step has changed, but not one whose identifier a later step reused
+or one made with none, so a host also keeps a revision of the document with each edit
+and refuses an edit made against an older one. One action of a view can be several
+edits one after another, such as a join's table and then its right keys. What the engine decides a new part starts
 with, a step, a link of an expression, an option or a test of a condition, comes
 from the catalogue's starts and the tables of allowed combinations, so no host or
 view repeats it. An edit may leave a step incomplete, with a hole, or refused, with

@@ -68,7 +68,9 @@ pub enum EditProblem {
     },
     /// The place names a step by an identifier the step at its number does not
     /// have, so the place is out of date: the document changed since it was
-    /// made.
+    /// made. A place is not out of date to the check where the step now at its
+    /// number has the same identifier, or where it names no identifier; see
+    /// [`Document`](super::super::Document) for what it does not guard against.
     StepChanged {
         /// The identifier of the step that is there now.
         found: StepId,
