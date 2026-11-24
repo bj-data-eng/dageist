@@ -326,8 +326,9 @@ pub enum Limit {
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
     /// table's rows or another expression's values. The tables measure the two in a context on
     /// a column that holds no null, where they drop nothing: how many values a column has is for
-    /// its rows to say. Polars refusing the rows, with a reason about lengths that has no place,
-    /// in a case with a `drop_nulls` or a `drop_nans`: the case run again with each of them
+    /// its rows to say. Polars refusing the rows, with a reason about lengths that has no place
+    /// (a replacement's `default` of other length than its input is one), in a case with a
+    /// `drop_nulls` or a `drop_nans`: the case run again with each of them
     /// made a call that fills nulls forward, which keeps every value, is not refused for lengths.
     ADropChangesTheLengths,
     /// A window evaluates what it follows once for each group, and what a replacement lists as
@@ -3309,9 +3310,19 @@ fn refused_for_lengths_without_drops(case: &Case) -> Option<bool> {
 /// What a replacement is refused with when what replaces it has fewer values than what it replaces.
 const NEW_AS_LONG_AS_OLD: &str = "must have the same length as `old`";
 
+/// What a replacement is refused with when its default has neither as many values as its input nor
+/// one.
+const DEFAULT_AS_LONG_AS_INPUT: &str = "must have the same length as the input or have length 1";
+
+/// Whether the reason is one of the two a replacement is refused with for a number of values.
+fn is_a_replacement_count(reason: &str) -> bool {
+    reason.contains(NEW_AS_LONG_AS_OLD) || reason.contains(DEFAULT_AS_LONG_AS_INPUT)
+}
+
 /// Whether Polars refuses the case for the reason given still when no call drops: for the words of
-/// a replacement that it be given as many values as it replaces, those words, and not another
-/// refusal about lengths, which a fill in place of the drop may meet for its own reasons.
+/// a replacement that it be given as many values as it replaces, or that its default be as many
+/// as its input or one, those words, and not another refusal about lengths, which a fill in
+/// place of the drop may meet for its own reasons.
 fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<bool> {
     changed(case_without_drops(case), case).map(|control| {
         (0..RUNS).any(|_| {
@@ -3319,6 +3330,8 @@ fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<boo
                 unplaced(&refusal)
                     && if reason.contains(NEW_AS_LONG_AS_OLD) {
                         refusal.reason.contains(NEW_AS_LONG_AS_OLD)
+                    } else if reason.contains(DEFAULT_AS_LONG_AS_INPUT) {
+                        refusal.reason.contains(DEFAULT_AS_LONG_AS_INPUT)
                     } else {
                         is_lengths(&refusal.reason)
                     }
@@ -4568,7 +4581,7 @@ fn applies(
             // a drop makes fewer where the rows hold a null: that is a refusal about lengths here
             // and is not one for the rows' own, which the drop's control shows.
             unplaced(refusal)
-                && (is_lengths(&refusal.reason) || refusal.reason.contains(NEW_AS_LONG_AS_OLD))
+                && (is_lengths(&refusal.reason) || is_a_replacement_count(&refusal.reason))
                 && held.iter().any(|(_, held)| any_call(held, &is_a_drop))
                 && refused_for_lengths_without_drops_as(case, &refusal.reason) == Some(false)
         }
@@ -12275,7 +12288,36 @@ mod tests {
             ),
             vec![Limit::ADropChangesTheLengths]
         );
-        // Without a drop the lengths are the rows' own.
+        // Without a drop nothing excuses it: a default of another length than the input, as the
+        // first two rows or the distinct values of a column are, is a refusal the tables do not
+        // see, and the limit for the rows' lengths does not take these words.
+        let aside = |default: Expression| {
+            let case = replaced(default);
+            (
+                refused_for_a_bound(&case, None, Stage::Rows, reason),
+                excused_by(&case),
+            )
+        };
+        let first_two = chain_of(
+            column("b"),
+            vec![call("Expr.head", vec![("n", Value::Expression(whole(2)))])],
+        );
+        let kept_where_f = chain_of(
+            column("b"),
+            vec![call(
+                "Expr.filter",
+                vec![("predicates", many(vec![chain(column("f"), &[])]))],
+            )],
+        );
+        for default in [
+            first_two,
+            chain(column("b"), &["Expr.unique"]),
+            kept_where_f,
+        ] {
+            let (said, found) = aside(default);
+            assert_eq!(said, vec![]);
+            assert_eq!(found, vec![]);
+        }
         assert_eq!(
             refused_for_a_bound(
                 &replaced(chain(column("b"), &["Expr.nan_max"])),
