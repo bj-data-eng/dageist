@@ -451,7 +451,8 @@ pub enum Limit {
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
     /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
-    /// literals alone make, which is one value, where it stands in a value of a branch of a
+    /// literals alone make, or of a value that it folds into a null literal (a comparison or an
+    /// arithmetic given the null literal, such as `mean() >= null`), which is one value, where it stands in a value of a branch of a
     /// condition, or in the predicate of a `when` after the first, with the reason that the
     /// quantile holds a null. It meets it in a select, a filter, a sort key, a join key, a window,
     /// the predicate of the first `when`, and on a column in the condition. The tables measured the
@@ -461,8 +462,9 @@ pub enum Limit {
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
     /// follows the quantile, cut after the quantile it is allowed, or with a column of the
-    /// literal's own dtype for each quantile, which a filter's rule asks for. The cut control
-    /// leaves a gap: a refusal of a call after the quantile that Polars would give the case once
+    /// literal's own dtype for each quantile, which a filter's rule asks for. For a quantile that
+    /// follows a fold the case is asked with every such fold left out, which the other controls
+    /// are then made of. The cut control leaves a gap: a refusal of a call after the quantile that Polars would give the case once
     /// the quantile is no longer refused is not seen, for what follows the quantile is not asked
     /// of the column.
     AnApproximateQuantileOfALiteralInACondition,
@@ -675,7 +677,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::AnApproximateQuantileOfALiteralInACondition => {
-                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make or that it folds into a null literal, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
@@ -2938,6 +2940,22 @@ fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
             .any(|link| is(link, "Expr.approx_quantile"))
 }
 
+/// Whether the chain takes an approximate quantile of a value that Polars folds into a null
+/// literal: a link before the quantile is a comparison or an arithmetic given the null literal.
+fn is_an_approximate_quantile_of_a_fold(expression: &Expression) -> bool {
+    let links = expression.links();
+    links.iter().enumerate().any(|(at, link)| {
+        is(link, "Expr.approx_quantile") && links[..at].iter().any(compares_with_a_null)
+    })
+}
+
+/// Whether the chain takes an approximate quantile that Polars reads as null where it stands in a
+/// condition: of a value that literals alone make, or of one it folds into a null literal.
+fn is_a_null_quantile_receiver(expression: &Expression) -> bool {
+    is_an_approximate_quantile_of_literals(expression)
+        || is_an_approximate_quantile_of_a_fold(expression)
+}
+
 /// Whether the call is where a condition's values and later predicates are evaluated together: a
 /// value of a branch, or the predicate of a `when` that follows another. The predicate of the
 /// first `when` is not.
@@ -2983,7 +3001,9 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 
 /// Whether Polars refuses the case, for any reason, still when each approximate quantile that
 /// starts from literals alone is a column's: the literals are then no cause, or not shown to be.
-/// `Some(false)` is a control that is allowed every time it runs. The case with the column in the
+/// `Some(false)` is a control that is allowed every time it runs. Where a quantile follows a link
+/// that Polars folds into a null literal, every such link is left out first, and what follows
+/// asks the case so. The case with the column in the
 /// literal's place is asked first, and where that is refused for what follows the quantile, which
 /// a column of numbers may not be given where a literal of text was, the case is asked again cut
 /// after the quantile, so that the column stands in for the literal and not for the dtype of what
@@ -2996,7 +3016,18 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// `Boolean` one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case
 /// start from, and so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
-    let step = &case.document.steps()[0];
+    // Where a quantile follows a value that Polars folds into a null literal, no column stands in
+    // for a literal there: the control leaves every such fold out, which is what the column of
+    // each other control is made of.
+    let folded = operands(case.document.steps()[0].call())
+        .into_iter()
+        .any(|(_, held)| holds_in_a_branch(held, &is_an_approximate_quantile_of_a_fold));
+    let base = if folded {
+        case_without_folds(case)?
+    } else {
+        case.clone()
+    };
+    let step = &base.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
     // The columns of numbers that stand in: a join's keys read the columns both tables hold, `u`
     // and `key`, and the other keys of the join may be named for one of them, which a join
@@ -3022,8 +3053,8 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
         )
         .ok()?;
         let control = Case {
-            receiver: case.receiver,
-            argument: case.argument,
+            receiver: base.receiver,
+            argument: base.argument,
             document: Document::new(vec![rebuilt]).ok()?,
         };
         changed(Some(control), case)
@@ -4316,9 +4347,9 @@ fn applies(
             unplaced(refusal)
                 && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains(A_NULL_QUANTILE)
-                && held.iter().any(|(_, held)| {
-                    holds_in_a_branch(held, &is_an_approximate_quantile_of_literals)
-                })
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_in_a_branch(held, &is_a_null_quantile_receiver))
                 && refused_with_columns_for_a_quantile(case) == Some(false)
         }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
@@ -10132,9 +10163,26 @@ mod tests {
             ),
             vec![]
         );
-        // Where the case is refused without the fold too, for the quantile of text, which Polars
-        // does not take, the fold is no reason it is.
-        assert_eq!(folded(column("g"), true), vec![]);
+        // Where the case is refused without the fold too, for the count of the characters of a
+        // number, the fold is no reason it is.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile_and(
+                    column("k"),
+                    vec![
+                        compared_with("Expr.add", chain(null(), &[])),
+                        call("Expr.str.len_chars", Vec::new()),
+                    ],
+                    a_share_of_one(),
+                    true,
+                    Vec::new(),
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
     }
 
     /// `when(f).then(k)` and further links, with `predicate` the predicate of the first `when`
