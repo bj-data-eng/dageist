@@ -96,9 +96,14 @@ pub(super) enum Leaf<'a> {
 
 /// `call` with the argument for `parameter` set to `value`, or taken away when
 /// that is `None`, as [`with_given_alone`] does, and the values that a parameter holds
-/// for each key kept as many as the keys when this changes how many there are: a
-/// value for each new key is the parameter's default, those for keys that are gone
-/// go, and one value for every key stays as it is.
+/// for each key kept with their keys when this changes how many keys `parameter` holds.
+///
+/// The values lie in the order of the keys, which are those of the parameter the values
+/// are for and then those of the starred parameter after it. Where `parameter` is one of
+/// the two, the values of its keys are the stretch of them that starts where its keys
+/// do: a new key holds the parameter's default, those of keys that are gone go, and the
+/// values of the keys of the other stay where they were. One value for every key stays
+/// as it is.
 pub(super) fn with_given(
     call: &Call,
     parameter: &str,
@@ -109,22 +114,27 @@ pub(super) fn with_given(
         let Shape::PerItem(of) = follower.shape() else {
             continue;
         };
-        let keys = made.key_count(of);
-        if call.key_count(of) == keys {
+        let Some(offset) = call.key_offset(of, parameter) else {
+            continue;
+        };
+        let (was, now) = (call.items_of(parameter), made.items_of(parameter));
+        if was == now {
             continue;
         }
         let Some(Value::Many(values)) = made.argument(follower.name()) else {
             continue;
         };
-        let mut values = values.clone();
-        values.truncate(keys);
-        if values.len() < keys {
-            let Some(default) = default_value(follower) else {
-                continue;
-            };
-            values.resize(keys, default);
-        }
-        made = with_given_alone(&made, follower.name(), Some(Value::Many(values)))?;
+        let Some(default) = default_value(follower) else {
+            continue;
+        };
+        let start = offset.min(values.len());
+        let end = (offset + was).min(values.len());
+        let mut own = values[start..end].to_vec();
+        own.resize(now, default);
+        let mut spliced = values[..start].to_vec();
+        spliced.extend(own);
+        spliced.extend_from_slice(&values[end..]);
+        made = with_given_alone(&made, follower.name(), Some(Value::Many(spliced)))?;
     }
     Ok(made)
 }

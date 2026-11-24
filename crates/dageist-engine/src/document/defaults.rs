@@ -74,7 +74,7 @@ impl Call {
 
     /// How many items the parameter `name` holds: those of a list, one for any
     /// other argument, and none when it is not given.
-    fn items_of(&self, name: &str) -> usize {
+    pub(super) fn items_of(&self, name: &str) -> usize {
         match self.argument(name) {
             Some(Value::Many(items)) => items.len(),
             Some(_) => 1,
