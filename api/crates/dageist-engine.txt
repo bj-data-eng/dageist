@@ -29,8 +29,7 @@ pub dageist_engine::allowed::Count::AtMost(u64)
 pub dageist_engine::allowed::Count::Exactly(u64)
 pub dageist_engine::allowed::Count::NotKnown
 impl dageist_engine::allowed::Count
-pub const fn dageist_engine::allowed::Count::may_equal(self, other: Self) -> bool
-pub const fn dageist_engine::allowed::Count::meeting(self, other: Self) -> Self
+pub const fn dageist_engine::allowed::Count::meeting(self, other: Self) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Count::most(self) -> core::option::Option<u64>
 impl core::fmt::Display for dageist_engine::allowed::Count
 pub fn dageist_engine::allowed::Count::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -401,7 +400,6 @@ pub dageist_engine::catalog::Counting::TheCondition
 pub dageist_engine::catalog::Counting::TheData
 pub dageist_engine::catalog::Counting::TheRowsLess(&'static str)
 impl dageist_engine::catalog::Counting
-pub const fn dageist_engine::catalog::Counting::keeps_one_value(self) -> bool
 pub fn dageist_engine::catalog::Counting::of(entry: &dageist_engine::catalog::Entry, options: &[(&str, &str)]) -> core::option::Option<Self>
 pub enum dageist_engine::catalog::DefaultValue
 pub dageist_engine::catalog::DefaultValue::Empty
