@@ -16,20 +16,26 @@
 //!   takes, and the values of a table that are unchanged, are then neither the rows nor one value;
 //! - four rows that tie, the second and third twice: the values that differ and the values that
 //!   occur most are then two, where the sample's columns leave one value, or all of them;
-//! - the number of `head(n)`, `top_k`, `gather_every` and `slice` made 2 values, which is neither
-//!   one value, which Polars broadcasts, nor the three rows.
+//! - the number of `head`, `tail`, `limit`, `top_k`, `bottom_k`, `gather_every`, `slice` and
+//!   `repeat` made 2 values, which is neither one value, which Polars broadcasts, nor the three
+//!   rows.
+//!
+//! Every control changes every count the case holds, so it is asked of one count only: of the
+//! item of the step that holds the refused place, and of nothing where that holds a count in more
+//! than one place (a count in a chain and one in an expression a call of it is given), or none.
+//! Another count's refusal for lengths says nothing of the refused one's.
 //!
 //! A refusal that stays when the count differs is not this: a sort key that Polars drops for
 //! being one value, and a part it folds, are allowed with any rows, which the probes ask about
 //! apart from the case.
 
 use dageist_engine::catalog::{self, Counting};
-use dageist_engine::document::{Call, Expression, Start, Value};
+use dageist_engine::document::{Call, Document, Expression, Segment, Start, Step, Value};
 
 use super::case::Case;
 use super::limits::{case_changed, changed};
 use super::observe::{Rows, Tables, observe, observe_probe};
-use super::predict::{Refused, Source};
+use super::predict::{Refused, Source, Verdict, predict};
 use super::probe::{counts_alone, is_a_count_that_may_not_end, is_a_refusal_of_lengths};
 
 /// What the outcome of a case says where the tables refuse a count that Polars allows because the
@@ -167,28 +173,134 @@ fn refused_for_lengths_once_the_count_is_another(case: &Case) -> Option<Settled>
     })
 }
 
+/// Whether the call decides a count of values that the data or the arguments make: a method
+/// that takes some of the values it follows, the values that differ or occur most, a range, and
+/// the test for membership, whose count follows the dtype of the values it is given.
+fn is_counting(call: &Call) -> bool {
+    let options: Vec<(&str, &str)> = call
+        .arguments()
+        .iter()
+        .filter_map(|given| match given.value() {
+            Value::Choice(word) => Some((given.parameter(), word.as_str())),
+            _ => None,
+        })
+        .collect();
+    Counting::of(call.entry(), &options).is_some() || call.entry().id().as_str() == "Expr.is_in"
+}
+
+/// The expressions a value holds, at any depth of lists and pairs.
+fn expressions_of(value: &Value) -> Vec<&Expression> {
+    match value {
+        Value::Expression(expression) => vec![expression],
+        Value::Many(items) => items.iter().flat_map(expressions_of).collect(),
+        Value::Pairs(pairs) => pairs
+            .iter()
+            .flat_map(|(key, entry)| expressions_of(key).into_iter().chain(expressions_of(entry)))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// How many places an expression holds a count in: the chain it is, where any call of it, of its
+/// start and its links, counts, since what follows a count is made of it and the chain gives one
+/// count, and each expression a call of it is given, for that is a count of its own, meeting the
+/// chain's.
+fn counting_places_in(expression: &Expression) -> usize {
+    let calls: Vec<&Call> = match expression.start() {
+        Start::Call(start) => std::iter::once(start).chain(expression.links()).collect(),
+        Start::Input(_) | Start::Hole => expression.links().iter().collect(),
+    };
+    usize::from(calls.iter().any(|call| is_counting(call)))
+        + calls
+            .iter()
+            .flat_map(|call| call.arguments())
+            .flat_map(|given| expressions_of(given.value()))
+            .map(counting_places_in)
+            .sum::<usize>()
+}
+
+/// How many places the step of the case holds a count in, in all the expressions it is given.
+fn counting_places(case: &Case) -> usize {
+    case.document.steps()[0]
+        .call()
+        .arguments()
+        .iter()
+        .flat_map(|given| expressions_of(given.value()))
+        .map(counting_places_in)
+        .sum()
+}
+
+/// The case with the step holding only the item of its list that holds the refused place, where
+/// the step takes a list of expressions that stand alone: the other items are other expressions,
+/// and the counts they hold are not the refused one's. A join's keys are paired, so they stay.
+fn only_the_item(case: &Case, refused: &Refused) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let call = step.call();
+    let [Segment::Parameter(name), Segment::Item(at), ..] = refused.place.path() else {
+        return Some(case.clone());
+    };
+    let Some(Value::Many(items)) = call.argument(name) else {
+        return Some(case.clone());
+    };
+    if items.len() < 2 || call.entry().id().as_str() == "LazyFrame.join" {
+        return Some(case.clone());
+    }
+    let kept = Value::Many(vec![items.get(*at)?.clone()]);
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| {
+            let value = if given.parameter() == name {
+                kept.clone()
+            } else {
+                given.value().clone()
+            };
+            (given.parameter(), value)
+        })
+        .collect();
+    let rebuilt = Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![Step::new(step.id().clone(), rebuilt).ok()?]).ok()?,
+    })
+}
+
+/// Whether the case holds a count in one place, Polars allows it on the sample's rows, and the
+/// tables refuse it for a count: the case a control may ask of the count that was refused.
+fn is_asked_of_one_count(case: &Case) -> bool {
+    counting_places(case) == 1
+        && observe(case).refusal.is_none()
+        && matches!(&predict(case).verdict, Verdict::Refuses(refused) if is_a_count_refusal(refused))
+}
+
 /// Whether the tables' refusal of a count that Polars allows is by design, shown by Polars
 /// refusing the case for lengths where the count is no longer the rows or one value by chance:
 /// on more rows, on rows that tie, or with the number that decides each count typed in made 2.
-/// Where Polars drops the part in the case, as a sort key of one value, it is the part alone,
-/// allowed on the sample's rows, that is asked the same. `None` where the tables' refusal is not
-/// of a count, or Polars allows the case then too, panics on it, or refuses it for another reason
-/// than lengths.
+/// A control changes every count the case holds, so it is asked of the item of the step that holds
+/// the refused place, and of nothing where that holds a count in more than one place, or none,
+/// or Polars refuses it on the sample's rows, or the tables do not refuse it for a count: another
+/// count's refusal for lengths is no sign of the refused one's. Where Polars drops the part in the
+/// case, as a sort key of one value, it is the part alone, allowed on the sample's rows and holding
+/// one count, that is asked the same. `None` where the tables' refusal is not of a count, or
+/// Polars allows the case then too, panics on it, or refuses it for another reason than lengths.
 pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     if !is_a_count_refusal(refused) {
         return None;
     }
-    refused_for_lengths_once_the_count_is_another(case).or_else(|| {
-        counts_alone(case, refused)
-            .iter()
-            // A part that Polars refuses on the sample's rows is no count by chance.
-            .filter(|alone| observe(alone).refusal.is_none())
-            .find_map(refused_for_lengths_once_the_count_is_another)
-            .map(|settled| Settled {
-                control: settled.control,
-                reason: format!("{}, of the part alone", settled.reason),
-            })
-    })
+    only_the_item(case, refused)
+        .filter(is_asked_of_one_count)
+        .and_then(|item| refused_for_lengths_once_the_count_is_another(&item))
+        .or_else(|| {
+            counts_alone(case, refused)
+                .iter()
+                .filter(|alone| counting_places(alone) == 1 && observe(alone).refusal.is_none())
+                .find_map(refused_for_lengths_once_the_count_is_another)
+                .map(|settled| Settled {
+                    control: settled.control,
+                    reason: format!("{}, of the part alone", settled.reason),
+                })
+        })
 }
 
 #[cfg(test)]
