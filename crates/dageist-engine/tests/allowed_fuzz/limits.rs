@@ -853,8 +853,8 @@ fn is_a_fill_with_text(call: &Call) -> bool {
 }
 
 /// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
-/// columns that are all of the dtype Null and only compare them, do arithmetic with them, pick one
-/// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables
+/// columns that are all of the dtype Null and only compare them, do arithmetic with them, cast them, pick
+/// one of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables
 /// measured the values of a column that holds some.
 fn leaves_nulls_of_a_column_of_nulls(
     frames: &Frames,
@@ -880,7 +880,8 @@ fn leaves_nulls_of_a_column_of_nulls(
             carries_nulls(id)
                 || matches!(
                     id,
-                    "Expr.first"
+                    "Expr.cast"
+                        | "Expr.first"
                         | "Expr.last"
                         | "Expr.min"
                         | "Expr.max"
