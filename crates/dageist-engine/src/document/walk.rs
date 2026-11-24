@@ -1077,8 +1077,10 @@ impl Walker<'_> {
         })
     }
 
-    /// The names of two zones of the values a condition has when this link ends it, where both are
-    /// known and they differ: Polars finds no dtype that the moments of two zones have in common.
+    /// The names of two zones of the values a condition has when this link gives it a value after
+    /// the first, where both are known and they differ: Polars finds no dtype that the moments of
+    /// two zones have in common, and meets the values where it works out the schema, so a `then` of
+    /// a chain is refused as an `otherwise` is, and a condition that has none is refused too.
     fn condition_zone_clash(
         &self,
         entry: &Entry,
@@ -1087,7 +1089,7 @@ impl Walker<'_> {
     ) -> Option<(String, String)> {
         if !matches!(
             entry.id().as_str(),
-            "Then.otherwise" | "ChainedThen.otherwise"
+            "ChainedWhen.then" | "Then.otherwise" | "ChainedThen.otherwise"
         ) {
             return None;
         }
