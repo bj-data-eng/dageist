@@ -471,7 +471,8 @@ gives and what no arguments make of it; its expression parameters that Polars re
 `reading_one_value`, and the generator of the tables lists them in `SCALAR_ONLY`. The
 generator of the tables then writes `counted` for it in the dtype and option tables, whatever three rows give, and
 measures its context going on to one value. The fuzz target draws such a method, and such a function, only where
-`DAGEIST_FUZZ_FOCUS` names it, until every shape of a count that the catalogue is to have exists.
+`DAGEIST_FUZZ_FOCUS` names it: a campaign without a focus that draws them finds counts that no control settles, as
+[the explanation](explanation.md#what-the-tables-are-checked-against) lists.
 A new step of a table also needs what a new step starts with, in `start_step` in
 `crates/dageist-engine/src/catalog/starting.rs`, and, where it has a flag or a choice, what the generator
 of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.
@@ -736,6 +737,19 @@ Polars by hand, and decide which it is:
   without the cause is evaluated: `allowed_fuzz/masks.rs` holds each cause with a
   case that differs from it in that alone, so that a part is not settled where the
   cause is not there.
+- **A count that is the rows or one value by chance**: the tables refuse a count of values that
+  the data or the arguments decide (the rules `values-meet-in-count` and `window-input-is-not-counted`,
+  or `it cannot end here` for a count), and Polars allows the step because the count is the table's
+  rows, or one value, as `head(10)` of three rows or `mode` of a column with one most common value is.
+  The target settles it by itself: it reduces the step to the one item that holds the refused place, runs
+  that item again on twelve rows, on four rows that tie, and with the number that decides its count made 2,
+  and counts the case as stricter by design where Polars refuses one of them for lengths. An item with
+  counts in more than one place settles nothing, so report it. A sort key of one value that Polars drops is asked by the probe above,
+  where the part alone is refused for lengths, and a part dropped whose count is by chance is asked of
+  the part apart from the case. Keep such a case as `regressions/by-design-<what it shows>.case`, which
+  the normal run replays and expects to say so. A count that stays the rows with any rows, as the values
+  that occur most of the places that sort a column, is no case of this: report it, for the walk could
+  know it.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
   nulls that the sample's rows leave), which the probes do not show: add or

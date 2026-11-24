@@ -1,0 +1,2 @@
+{"a":"Date","b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.limit","arguments":{}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}},{"entry":"Expr.sum","arguments":{}}]}}]}}}}]}

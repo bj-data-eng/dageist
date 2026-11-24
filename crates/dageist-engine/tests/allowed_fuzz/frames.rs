@@ -15,7 +15,7 @@
 use dageist_engine::allowed::Representative;
 use dageist_engine::document::Inputs;
 use polars::prelude::{
-    DataFrame, DataType, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
+    DataFrame, DataType, IdxCa, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
 };
 
 /// The name of the column the join's `index`th key is paired with on the other
@@ -229,6 +229,20 @@ impl Frames {
         }
     }
 
+    /// The same tables with the rows `picks` names, of the left and of the other table, in that
+    /// order and as often as they are named: a column keeps its dtype and its values, and a
+    /// count that the data or the arguments decide, as the values that differ are or the first
+    /// values are, is then no longer what three rows leave it by chance.
+    pub fn picked(self, picks: &[u32]) -> Self {
+        let indices = IdxCa::from_vec("".into(), picks.to_vec());
+        let pick = |frame: &DataFrame| frame.take(&indices).expect("the rows named are there");
+        Self {
+            rows: pick(&self.rows),
+            other_rows: pick(&self.other_rows),
+            ..self
+        }
+    }
+
     /// The same tables with the other table as the one a step starts from, for
     /// an expression that a join's `right_on` holds, which reads that table's
     /// columns.
@@ -315,5 +329,28 @@ mod tests {
             assert_eq!(column.dtype(), made, "{asked:?}");
             assert_eq!(column.null_count(), 3, "{asked:?}");
         }
+    }
+
+    #[test]
+    fn rows_picked_keep_the_columns_their_dtypes_and_their_values() {
+        let frames = Frames::new(
+            Representative::Date,
+            Representative::Int8,
+            &[DataType::Int64],
+        )
+        .picked(&[0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]);
+        for table in [&frames.rows, &frames.other_rows] {
+            assert_eq!(table.height(), 12);
+        }
+        assert_eq!(frames.empty.height(), 0);
+        let k = frames.rows.column("k").expect("a column");
+        assert_eq!(k.n_unique().expect("the values that differ"), 2);
+        let a = frames.rows.column("a").expect("a column");
+        assert_eq!(a.dtype(), &Representative::Date.dtype());
+        assert_eq!(a.null_count(), 4);
+        let tied =
+            Frames::new(Representative::Date, Representative::Int8, &[]).picked(&[1, 2, 1, 2]);
+        let u = tied.rows.column("u").expect("a column");
+        assert_eq!(u.n_unique().expect("the values that differ"), 2);
     }
 }
