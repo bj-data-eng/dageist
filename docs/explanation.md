@@ -559,15 +559,19 @@ What Polars does with each is what the tables say, and some of it is not what a 
   count is the argument's, and so is `gather`'s of its `indices`. `is_in` takes a column of the dtype of the values it
   follows as their set, whole, so it gives the count of the values it follows, and a list column row by row, as the
   operand of a method is met, so it gives as many as the two meet; a Python list given as `other` waits for a list kind.
-  `interpolate` and the functions that make a range wait; `left_out.rs` gives the reason of each.
+  A join may key on `is_in` of a list or an array, which Polars meets row by row, so the context table measures it as a
+  form of its own, `Expr.is_in[other=list]`. `interpolate` waits, `Expr.item` and the functions that give a list of ranges
+  are left out, and `left_out.rs` gives the reason of each; the functions that start a range or a repeat are
+  [below](#ranges-and-repeats).
 
 ### A Count Of Values
 
 A chain gives one value, as many values as the table has rows, or another number of them. The tables measure
 the three, and the walk follows them as the shape of a value: `one`, `many` and `counted`. The first values of
 a column, the rows that pass a filter, the values that differ and the places of a range are counted: the data
-or the arguments decide how many, which is neither one nor the rows. A method that takes some of the values it
-follows says so in the catalogue, as [`Counting`](../crates/dageist-engine/src/catalog/counting.rs) names what decides:
+or the arguments decide how many, which is neither one nor the rows. A function that starts an expression may give one
+too: the [ranges and repeats](#ranges-and-repeats), whose count is the arguments' own. A method that takes some of the
+values it follows says so in the catalogue, as [`Counting`](../crates/dageist-engine/src/catalog/counting.rs) names what decides:
 the count a parameter holds, a place and a length, every nth value, the data, a condition, or an argument's
 values. Three rows decide the count of such a method by chance, so the dtype and option tables write `counted`
 for it whatever the sample gives, and the context table measures it going on to one value, which every place
@@ -680,9 +684,67 @@ What Polars does with each is what the tables say, and some of it is not what a 
 - `bitwise_and`, `bitwise_or` and `bitwise_xor` fold the values bit by bit into one of the dtype they follow,
   whole numbers and booleans, and the counts give a `UInt32` for each value, of the bits that are set or not, and
   of those before the first, or after the last, that is not. A float is refused by all nine.
-- `item` is not catalogued: it gives the single value and Polars refuses a column of more than one, or none, so
-  whether it is accepted depends on how many rows the table holds, a count of values that the data decide, which
-  `left_out.rs` gives with the methods that wait for [issue 129](https://github.com/bj-data-eng/dageist/issues/129)'s shape.
+- `item` is not catalogued: it gives the single value and Polars refuses a column of more than one, or none. The shapes say it
+  is accepted after one value, which it gives again, and after a count of exactly one, and refused after a count of more; what
+  it is for, to find that a table holds one row, is no shape, and the editor, which is strict where the data decide,
+  would refuse it there, so what it would accept is a call that gives back what it is given. `left_out.rs` says so.
+
+### Ranges And Repeats
+
+`polars.int_range`, `date_range`, `datetime_range`, `time_range`, `linear_space` and `repeat` start an expression
+with a count of values their arguments decide, under Polars' own names, in the Start family. Each is built as Python
+Polars 2.1.0 builds it: `int_range` given one bound reads it as the end, counted from 0; `time_range` makes the bounds
+it is not given of the day, from midnight to the last microsecond; `datetime_range` counts in nanoseconds where its
+interval says them and it is given no unit; `repeat` converts its value to the dtype it is given as a cast that is not
+strict; and `closed` says whether each end is in. Python's `eager`, which makes a series where a step makes a plan, is in
+the signature and is never offered, and a step that sets it is refused where it is built. The interval is a
+[duration](#the-duration-string) typed in, a text Polars reads.
+
+Every bound, the number of samples, the value and the number of times are read by Polars as one value that it can tell
+is one before the rows run: the rows, a count of values and the one value that `head` took of one value are all refused
+with "non-scalar start passed" or "must be a scalar value", which the rule `parameter-takes-one-value` says. The tables
+measure each with the number 1 of its dtype, as they do `shift`'s count. A range takes the numbers and, where Polars does,
+the dates, moments and times of day; `repeat` takes a value of any dtype that one number casts to, and the tables refuse a
+list, an array and a struct, which they cannot make of a number, though Polars repeats them.
+
+How many values the call gives is worked out where the arguments that decide it are typed in: a whole number written
+out, or a date, a moment or a time of day made of numbers written out with `polars.date`, `datetime` and `time`. A
+column, an aggregate or any other chain is not, and the count is then not known.
+
+- `int_range` counts from the bounds and the step with whole numbers wider than an `i64`: from `start` up to but not
+  including `end`, by `step`, so `0` to `10` by 2 is five, a step down counts down, a range that goes the other way from
+  its step is none, and a step past the end is one. A step of nothing is refused, and so is a bound that the dtype does not
+  hold: 300 is no `UInt8`, and Polars refuses it of a range that is empty too.
+- `linear_space` and `repeat` give as many values as the number of samples and the number of times: none for 0, and a
+  number below nothing is refused.
+- The dates, moments and times of day of `date_range`, `datetime_range` and `time_range` are counted by Polars, which the
+  engine asks with the arguments typed in, as it asks of a duration: how many months fit between two dates, the last day
+  of a month, a clock put back or forward in a time zone and a range counted in nanoseconds are Polars' to say. A range of
+  more than a million values is not asked, and nor is one Polars panics on, and the count of either is not known. A build of
+  Polars with debug assertions asserts on a range of days in a zone that crosses the clocks going forward, which the
+  release builds.
+- No column of Polars holds more than 4294967295 values in the build the engine is, so a range of more is refused.
+
+What no arguments make a range of is refused by the rule `range-is-valid`, with Polars' words where Polars says it: a step
+of nothing, a bound that the dtype does not hold, an interval that is no duration, is not whole days for a date, has a unit
+of days, weeks, months or years for a time of day, or is shorter than the unit it is counted in, bounds that are no
+dates, moments or times, a date that is no day of a calendar, a clock time that a zone has none of or two of, a number of
+samples or times below nothing, and, for a linear space, bounds of dtypes that have none in common. Two moments in different
+time zones are refused by `moments-share-a-zone`.
+
+Some of what the editor refuses Polars takes, on purpose:
+
+- An interval of nothing or below nothing is refused whatever the bounds are, though Polars gives no values where the end is
+  before the start and refuses it only where it is not: the editor is strict where the data decide.
+- A count of exactly one beside the rows is refused, as `values-meet-in-count` says of every count. The streaming engine,
+  which a step runs on, broadcasts it where Python's in-memory engine refuses it.
+
+What the rows hold is not known to the editor: a bound that holds a null, a text that is no number given as the number of
+samples, and a number below nothing that a time of day is made of are refused when the rows run.
+
+A range is a count and not one value: the rule `window-input-is-not-counted` refuses it in a window, and a join's key or a
+sort key takes it only where the table of counts says so. Python's `*_ranges` functions, which give a list for each row,
+wait for a list kind, and `Expr.item` is not catalogued; `left_out.rs` gives the reasons.
 
 ### The Steps That Cut And Number A Table
 
@@ -1464,7 +1526,9 @@ A method that takes an option in place of a parameter, as `fill_null` takes a
 well as for the method as it is, under its name with the form after it, such as
 `Expr.fill_null[strategy=forward]`: Polars calls a fill by `zero` or by `one` elementwise, as a
 join's key must be, and a fill by any other word not, so one line would say a wrong thing of
-one of them. `drop_nulls` and `drop_nans` are measured on a column that holds no null: how many
+one of them. `is_in` has a form of its own, `Expr.is_in[other=list]`, measured with a list column as the values it tests
+membership in: Polars meets a list row by row, so a join may key on it, where the same call given a column of its own dtype,
+which is a set met whole, is no key. `drop_nulls` and `drop_nans` are measured on a column that holds no null: how many
 values a column has once the nulls are dropped is for the rows to say, and a column that holds
 one has fewer than the table has rows, which Polars refuses to meet them.
 
