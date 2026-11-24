@@ -476,11 +476,23 @@ pub enum Limit {
     /// every receiver. The rule is the tables' own, so the disagreement is of a rule that refuses
     /// what Polars allows, at a shift that is filled, whose receiver gives one value.
     AMomentOfOneValueFilledInAnotherZone,
+    /// Polars folds a comparison or an arithmetic with the null literal into a null before it runs
+    /// what the call followed or what an argument was made of, so a part inside it is never met:
+    /// `h + null` is a null whatever `h` is, and what is made of it is made of a null. The tables
+    /// judge the part as written and refuse a call for the dtype of what it is given. Polars
+    /// allowing the step, where the refused call is given an expression that holds such a call, at
+    /// any depth, with another call after it (a fold that ends a chain leaves a null literal, a
+    /// literal's), and Polars refusing the case run again with each such call left out for the
+    /// reason the tables gave, where it lies inside the expression that holds the refused call or
+    /// has no place: the fold is then why Polars allows it. A case that is the same without them,
+    /// or that Polars still allows or refuses for another reason, is excused by nothing, and a call
+    /// that follows a fold in its own chain is a probe's, which asks it of a value of its dtype.
+    APartPolarsFoldsToANull,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -519,6 +531,7 @@ impl Limit {
         Self::AMomentBeyondTheRangeOfAUnit,
         Self::AnApproximateQuantileOfALiteralInACondition,
         Self::AMomentOfOneValueFilledInAnotherZone,
+        Self::APartPolarsFoldsToANull,
     ];
 
     /// The name a kept case is filed under.
@@ -576,6 +589,7 @@ impl Limit {
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "a-moment-of-one-value-filled-in-another-zone"
             }
+            Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
         }
     }
 
@@ -665,6 +679,9 @@ impl Limit {
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
+            }
+            Self::APartPolarsFoldsToANull => {
+                "Polars folds a comparison or an arithmetic with a null literal into a null before it runs what that call followed, so a part inside it is never met, where the tables judged the part as written"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -3788,6 +3805,96 @@ fn refused_for_lengths_without_explodes(case: &Case) -> Option<bool> {
     })
 }
 
+/// Whether the expression, or one inside it, has a link that Polars folds into a null which
+/// another link follows: what follows is run on a null, which the tables do not know. A fold that
+/// ends a chain leaves a null literal, which is a literal's.
+fn holds_a_fold_before_a_link(expression: &Expression) -> bool {
+    let count = expression.links().len();
+    expression
+        .links()
+        .iter()
+        .enumerate()
+        .any(|(at, link)| at + 1 < count && compares_with_a_null(link))
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_fold_before_a_link(inside))
+            })
+}
+
+/// The call with every link that Polars folds into a null left out, in the call and in the
+/// expressions it holds: what followed each is then given what the call followed.
+fn call_without_folds(call: &Call) -> Option<Call> {
+    fn value(held: &Value) -> Option<Value> {
+        Some(match held {
+            Value::Expression(inner) => Value::Expression(expression(inner)?),
+            Value::Many(items) => Value::Many(items.iter().map(value).collect::<Option<Vec<_>>>()?),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((value(key)?, value(entry)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    fn expression(held: &Expression) -> Option<Expression> {
+        let start = match held.start() {
+            Start::Call(start) => Start::Call(call_without_folds(start)?),
+            other => other.clone(),
+        };
+        let links = held
+            .links()
+            .iter()
+            .filter(|link| !compares_with_a_null(link))
+            .map(call_without_folds)
+            .collect::<Option<Vec<_>>>()?;
+        Expression::new(start, links).ok()
+    }
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), value(given.value())?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// The case with every call that Polars folds into a null left out.
+fn case_without_folds(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_without_folds(step.call())?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case, with every call that it folds into a null left out, for the
+/// reason the tables gave: where it has a place, it lies inside the expression that holds the
+/// refused part. `None` where nothing is folded, which the case itself is.
+fn refused_without_folds(case: &Case, refused: &Refused) -> Option<bool> {
+    let locus = locate(case, &refused.place);
+    let within = locus.places.first()?;
+    changed(case_without_folds(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && refusal
+                        .place
+                        .as_ref()
+                        .is_none_or(|place| place.path().starts_with(within.path()))
+            })
+        })
+    })
+}
+
 /// The expressions that start from a literal and that the limit is about at the
 /// place the tables refused: the chain the call is at, an argument the call is
 /// given, and, where the tables refused when they ran rows, a chain that holds the
@@ -4759,6 +4866,17 @@ fn applies(
                     .chain
                     .zip(locus.index)
                     .is_some_and(|(chain, at)| gives_one_value_of_literals(chain, at))
+        }
+        (Limit::APartPolarsFoldsToANull, Disagreement::PolarsAllows(refused)) => {
+            // The refused call is given an expression that holds a call that Polars folds, which
+            // a call follows, and Polars refuses the case, with every such call left out, for the
+            // tables' reason. A call that follows a fold in its own chain is asked of a value of
+            // its dtype instead ([`super::probe::settle_on_a_value`]).
+            locate(case, &refused.place).call.is_some_and(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, given)| holds_a_fold_before_a_link(given))
+            }) && refused_without_folds(case, refused) == Some(true)
         }
         _ => false,
     }
