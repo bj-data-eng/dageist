@@ -437,3 +437,55 @@ fn a_refusal_of_a_place_with_the_largest_index_can_be_shown() {
     assert!(matches!(error.problem(), EditProblem::NoStep { steps: 3 }));
     assert!(error.to_string().contains("step number"), "{error}");
 }
+
+#[test]
+fn a_place_with_no_identifier_is_checked_against_the_step_number_alone() {
+    // The documentation says so: such a place names whichever step is at its number.
+    let document = document();
+    let edited = document
+        .remove_step(&dageist_engine::document::Place::of_step(1, None))
+        .expect("removed");
+    let ids: Vec<&str> = edited
+        .steps()
+        .iter()
+        .map(|step| step.id().as_str())
+        .collect();
+    assert_eq!(ids, ["first", "third"]);
+}
+
+#[test]
+fn a_place_made_for_a_step_that_was_taken_away_names_a_new_step_that_has_its_identifier() {
+    // The documentation says so: a name is free again once its step is gone, so the identifier
+    // check passes for a place made for the step before, and a host keeps a revision of the
+    // document to tell the two documents apart.
+    let columns = vec!["a".to_owned()];
+    let frame = StepFrame {
+        columns: &columns,
+        tables: &[],
+    };
+    let sorted = read(vec![step(
+        "sort",
+        "LazyFrame.sort",
+        json!({ "by": many(vec![crate::support::field("a")]), "descending": { "flag": true } }),
+    )]);
+    let old_place = inside(0, "sort", vec![parameter("descending")]);
+    let again = sorted
+        .remove_step(&step_at(0, "sort"))
+        .and_then(|empty| empty.add_step(0, "LazyFrame.sort", &frame))
+        .expect("a sort again");
+    // The new step has the identifier the old one had.
+    assert_eq!(again.steps()[0].id().as_str(), "sort");
+    assert_ne!(again.steps()[0], sorted.steps()[0]);
+    // The place for the old step is not refused: it clears an argument the new step does not have.
+    let error = refused(again.clear_argument(&old_place));
+    assert!(matches!(error.problem(), EditProblem::Nothing));
+    // ... and it edits the new step where the way leads somewhere in it.
+    let edited = again
+        .set_argument(&old_place, Value::Flag(Some(false)))
+        .expect("set");
+    assert_eq!(edited.steps()[0].id().as_str(), "sort");
+    assert_eq!(
+        edited.steps()[0].call().argument("descending"),
+        Some(&Value::Flag(Some(false)))
+    );
+}
