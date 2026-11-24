@@ -736,7 +736,11 @@ fn the_values_of_a_chained_condition_are_moments_in_one_zone_whether_or_not_it_h
             json!({ "statement": values.next().expect("a first value") }),
         )];
         for (at, value) in values.enumerate() {
-            let when = if at == 0 { "Then.when" } else { "ChainedThen.when" };
+            let when = if at == 0 {
+                "Then.when"
+            } else {
+                "ChainedThen.when"
+            };
             links.push(call(when, json!({ "predicates": predicate() })));
             links.push(call("ChainedWhen.then", json!({ "statement": value })));
         }
