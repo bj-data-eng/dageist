@@ -819,9 +819,9 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
 }
 
 /// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
-/// group cast to text and nothing else: the values the pivot reads are columns of numbers, and the
-/// one call before it casts them to text or fills them with a text literal. The text reads as the
-/// numbers, which the sample's does not.
+/// group cast to text and nothing else: the values the pivot reads are columns of numbers, the
+/// first call casts them to text or fills them with a text literal, and any that follow it keep
+/// each value as it is. The text reads as the numbers, which the sample's does not.
 fn is_text_of_the_numbers_of_a_group(
     frames: &Frames,
     step: &Call,
@@ -832,7 +832,22 @@ fn is_text_of_the_numbers_of_a_group(
         return false;
     };
     matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
-        && at == 1
+        && at >= 1
+        // What stands between keeps each value as it is and takes none away.
+        && chain.links()[1..at].iter().all(|link| {
+            matches!(
+                link.entry().id().as_str(),
+                "Expr.forward_fill"
+                    | "Expr.backward_fill"
+                    | "Expr.reverse"
+                    | "Expr.sort"
+                    | "Expr.drop_nulls"
+                    | "Expr.first"
+                    | "Expr.last"
+                    | "Expr.min"
+                    | "Expr.max"
+            )
+        })
         && chain.links().first().is_some_and(|first| {
             // A cast to text, or a fill with a text literal, which gives numbers the dtype text.
             (is(first, "Expr.cast")
