@@ -725,6 +725,52 @@ mod tests {
             .expect("the case is evaluated")
     }
 
+    /// The target of the descriptor, admitting cases of up to `bytes` bytes.
+    fn target_admitting(bytes: u64) -> AllowedTarget {
+        let text =
+            include_str!("descriptor.toml").replace("bytes = 65536", &format!("bytes = {bytes}"));
+        let manifest: FuzzManifest = toml::from_str(&text).expect("a valid descriptor");
+        let descriptor = manifest
+            .targets
+            .into_iter()
+            .find(|target| target.id().as_str() == TARGET)
+            .expect("the descriptor declares the target");
+        AllowedTarget {
+            descriptor,
+            focus: None,
+        }
+    }
+
+    #[test]
+    fn a_case_longer_than_the_target_admits_is_drawn_again_and_never_made() {
+        // The engine stops a run for an input over the ceiling, which would end a campaign after
+        // hours of cases and lose what it found, so the target draws such a case again.
+        let ceiling = 700;
+        let target = target_admitting(ceiling);
+        let (mut made, mut again, mut longest) = (0, 0, 0);
+        for offset in 0..300_u64 {
+            let entropy: Vec<u8> = (0..1024_u64)
+                .map(|at| {
+                    let mut mixed = (offset << 16 | at).wrapping_add(0x9e37_79b9_7f4a_7c15);
+                    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                    (mixed ^ (mixed >> 31)) as u8
+                })
+                .collect();
+            match target.generate(&entropy).expect("a generation") {
+                Generation::Generated(case) => {
+                    longest = longest.max(case.encode().len() as u64);
+                    made += 1;
+                }
+                Generation::Rejected(_) => again += 1,
+            }
+        }
+        assert!(made > 20, "only {made} cases were made");
+        assert!(again > 20, "only {again} cases were drawn again");
+        assert!(longest <= ceiling, "a case of {longest} bytes was made");
+        take_counts();
+    }
+
     fn counted(tally: &[String], what: &str) -> Option<u64> {
         tally
             .iter()
