@@ -2,6 +2,7 @@
 //! and running it on a small claims table.
 
 mod claims;
+mod counted;
 mod counts;
 mod dates;
 mod defaults;

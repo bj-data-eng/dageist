@@ -21,7 +21,7 @@
 use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
+    self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
@@ -120,6 +120,16 @@ impl WalkedExpression {
     #[must_use]
     pub const fn ending(&self) -> Option<&Ending> {
         self.ending.as_ref()
+    }
+
+    /// How many values the expression gives, where that is neither one value nor as many as the
+    /// table has rows: what the arguments fix of it, such as `head(2)` of a column giving at most
+    /// two values, and where they fix nothing, that the count is not known. `None` where the
+    /// expression gives one value or as many as the rows, or where the walk could not say what it
+    /// gives.
+    #[must_use]
+    pub const fn count(&self) -> Option<Count> {
+        None
     }
 }
 
