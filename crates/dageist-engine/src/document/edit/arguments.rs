@@ -9,8 +9,8 @@ use crate::catalog::{BuildError, Shape};
 
 use super::super::error::{Cause, Place, Segment};
 use super::super::model::{Call, Document, Value};
-use super::error::{EditError, EditProblem};
-use super::path::{Fault, Leaf, kind_name, with_given};
+use super::error::{EditError, EditProblem, Thing, Wanted};
+use super::path::{Fault, Leaf, with_given};
 use super::starting::{default_value, option_start, started_test};
 
 /// What a list, or pairs, is changed by.
@@ -78,8 +78,8 @@ impl Document {
             }
             Segment::Start | Segment::Link(_) => Err(wrong_place(
                 place,
-                "an argument, an item, or the key or value of an entry",
-                "a part of an expression",
+                Wanted::Argument,
+                Thing::of_segment(&last),
             )),
         }
     }
@@ -94,7 +94,11 @@ impl Document {
     pub fn clear_argument(&self, place: &Place) -> Result<Self, EditError> {
         let (parent, last) = split(place)?;
         let Segment::Parameter(name) = last else {
-            return Err(wrong_place(place, "a parameter", "a part of an argument"));
+            return Err(wrong_place(
+                place,
+                Wanted::Parameter,
+                Thing::of_segment(&last),
+            ));
         };
         self.edited_at(
             place,
@@ -202,7 +206,7 @@ impl Document {
     pub fn remove_item(&self, item: &Place) -> Result<Self, EditError> {
         let (list, last) = split(item)?;
         let Segment::Item(at) = last else {
-            return Err(wrong_place(item, "an item of a list", "something else"));
+            return Err(wrong_place(item, Wanted::Item, Thing::of_segment(&last)));
         };
         self.change_list(item, &list, &Change::Remove { at })
     }
@@ -249,7 +253,7 @@ impl Document {
                     entries.insert(at, (key.clone(), value.clone()));
                     Ok(Value::Pairs(entries))
                 }
-                other => Err(wrong_found("pairs", other)),
+                other => Err(wrong_found(Wanted::Pairs, other)),
             }),
         )
     }
@@ -265,8 +269,8 @@ impl Document {
         let (Segment::Key(at) | Segment::Value(at)) = last else {
             return Err(wrong_place(
                 entry,
-                "the key or value of an entry",
-                "something else",
+                Wanted::EntryPart,
+                Thing::of_segment(&last),
             ));
         };
         self.edited_at(
@@ -347,7 +351,7 @@ impl Document {
 /// The list `held` with `change` made to it.
 fn changed(held: &Value, change: &Change) -> Result<Value, Fault> {
     let Value::Many(items) = held else {
-        return Err(wrong_found("a list", held));
+        return Err(wrong_found(Wanted::List, held));
     };
     let mut items = items.clone();
     match change {
@@ -381,41 +385,26 @@ fn set_for_item(call: &Call, parameter: &str, item: usize, value: &Value) -> Res
         return Err(unknown_parameter(parameter));
     };
     let Shape::PerItem(of) = found.shape() else {
-        return Err(Fault::inside(
-            vec![Segment::Parameter(parameter.to_owned())],
-            EditProblem::WrongPlace {
-                needs: "a parameter that holds a value for each item",
-                found: "a parameter that holds one",
-            },
-        ));
+        return Err(at_parameter(parameter, EditProblem::NotPerItem));
     };
     let items = call.key_count(of);
     if item >= items {
-        return Err(Fault::inside(
-            vec![Segment::Parameter(parameter.to_owned())],
+        return Err(at_parameter(
+            parameter,
             EditProblem::OutOfRange {
                 index: item,
                 len: items,
             },
         ));
     }
+    let default = default_value(found);
+    let no_default = || at_parameter(parameter, EditProblem::NoDefault);
     let mut values = match call.argument(parameter) {
         Some(Value::Many(held)) => held.clone(),
         Some(one) => vec![one.clone(); items],
-        None => {
-            let default = default_value(found).ok_or_else(|| {
-                Fault::inside(
-                    vec![Segment::Parameter(parameter.to_owned())],
-                    EditProblem::WrongPlace {
-                        needs: "a parameter with a default",
-                        found: "a parameter with none",
-                    },
-                )
-            })?;
-            vec![default; items]
-        }
+        None => vec![default.clone().ok_or_else(no_default)?; items],
     };
-    if let Some(filler) = values.last().cloned().or_else(|| default_value(found)) {
+    if let Some(filler) = values.last().cloned().or(default) {
         values.resize(items, filler);
     }
     if let Some(slot) = values.get_mut(item) {
@@ -427,7 +416,7 @@ fn set_for_item(call: &Call, parameter: &str, item: usize, value: &Value) -> Res
 /// The place without its last segment, and the last segment.
 fn split(place: &Place) -> Result<(Place, Segment), EditError> {
     let Some((last, before)) = place.path().split_last() else {
-        return Err(wrong_place(place, "a part of a step", "a step"));
+        return Err(wrong_place(place, Wanted::PartOfStep, Thing::Step));
     };
     let mut parent = Place::of_step(
         place.step_index().unwrap_or_default(),
@@ -439,14 +428,14 @@ fn split(place: &Place) -> Result<(Place, Segment), EditError> {
     Ok((parent, last.clone()))
 }
 
-fn wrong_place(place: &Place, needs: &'static str, found: &'static str) -> EditError {
+fn wrong_place(place: &Place, needs: Wanted, found: Thing) -> EditError {
     EditError::new(place.clone(), EditProblem::WrongPlace { needs, found })
 }
 
-fn wrong_found(needs: &'static str, found: &Value) -> Fault {
+fn wrong_found(needs: Wanted, found: &Value) -> Fault {
     Fault::here(EditProblem::WrongPlace {
         needs,
-        found: kind_name(found),
+        found: Thing::of_value(found),
     })
 }
 
@@ -454,9 +443,14 @@ fn does_not_fit(found: &Value) -> Fault {
     Fault::beyond(
         1,
         EditProblem::DoesNotFit {
-            found: kind_name(found),
+            found: Thing::of_value(found),
         },
     )
+}
+
+/// A fault at the argument of `parameter` of the call the edit has come to.
+fn at_parameter(parameter: &str, problem: EditProblem) -> Fault {
+    Fault::inside(vec![Segment::Parameter(parameter.to_owned())], problem)
 }
 
 pub(super) fn unknown_parameter(parameter: &str) -> Fault {

@@ -9,8 +9,8 @@ use crate::catalog::Build;
 
 use super::super::error::{Place, Position, Segment};
 use super::super::model::{Document, Expression, Start, Value};
-use super::error::{EditError, EditProblem};
-use super::path::{Fault, Leaf, kind_name};
+use super::error::{EditError, EditProblem, Thing, Wanted};
+use super::path::{Fault, Leaf};
 use super::starting::{link_call, start_calls};
 use super::steps::entry_named;
 
@@ -203,8 +203,8 @@ impl Document {
             &Leaf::Value(&|held| match held {
                 Value::Expression(expression) => change(expression).map(Value::Expression),
                 other => Err(Fault::here(EditProblem::WrongPlace {
-                    needs: "an expression",
-                    found: kind_name(other),
+                    needs: Wanted::Expression,
+                    found: Thing::of_value(other),
                 })),
             }),
         )
@@ -217,16 +217,16 @@ fn link_of(link: &Place) -> Result<(Place, usize), EditError> {
         EditError::new(
             link.clone(),
             EditProblem::WrongPlace {
-                needs: "a link of an expression",
+                needs: Wanted::Link,
                 found,
             },
         )
     };
     let Some((last, before)) = link.path().split_last() else {
-        return Err(wrong("a step"));
+        return Err(wrong(Thing::Step));
     };
     let Segment::Link(at) = last else {
-        return Err(wrong("something else"));
+        return Err(wrong(Thing::of_segment(last)));
     };
     let mut expression = Place::of_step(
         link.step_index().unwrap_or_default(),

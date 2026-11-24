@@ -8,7 +8,7 @@ mod path;
 mod starting;
 mod steps;
 
-pub use error::{EditError, EditProblem};
+pub use error::{EditError, EditProblem, Thing, ValueKind, Wanted};
 
 use super::error::Place;
 use super::model::{Document, Step};

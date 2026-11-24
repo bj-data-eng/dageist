@@ -9,7 +9,7 @@
 
 use super::super::error::{Place, Refusal, Segment};
 use super::super::model::{Call, Expression, Start, Value};
-use super::error::{EditError, EditProblem};
+use super::error::{EditError, EditProblem, Thing, Wanted};
 
 /// An edit that could not be made, before it is given the place it was made
 /// at.
@@ -92,27 +92,6 @@ pub(super) enum Leaf<'a> {
     Value(&'a dyn Fn(&Value) -> Result<Value, Fault>),
 }
 
-/// What kind of thing a value is, in words for an error.
-pub(super) const fn kind_name(value: &Value) -> &'static str {
-    match value {
-        Value::Expression(_) => "an expression",
-        Value::Columns(_) => "column names",
-        Value::Integer(_) => "a whole number",
-        Value::Float(_) => "a number",
-        Value::String(_) => "text",
-        Value::Flag(_) => "a flag",
-        Value::Choice(_) => "a choice",
-        Value::Dtype(_) => "a dtype",
-        Value::Duration(_) => "a duration",
-        Value::Pattern(_) => "a pattern",
-        Value::TimeZone(_) => "a time zone",
-        Value::Table(_) => "a table",
-        Value::Path(_) => "a path",
-        Value::Pairs(_) => "pairs",
-        Value::Many(_) => "a list",
-    }
-}
-
 /// `call` with the argument for `parameter` set to `value`, or taken away when
 /// that is `None`. A new argument goes where the entry's parameters put it,
 /// among the ones already given.
@@ -166,14 +145,14 @@ pub(super) fn rebuild_call(
         return match leaf {
             Leaf::Call(edit) => edit(call).map_err(|fault| fault.shifted(at)),
             Leaf::Value(_) => Err(Fault::here(EditProblem::WrongPlace {
-                needs: "an argument",
-                found: "a call",
+                needs: Wanted::Argument,
+                found: Thing::Call,
             })
             .shifted(at)),
         };
     };
     let Segment::Parameter(name) = segment else {
-        return Err(Fault::beyond(1, EditProblem::DoesNotFit { found: "a call" }).shifted(at));
+        return Err(Fault::beyond(1, EditProblem::DoesNotFit { found: Thing::Call }).shifted(at));
     };
     let Some(given) = call.argument(name) else {
         return Err(Fault::beyond(1, EditProblem::Nothing).shifted(at));
@@ -194,8 +173,8 @@ pub(super) fn rebuild_value(
         return match leaf {
             Leaf::Value(edit) => edit(value).map_err(|fault| fault.shifted(at)),
             Leaf::Call(_) => Err(Fault::here(EditProblem::WrongPlace {
-                needs: "a call",
-                found: kind_name(value),
+                needs: Wanted::Call,
+                found: Thing::of_value(value),
             })
             .shifted(at)),
         };
@@ -204,7 +183,7 @@ pub(super) fn rebuild_value(
         Fault::beyond(
             1,
             EditProblem::DoesNotFit {
-                found: kind_name(value),
+                found: Thing::of_value(value),
             },
         )
         .shifted(at)
@@ -238,7 +217,7 @@ pub(super) fn rebuild_value(
                 return Err(Fault::beyond(
                     1,
                     EditProblem::DoesNotFit {
-                        found: "an expression that starts with no call",
+                        found: Thing::ExpressionWithoutCall,
                     },
                 )
                 .shifted(at));

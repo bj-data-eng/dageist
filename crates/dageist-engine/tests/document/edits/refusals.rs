@@ -4,7 +4,9 @@
 use dageist_engine::allowed::Literal;
 use dageist_engine::catalog;
 use dageist_engine::catalog::StepFrame;
-use dageist_engine::document::{Call, Cause, Document, EditProblem, Expression, Segment, Value};
+use dageist_engine::document::{
+    Call, Cause, Document, EditProblem, Expression, Segment, Thing, Value, ValueKind, Wanted,
+};
 use serde_json::json;
 
 use super::{inside, parameter, read, refused, select, step_at};
@@ -127,7 +129,14 @@ fn a_segment_that_what_is_there_does_not_have_is_refused_and_says_what_is_there(
         &before,
         document.set_argument(&item_of_a_choice, Value::Integer(1)),
         &item_of_a_choice,
-        |problem| matches!(problem, EditProblem::DoesNotFit { found: "a choice" }),
+        |problem| {
+            matches!(
+                problem,
+                EditProblem::DoesNotFit {
+                    found: Thing::Value(ValueKind::Choice)
+                }
+            )
+        },
     );
     let link_of_a_choice = inside(
         2,
@@ -139,7 +148,14 @@ fn a_segment_that_what_is_there_does_not_have_is_refused_and_says_what_is_there(
         &before,
         document.clear_argument(&link_of_a_choice),
         &inside(2, "third", vec![parameter("how"), Segment::Link(0)]),
-        |problem| matches!(problem, EditProblem::DoesNotFit { found: "a choice" }),
+        |problem| {
+            matches!(
+                problem,
+                EditProblem::DoesNotFit {
+                    found: Thing::Value(ValueKind::Choice)
+                }
+            )
+        },
     );
 }
 
@@ -186,7 +202,7 @@ fn a_place_that_names_another_kind_of_thing_than_the_edit_needs_is_refused() {
             matches!(
                 problem,
                 EditProblem::WrongPlace {
-                    found: "a choice",
+                    found: Thing::Value(ValueKind::Choice),
                     ..
                 }
             )
@@ -202,7 +218,7 @@ fn a_place_that_names_another_kind_of_thing_than_the_edit_needs_is_refused() {
             matches!(
                 problem,
                 EditProblem::WrongPlace {
-                    needs: "a list",
+                    needs: Wanted::List,
                     ..
                 }
             )

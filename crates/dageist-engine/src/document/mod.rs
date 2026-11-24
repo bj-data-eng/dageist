@@ -97,7 +97,7 @@ pub use changes::{Change, ColumnChange};
 pub use columns::ColumnDescription;
 pub use counts::{ColumnValues, Counted, StepRows};
 pub use dtype::{Dtype, DtypeError};
-pub use edit::{EditError, EditProblem};
+pub use edit::{EditError, EditProblem, Thing, ValueKind, Wanted};
 pub use error::{Cause, Place, Position, ReadError, Refusal, Segment};
 pub use inputs::{DuplicateInput, InputDescription, InputKind, Inputs, ListOrigin, Origin};
 pub(crate) use json::{NotWritten, WrittenNumber, read_number};
