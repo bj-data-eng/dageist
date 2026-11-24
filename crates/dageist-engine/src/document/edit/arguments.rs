@@ -397,6 +397,8 @@ fn set_for_item(call: &Call, parameter: &str, item: usize, value: &Value) -> Res
             },
         ));
     }
+    // An item that the parameter has no value of its own for holds the one it is shared, or else
+    // the parameter's default.
     let default = default_value(found);
     let no_default = || at_parameter(parameter, EditProblem::NoDefault);
     let mut values = match call.argument(parameter) {
@@ -404,8 +406,9 @@ fn set_for_item(call: &Call, parameter: &str, item: usize, value: &Value) -> Res
         Some(one) => vec![one.clone(); items],
         None => vec![default.clone().ok_or_else(no_default)?; items],
     };
-    if let Some(filler) = values.last().cloned().or(default) {
-        values.resize(items, filler);
+    values.truncate(items);
+    if values.len() < items {
+        values.resize(items, default.ok_or_else(no_default)?);
     }
     if let Some(slot) = values.get_mut(item) {
         *slot = value.clone();
