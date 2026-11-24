@@ -5023,6 +5023,183 @@ mod tests {
         );
     }
 
+    /// A pivot of the column `a`, of dtype `receiver`, whose aggregate is `aggregate`.
+    fn pivot_of(receiver: Representative, aggregate: Expression) -> Case {
+        Case {
+            receiver,
+            ..pivot(aggregate)
+        }
+    }
+
+    fn text_of(text: &str) -> Call {
+        call(
+            "polars.lit",
+            vec![("value", Value::String(text.to_owned()))],
+        )
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_the_text_of_numbers_a_group_makes_and_for_no_other_text() {
+        // A count or a position is a number whatever the group holds, which a fill with text turns
+        // to the text of the number, and the text reads as the number it converts to, where the
+        // tables measured the sample's text, which no number reads.
+        for kept in [
+            "uncovered-a-group-aggregate--text-made-of-a-count.case",
+            "uncovered-a-group-aggregate--text-made-of-positions.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(kept),
+                vec![Limit::AGroupAggregate],
+                "{kept}"
+            );
+        }
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let filled = |making: &str| {
+            vec![
+                call(making, Vec::new()),
+                call(
+                    "Expr.fill_null",
+                    vec![(
+                        "value",
+                        Value::Expression(chain_of(text_of("1d"), Vec::new())),
+                    )],
+                ),
+                call("Expr.skew", Vec::new()),
+            ]
+        };
+        let at_the_skew = || at(&[parameter("aggregate_function"), Segment::Link(2)]);
+        for making in [
+            "Expr.count",
+            "Expr.len",
+            "Expr.n_unique",
+            "Expr.null_count",
+            "Expr.arg_sort",
+            "Expr.arg_max",
+            "Expr.rle_id",
+        ] {
+            let case = pivot(chain_of(call("polars.element", Vec::new()), filled(making)));
+            assert_eq!(
+                refused_by_the_tables_at(&case, at_the_skew(), text),
+                vec![Limit::AGroupAggregate],
+                "{making}"
+            );
+        }
+        // The text of the values themselves is the sample's, which the tables measured.
+        let values = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            filled("Expr.reverse"),
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&values, at_the_skew(), text),
+            vec![]
+        );
+        // A count after the conversion makes nothing that is converted.
+        let after = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                call("Expr.skew", Vec::new()),
+                call("Expr.count", Vec::new()),
+            ],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(
+                &after,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                text
+            ),
+            vec![]
+        );
+        // Only a failed conversion of text is this: a count is no cause of another refusal.
+        let other = "conversion from `bool` to `f64` failed in column 'a' for 2 out of 3 values: [true, false]";
+        let counted = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            filled("Expr.count"),
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&counted, at_the_skew(), other),
+            vec![]
+        );
+        // A select has no group whose kernels read the text.
+        let selected = select(vec![chain_of(column("a"), filled("Expr.count"))]);
+        assert_eq!(
+            refused_by_the_tables_at(
+                &selected,
+                at(&[parameter("exprs"), Segment::Item(0), Segment::Link(2)]),
+                text
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_what_a_column_of_nulls_is_compared_with() {
+        // The values of a group of a column of the dtype Null are nulls, which a comparison leaves
+        // null and a cast converts, where the tables measured the comparison of a column that holds
+        // values, whose booleans cannot become nulls.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-cast-of-a-comparison-of-nulls.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let reason = "conversion from `bool` to `null` failed in column 'a' for 2 out of 3 values: [true, false]";
+        let at_the_cast = || at(&[parameter("aggregate_function"), Segment::Link(1)]);
+        let cast_after = |link: Call, receiver: Representative| {
+            pivot_of(
+                receiver,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![link, cast_to(Representative::Null, Vec::new())],
+                ),
+            )
+        };
+        for id in ["Expr.ne", "Expr.eq", "Expr.lt", "Expr.add", "Expr.sub"] {
+            let compared = || compared_with(id, chain_of(text_of("1d"), Vec::new()));
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &cast_after(compared(), Representative::Null),
+                    at_the_cast(),
+                    reason
+                ),
+                vec![Limit::AGroupAggregate],
+                "{id}"
+            );
+            // A column that holds values has the booleans the tables measured.
+            assert_eq!(
+                refused_by_the_tables_at(
+                    &cast_after(compared(), Representative::Date),
+                    at_the_cast(),
+                    reason
+                ),
+                vec![],
+                "{id} of dates"
+            );
+        }
+        // A call that gives a value for a null, as the test for one, leaves booleans to cast.
+        assert_eq!(
+            refused_by_the_tables_at(
+                &cast_after(call("Expr.is_null", Vec::new()), Representative::Null),
+                at_the_cast(),
+                reason
+            ),
+            vec![]
+        );
+        // The cast is the first call: there is no comparison that leaves the nulls null.
+        let bare = pivot_of(
+            Representative::Null,
+            chain_of(
+                call("polars.element", Vec::new()),
+                vec![cast_to(Representative::Null, Vec::new())],
+            ),
+        );
+        assert_eq!(
+            refused_by_the_tables_at(
+                &bare,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                reason
+            ),
+            vec![]
+        );
+    }
+
     #[test]
     fn a_text_literal_beside_another_literal_is_a_part_polars_converts_and_a_column_beside_it_is_not()
      {
