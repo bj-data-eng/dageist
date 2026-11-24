@@ -20,6 +20,88 @@
 //! it kept of those it received, with the first values of the columns it added
 //! or replaced; each [`Outcome::Valid`] says which columns those are.
 //!
+//! # Editing
+//!
+//! Each edit takes a document and gives the edited document, or an [`EditError`]
+//! that says why it could not.
+//!
+//! Every edit is made on the model, not on text: the calls, expressions and
+//! steps on the way to what is edited are made again with their
+//! constructors, so that an edit is checked as it is made, as reading checks
+//! a document. The edited document is as the reader reads it: writing it with
+//! [`Document::write`] and reading that gives the same document. A document
+//! is edited, never changed in place; an edit that is refused leaves the
+//! document as it was.
+//!
+//! Whether the steps run is not decided by an edit. It may leave a step
+//! incomplete, with a hole where an expression is still to be picked, or
+//! refused, with an argument left out that Polars needs; running the document
+//! says so.
+//!
+//! An edit names where it is made by a [`Place`], as reports and offers name
+//! places: a step by its number and, if it has one, its identifier; then the
+//! way down through the step's arguments. The segments mean:
+//!
+//! - [`Segment::Parameter`]: the argument given for a parameter of the call
+//!   the way has come to, which is the step's own at first;
+//! - [`Segment::Item`]: an item of a list;
+//! - [`Segment::Key`] and [`Segment::Value`]: the key or the value of an entry
+//!   of pairs;
+//! - [`Segment::Start`] and [`Segment::Link`]: the call an expression starts
+//!   with, and one of the links after it.
+//!
+//! ## What a place does not guard against
+//!
+//! An edit checks the identifier a place carries against the step at the
+//! place's number, and refuses a place made for another document with
+//! [`EditProblem::StepChanged`] when they differ. That catches a step that was
+//! moved, or taken away so that another took its number. It does not catch:
+//!
+//! - **A reused identifier.** An identifier is made from the entry's name, and
+//!   a name is free again once a step is taken away: a document where a `sort`
+//!   was removed and another added gives the new step the identifier `sort`. A
+//!   place made for the old step then names the new one, and the check passes.
+//! - **A place with no identifier.** [`Place::of_step`] given `None` is checked
+//!   against the step's number alone.
+//! - **A way that leads somewhere else.** The way down through the arguments is
+//!   followed as it stands. It is refused where it leads nowhere
+//!   ([`EditProblem::Nothing`], [`EditProblem::DoesNotFit`]), but not where
+//!   what it leads to is another item, argument or link than the one it was
+//!   made for.
+//!
+//! A host guards against stale places by keeping a revision of the document
+//! with each edit it makes, and refusing an edit that was made against an older
+//! revision, before it asks the engine for the edit. The identifier check is a
+//! second guard, not a replacement for it.
+//!
+//! ## Edits that go together
+//!
+//! One action of a view can be more than one edit, made one after another on
+//! the document each gives: picking another table for a join is
+//! [`set_argument`](Document::set_argument) of `other` and then of `right_on`,
+//! which starts from a field of the new table, and a switch of the comparison
+//! of a test that also changes what it is compared with is
+//! [`swap_link`](Document::swap_link) and then [`set_argument`](Document::set_argument)
+//! of the link's `other`. Each edit is checked on its own, so a document
+//! between two of them is a document the reader reads, with a step that the
+//! report may say is incomplete or refused.
+//!
+//! ## The edits
+//!
+//! | Edit | Methods |
+//! | --- | --- |
+//! | The steps | [`add_step`](Document::add_step), [`swap_step`](Document::swap_step), [`remove_step`](Document::remove_step), [`move_step`](Document::move_step) |
+//! | An argument | [`set_argument`](Document::set_argument), [`clear_argument`](Document::clear_argument), [`add_option`](Document::add_option), [`set_for_item`](Document::set_for_item) |
+//! | Lists and pairs | [`insert_item`](Document::insert_item), [`remove_item`](Document::remove_item), [`insert_test`](Document::insert_test), [`insert_entry`](Document::insert_entry), [`remove_entry`](Document::remove_entry) |
+//! | An expression | [`set_start`](Document::set_start), [`start_with`](Document::start_with), [`insert_link`](Document::insert_link), [`swap_link`](Document::swap_link), [`remove_link`](Document::remove_link), [`move_link`](Document::move_link) |
+//!
+//! What the engine decides a new part starts with, a step, a link, an option
+//! or a test, comes from the catalogue's starts and the tables of allowed
+//! combinations, so no host or view repeats it. [`Expression::hole`],
+//! [`Expression::field`], [`Expression::literal`] and [`Expression::input`] make
+//! the expressions of one word that an edit puts in a slot, and
+//! [`Value::from_literal`] a typed literal as the argument of a parameter.
+//!
 //! The JSON is read by RFC 8259, strictly: a number keeps the value its digits
 //! name, so a float reads back as the `f64` it was written from.
 //!
@@ -31,6 +113,7 @@ mod columns;
 mod counts;
 mod defaults;
 mod dtype;
+mod edit;
 mod error;
 mod inputs;
 mod json;
@@ -50,6 +133,7 @@ pub use changes::{Change, ColumnChange};
 pub use columns::ColumnDescription;
 pub use counts::{ColumnValues, Counted, StepRows};
 pub use dtype::{Dtype, DtypeError};
+pub use edit::{EditError, EditProblem, Thing, ValueKind, Wanted};
 pub use error::{Cause, Place, Position, ReadError, Refusal, Segment};
 pub use inputs::{DuplicateInput, InputDescription, InputKind, Inputs, ListOrigin, Origin};
 pub(crate) use json::{NotWritten, WrittenNumber, read_number};

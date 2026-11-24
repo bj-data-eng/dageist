@@ -103,17 +103,19 @@ impl fmt::Display for Place {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (&self.step, self.index) {
             (Some(id), _) => write!(formatter, "step {:?}", id.as_str())?,
-            (None, Some(index)) => write!(formatter, "step number {}", index + 1)?,
+            (None, Some(index)) => write!(formatter, "step number {}", index.saturating_add(1))?,
             (None, None) => formatter.write_str("the document")?,
         }
         for segment in &self.path {
             match segment {
                 Segment::Parameter(name) => write!(formatter, ", {name}")?,
-                Segment::Item(item) => write!(formatter, " item {}", item + 1)?,
-                Segment::Key(entry) => write!(formatter, " entry {} key", entry + 1)?,
-                Segment::Value(entry) => write!(formatter, " entry {} value", entry + 1)?,
+                Segment::Item(item) => write!(formatter, " item {}", item.saturating_add(1))?,
+                Segment::Key(entry) => write!(formatter, " entry {} key", entry.saturating_add(1))?,
+                Segment::Value(entry) => {
+                    write!(formatter, " entry {} value", entry.saturating_add(1))?
+                }
                 Segment::Start => formatter.write_str(", the start")?,
-                Segment::Link(link) => write!(formatter, ", link {}", link + 1)?,
+                Segment::Link(link) => write!(formatter, ", link {}", link.saturating_add(1))?,
             }
         }
         Ok(())
@@ -311,6 +313,12 @@ impl Refusal {
     pub(super) fn under(mut self, segment: Segment) -> Self {
         self.0.place = std::mem::take(&mut self.0.place).under(segment);
         self
+    }
+
+    /// The place and the cause, by value.
+    pub(super) fn into_parts(self) -> (Place, Cause) {
+        let Refused { place, cause } = *self.0;
+        (place, cause)
     }
 
     pub(super) fn under_all(mut self, path: Vec<Segment>) -> Self {

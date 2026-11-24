@@ -755,6 +755,33 @@ impl core::error::Error for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::EditProblem
+pub dageist_engine::document::EditProblem::CannotAdd(dageist_engine::allowed::Refusal)
+pub dageist_engine::document::EditProblem::DoesNotFit
+pub dageist_engine::document::EditProblem::DoesNotFit::found: dageist_engine::document::Thing
+pub dageist_engine::document::EditProblem::NeedsValue
+pub dageist_engine::document::EditProblem::NeedsValue::parameter: &'static str
+pub dageist_engine::document::EditProblem::NoDefault
+pub dageist_engine::document::EditProblem::NoStart
+pub dageist_engine::document::EditProblem::NoStart::entry: &'static str
+pub dageist_engine::document::EditProblem::NoStep
+pub dageist_engine::document::EditProblem::NoStep::steps: usize
+pub dageist_engine::document::EditProblem::NotPerItem
+pub dageist_engine::document::EditProblem::Nothing
+pub dageist_engine::document::EditProblem::OutOfRange
+pub dageist_engine::document::EditProblem::OutOfRange::index: usize
+pub dageist_engine::document::EditProblem::OutOfRange::len: usize
+pub dageist_engine::document::EditProblem::Refused(dageist_engine::document::Cause)
+pub dageist_engine::document::EditProblem::StepChanged
+pub dageist_engine::document::EditProblem::StepChanged::found: dageist_engine::document::StepId
+pub dageist_engine::document::EditProblem::UnknownEntry(alloc::string::String)
+pub dageist_engine::document::EditProblem::WrongPlace
+pub dageist_engine::document::EditProblem::WrongPlace::found: dageist_engine::document::Thing
+pub dageist_engine::document::EditProblem::WrongPlace::needs: dageist_engine::document::Wanted
+impl core::error::Error for dageist_engine::document::EditProblem
+pub fn dageist_engine::document::EditProblem::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::EditProblem
+pub fn dageist_engine::document::EditProblem::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::InputKind
 pub dageist_engine::document::InputKind::List
 pub dageist_engine::document::InputKind::List::dtype: alloc::string::String
@@ -836,6 +863,8 @@ pub enum dageist_engine::document::Start
 pub dageist_engine::document::Start::Call(dageist_engine::document::Call)
 pub dageist_engine::document::Start::Hole
 pub dageist_engine::document::Start::Input(alloc::string::String)
+impl dageist_engine::document::Start
+pub fn dageist_engine::document::Start::field(name: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub enum dageist_engine::document::StepRows
 pub dageist_engine::document::StepRows::Counted(dageist_engine::document::Counted)
 pub dageist_engine::document::StepRows::Failed(polars_error::PolarsError)
@@ -854,6 +883,21 @@ pub dageist_engine::document::SyntaxProblem::TrailingText(char)
 pub dageist_engine::document::SyntaxProblem::Unexpected(char)
 impl core::fmt::Display for dageist_engine::document::SyntaxProblem
 pub fn dageist_engine::document::SyntaxProblem::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Thing
+pub dageist_engine::document::Thing::Call
+pub dageist_engine::document::Thing::EntryValue
+pub dageist_engine::document::Thing::ExpressionWithoutCall
+pub dageist_engine::document::Thing::Item
+pub dageist_engine::document::Thing::Key
+pub dageist_engine::document::Thing::Link
+pub dageist_engine::document::Thing::Parameter
+pub dageist_engine::document::Thing::Start
+pub dageist_engine::document::Thing::Step
+pub dageist_engine::document::Thing::Value(dageist_engine::document::ValueKind)
+impl dageist_engine::document::Thing
+pub const fn dageist_engine::document::Thing::of_segment(segment: &dageist_engine::document::Segment) -> Self
+impl core::fmt::Display for dageist_engine::document::Thing
+pub fn dageist_engine::document::Thing::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::Value
 pub dageist_engine::document::Value::Choice(alloc::string::String)
 pub dageist_engine::document::Value::Columns(alloc::vec::Vec<alloc::string::String>)
@@ -870,6 +914,39 @@ pub dageist_engine::document::Value::Pattern(alloc::string::String)
 pub dageist_engine::document::Value::String(alloc::string::String)
 pub dageist_engine::document::Value::Table(alloc::string::String)
 pub dageist_engine::document::Value::TimeZone(core::option::Option<alloc::string::String>)
+impl dageist_engine::document::Value
+pub fn dageist_engine::document::Value::from_literal(literal: &dageist_engine::allowed::Literal, kind: dageist_engine::catalog::Kind) -> Self
+pub enum dageist_engine::document::ValueKind
+pub dageist_engine::document::ValueKind::Choice
+pub dageist_engine::document::ValueKind::Columns
+pub dageist_engine::document::ValueKind::Dtype
+pub dageist_engine::document::ValueKind::Duration
+pub dageist_engine::document::ValueKind::Expression
+pub dageist_engine::document::ValueKind::Flag
+pub dageist_engine::document::ValueKind::Float
+pub dageist_engine::document::ValueKind::Integer
+pub dageist_engine::document::ValueKind::List
+pub dageist_engine::document::ValueKind::Pairs
+pub dageist_engine::document::ValueKind::Path
+pub dageist_engine::document::ValueKind::Pattern
+pub dageist_engine::document::ValueKind::String
+pub dageist_engine::document::ValueKind::Table
+pub dageist_engine::document::ValueKind::TimeZone
+impl dageist_engine::document::ValueKind
+pub const fn dageist_engine::document::ValueKind::of(value: &dageist_engine::document::Value) -> Self
+pub enum dageist_engine::document::Wanted
+pub dageist_engine::document::Wanted::Argument
+pub dageist_engine::document::Wanted::Call
+pub dageist_engine::document::Wanted::EntryPart
+pub dageist_engine::document::Wanted::Expression
+pub dageist_engine::document::Wanted::Item
+pub dageist_engine::document::Wanted::Link
+pub dageist_engine::document::Wanted::List
+pub dageist_engine::document::Wanted::Pairs
+pub dageist_engine::document::Wanted::Parameter
+pub dageist_engine::document::Wanted::PartOfStep
+impl core::fmt::Display for dageist_engine::document::Wanted
+pub fn dageist_engine::document::Wanted::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::Call
 impl dageist_engine::document::Call
 pub fn dageist_engine::document::Call::argument(&self, parameter: &str) -> core::option::Option<&dageist_engine::document::Value>
@@ -900,6 +977,28 @@ pub const fn dageist_engine::document::Counted::kept(&self) -> usize
 pub const fn dageist_engine::document::Counted::received(&self) -> usize
 pub struct dageist_engine::document::Document
 impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::add_option(&self, call: &dageist_engine::document::Place, parameter: &str) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::clear_argument(&self, place: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::insert_entry(&self, pairs: &dageist_engine::document::Place, at: usize, key: dageist_engine::document::Value, value: dageist_engine::document::Value) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::insert_item(&self, list: &dageist_engine::document::Place, at: usize, item: dageist_engine::document::Value) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::insert_test(&self, list: &dageist_engine::document::Place, at: usize) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::remove_entry(&self, entry: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::remove_item(&self, item: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::set_argument(&self, place: &dageist_engine::document::Place, value: dageist_engine::document::Value) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::set_for_item(&self, call: &dageist_engine::document::Place, parameter: &str, item: usize, value: dageist_engine::document::Value) -> core::result::Result<Self, dageist_engine::document::EditError>
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::add_step(&self, at: usize, entry: &str, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::move_step(&self, step: &dageist_engine::document::Place, to: usize) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::remove_step(&self, step: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::swap_step(&self, step: &dageist_engine::document::Place, entry: &str, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::result::Result<Self, dageist_engine::document::EditError>
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::insert_link(&self, expression: &dageist_engine::document::Place, at: usize, entry: &str, standing: core::option::Option<&dageist_engine::allowed::Place>) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::move_link(&self, link: &dageist_engine::document::Place, to: usize) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::remove_link(&self, link: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::set_start(&self, expression: &dageist_engine::document::Place, start: dageist_engine::document::Start) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::start_with(&self, expression: &dageist_engine::document::Place, entry: &str) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::swap_link(&self, link: &dageist_engine::document::Place, entry: &str, standing: core::option::Option<&dageist_engine::allowed::Place>) -> core::result::Result<Self, dageist_engine::document::EditError>
+impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::new(steps: alloc::vec::Vec<dageist_engine::document::Step>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub fn dageist_engine::document::Document::steps(&self) -> &[dageist_engine::document::Step]
 impl dageist_engine::document::Document
@@ -927,11 +1026,24 @@ pub struct dageist_engine::document::DuplicateInput(pub alloc::string::String)
 impl core::error::Error for dageist_engine::document::DuplicateInput
 impl core::fmt::Display for dageist_engine::document::DuplicateInput
 pub fn dageist_engine::document::DuplicateInput::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::EditError(_)
+impl dageist_engine::document::EditError
+pub fn dageist_engine::document::EditError::place(&self) -> &dageist_engine::document::Place
+pub fn dageist_engine::document::EditError::problem(&self) -> &dageist_engine::document::EditProblem
+impl core::error::Error for dageist_engine::document::EditError
+pub fn dageist_engine::document::EditError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::EditError
+pub fn dageist_engine::document::EditError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::EmptyStepId
 impl core::error::Error for dageist_engine::document::EmptyStepId
 impl core::fmt::Display for dageist_engine::document::EmptyStepId
 pub fn dageist_engine::document::EmptyStepId::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::Expression
+impl dageist_engine::document::Expression
+pub fn dageist_engine::document::Expression::field(name: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_engine::document::Refusal>
+pub const fn dageist_engine::document::Expression::hole() -> Self
+pub fn dageist_engine::document::Expression::input(name: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dageist_engine::document::Expression::literal(literal: &dageist_engine::allowed::Literal) -> core::result::Result<Self, dageist_engine::document::Refusal>
 impl dageist_engine::document::Expression
 pub fn dageist_engine::document::Expression::links(&self) -> &[dageist_engine::document::Call]
 pub fn dageist_engine::document::Expression::new(start: dageist_engine::document::Start, links: alloc::vec::Vec<dageist_engine::document::Call>) -> core::result::Result<Self, dageist_engine::document::Refusal>

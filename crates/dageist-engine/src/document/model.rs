@@ -10,6 +10,7 @@
 
 use std::fmt;
 
+use crate::allowed::Literal;
 use crate::catalog::{
     Argument, Build, DefaultValue, DurationUse, Entry, Kind, Parameter, Shape, ValueType,
 };
@@ -727,4 +728,106 @@ fn typed_text(expression: &Expression) -> Option<&String> {
         Value::String(text) => Some(text),
         _ => None,
     }
+}
+
+impl Start {
+    /// The start that reads the column called `name`: the call `polars.col(name)`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue has no `polars.col`, or refuses its argument.
+    pub fn field(name: impl Into<String>) -> Result<Self, Refusal> {
+        let call = Call::new(
+            function("polars.col")?,
+            [("name", Value::Columns(vec![name.into()]))],
+        )?;
+        Ok(Self::Call(call))
+    }
+}
+
+impl Expression {
+    /// An expression with nothing picked yet: its start is a [`Start::Hole`].
+    /// A step that holds it is incomplete, not refused.
+    #[must_use]
+    pub const fn hole() -> Self {
+        Self {
+            start: Start::Hole,
+            links: Vec::new(),
+        }
+    }
+
+    /// An expression that is the connected input called `name`, as a value or
+    /// a list.
+    #[must_use]
+    pub fn input(name: impl Into<String>) -> Self {
+        Self {
+            start: Start::Input(name.into()),
+            links: Vec::new(),
+        }
+    }
+
+    /// An expression that reads the column called `name`: `polars.col(name)`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue has no `polars.col`, or refuses its argument.
+    pub fn field(name: impl Into<String>) -> Result<Self, Refusal> {
+        Self::new(Start::field(name)?, Vec::new())
+    }
+
+    /// An expression that is `literal`, the same on every row: `polars.lit`,
+    /// which gives it the dtype Polars gives a literal of its kind.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue has no `polars.lit`, or the literal is a number that
+    /// is not finite.
+    pub fn literal(literal: &Literal) -> Result<Self, Refusal> {
+        let call = Call::new(
+            function("polars.lit")?,
+            [(
+                "value",
+                Value::from_literal(literal, Kind::Value(ValueType::Any)),
+            )],
+        )?;
+        Self::new(Start::Call(call), Vec::new())
+    }
+}
+
+impl Value {
+    /// The argument for a parameter of `kind` that holds `literal`, as the
+    /// kind holds it: a number for a parameter that takes a number, and text
+    /// as a duration, a pattern, a time zone, a path or plain text, as the
+    /// parameter's kind says. A whole number that no number holds exactly is
+    /// not rounded: it stays a whole number, which [`Call::new`] refuses for a
+    /// parameter of numbers. Whether the kind takes the argument is for
+    /// [`Call::new`] to say.
+    #[must_use]
+    pub fn from_literal(literal: &Literal, kind: Kind) -> Self {
+        match (literal, kind) {
+            // A whole number given to a parameter of numbers is the number it names, unless no
+            // number is it: it is left whole, which the parameter refuses, and not rounded.
+            (Literal::Integer(value), Kind::Value(ValueType::Float)) => {
+                let number = *value as f64;
+                if number as i128 == i128::from(*value) {
+                    Self::Float(number)
+                } else {
+                    Self::Integer(*value)
+                }
+            }
+            (Literal::Integer(value), _) => Self::Integer(*value),
+            (Literal::Float(value), _) => Self::Float(*value),
+            (Literal::String(text), Kind::Duration) => Self::Duration(text.clone()),
+            (Literal::String(text), Kind::Pattern) => Self::Pattern(text.clone()),
+            (Literal::String(text), Kind::TimeZone) => Self::TimeZone(Some(text.clone())),
+            (Literal::String(text), Kind::Path) => Self::Path(text.clone()),
+            (Literal::String(text), _) => Self::String(text.clone()),
+        }
+    }
+}
+
+/// The entry `id`, which the catalogue has, as a refusal says where it does
+/// not.
+pub(super) fn function(id: &str) -> Result<&'static Entry, Refusal> {
+    crate::catalog::entry(id).ok_or_else(|| Refusal::new(Cause::UnknownEntry(id.to_owned())))
 }

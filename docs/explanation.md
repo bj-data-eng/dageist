@@ -1186,6 +1186,25 @@ reads back as the same document, and text the writer produced is written back
 exactly, each float to the bit. Nesting is limited to a fixed depth, which
 reading and constructing a document both enforce.
 
+The engine also makes every edit of a document. An edit takes a document and
+gives the edited document or an `EditError` that says why not, so a host or a view
+sends what the user did and does not build or change the JSON itself. Each edit is
+made on the model: the calls, expressions and steps on the way to what is changed
+are made again with their constructors, so the model checks an edit as it is made
+and the document an edit gives reads back as the same document. An edit names where
+it is made as offers and reports name places, a step by its number and its
+identifier, then the way through the step's arguments. The check of the identifier
+refuses a place whose step has changed, but not one whose identifier a later step reused
+or one made with none, so a host also keeps a revision of the document with each edit
+and refuses an edit made against an older one. One action of a view can be several
+edits one after another, such as a join's table and then its right keys. What the engine decides a new part starts
+with, a step, a link of an expression, an option or a test of a condition, comes
+from the catalogue's starts and the tables of allowed combinations, so no host or
+view repeats it. An edit may leave a step incomplete, with a hole, or refused, with
+an argument left out that Polars needs; running the document says so, as it does for
+a document written by hand. The edits are listed in the documentation of
+`Document` in the engine.
+
 The engine runs a document on a source table and the graph's inputs. It
 builds each step through the catalogue and reports whether it is valid, with
 the place and reason when it is not, its result schema, and the dtype after
