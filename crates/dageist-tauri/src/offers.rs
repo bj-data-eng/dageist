@@ -23,7 +23,6 @@ use dageist_engine::catalog::{self, Applies, Entry, StepFrame, ValueType};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::catalogue::{SettingView, setting_view};
 use crate::report::{
     ConditionStateView, OfferPlaceView, RefusalView, ValueShapeView, VerdictView, offer_place_view,
     refusal_view, verdict_view,
@@ -390,26 +389,17 @@ pub(crate) struct OptionsView {
     options: Vec<OptionView>,
 }
 
-/// One argument a new step starts with.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct StartArgumentView {
-    /// The parameter, by Python's name.
-    parameter: &'static str,
-    setting: SettingView,
-}
-
-/// What a new step of an entry starts with.
+/// An entry of the list that starts a step.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct StepStartView {
     entry: &'static str,
-    /// The parameters the step starts with. Any other holds its default.
-    arguments: Vec<StartArgumentView>,
 }
 
-/// What every step of the list starts with when it is added to a table.
+/// Which steps of the list can be added to a table.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct StepStartsView {
-    /// One for each step, ordered by identifier.
+    /// One for each step that can, ordered by identifier. What a new step holds is the engine's to
+    /// say when it is added, as an edit, so this says only that it can be.
     starts: Vec<StepStartView>,
 }
 
@@ -622,26 +612,16 @@ pub fn options_view(entry: &str, chosen: &[ChosenOptionRequest]) -> Result<Optio
     Ok(OptionsView { options })
 }
 
-/// What each step of the list starts with when it is added to a table of
-/// `columns`, with the connected `tables` it can bring in. The engine decides
-/// every argument.
+/// Which steps of the list can be added to a table of `columns`, with the connected `tables` it
+/// can bring in. The engine decides it.
 pub fn step_starts_view(columns: &[String], tables: &[String]) -> StepStartsView {
     let frame = StepFrame { columns, tables };
     let starts = catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Frame)
-        .filter_map(|entry| {
-            catalog::start_step(entry, &frame).map(|start| StepStartView {
-                entry: entry.id().as_str(),
-                arguments: start
-                    .arguments()
-                    .iter()
-                    .map(|(parameter, setting)| StartArgumentView {
-                        parameter,
-                        setting: setting_view(setting),
-                    })
-                    .collect(),
-            })
+        .filter(|entry| catalog::start_step(entry, &frame).is_some())
+        .map(|entry| StepStartView {
+            entry: entry.id().as_str(),
         })
         .collect();
     StepStartsView { starts }

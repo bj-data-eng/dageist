@@ -335,15 +335,10 @@ describe('the options of an entry', () => {
   });
 });
 
-describe('what each step starts with', () => {
+describe('which steps can be added', () => {
   const starts = decodeStepStarts(stepStarts).starts;
-  const startOf = (entry: string) => {
-    const found = starts.find((start) => start.entry === entry);
-    if (found === undefined) throw new Error(`no start for ${entry}`);
-    return found;
-  };
 
-  it('has one for each step of the list, ordered by identifier', () => {
+  it('has one for each step of the list that can be, ordered by identifier', () => {
     expect(starts.map((start) => start.entry)).toEqual([
       'LazyFrame.drop',
       'LazyFrame.drop_nans',
@@ -368,119 +363,18 @@ describe('what each step starts with', () => {
     ]);
   });
 
-  it('gives a step that cuts or numbers a table only what it cannot do without', () => {
-    // Each of these is complete as Polars runs it with nothing given: five rows, every column,
-    // the rows as they are and a count from zero.
-    for (const entry of [
-      'LazyFrame.drop_nans',
-      'LazyFrame.drop_nulls',
-      'LazyFrame.first',
-      'LazyFrame.head',
-      'LazyFrame.last',
-      'LazyFrame.limit',
-      'LazyFrame.reverse',
-      'LazyFrame.tail',
-      'LazyFrame.with_row_index',
-    ]) {
-      expect(startOf(entry).arguments, entry).toEqual([]);
-    }
-    // A drop needs a column to drop, a slice where it starts, a gather every nth row and a fill the
-    // value it fills with, each still to be given.
-    expect(startOf('LazyFrame.drop').arguments).toEqual([
-      { parameter: 'columns', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
-    ]);
-    expect(startOf('LazyFrame.slice').arguments).toEqual([
-      { parameter: 'offset', setting: { kind: 'unset' } },
-    ]);
-    expect(startOf('LazyFrame.gather_every').arguments).toEqual([
-      { parameter: 'n', setting: { kind: 'unset' } },
-    ]);
-    expect(startOf('LazyFrame.fill_nan').arguments).toEqual([
-      { parameter: 'value', setting: { kind: 'unset' } },
-    ]);
-  });
-
-  it('gives a select every column of the table in its order, as fields', () => {
-    expect(startOf('LazyFrame.select').arguments).toEqual([
-      {
-        parameter: 'exprs',
-        setting: {
-          kind: 'list',
-          items: ['dcn', 'timestamp', 'step_to', 'owner', 'row_days'].map((column) => ({
-            kind: 'field',
-            column,
-          })),
-        },
-      },
-    ]);
-  });
-
-  it('gives a join the first connected table, keys still to be given, and the rows of the left table kept', () => {
-    expect(startOf('LazyFrame.join').arguments).toEqual([
-      { parameter: 'other', setting: { kind: 'word', value: 'step_names' } },
-      { parameter: 'left_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
-      { parameter: 'right_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
-      { parameter: 'how', setting: { kind: 'word', value: 'left' } },
-    ]);
-  });
-
-  it('gives a filter a comparison for equality of a field and a value still to be given', () => {
-    expect(startOf('LazyFrame.filter').arguments).toEqual([
-      {
-        parameter: 'predicates',
-        setting: {
-          kind: 'list',
-          items: [
-            {
-              kind: 'comparison',
-              entry: 'Expr.eq',
-              field: { kind: 'unset' },
-              other: { kind: 'unset' },
-            },
-          ],
-        },
-      },
-    ]);
-  });
-
-  it('gives a pivot the first connected table and the first value of each cell', () => {
-    expect(startOf('LazyFrame.pivot').arguments).toContainEqual({
-      parameter: 'aggregate_function',
-      setting: { kind: 'element', method: 'first' },
-    });
-    expect(startOf('LazyFrame.pivot').arguments).toContainEqual({
-      parameter: 'on_columns',
-      setting: { kind: 'word', value: 'step_names' },
-    });
-  });
-
-  it('gives a new column the name new_column, with what it holds still to be given', () => {
-    expect(startOf('LazyFrame.with_columns').arguments).toEqual([
-      {
-        parameter: 'named_exprs',
-        setting: {
-          kind: 'pairs',
-          entries: [
-            {
-              key: { kind: 'text', value: 'new_column', shown: 'new_column' },
-              value: { kind: 'unset' },
-            },
-          ],
-        },
-      },
-    ]);
-  });
-
   it('is refused with the place of what is wrong', () => {
     expect(refusal(decodeStepStarts, replaced(stepStarts, ['starts'], {})).message).toBe(
       '$.starts: must be a list, not an object',
     );
-    expect(
-      refusal(decodeStepStarts, replaced(stepStarts, ['starts', 0, 'arguments', 0, 'setting'], 1))
-        .message,
-    ).toBe('$.starts[0].arguments[0].setting: must be an object, not a number');
+    expect(refusal(decodeStepStarts, replaced(stepStarts, ['starts', 0, 'entry'], 1)).message).toBe(
+      '$.starts[0].entry: must be a string, not a number',
+    );
     expect(
       refusal(decodeStepStarts, withField(stepStarts, ['starts', 0], 'extra', 1)).message,
     ).toBe('$.starts[0]: has the field "extra", which the contract lacks');
+    expect(
+      refusal(decodeStepStarts, withField(stepStarts, ['starts', 0], 'arguments', [])).message,
+    ).toBe('$.starts[0]: has the field "arguments", which the contract lacks');
   });
 });

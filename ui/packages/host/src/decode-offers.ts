@@ -17,7 +17,6 @@ import type {
   OptionsView,
   ReadingView,
   ReadingsView,
-  StartArgumentView,
   StepStartView,
   StepStartsView,
 } from './contract';
@@ -33,7 +32,6 @@ import {
   readString,
   readTagged,
 } from './decode';
-import { readSettingView } from './decode-catalogue';
 import { readOfferPlace, readRefusal, readVerdict } from './decode-run';
 
 const readLiteral: Decode<LiteralView> = readTagged<LiteralView>('kind', {
@@ -152,17 +150,8 @@ const readOptions: Decode<OptionsView> = readRecord(['options'], (fields, path) 
   options: readField(fields, path, 'options', readList(readOption)),
 }));
 
-const readStartArgument: Decode<StartArgumentView> = readRecord(
-  ['parameter', 'setting'],
-  (fields, path) => ({
-    parameter: readField(fields, path, 'parameter', readString),
-    setting: readField(fields, path, 'setting', readSettingView),
-  }),
-);
-
-const readStepStart: Decode<StepStartView> = readRecord(['entry', 'arguments'], (fields, path) => ({
+const readStepStart: Decode<StepStartView> = readRecord(['entry'], (fields, path) => ({
   entry: readField(fields, path, 'entry', readString),
-  arguments: readField(fields, path, 'arguments', readList(readStartArgument)),
 }));
 
 const readStepStarts: Decode<StepStartsView> = readRecord(['starts'], (fields, path) => ({

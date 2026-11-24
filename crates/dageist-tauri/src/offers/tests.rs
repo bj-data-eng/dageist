@@ -875,99 +875,58 @@ fn names(texts: &[&str]) -> Vec<String> {
 }
 
 #[test]
-fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
+fn every_step_of_the_list_that_can_be_added_is_named() {
     let answer = invoke(
         "step_starts",
         json!({ "columns": ["dcn", "owner"], "tables": ["step_names", "step_sla"] }),
     )
     .expect("the starts");
-    let unset = || json!({ "kind": "unset" });
-    let unset_list = || json!({ "kind": "list", "items": [{ "kind": "unset" }] });
-    let argument =
-        |parameter: &str, setting: Value| json!({ "parameter": parameter, "setting": setting });
-    // Worked out by hand: a join takes the first table and keeps the rows that have no match,
-    // a select every column in order, and a pivot takes the first table and the first value.
+    // Worked out by hand from the steps the catalogue lists for a table: each that starts a
+    // step, ordered by identifier. What a new step holds is the engine's to say as an edit.
+    let entries: Vec<&str> = [
+        "drop",
+        "drop_nans",
+        "drop_nulls",
+        "fill_nan",
+        "filter",
+        "first",
+        "gather_every",
+        "head",
+        "join",
+        "last",
+        "limit",
+        "pivot",
+        "rename",
+        "reverse",
+        "select",
+        "slice",
+        "sort",
+        "tail",
+        "with_columns",
+        "with_row_index",
+    ]
+    .into_iter()
+    .collect();
+    let named: Vec<String> = entries
+        .iter()
+        .map(|name| format!("LazyFrame.{name}"))
+        .collect();
     assert_eq!(
         answer,
-        json!({ "starts": [
-            { "entry": "LazyFrame.drop", "arguments": [argument("columns", unset_list())] },
-            { "entry": "LazyFrame.drop_nans", "arguments": [] },
-            { "entry": "LazyFrame.drop_nulls", "arguments": [] },
-            { "entry": "LazyFrame.fill_nan", "arguments": [argument("value", unset())] },
-            { "entry": "LazyFrame.filter", "arguments": [argument("predicates", json!({
-                "kind": "list",
-                "items": [{
-                    "kind": "comparison",
-                    "entry": "Expr.eq",
-                    "field": { "kind": "unset" },
-                    "other": { "kind": "unset" },
-                }],
-            }))] },
-            { "entry": "LazyFrame.first", "arguments": [] },
-            { "entry": "LazyFrame.gather_every", "arguments": [argument("n", unset())] },
-            { "entry": "LazyFrame.head", "arguments": [] },
-            { "entry": "LazyFrame.join", "arguments": [
-                argument("other", json!({ "kind": "word", "value": "step_names" })),
-                argument("left_on", unset_list()),
-                argument("right_on", unset_list()),
-                argument("how", json!({ "kind": "word", "value": "left" })),
-            ] },
-            { "entry": "LazyFrame.last", "arguments": [] },
-            { "entry": "LazyFrame.limit", "arguments": [] },
-            { "entry": "LazyFrame.pivot", "arguments": [
-                argument("on", unset()),
-                argument("on_columns", json!({ "kind": "word", "value": "step_names" })),
-                argument("index", unset()),
-                argument("values", unset()),
-                argument("aggregate_function", json!({ "kind": "element", "method": "first" })),
-            ] },
-            { "entry": "LazyFrame.rename", "arguments": [
-                argument("mapping", json!({ "kind": "pairs", "entries": [] })),
-            ] },
-            { "entry": "LazyFrame.reverse", "arguments": [] },
-            { "entry": "LazyFrame.select", "arguments": [
-                argument("exprs", json!({ "kind": "list", "items": [
-                    { "kind": "field", "column": "dcn" },
-                    { "kind": "field", "column": "owner" },
-                ] })),
-            ] },
-            { "entry": "LazyFrame.slice", "arguments": [argument("offset", unset())] },
-            { "entry": "LazyFrame.sort", "arguments": [argument("by", unset_list())] },
-            { "entry": "LazyFrame.tail", "arguments": [] },
-            { "entry": "LazyFrame.with_columns", "arguments": [
-                argument("named_exprs", json!({ "kind": "pairs", "entries": [
-                    { "key": { "kind": "text", "value": "new_column", "shown": "new_column" }, "value": unset() },
-                ] })),
-            ] },
-            { "entry": "LazyFrame.with_row_index", "arguments": [] },
-        ] })
+        json!({ "starts": named.iter().map(|entry| json!({ "entry": entry })).collect::<Vec<_>>() })
     );
 }
 
 #[test]
-fn a_join_and_a_pivot_with_no_connected_table_start_without_one() {
+fn a_join_and_a_pivot_with_no_connected_table_can_still_be_added() {
     let view = json_of(&step_starts_view(&names(&["a"]), &[]));
     let starts = view["starts"].as_array().expect("starts");
-    let argument = |entry: &str, parameter: &str| {
-        starts
-            .iter()
-            .find(|start| start["entry"] == entry)
-            .and_then(|start| {
-                start["arguments"]
-                    .as_array()?
-                    .iter()
-                    .find(|argument| argument["parameter"] == parameter)
-            })
-            .map(|argument| argument["setting"].clone())
-    };
-    assert_eq!(
-        argument("LazyFrame.join", "other"),
-        Some(json!({ "kind": "unset" }))
-    );
-    assert_eq!(
-        argument("LazyFrame.pivot", "on_columns"),
-        Some(json!({ "kind": "unset" }))
-    );
+    for entry in ["LazyFrame.join", "LazyFrame.pivot"] {
+        assert!(
+            starts.iter().any(|start| start["entry"] == entry),
+            "{entry}"
+        );
+    }
 }
 
 #[test]

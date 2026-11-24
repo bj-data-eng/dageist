@@ -89,7 +89,6 @@ export type {
   SourceView,
   StageView,
   StandingView,
-  StartArgumentView,
   StepReportView,
   StepStartView,
   StepStartsRequest,

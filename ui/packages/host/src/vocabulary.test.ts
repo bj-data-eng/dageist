@@ -139,7 +139,7 @@ describe('the words the decoders read', () => {
         decodeCatalogue(
           replaced(
             catalogue,
-            ['entries', shiftIndex(), 'parameters', 0, 'start'],
+            ['entries', shiftIndex(), 'parameters', 0, 'defaultSetting'],
             settingOfKind(word),
           ),
         ),

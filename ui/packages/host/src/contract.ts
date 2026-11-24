@@ -202,8 +202,6 @@ export interface ParameterView {
    * given, Polars decides or the default is not a value.
    */
   readonly defaultSetting: SettingView | null;
-  /** What the parameter is set to when it is first added, which differs from its default. */
-  readonly start: SettingView;
   /**
    * Where the expression the parameter holds stands, when a named position
    * holds it; the engine's tables are asked at that place.
@@ -1139,24 +1137,15 @@ export interface StepStartsRequest {
   readonly tables: readonly string[];
 }
 
-/** One argument a new step starts with. */
-export interface StartArgumentView {
-  /** The parameter, by Python's name. */
-  readonly parameter: string;
-  readonly setting: SettingView;
-}
-
-/** What a new step of an entry starts with. Mirrors `StepStartView` in crates/dageist-tauri/src/offers.rs. */
+/** An entry of the list that starts a step. Mirrors `StepStartView` in crates/dageist-tauri/src/offers.rs. */
 export interface StepStartView {
   /** The identifier the catalogue gives the entry. */
   readonly entry: string;
-  /** The parameters the step starts with. Any other holds its default. */
-  readonly arguments: readonly StartArgumentView[];
 }
 
-/** What every step of the list starts with. Mirrors `StepStartsView` in crates/dageist-tauri/src/offers.rs. */
+/** Which steps of the list can be added to a table. Mirrors `StepStartsView` in crates/dageist-tauri/src/offers.rs. */
 export interface StepStartsView {
-  /** One for each step, ordered by identifier. */
+  /** One for each step that can, ordered by identifier. */
   readonly starts: readonly StepStartView[];
 }
 

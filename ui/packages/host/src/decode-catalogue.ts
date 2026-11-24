@@ -232,9 +232,6 @@ function readPair(value: unknown, path: string): PairView {
   }))(value, path);
 }
 
-/** Reads a setting the engine reports, which is `unset`, a flag, a number, text, a word, an expression, a list or pairs. */
-export const readSettingView: Decode<SettingView> = (value, path) => readSetting(value, path);
-
 const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
   outer: {
     fields: ['name'],
@@ -253,18 +250,7 @@ const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
 });
 
 const readParameter: Decode<ParameterView> = readRecord(
-  [
-    'name',
-    'shown',
-    'label',
-    'kind',
-    'shape',
-    'default',
-    'defaultSetting',
-    'start',
-    'position',
-    'offered',
-  ],
+  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'defaultSetting', 'position', 'offered'],
   (fields, path) => ({
     name: readField(fields, path, 'name', readString),
     shown: readField(fields, path, 'shown', readString),
@@ -273,7 +259,6 @@ const readParameter: Decode<ParameterView> = readRecord(
     shape: readField(fields, path, 'shape', readShape),
     default: readField(fields, path, 'default', readDefault),
     defaultSetting: readField(fields, path, 'defaultSetting', readNullable(readSetting)),
-    start: readField(fields, path, 'start', readSetting),
     position: readField(fields, path, 'position', readNullable(readPosition)),
     offered: readField(fields, path, 'offered', readBoolean),
   }),

@@ -890,16 +890,16 @@ and never shows what was answered for another place. Five commands answer:
 - `option_offers` says what the flags and choices of an entry may be set to
   beside those already chosen, and the word each starts with when it is added,
   so that an option is added with a word Polars allows, or not at all.
-- `step_starts` says what each step of the list starts with on a table: the
-  list of steps asks it while it is open, and a step is added or changed to
-  with what the engine says, so it cannot be picked until the engine has said.
-  A filter starts with a comparison for equality of a field and a value still
-  to be given, which the editor draws as a test.
+- `step_starts` says which steps of the list can be added to a table: the
+  list of steps asks it while it is open, so a step cannot be picked until the
+  engine has said. What a new step holds, a filter's comparison for equality of
+  a field and a value still to be given among it, is the engine's to say when the
+  step is added as an edit.
 
 What a parameter holds when it is not given, what it is first set to and
 whether an option is at its default are rules about Polars, so the engine
-decides them and the editor applies them. The catalogue carries each
-parameter's default and its first setting, and a step report names the
+decides them and the editor shows what it says. The catalogue carries each
+parameter's default, and a step report names the
 arguments of the step, and of the calls inside its expressions, that are what
 their parameter holds when it is not given, which the editor shows as "same as
 the default". Polars calls a method the same with a parameter left out or

@@ -95,7 +95,6 @@ describe('the catalogue the host sends', () => {
           shape: { shape: 'one' },
           default: { kind: 'integer', value: 1 },
           defaultSetting: { kind: 'integer', value: 1, shown: '1' },
-          start: { kind: 'unset' },
           position: null,
           offered: true,
         },
@@ -107,7 +106,6 @@ describe('the catalogue the host sends', () => {
           shape: { shape: 'one' },
           default: { kind: 'none' },
           defaultSetting: null,
-          start: { kind: 'unset' },
           position: null,
           offered: true,
         },
@@ -341,11 +339,10 @@ describe('the default and the first setting of a parameter', () => {
     return found;
   };
 
-  it('are the engine’s: Polars’ default as a setting, and what is set when it is first added', () => {
+  it('are the engine’s: Polars’ default as a setting', () => {
     // Worked out from Python Polars: `join(how="inner", suffix="_right", coalesce=None)`.
     const how = parameterOf('LazyFrame.join', 'how');
     expect(how.defaultSetting).toEqual({ kind: 'word', value: 'inner' });
-    expect(how.start).toEqual({ kind: 'word', value: 'left' });
     expect(parameterOf('LazyFrame.join', 'suffix').defaultSetting).toEqual({
       kind: 'text',
       value: '_right',
@@ -357,39 +354,33 @@ describe('the default and the first setting of a parameter', () => {
       shown: '1',
     });
     expect(parameterOf('LazyFrame.join', 'coalesce').defaultSetting).toBeNull();
-    expect(parameterOf('LazyFrame.sort', 'descending').start).toEqual({
-      kind: 'flag',
-      value: true,
-    });
-    expect(parameterOf('LazyFrame.join', 'left_on').start).toEqual({
-      kind: 'list',
-      items: [{ kind: 'unset' }],
-    });
-    expect(parameterOf('LazyFrame.rename', 'mapping').start).toEqual({
-      kind: 'pairs',
-      entries: [],
-    });
   });
 
   it('are refused where a setting is of a kind the contract lacks or holds another kind of value', () => {
     const how = parameterPath(catalogue, 'LazyFrame.join', 'how');
     const here = `$.entries[${String(how[1])}].parameters[${String(how[3])}]`;
-    expect(refusal(replaced(catalogue, [...how, 'start'], { kind: 'text-ish' })).message).toContain(
-      `${here}.start.kind`,
-    );
     expect(
-      refusal(replaced(catalogue, [...how, 'start'], { kind: 'flag', value: 'yes' })).message,
-    ).toBe(`${here}.start.value: must be a boolean, not a string`);
+      refusal(replaced(catalogue, [...how, 'defaultSetting'], { kind: 'text-ish' })).message,
+    ).toContain(`${here}.defaultSetting.kind`);
+    expect(
+      refusal(replaced(catalogue, [...how, 'defaultSetting'], { kind: 'flag', value: 'yes' }))
+        .message,
+    ).toBe(`${here}.defaultSetting.value: must be a boolean, not a string`);
     // A number or text the engine reports comes with the words it is shown as.
     expect(
-      refusal(replaced(catalogue, [...how, 'start'], { kind: 'integer', value: 1 })).message,
-    ).toBe(`${here}.start: is missing the field "shown"`);
+      refusal(replaced(catalogue, [...how, 'defaultSetting'], { kind: 'integer', value: 1 }))
+        .message,
+    ).toBe(`${here}.defaultSetting: is missing the field "shown"`);
     expect(refusal(without(catalogue, how, 'defaultSetting')).message).toBe(
       `${here}: is missing the field "defaultSetting"`,
     );
     expect(
-      refusal(replaced(catalogue, [...how, 'start'], { kind: 'list', items: [{ kind: 'nope' }] }))
-        .message,
-    ).toContain(`${here}.start.items[0].kind`);
+      refusal(
+        replaced(catalogue, [...how, 'defaultSetting'], {
+          kind: 'list',
+          items: [{ kind: 'nope' }],
+        }),
+      ).message,
+    ).toContain(`${here}.defaultSetting.items[0].kind`);
   });
 });

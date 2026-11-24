@@ -155,9 +155,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": {
             "kind": "nested",
             "name": "condition.value"
@@ -189,14 +186,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
@@ -223,10 +212,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": null,
           "offered": true
         }
@@ -255,9 +240,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": {
             "kind": "nested",
             "name": "condition.value"
@@ -299,9 +281,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -334,10 +313,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         }
@@ -366,14 +341,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         }
@@ -405,10 +372,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -448,9 +411,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -494,10 +454,6 @@
             "kind": "word",
             "value": "auto"
           },
-          "start": {
-            "kind": "word",
-            "value": "kll"
-          },
           "position": null,
           "offered": true
         },
@@ -520,9 +476,6 @@
             "kind": "float",
             "value": 0.001,
             "shown": "0.001"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -554,10 +507,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "empirical"
-          },
-          "start": {
-            "kind": "word",
-            "value": "formal"
           },
           "position": null,
           "offered": true
@@ -671,10 +620,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -695,10 +640,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -729,9 +670,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -850,9 +788,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -874,10 +809,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         },
@@ -898,10 +829,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -951,9 +878,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -971,9 +895,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -1046,10 +967,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -1081,10 +998,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -1118,10 +1031,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -1154,10 +1063,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -1189,10 +1094,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -1237,9 +1138,6 @@
             "value": 1,
             "shown": "1"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1266,9 +1164,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "ignore"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": false
@@ -1342,10 +1237,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         }
@@ -1384,9 +1275,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1422,10 +1310,6 @@
             "kind": "word",
             "value": "us"
           },
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         }
@@ -1455,9 +1339,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -1551,10 +1432,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "us"
-          },
-          "start": {
-            "kind": "word",
-            "value": "ns"
           },
           "position": null,
           "offered": true
@@ -1694,9 +1571,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -1745,9 +1619,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1765,9 +1636,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1785,9 +1653,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1805,9 +1670,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1825,9 +1687,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1845,9 +1704,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1865,9 +1721,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1906,10 +1759,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "raise"
-          },
-          "start": {
-            "kind": "word",
-            "value": "earliest"
           },
           "position": null,
           "offered": true
@@ -1943,9 +1792,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -1985,10 +1831,6 @@
             "kind": "word",
             "value": "raise"
           },
-          "start": {
-            "kind": "word",
-            "value": "earliest"
-          },
           "position": null,
           "offered": true
         },
@@ -2020,10 +1862,6 @@
             "kind": "word",
             "value": "raise"
           },
-          "start": {
-            "kind": "word",
-            "value": "null"
-          },
           "position": null,
           "offered": true
         }
@@ -2052,9 +1890,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2087,10 +1922,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -2120,9 +1951,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2179,10 +2007,6 @@
             "kind": "word",
             "value": "us"
           },
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         }
@@ -2212,9 +2036,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2246,10 +2067,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -2283,10 +2100,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -2318,10 +2131,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -2355,10 +2164,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -2390,10 +2195,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -2427,10 +2228,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -2463,10 +2260,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -2495,9 +2288,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2562,9 +2352,6 @@
             "value": 2.718281828459045,
             "shown": "2.718281828459045"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -2585,10 +2372,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -2618,9 +2401,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2649,9 +2429,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2710,9 +2487,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2741,9 +2515,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -2791,10 +2562,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "word",
-            "value": "forward"
-          },
           "position": null,
           "offered": true
         },
@@ -2813,9 +2580,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2847,10 +2611,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -2890,9 +2650,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2922,9 +2679,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2953,9 +2707,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -2984,9 +2735,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3025,9 +2773,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -3045,9 +2790,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -3087,10 +2829,6 @@
             "kind": "word",
             "value": "both"
           },
-          "start": {
-            "kind": "word",
-            "value": "left"
-          },
           "position": null,
           "offered": true
         }
@@ -3119,9 +2857,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -3144,9 +2879,6 @@
             "kind": "float",
             "value": 0.0,
             "shown": "0.0"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -3171,9 +2903,6 @@
             "value": 1e-9,
             "shown": "1e-09"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -3194,10 +2923,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -3331,10 +3056,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         },
@@ -3355,10 +3076,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -3392,10 +3109,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         }
@@ -3424,9 +3137,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3470,9 +3180,6 @@
             "value": 2.718281828459045,
             "shown": "2.718281828459045"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3511,9 +3218,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3582,9 +3286,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3613,9 +3314,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3674,9 +3372,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3705,9 +3400,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -3766,14 +3458,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         }
@@ -3802,14 +3486,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "over.partition_by"
@@ -3830,14 +3506,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "over.partition_by"
@@ -3858,14 +3526,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "over.order_by"
@@ -3890,10 +3550,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -3914,10 +3570,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -3954,10 +3606,6 @@
             "kind": "word",
             "value": "group_to_rows"
           },
-          "start": {
-            "kind": "word",
-            "value": "join"
-          },
           "position": null,
           "offered": true
         }
@@ -3991,9 +3639,6 @@
             "value": 1,
             "shown": "1"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4022,9 +3667,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4063,9 +3705,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4112,10 +3751,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "nearest"
-          },
-          "start": {
-            "kind": "word",
-            "value": "higher"
           },
           "position": null,
           "offered": true
@@ -4185,10 +3820,6 @@
             "kind": "word",
             "value": "average"
           },
-          "start": {
-            "kind": "word",
-            "value": "min"
-          },
           "position": null,
           "offered": true
         },
@@ -4210,10 +3841,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -4232,9 +3859,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4263,9 +3887,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4283,9 +3904,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4314,9 +3932,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4334,9 +3949,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4354,9 +3966,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4374,9 +3983,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4431,9 +4037,6 @@
             "value": 0,
             "shown": "0"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4465,10 +4068,6 @@
             "kind": "word",
             "value": "half_to_even"
           },
-          "start": {
-            "kind": "word",
-            "value": "half_away_from_zero"
-          },
           "position": null,
           "offered": true
         }
@@ -4498,9 +4097,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4534,9 +4130,6 @@
             "value": 1,
             "shown": "1"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4554,9 +4147,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4619,10 +4209,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         }
@@ -4655,10 +4241,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -4679,10 +4261,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -4712,14 +4290,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         },
@@ -4737,14 +4307,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         },
@@ -4766,10 +4328,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -4793,10 +4351,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -4818,10 +4372,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         },
@@ -4842,10 +4392,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -4891,9 +4437,6 @@
             "value": 1,
             "shown": "1"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -4923,9 +4466,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -4947,10 +4487,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -4971,10 +4507,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": false
@@ -5005,9 +4537,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5028,10 +4557,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -5061,9 +4586,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5103,9 +4625,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5128,9 +4647,6 @@
             "kind": "integer",
             "value": 1,
             "shown": "1"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -5161,9 +4677,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5193,9 +4706,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5225,9 +4735,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5249,10 +4756,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -5273,10 +4776,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": false
@@ -5306,9 +4805,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5343,9 +4839,6 @@
             "value": "",
             "shown": ""
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5366,10 +4859,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -5419,9 +4908,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5444,9 +4930,6 @@
             "kind": "text",
             "value": " ",
             "shown": " "
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -5476,9 +4959,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5501,9 +4981,6 @@
             "kind": "text",
             "value": " ",
             "shown": " "
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -5534,9 +5011,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5554,9 +5028,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5577,10 +5048,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -5604,9 +5071,6 @@
             "kind": "integer",
             "value": 1,
             "shown": "1"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -5637,9 +5101,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5657,9 +5118,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5680,10 +5138,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -5723,9 +5177,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5743,9 +5194,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5774,9 +5222,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -5797,10 +5242,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -5823,10 +5264,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         },
@@ -5847,10 +5284,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -5880,9 +5313,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5911,9 +5341,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5942,9 +5369,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -5973,9 +5397,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6004,9 +5425,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6035,9 +5453,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6066,9 +5481,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6127,9 +5539,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6158,9 +5567,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6219,9 +5625,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6255,9 +5658,6 @@
             "kind": "integer",
             "value": 0,
             "shown": "0"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -6293,9 +5693,6 @@
             "value": 1,
             "shown": "1"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6324,9 +5721,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6355,14 +5749,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         },
@@ -6383,10 +5769,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -6416,9 +5798,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6447,9 +5826,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6479,9 +5855,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6510,14 +5883,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "filter"
@@ -6544,10 +5909,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": null,
           "offered": true
         }
@@ -6587,9 +5948,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -6612,9 +5970,6 @@
             "kind": "integer",
             "value": 0,
             "shown": "0"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -6650,9 +6005,6 @@
             "value": 5,
             "shown": "5"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -6681,9 +6033,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -6701,14 +6050,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "join_left"
@@ -6763,10 +6104,6 @@
             "kind": "word",
             "value": "inner"
           },
-          "start": {
-            "kind": "word",
-            "value": "left"
-          },
           "position": null,
           "offered": true
         },
@@ -6784,14 +6121,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "join_left"
@@ -6812,14 +6141,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "join_right"
@@ -6845,9 +6166,6 @@
             "kind": "text",
             "value": "_right",
             "shown": "_right"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -6888,10 +6206,6 @@
             "kind": "word",
             "value": "m:m"
           },
-          "start": {
-            "kind": "word",
-            "value": "m:1"
-          },
           "position": null,
           "offered": true
         },
@@ -6913,10 +6227,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -6934,10 +6244,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -6977,10 +6283,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "word",
-            "value": "none"
-          },
           "position": null,
           "offered": true
         },
@@ -7024,10 +6326,6 @@
             "kind": "word",
             "value": "auto"
           },
-          "start": {
-            "kind": "word",
-            "value": "prefer_left"
-          },
           "position": null,
           "offered": true
         },
@@ -7049,10 +6347,6 @@
             "kind": "flag",
             "value": true
           },
-          "start": {
-            "kind": "flag",
-            "value": false
-          },
           "position": null,
           "offered": true
         },
@@ -7073,10 +6367,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -7122,9 +6412,6 @@
             "value": 5,
             "shown": "5"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -7153,9 +6440,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7173,9 +6457,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7193,9 +6474,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7213,9 +6491,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7233,9 +6508,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": {
             "kind": "outer",
             "name": "pivot_aggregate"
@@ -7260,10 +6532,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -7286,9 +6554,6 @@
             "kind": "text",
             "value": "_",
             "shown": "_"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -7320,10 +6585,6 @@
           "defaultSetting": {
             "kind": "word",
             "value": "auto"
-          },
-          "start": {
-            "kind": "word",
-            "value": "combine"
           },
           "position": null,
           "offered": true
@@ -7360,10 +6621,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": null,
           "offered": true
         },
@@ -7384,10 +6641,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -7427,14 +6680,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "select"
@@ -7461,10 +6706,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": {
             "kind": "outer",
             "name": "select"
@@ -7497,9 +6738,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7518,9 +6756,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -7549,14 +6784,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "sort"
@@ -7577,14 +6804,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "sort"
@@ -7610,10 +6829,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -7636,10 +6851,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -7661,10 +6872,6 @@
             "kind": "flag",
             "value": false
           },
-          "start": {
-            "kind": "flag",
-            "value": true
-          },
           "position": null,
           "offered": true
         },
@@ -7685,10 +6892,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": true
-          },
-          "start": {
-            "kind": "flag",
-            "value": false
           },
           "position": null,
           "offered": true
@@ -7724,9 +6927,6 @@
             "value": 5,
             "shown": "5"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -7755,14 +6955,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "outer",
             "name": "select"
@@ -7789,10 +6981,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": {
             "kind": "outer",
             "name": "select"
@@ -7830,9 +7018,6 @@
             "value": "index",
             "shown": "index"
           },
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -7855,9 +7040,6 @@
             "kind": "integer",
             "value": 0,
             "shown": "0"
-          },
-          "start": {
-            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -7887,9 +7069,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": {
             "kind": "nested",
             "name": "condition.value"
@@ -7921,14 +7100,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
@@ -7955,10 +7126,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": null,
           "offered": true
         }
@@ -7987,9 +7154,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": {
             "kind": "nested",
             "name": "condition.value"
@@ -8021,9 +7185,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8041,14 +7202,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": null,
           "offered": true
         }
@@ -8077,9 +7230,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8097,9 +7247,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8117,9 +7264,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -8148,9 +7292,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8168,9 +7309,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8188,9 +7326,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8208,9 +7343,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8228,9 +7360,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8248,9 +7377,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8268,9 +7394,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8306,10 +7429,6 @@
             "kind": "word",
             "value": "us"
           },
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         },
@@ -8331,9 +7450,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8373,10 +7489,6 @@
             "kind": "word",
             "value": "raise"
           },
-          "start": {
-            "kind": "word",
-            "value": "earliest"
-          },
           "position": null,
           "offered": true
         }
@@ -8405,9 +7517,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8425,9 +7534,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8445,9 +7551,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8465,9 +7568,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8485,9 +7585,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8505,9 +7602,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8525,9 +7619,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8545,9 +7636,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8579,10 +7667,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         }
@@ -8621,9 +7705,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8667,10 +7748,6 @@
             "kind": "word",
             "value": "s"
           },
-          "start": {
-            "kind": "word",
-            "value": "ns"
-          },
           "position": null,
           "offered": true
         }
@@ -8700,9 +7777,6 @@
             "kind": "required"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8720,9 +7794,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8743,10 +7814,6 @@
           "defaultSetting": {
             "kind": "flag",
             "value": false
-          },
-          "start": {
-            "kind": "flag",
-            "value": true
           },
           "position": null,
           "offered": true
@@ -8776,9 +7843,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8796,9 +7860,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8816,9 +7877,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         },
@@ -8836,9 +7894,6 @@
             "kind": "none"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "unset"
-          },
           "position": null,
           "offered": true
         }
@@ -8867,14 +7922,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "list",
-            "items": [
-              {
-                "kind": "unset"
-              }
-            ]
-          },
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
@@ -8901,10 +7948,6 @@
             "kind": "empty"
           },
           "defaultSetting": null,
-          "start": {
-            "kind": "pairs",
-            "entries": []
-          },
           "position": null,
           "offered": true
         }
