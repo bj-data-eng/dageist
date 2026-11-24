@@ -5755,6 +5755,51 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_aggregate_is_excused_for_a_date_written_as_digits_and_for_no_other_format() {
+        // `element().dt.to_string("%Y").skew()`: the year of a date written alone reads as a
+        // number, where the tables measured the sample's text, which no number reads.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-date-written-as-digits.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let written = |entry: &str, format: &str, receiver: Representative| {
+            let case = pivot_of(
+                receiver,
+                chain_of(
+                    call("polars.element", Vec::new()),
+                    vec![
+                        call(entry, vec![("format", Value::String(format.to_owned()))]),
+                        call("Expr.skew", Vec::new()),
+                    ],
+                ),
+            );
+            refused_by_the_tables_at(
+                &case,
+                at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                text,
+            )
+        };
+        for entry in ["Expr.dt.to_string", "Expr.dt.strftime"] {
+            for format in ["%Y", "%Y%m%d", "%H%M%S", "20%y"] {
+                assert_eq!(
+                    written(entry, format, Representative::Date),
+                    vec![Limit::AGroupAggregate],
+                    "{entry} {format}"
+                );
+            }
+            // A format that writes a name or a separator does not read as a number.
+            for format in ["%Y-%m-%d", "%b", "%Y %m", "%A", ""] {
+                assert_eq!(
+                    written(entry, format, Representative::Date),
+                    vec![],
+                    "{entry} {format}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_the_text_of_the_numbers_of_a_group_and_for_no_other() {
         // The values of a group of numbers, cast to text, read as the numbers again, where the
         // tables measured the sample's text, which no number reads.
