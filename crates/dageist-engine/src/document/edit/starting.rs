@@ -352,7 +352,9 @@ pub(super) fn option_start(call: &Call, parameter: &'static Parameter) -> Result
                     Ok(Value::Flag(Some(word == "true")))
                 }
                 (Some(word), _) => Ok(Value::Choice(word.to_owned())),
-                (None, Some(refusal)) => Err(Fault::here(EditProblem::CannotAdd(refusal))),
+                (None, Some(refusal)) => {
+                    Err(at_parameter(parameter, EditProblem::CannotAdd(refusal)))
+                }
                 (None, None) => Err(needs_value(parameter)),
             };
         }
@@ -363,11 +365,19 @@ pub(super) fn option_start(call: &Call, parameter: &'static Parameter) -> Result
 }
 
 fn needs_value(parameter: &Parameter) -> Fault {
-    Fault::inside(
-        vec![Segment::Parameter(parameter.name().to_owned())],
+    at_parameter(
+        parameter,
         EditProblem::NeedsValue {
             parameter: parameter.name(),
         },
+    )
+}
+
+/// A fault at the argument of `parameter` of the call the edit has come to.
+fn at_parameter(parameter: &Parameter, problem: EditProblem) -> Fault {
+    Fault::inside(
+        vec![Segment::Parameter(parameter.name().to_owned())],
+        problem,
     )
 }
 
