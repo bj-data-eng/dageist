@@ -19,7 +19,7 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from '@xyflow/react';
-import type { Edge, NodeChangeset, NodeTypes } from '@xyflow/react';
+import type { EdgeTypes, NodeChangeset, NodeTypes } from '@xyflow/react';
 
 import { Skeleton } from '@dageist/design';
 import type { Host } from '@dageist/host';
@@ -27,7 +27,12 @@ import type { Host } from '@dageist/host';
 import { StepsBox, SupplierBox } from './Boxes';
 import type { StepsNode, SupplierNode } from './Boxes';
 import { canvasGraph, guessedHeights, placesOf } from './graph';
+import { RoutedWire } from './RoutedWire';
+import type { Wire } from './RoutedWire';
 import type { CanvasGraph, Heights } from './graph';
+import type { Box as RouteBox } from './route';
+// Named apart from this file's own `boxesOf`, which places React Flow's boxes.
+import { SettledBoxes, anyMoving, boxesOf as obstaclesOf } from './settled';
 
 /** The id of the node's own box, which every wire ends at. */
 const NODE = 'node';
@@ -40,6 +45,9 @@ const FIT_PADDING = { top: '84px', bottom: '48px', x: '64px' } as const;
 
 /** How React Flow draws each kind of box. */
 const NODE_TYPES: NodeTypes = { supplier: SupplierBox, steps: StepsBox };
+
+/** How React Flow draws each kind of wire. */
+const EDGE_TYPES: EdgeTypes = { routed: RoutedWire };
 
 /** The size the node's box starts at. */
 const STEPS_START = { width: 340, height: 520 } as const;
@@ -70,14 +78,20 @@ function boxesOf(graph: CanvasGraph, heights: Heights): Box[] {
   ];
 }
 
-/** Returns a wire for each input that a supplier feeds. */
-function wiresOf(graph: CanvasGraph): Edge[] {
-  return graph.wires.map((wire) => ({
+/**
+ * Returns a wire for each input that a supplier feeds, each on a lane of its
+ * own by its place among the wires, drawn in straight runs and right angles
+ * around the boxes.
+ */
+function wiresOf(graph: CanvasGraph): Wire[] {
+  return graph.wires.map((wire, lane) => ({
     id: `${wire.supplier}/${wire.output}->${wire.input}`,
     source: wire.supplier,
     sourceHandle: wire.output,
     target: NODE,
     targetHandle: wire.input,
+    type: 'routed',
+    data: { lane, lanes: graph.wires.length },
   }));
 }
 
@@ -88,20 +102,28 @@ function wiresOf(graph: CanvasGraph): Edge[] {
  */
 function Flow({ graph }: { readonly graph: CanvasGraph }): React.JSX.Element {
   const [boxes, setBoxes] = useState<Box[]>(() => boxesOf(graph, guessedHeights(graph)));
+  // The boxes the wires are routed around, taken again only once nothing is moving.
+  const [settled, setSettled] = useState<readonly RouteBox[]>([]);
   const stacked = useRef(false);
   const { fitView } = useReactFlow();
+
+  /** Shows `next`, and routes the wires around it once no box in it is moving. */
+  const show = (next: Box[]): void => {
+    setBoxes(next);
+    if (!anyMoving(next)) setSettled(obstaclesOf(next));
+  };
 
   const onBoxesChange = (changes: NodeChangeset<Box>): void => {
     const next = changes.applyTo(boxes);
     if (stacked.current || !next.every((box) => box.measured?.height !== undefined)) {
-      setBoxes(next);
+      show(next);
       return;
     }
     // Every box has now been measured: stack them by what they measure.
     stacked.current = true;
     const height = (id: string): number => next.find((box) => box.id === id)?.measured?.height ?? 0;
     const places = boxesOf(graph, { supplier: height, node: height(NODE) });
-    setBoxes(
+    show(
       next.map((box) => ({
         ...box,
         position: places.find((placed) => placed.id === box.id)?.position ?? box.position,
@@ -114,23 +136,26 @@ function Flow({ graph }: { readonly graph: CanvasGraph }): React.JSX.Element {
   };
 
   return (
-    <ReactFlow
-      className="dageist-flow"
-      forceColorMode="dark"
-      nodes={boxes}
-      edges={wiresOf(graph)}
-      nodeTypes={NODE_TYPES}
-      onNodesChange={onBoxesChange}
-      nodesConnectable={false}
-      edgesFocusable={false}
-      fitView
-      fitViewOptions={{ padding: FIT_PADDING }}
-      minZoom={0.2}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
-      <Controls showInteractive={false} />
-      <MiniMap pannable zoomable />
-    </ReactFlow>
+    <SettledBoxes value={settled}>
+      <ReactFlow
+        className="dageist-flow"
+        forceColorMode="dark"
+        nodes={boxes}
+        edges={wiresOf(graph)}
+        edgeTypes={EDGE_TYPES}
+        nodeTypes={NODE_TYPES}
+        onNodesChange={onBoxesChange}
+        nodesConnectable={false}
+        edgesFocusable={false}
+        fitView
+        fitViewOptions={{ padding: FIT_PADDING }}
+        minZoom={0.2}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
+        <Controls showInteractive={false} />
+        <MiniMap pannable zoomable />
+      </ReactFlow>
+    </SettledBoxes>
   );
 }
 
