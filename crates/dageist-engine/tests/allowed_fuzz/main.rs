@@ -266,9 +266,25 @@ const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case
 const AGREE_ON_ONE_THREAD: [&str; 1] =
     ["uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case"];
 
-/// Whether Polars is told to run on one thread.
+/// How many threads Polars runs on: the size of its own pool, which `POLARS_MAX_THREADS` sets and
+/// which is the number of cores where it is not set.
+fn polars_threads() -> usize {
+    polars_core::runtime::THREAD_POOL.current_num_threads()
+}
+
+/// Whether Polars runs on one thread.
 fn one_thread() -> bool {
-    std::env::var("POLARS_MAX_THREADS").is_ok_and(|threads| threads.trim() == "1")
+    polars_threads() == 1
+}
+
+#[test]
+fn the_threads_polars_runs_on_are_the_ones_it_is_told_to() {
+    // Where the thread count is set the pool has that size, which is why the tests of what
+    // depends on it read the pool and not the setting: a machine of one core has one too.
+    if let Some(told) = env_whole("POLARS_MAX_THREADS") {
+        assert_eq!(polars_threads() as u64, told);
+    }
+    assert!(polars_threads() >= 1);
 }
 
 #[test]
@@ -317,7 +333,8 @@ fn kept_cases_replay_as_settled() {
         }
         if name.starts_with("fixed-") {
             // On one thread Polars refuses the part the probe asks about for the tables' own
-            // reason, where it does not on more, so the case settles as a part it does not evaluate.
+            // reason, where it does not on more, so the case settles as a part it does not
+            // evaluate.
             let on_one_thread = one_thread() && SETTLED_AS_STRICTER_ON_ONE_THREAD.contains(&name);
             if on_one_thread && outcome.kind() == OutcomeKind::ExpectedRejection {
                 assert!(

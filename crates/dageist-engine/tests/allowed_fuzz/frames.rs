@@ -106,6 +106,25 @@ fn column(dtype: Representative, name: &str) -> Series {
     }
 }
 
+/// `dtype` as a column can hold it: a list whose element dtype Polars has not worked out is a list
+/// of nulls, for Polars panics making a column of the one it has not.
+fn resolved(dtype: &DataType) -> DataType {
+    match dtype {
+        DataType::List(inner) => DataType::List(Box::new(match &**inner {
+            DataType::Unknown(_) => DataType::Null,
+            other => resolved(other),
+        })),
+        DataType::Array(inner, width) => DataType::Array(
+            Box::new(match &**inner {
+                DataType::Unknown(_) => DataType::Null,
+                other => resolved(other),
+            }),
+            *width,
+        ),
+        other => other.clone(),
+    }
+}
+
 /// The tables of one case, with rows and without.
 pub struct Frames {
     /// The left table, with rows.
@@ -144,7 +163,9 @@ impl Frames {
                 Series::new("u".into(), [1_i64, 2, 3]).into(),
             ];
             for (at, key) in keys.unwrap_or_default().iter().enumerate() {
-                columns.push(Series::full_null(key_column(at).as_str().into(), 3, key).into());
+                columns.push(
+                    Series::full_null(key_column(at).as_str().into(), 3, &resolved(key)).into(),
+                );
             }
             DataFrame::new(3, columns).expect("columns of three rows")
         };
@@ -255,4 +276,44 @@ pub fn column_class(
         "g" | "rg" | "h" | "rh" => Representative::String,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use polars::prelude::{DataType, UnknownKind};
+
+    use super::*;
+
+    #[test]
+    fn a_key_column_of_every_dtype_a_key_may_have_is_made_of_nulls() {
+        // The dtypes of a join's keys are what Polars gives them, and a list of text is one:
+        // making the column of nulls of such a dtype must not end the process. A dtype that Polars
+        // has not worked out, at any depth of lists and arrays, is a list of nulls.
+        let unknown = || DataType::Unknown(UnknownKind::Any);
+        let list = |inner: DataType| DataType::List(Box::new(inner));
+        let array = |inner: DataType, width: usize| DataType::Array(Box::new(inner), width);
+        let keys = [
+            (list(DataType::String), list(DataType::String)),
+            (list(DataType::Boolean), list(DataType::Boolean)),
+            (list(DataType::Float32), list(DataType::Float32)),
+            (list(DataType::Null), list(DataType::Null)),
+            (list(unknown()), list(DataType::Null)),
+            (list(list(DataType::String)), list(list(DataType::String))),
+            (list(list(unknown())), list(list(DataType::Null))),
+            (array(unknown(), 2), array(DataType::Null, 2)),
+            (array(list(unknown()), 2), array(list(DataType::Null), 2)),
+            (list(array(unknown(), 3)), list(array(DataType::Null, 3))),
+            (list(DataType::Int64), list(DataType::Int64)),
+            (array(DataType::Int64, 2), array(DataType::Int64, 2)),
+            (DataType::String, DataType::String),
+            (DataType::Null, DataType::Null),
+        ];
+        let asked: Vec<DataType> = keys.iter().map(|(asked, _)| asked.clone()).collect();
+        let frames = Frames::new(Representative::Int64, Representative::Int64, &asked);
+        for (at, (asked, made)) in keys.iter().enumerate() {
+            let column = frames.rows.column(&key_column(at)).expect("a key column");
+            assert_eq!(column.dtype(), made, "{asked:?}");
+            assert_eq!(column.null_count(), 3, "{asked:?}");
+        }
+    }
 }

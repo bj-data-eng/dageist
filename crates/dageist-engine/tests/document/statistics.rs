@@ -395,8 +395,8 @@ fn an_arg_max_and_an_arg_min_give_a_row_that_holds_the_largest_and_smallest() {
     // the smallest, at rows 2 and 5.
     one_of(method("step_to", "Expr.arg_max", json!({})), &["4", "6"]);
     one_of(method("step_to", "Expr.arg_min", json!({})), &["2", "5"]);
-    // The rows with no value are not the largest or the smallest: `0, null, null, 0, null, null, 1`,
-    // where the one largest is at row 6.
+    // The rows with no value are not the largest or the smallest: `0, null, null, 0, null, null,
+    // 1`, where the one largest is at row 6.
     let with_a_gap = |entry: &str| selecting(after(&with_gaps(), vec![call(entry, json!({}))]));
     assert_eq!(cells(&with_a_gap("Expr.arg_max")), texts(&["6"]));
     let smallest_with_a_gap = cells(&with_a_gap("Expr.arg_min"));

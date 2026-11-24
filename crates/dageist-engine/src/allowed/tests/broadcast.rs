@@ -160,8 +160,8 @@ const NOT_MEASURED: [(&str, &str, &str); 9] = [
 fn the_catalogue_says_for_each_expression_parameter_whether_polars_meets_a_receiver_of_one_value_with_each_value()
  {
     let mut measured = 0;
-    // The thread count Polars is told, which its pool is made with when it first runs.
-    let one_thread = std::env::var("POLARS_MAX_THREADS").is_ok_and(|threads| threads.trim() == "1");
+    // The threads Polars runs on, which its pool says: a machine of one core has one as well.
+    let one_thread = polars_core::runtime::THREAD_POOL.current_num_threads() == 1;
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)

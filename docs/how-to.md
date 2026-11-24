@@ -705,7 +705,7 @@ Polars by hand, and decide which it is:
   same case allowed once the predicate that holds the refused call is made `false`; and, for a predicate that the rule that a condition's predicate be a `Boolean`
   refused where no column of its dtype can be asked or no column is to be had, as in a
   pivot's aggregate, the condition alone with what follows it removed, where Polars refusing
-  it in the predicate, and allowing it with the predicate made `true`, shows that a sort key
+  it in the predicate, and allowing it with the predicate made `false`, shows that a sort key
   of one value or a fold to `true` is why Polars never evaluated it. A call that the tables
   judge by each of its values beside a companion, `replace`, `replace_strict`, `is_between`, `is_close` and `dt.replace`, counts when Polars refuses
   the part at the call, or in what the call is given, whatever words it uses, for the

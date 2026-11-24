@@ -70,7 +70,7 @@
 //! and Polars never evaluates, because a call after its condition makes it one value that Polars
 //! drops or folds, is asked in [`settle_by_evaluating_the_condition`]: the condition alone, in the
 //! place of the expression that holds it, with what follows it removed and its last value made to
-//! differ. Polars refusing that in the predicate, and allowing it with the predicate made `true`,
+//! differ. Polars refusing that in the predicate, and allowing it with that predicate made `false`,
 //! shows that it is the predicate Polars refuses once nothing hides it
 //! ([`Showing::WhereTheConditionIsEvaluated`]).
 //!
@@ -116,14 +116,16 @@ pub enum Showing {
     ForAnyDtypeOfTheArgument,
     /// The tables refused a part of a predicate of a condition that Polars allows, because the
     /// values of the condition are one expression and Polars drops its predicates. The case with
-    /// the values made to differ is refused by Polars for the tables' reason, so the predicate is
-    /// evaluated there, and it is the dropping that Polars allows the case for.
+    /// the values made to differ is refused by Polars for the tables' reason, or, for a call the
+    /// tables judge by its parts, for the part it meets first where the case with the predicate
+    /// that holds the call made `false` is allowed, so the predicate is evaluated there, and it is
+    /// the dropping that Polars allows the case for.
     WhereTheValuesDiffer,
     /// The rule that a condition's predicate be a `Boolean` refused a predicate that Polars allows
     /// because it never evaluates it: a call that follows the condition makes it one value that
     /// Polars drops or folds. The condition standing alone, with what follows it removed and its
     /// values made to differ, is refused by Polars, and the same condition with the predicate
-    /// made `true` is allowed, so it is the predicate that Polars refuses once it evaluates it.
+    /// made `false` is allowed, so it is the predicate that Polars refuses once it evaluates it.
     WhereTheConditionIsEvaluated,
 }
 
@@ -153,11 +155,11 @@ impl Settled {
                 self.probe, self.reason
             ),
             Showing::WhereTheValuesDiffer => format!(
-                "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason: {}",
+                "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason or, for a call judged by its parts, for the part it meets first: {}",
                 self.probe, self.reason
             ),
             Showing::WhereTheConditionIsEvaluated => format!(
-                "Polars never evaluates the predicate where what follows its condition makes it one value, and refuses the condition alone {}, {}, which is allowed with the predicate made true: {}",
+                "Polars never evaluates the predicate where what follows its condition makes it one value, and refuses the condition alone {}, {}, which is allowed with the predicate made false: {}",
                 self.probe,
                 if is_refused_as_a_predicate_that_is_no_boolean(&self.reason) {
                     "for the rule's reason"
@@ -1560,7 +1562,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
             Some((argument.parameter(), value))
         })
         .collect();
-    let made_true = given
+    let made_false = given
         .and_then(|given| call(step.entry().id().as_str(), given))
         .and_then(|rebuilt| Step::new(case.document.steps()[0].id().clone(), rebuilt).ok())
         .and_then(|rebuilt| Document::new(vec![rebuilt]).ok())
@@ -1569,7 +1571,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
             argument: case.argument,
             document,
         });
-    made_true.is_some_and(|made_true| (0..RUNS).all(|_| observe(&made_true).refusal.is_none()))
+    made_false.is_some_and(|made_false| (0..RUNS).all(|_| observe(&made_false).refusal.is_none()))
 }
 
 /// `value` with the expression that `path` leads to, through the arguments of the calls of the
@@ -1731,7 +1733,9 @@ const CONDITION_RULE: &str = "condition-predicate-is-boolean";
 /// the place of the expression that holds it, with what follows it removed and its last value made
 /// to differ from the others, which removes what Polars folds or drops it for. Polars refusing it
 /// shows that Polars evaluates the predicate and refuses it once nothing hides it. That it is the
-/// predicate is shown by a control: the same condition with the predicate made `true` is allowed.
+/// predicate is shown by a control: the same condition with that predicate made `false` is allowed,
+/// which drops its branch and leaves the other predicates evaluated, as a `true` would not; and by
+/// a second, with it made `true`, which keeps the value the branch guards and shows it is no cause.
 ///
 /// The refusal may be in the rule's words, or in other words for what the predicate holds, which
 /// Polars meets before it judges the dtype. Both are a refusal of the predicate once it is
@@ -1755,6 +1759,21 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
     let held = place_of_the_part(&found, false);
     // Where the predicate stands in the probe: in the condition that stands alone.
     let predicate_place = inner.iter().cloned().fold(held, Place::then);
+    // Made `false` the branch the predicate guards is dropped, and the predicates after it are
+    // still evaluated, which a `true` would leave unevaluated where Polars takes its branch.
+    let falsity = Expression::new(
+        Start::Call(call(
+            "polars.lit",
+            vec![("value", Value::Flag(Some(false)))],
+        )?),
+        Vec::new(),
+    )
+    .ok()?;
+    let with_falsity = replaced_through(&alone, inner, &falsity)?;
+    // Made `false` the predicate drops the value its branch guards with it, so a value that Polars
+    // refuses only when the rows run, with a refusal that has no place, would be shown as the
+    // predicate's fault. Made `true` the branch is taken and its value is evaluated, so that
+    // case, which is allowed only where the value is no cause, shows the value is fine.
     let truth = Expression::new(
         Start::Call(call(
             "polars.lit",
@@ -1772,15 +1791,19 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
         })
     };
     let probed = run(alone)?;
-    let control = run(with_truth)?;
+    let control = run(with_falsity)?;
+    let value_control = run(with_truth)?;
     let tables = tables_of(&found, None);
     let refusal = (0..RUNS).find_map(|_| {
         observe_probe(&probed, tables)
             .refusal
             .filter(|refusal| lies_in(refusal, &predicate_place))
     })?;
-    // The control is allowed every time it runs.
-    if (0..RUNS).any(|_| observe_probe(&control, tables).refusal.is_some()) {
+    // The controls are allowed every time they run.
+    if (0..RUNS).any(|_| {
+        observe_probe(&control, tables).refusal.is_some()
+            || observe_probe(&value_control, tables).refusal.is_some()
+    }) {
         return None;
     }
     Some(Settled {
@@ -3333,6 +3356,72 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_is_not_settled_where_the_condition_stands_alone_by_another_predicates_refusal() {
+        // `select(when(a.dt.replace(day=1).is_null()).then(a).when(a.dt.replace(day=g).is_null())
+        // .then(a).otherwise(a))`: the rule is asked about the first predicate, and Polars refuses
+        // the second, whose day is text, for the rows, which has no place. With the first made
+        // `true` Polars takes its branch and never evaluates the second, so the control is allowed
+        // for the fold and not for the first predicate.
+        let predicate = |day: String| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.dt.replace","arguments":{{"day":{day}}}}},{{"entry":"Expr.is_null","arguments":{{}}}}]}}}}"#
+            )
+        };
+        let one = r#"{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}"#;
+        let value = |entry: &str| {
+            format!(
+                r#"{{"entry":"{entry}","arguments":{{"statement":{}}}}}"#,
+                col_json("a")
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{},{{"entry":"Then.when","arguments":{{"predicates":{{"many":[{}]}}}}}},{},{}]}}}}]}}}}}}}}]}}"#,
+            predicate(one.to_owned()),
+            value("When.then"),
+            predicate(col_json("g")),
+            value("ChainedWhen.then"),
+            value("ChainedThen.otherwise"),
+        );
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start)
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        let refused = Refused {
+            place: place.clone(),
+            at: place.to_string(),
+            ..refused_as_a_predicate_that_is_no_boolean()
+        };
+        assert_eq!(settle_by_evaluating_the_condition(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_predicate_is_not_settled_where_the_value_it_guards_is_refused_only_when_the_rows_run() {
+        // `sort(by=when(f).then(g.cast(Int8)).otherwise(k.cast(Int8)))`: the rule is asked about
+        // the predicate, and Polars refuses the condition alone for the value the predicate
+        // guards, a text that is no number, when the rows run, with a refusal that has no place.
+        // Made `false` the predicate drops that value with its branch, so the control is allowed,
+        // and the case would be settled as the predicate's fault if the dropping were not seen.
+        let to_a_whole_number = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[{{"entry":"Expr.cast","arguments":{{"dtype":{{"dtype":"Int8"}}}}}}]}}}}"#
+            )
+        };
+        let case = sorted_by_a_condition(
+            &col_json("f"),
+            &to_a_whole_number("g"),
+            Some(&to_a_whole_number("k")),
+            &[],
+        );
+        let settled =
+            settle_by_evaluating_the_condition(&case, &refused_as_a_predicate_that_is_no_boolean());
+        assert_eq!(settled, None);
+    }
+
+    #[test]
     fn a_non_boolean_predicate_in_a_pivot_aggregate_is_asked_in_the_pivot() {
         // There is no column to stand in for the predicate, so the condition stands alone as the
         // aggregate of the same pivot.
@@ -3380,7 +3469,7 @@ mod tests {
     #[test]
     fn a_condition_that_is_refused_for_what_is_not_its_predicate_settles_nothing() {
         // The value is refused whatever the predicate is: the same condition with the predicate
-        // made `true` is refused too, so the refusal is no evidence about the predicate.
+        // made `false` is refused too, so the refusal is no evidence about the predicate.
         let dt_date_of_text = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}"#;
         let case = sorted_by_a_condition(
             &a_comparison_of_text_with_a_number(),
