@@ -802,8 +802,8 @@ fn gives_a_number_of_its_own(call: &Call) -> bool {
 }
 
 /// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
-/// columns that are all of the dtype Null and only compare them or do arithmetic with them, which
-/// leaves a null in each row: the call at `upto` meets nulls, where the tables measured the
+/// columns that are all of the dtype Null and only compare them, do arithmetic with them, pick one
+/// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables measured the
 /// values of a column that holds some.
 fn leaves_nulls_of_a_column_of_nulls(
     frames: &Frames,
@@ -822,9 +822,21 @@ fn leaves_nulls_of_a_column_of_nulls(
                 .dtype_of(name)
                 .is_some_and(|dtype| *dtype == polars::prelude::DataType::Null)
         })
-        && chain.links()[..upto]
-            .iter()
-            .all(|link| carries_nulls(link.entry().id().as_str()))
+        && chain.links()[..upto].iter().all(|link| {
+            let id = link.entry().id().as_str();
+            // A comparison or an arithmetic leaves a null for each null, and a call that picks
+            // one of the values or orders them leaves nothing else.
+            carries_nulls(id)
+                || matches!(
+                    id,
+                    "Expr.first"
+                        | "Expr.last"
+                        | "Expr.min"
+                        | "Expr.max"
+                        | "Expr.reverse"
+                        | "Expr.sort"
+                )
+        })
 }
 
 /// Whether `call` is a comparison or an arithmetic given the null literal, which is a null in each
