@@ -2232,15 +2232,36 @@ fn chains_from_a_range() -> Vec<(&'static str, Value)> {
     ]
 }
 
-/// The links that Python Polars 2.1.0 and the engine of steps fold a cut into where it is by
-/// `head`, `limit` or a slice's length: the first values and the methods that give a value for each
-/// value they follow. With its optimizations off Polars refuses them as it does every other chain.
-fn chains_a_cut_is_folded_into() -> Vec<(&'static str, Value)> {
+/// The chains that Python Polars 2.1.0 and the engine of steps fold a cut into where it is by `head`,
+/// `limit` or a slice's length: the first values, and the methods that give a value for each value
+/// they follow, whose cut the optimizer moves into what they follow. With its optimizations off
+/// Polars refuses them as it does every other chain.
+fn chains_a_cut_is_folded_into() -> Vec<(&'static str, Vec<Value>)> {
+    let one = |id: &str, arguments: Value| vec![call(id, arguments)];
     vec![
-        ("head", call("Expr.head", json!({ "n": whole(5) }))),
-        ("abs", call("Expr.abs", json!({}))),
-        ("neg", call("Expr.neg", json!({}))),
-        ("add", call("Expr.add", json!({ "other": whole(1) }))),
+        ("head", one("Expr.head", json!({ "n": whole(5) }))),
+        ("slice", one("Expr.slice", json!({ "offset": whole(1) }))),
+        ("abs", one("Expr.abs", json!({}))),
+        ("neg", one("Expr.neg", json!({}))),
+        ("add", one("Expr.add", json!({ "other": whole(1) }))),
+        ("sqrt", one("Expr.sqrt", json!({}))),
+        ("is_null", one("Expr.is_null", json!({}))),
+        ("is_not_null", one("Expr.is_not_null", json!({}))),
+        (
+            "fill_null",
+            one("Expr.fill_null", json!({ "value": whole(0) })),
+        ),
+        (
+            "is_in",
+            one(
+                "Expr.is_in",
+                json!({ "other": int_range(vec![("start", whole(0)), ("end", whole(3))]) }),
+            ),
+        ),
+        (
+            "cum_sum then abs",
+            vec![call("Expr.cum_sum", json!({})), call("Expr.abs", json!({}))],
+        ),
     ]
 }
 
@@ -2322,18 +2343,22 @@ fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_c
     // Stricter by design: after the first values or a method that gives a value for each value it
     // follows, Python Polars 2.1.0 and the engine of steps fold a cut by `head`, `limit` or the
     // length of a slice into the range and run `int_range(0, 10).abs().head(-2)`, where they refuse
-    // `tail`. With the optimizations off Polars refuses every one of them: its answer is the
+    // `tail` of some. With the optimizations off Polars refuses every one of them: its answer is the
     // optimizer's, and the engines differ on it, so the editor refuses a cut below nothing after
     // every chain that starts at a range.
     let mut found = Vec::new();
     for (range, start) in ranges_to_cut() {
         for (first_name, first) in chains_a_cut_is_folded_into() {
             for (cut_name, cut) in below_nothing_cuts() {
-                let report = select_of(vec![on_start(&start, vec![first.clone(), cut])]);
-                let folded = cut_name != "tail";
-                if polars_says(&report).accepts() != folded {
+                let mut links = first.clone();
+                links.push(cut);
+                let report = select_of(vec![on_start(&start, links)]);
+                // The cut by the first values is the one that is folded into every one of them.
+                if cut_name == "head"
+                    && matches!(polars_says(&report), Said::Refuses(text) if text.contains("unable to extract length"))
+                {
                     found.push(format!(
-                        "{cut_name} after {first_name} of {range}: the engine of steps says {:?}, which changes this exception",
+                        "{cut_name} after {first_name} of {range}: the engine of steps says {:?}, which ends this exception",
                         polars_says(&report)
                     ));
                 }
@@ -2343,6 +2368,196 @@ fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_c
                     ));
                 }
             }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "{} cases:\n{}",
+        found.len(),
+        found.join("\n")
+    );
+}
+
+// ---------------------------------------------------------------------------
+// A cut below nothing of a value made of literals and ranges alone
+
+/// `expression` followed by `links`, whatever it has already.
+fn then(expression: &Value, links: Vec<Value>) -> Value {
+    let mut extended = expression.clone();
+    let after = extended["expression"]["then"]
+        .as_array_mut()
+        .expect("the links of a chain");
+    after.extend(links);
+    extended
+}
+
+#[test]
+fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as_polars_cuts_it() {
+    // Polars' physical slice casts the length to an unsigned number where it cuts a series of
+    // literals, so a number below nothing is refused wherever the value has no column in it and the
+    // optimizer does not fold the cut away: of a chain that meets a range as an operand, a branch, a
+    // predicate or a fill, and of a literal that is no range. Where a column is what is cut, and a
+    // range is met by it, the engine of steps runs the cut.
+    let ten = || int_range(vec![("start", whole(0)), ("end", whole(10))]);
+    let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
+    let on = |start: Value, links: Vec<Value>| chain(start, links);
+    let literal = |number: i64| call("polars.lit", json!({ "value": { "integer": number } }));
+    let with = |id: &str, parameter: &str, other: Value| call(id, json!({ parameter: other }));
+    let cum = || call("Expr.cum_sum", json!({}));
+    let when = |predicate: Value, value: Value, otherwise: Value| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![predicate]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": value })),
+                call("Then.otherwise", json!({ "statement": otherwise })),
+            ],
+        )
+    };
+    let flag = |on: bool| {
+        chain(
+            call("polars.lit", json!({ "value": { "flag": on } })),
+            vec![],
+        )
+    };
+    let cuts = || {
+        vec![
+            ("head", call("Expr.head", json!({ "n": whole(-2) }))),
+            ("tail", call("Expr.tail", json!({ "n": whole(-2) }))),
+            (
+                "slice with a length",
+                call(
+                    "Expr.slice",
+                    json!({ "offset": whole(2), "length": whole(-1) }),
+                ),
+            ),
+        ]
+    };
+    // Each is a value with no column in it, and the links that go on from it before the cut.
+    let literals: Vec<(&str, Value)> = vec![
+        (
+            "a number and a range",
+            on(literal(1), vec![with("Expr.add", "other", ten())]),
+        ),
+        (
+            "a number and a range, accumulated",
+            on(literal(1), vec![with("Expr.add", "other", ten()), cum()]),
+        ),
+        (
+            "a number to the power of a range, accumulated",
+            on(literal(3), vec![with("Expr.pow", "exponent", ten()), cum()]),
+        ),
+        (
+            "a condition on a range, accumulated",
+            then(
+                &when(
+                    on_start(&ten(), vec![with("Expr.gt", "other", whole(3))]),
+                    whole(1),
+                    whole(0),
+                ),
+                vec![cum()],
+            ),
+        ),
+        (
+            "a number filled by a range, accumulated",
+            on(
+                literal(3),
+                vec![with("Expr.fill_null", "value", ten()), cum()],
+            ),
+        ),
+        (
+            "a condition of true over a range, accumulated",
+            then(&when(flag(true), ten(), ten()), vec![cum()]),
+        ),
+        (
+            "membership of a number in a range, counted",
+            on(
+                literal(1),
+                vec![
+                    with("Expr.is_in", "other", ten()),
+                    call("Expr.cum_count", json!({})),
+                ],
+            ),
+        ),
+        (
+            "a number times a repeat, sorted",
+            on(
+                literal(2),
+                vec![
+                    with(
+                        "Expr.mul",
+                        "other",
+                        repeat(vec![("value", whole(1)), ("n", whole(5))]),
+                    ),
+                    call("Expr.sort", json!({})),
+                ],
+            ),
+        ),
+        ("a number", on(literal(5), vec![])),
+        ("a number, accumulated", on(literal(5), vec![cum()])),
+        (
+            "a number and one",
+            on(literal(5), vec![with("Expr.add", "other", whole(1))]),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, value) in &literals {
+        for (cut_name, cut) in cuts() {
+            let report = select_of(vec![then(value, vec![cut])]);
+            let (polars, walk) = (polars_says(&report), walk_says(&report));
+            // The one value for each value that a number and a range make is folded into, where the
+            // cut is by the first values, as it is of the chains pinned above.
+            let folded = *name == "a number and a range" && cut_name != "tail";
+            if polars.accepts() != folded || walk.accepts() {
+                found.push(format!(
+                    "{cut_name} of {name}: Polars says {polars:?}, the walk says {walk:?}"
+                ));
+            }
+        }
+    }
+    // Each has a column that is cut, which a range beside it does not make a value of literals.
+    let head = || call("Expr.head", json!({ "n": whole(-2) }));
+    let controls: Vec<(&str, Value)> = vec![
+        (
+            "a column of some values and a range, accumulated",
+            on_column(
+                "a",
+                vec![
+                    call("Expr.head", json!({ "n": whole(4) })),
+                    with("Expr.add", "other", four()),
+                    cum(),
+                    head(),
+                ],
+            ),
+        ),
+        (
+            "the places of a range in a column, accumulated",
+            on_column(
+                "a",
+                vec![with("Expr.gather", "indices", four()), cum(), head()],
+            ),
+        ),
+        (
+            "a condition on some values over a range, accumulated",
+            then(
+                &when(
+                    on_column("f", vec![call("Expr.head", json!({ "n": whole(4) }))]),
+                    four(),
+                    four(),
+                ),
+                vec![cum(), head()],
+            ),
+        ),
+    ];
+    for (name, expression) in &controls {
+        let report = select_of(vec![expression.clone()]);
+        let (polars, walk) = (polars_says(&report), walk_says(&report));
+        if !polars.accepts() || !walk.accepts() {
+            found.push(format!(
+                "{name}: Polars says {polars:?}, the walk says {walk:?}"
+            ));
         }
     }
     assert!(
