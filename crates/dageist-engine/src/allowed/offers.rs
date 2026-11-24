@@ -1308,6 +1308,15 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
     )
 }
 
+/// The refusal of the rule that arrays that meet and give an array are of one width, which is
+/// known, where they are not.
+///
+/// # Errors
+/// Always: the caller asks it where it found arrays of other widths or of a width it does not know.
+pub fn rule_forbids_arrays_of_other_widths() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::ArraysMeetAtOneWidth))
+}
+
 /// The refusal of a rule that forbids the method `entry` to follow a value of the dtype
 /// `receiver`, if one does, without the tables: Polars panics on it where the rows run, so a
 /// document that holds it is refused before Polars is asked.

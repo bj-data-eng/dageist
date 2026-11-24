@@ -317,6 +317,8 @@ struct Operand {
     reliable: bool,
     /// The time zone it is a moment in, where the chain knows it.
     zone: Option<Zone>,
+    /// The width of the array it is, where the chain knows it.
+    width: Option<usize>,
 }
 
 /// The time zone of a moment: none, or a name that the walk holds once, by its place in the list.
@@ -379,6 +381,8 @@ enum Cur {
         taken: Taken,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
+        /// The width of each value, where it is an array whose width is known, in the order of `values`.
+        widths: Vec<Option<usize>>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -942,6 +946,21 @@ fn takes_an_operand(entry: &Entry) -> bool {
         && entry.parameters().iter().any(|parameter| {
             matches!(parameter.kind(), Kind::Expression(_)) && !parameter.role().is_a_count()
         })
+}
+
+/// Whether the values of a condition that are arrays are not all of one width that is known: Polars
+/// gives a list for them, where the tables, which write one width, give an array.
+fn arrays_of_other_widths(values: &[Valued], widths: &[Option<usize>]) -> bool {
+    let arrays: Vec<Option<usize>> = values
+        .iter()
+        .zip(widths)
+        .filter(|((class, _), _)| matches!(class, Some(Representative::Array(_))))
+        .map(|(_, width)| *width)
+        .collect();
+    arrays.len() > 1
+        && !arrays
+            .iter()
+            .all(|width| width.is_some() && *width == arrays[0])
 }
 
 /// The class every value of a condition has, when they have the same one. A
@@ -1573,6 +1592,7 @@ impl Walker<'_> {
             known: false,
             reliable: false,
             zone: None,
+            width: None,
         };
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
@@ -1745,6 +1765,7 @@ impl Walker<'_> {
                                         all.or(operand.taken)
                                     }),
                                 zones: Vec::new(),
+                                widths: Vec::new(),
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
@@ -1988,11 +2009,13 @@ impl Walker<'_> {
                 known: dtype.is_some(),
                 reliable: dtype.is_some() && !branches_are_one,
                 zone,
+                width,
             },
             Cur::Condition {
                 values,
                 meeting,
                 taken,
+                widths,
                 ..
             } => Operand {
                 dtype: unify(&values),
@@ -2007,6 +2030,14 @@ impl Walker<'_> {
                 known: true,
                 reliable: !branches_are_one,
                 zone: None,
+                // The width the arrays among the values share, where they are of one.
+                width: widths
+                    .iter()
+                    .zip(&values)
+                    .filter(|(_, (class, _))| matches!(class, Some(Representative::Array(_))))
+                    .map(|(width, _)| *width)
+                    .reduce(|first, other| if first == other { first } else { None })
+                    .flatten(),
             },
             Cur::Dead => unsaid,
         };
@@ -2503,6 +2534,37 @@ impl Walker<'_> {
             }
             Verdict::Allowed(allowance) => allowance,
         };
+        // Arrays that meet and give an array are of one width, which is known: Polars refuses a sum
+        // of arrays of two widths and gives a list where it fills one with the other.
+        if matches!(
+            allowance.result().and_then(allowed::ResultDtype::class),
+            Some(Representative::Array(_))
+        ) && matches!(
+            &cur,
+            Cur::Value {
+                dtype: Some(Representative::Array(_)),
+                ..
+            }
+        ) {
+            let met: Vec<Option<usize>> = arguments
+                .iter()
+                .filter(|(_, operand)| matches!(operand.dtype, Some(Representative::Array(_))))
+                .map(|(_, operand)| operand.width)
+                .collect();
+            if !met.is_empty()
+                && !(width.is_some() && met.iter().all(|other| *other == width))
+                && let Err(refusal) = allowed::rule_forbids_arrays_of_other_widths()
+            {
+                self.refuse(&refusal, false);
+                return (
+                    Cur::Dead,
+                    Standing {
+                        follows: standing.follows,
+                        verdict: Some(Verdict::Refused(refusal)),
+                    },
+                );
+            }
+        }
         // Polars refuses the rows of a replacement given values of other numbers than it takes,
         // which the shapes of the arguments say.
         if let Cur::Value { shape, .. } = &cur
@@ -2598,6 +2660,7 @@ impl Walker<'_> {
                 Cur::Condition {
                     mut values,
                     mut zones,
+                    mut widths,
                     single,
                     values_single,
                     known,
@@ -2649,16 +2712,33 @@ impl Walker<'_> {
                     "When.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
+                        widths.push(statement.and_then(|operand| operand.width));
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
+                        widths.push(statement.and_then(|operand| operand.width));
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
                         values.push(statement_class);
+                        widths.push(statement.and_then(|operand| operand.width));
+                        // Arrays that are the values of a condition are an array where they are
+                        // of one width, which is known, and a list where they are not.
+                        if arrays_of_other_widths(&values, &widths)
+                            && let Err(refusal) = allowed::rule_forbids_arrays_of_other_widths()
+                        {
+                            self.refuse(&refusal, false);
+                            return (
+                                Cur::Dead,
+                                Standing {
+                                    follows: standing.follows,
+                                    verdict: Some(Verdict::Refused(refusal)),
+                                },
+                            );
+                        }
                         let dtype = if known { unify(&values) } else { None };
                         let (shape, count) = if meeting.0 == Shape::Counted {
                             meeting
@@ -2703,6 +2783,7 @@ impl Walker<'_> {
                     meeting,
                     taken,
                     zones,
+                    widths,
                     single,
                     values_single,
                     known,

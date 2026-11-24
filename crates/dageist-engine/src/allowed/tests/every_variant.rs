@@ -49,6 +49,7 @@ const fn next_nested(nested: Nested) -> Option<Nested> {
 
 const fn next_rule(rule: Rule) -> Option<Rule> {
     match rule {
+        Rule::ArraysMeetAtOneWidth => Some(Rule::ConditionPredicateIsBoolean),
         Rule::ConditionPredicateIsBoolean => Some(Rule::DurationIsValid),
         Rule::DurationIsValid => Some(Rule::ElementDtypeIsImplemented),
         Rule::ElementDtypeIsImplemented => Some(Rule::ElementDtypeIsMeasured),
@@ -109,10 +110,7 @@ fn the_position_lists_are_every_variant_in_order() {
 
 #[test]
 fn the_rule_list_is_every_variant_in_order() {
-    assert_eq!(
-        chain(Rule::ConditionPredicateIsBoolean, next_rule),
-        Rule::ALL
-    );
+    assert_eq!(chain(Rule::ArraysMeetAtOneWidth, next_rule), Rule::ALL);
 }
 
 #[test]

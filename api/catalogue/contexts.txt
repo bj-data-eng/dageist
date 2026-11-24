@@ -45,6 +45,7 @@
 #
 # The rules column names the rules that govern the line, which dageist holds and Polars
 # does not. The outcome is Polars' alone, whatever the rules say. The rules are:
+#   arrays-meet-at-one-width: arrays that meet, as the operands of a method or the values of a condition, and give an array must be of one width, which must be known: Polars refuses to add arrays of two widths, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another.
 #   condition-predicate-is-boolean: a condition's predicate must be Boolean.
 #   duration-is-valid: a duration typed in must be a duration string Polars reads.
 #   element-dtype-is-implemented: a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from.

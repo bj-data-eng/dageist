@@ -46,6 +46,9 @@ pub enum Rule {
     /// A method whose answer depends on the element dtype of a list or an array is run on one the
     /// tables are measured for: for another Polars is not asked, and may panic.
     ElementDtypeIsMeasured,
+    /// Arrays that meet and give an array are of one width, which is known: Polars refuses to add
+    /// arrays of two widths and gives a list where it fills one with the other.
+    ArraysMeetAtOneWidth,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
@@ -84,7 +87,8 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
+        Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementDtypeIsImplemented,
@@ -115,6 +119,7 @@ impl Rule {
             Self::DurationIsValid => "duration-is-valid",
             Self::ElementDtypeIsImplemented => "element-dtype-is-implemented",
             Self::ElementDtypeIsMeasured => "element-dtype-is-measured",
+            Self::ArraysMeetAtOneWidth => "arrays-meet-at-one-width",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
@@ -146,6 +151,9 @@ impl Rule {
                 "a pivot's aggregate must give one value for each group"
             }
             Self::ConditionPredicateIsBoolean => "a condition's predicate must be Boolean",
+            Self::ArraysMeetAtOneWidth => {
+                "arrays that meet, as the operands of a method or the values of a condition, and give an array must be of one width, which must be known: Polars refuses to add arrays of two widths, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another"
+            }
             Self::ElementDtypeIsMeasured => {
                 "a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on"
             }
@@ -210,6 +218,7 @@ impl Rule {
             Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
             | Self::ElementDtypeIsMeasured
+            | Self::ArraysMeetAtOneWidth
             | Self::MomentsShareAZone
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -359,6 +368,7 @@ impl Rule {
             | Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
             | Self::ElementDtypeIsMeasured
+            | Self::ArraysMeetAtOneWidth
             | Self::PatternIsValid
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber

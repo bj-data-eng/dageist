@@ -65,8 +65,8 @@ pub use offers::{
     rule_forbids_a_key_known_not_elementwise, rule_forbids_a_parameter_given_more_than_one_value,
     rule_forbids_a_range_that_cannot_be_made, rule_forbids_a_receiver,
     rule_forbids_a_repeated_pair_of_key_names, rule_forbids_a_window_over_a_count,
-    rule_forbids_a_window_over_a_widened_value, rule_forbids_replacement_values_of_other_numbers,
-    rule_forbids_values_of_other_counts,
+    rule_forbids_a_window_over_a_widened_value, rule_forbids_arrays_of_other_widths,
+    rule_forbids_replacement_values_of_other_numbers, rule_forbids_values_of_other_counts,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};
