@@ -630,6 +630,10 @@ directory:
 )
 ```
 
+A case that disagrees is kept in the directory as `<seed>-<place>-<length>.case` when the run that
+found it goes on, so a run that ended at a timeout after one has told it in its findings so far, and the runs
+after it end without a failure: list the directory for such files, not only the last status.
+
 The case that is about to run is written to `current.case` in that directory
 first. To run one kept case again, and see what the tables predicted and Polars did,
 name its file. A kept timeout is timed in the same way and ends the replay with the same
