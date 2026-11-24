@@ -96,7 +96,7 @@ pub enum Limit {
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
     ///   made by a fill with a text literal after the call that counts, or of the numbers of a
-    ///   group cast to text by the call before it, which read as the numbers, or of what a column
+    ///   group cast or filled to text by the call before it, which read as the numbers, or of what a column
     ///   of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -817,7 +817,7 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
 
 /// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
 /// group cast to text and nothing else: the values the pivot reads are columns of numbers, and the
-/// one call before it casts them to text. The text reads as the numbers, which the sample's does not.
+/// one call before it casts them to text or fills them with a text literal. The text reads as the numbers, which the sample's does not.
 fn is_text_of_the_numbers_of_a_group(
     frames: &Frames,
     step: &Call,
@@ -829,9 +829,11 @@ fn is_text_of_the_numbers_of_a_group(
     };
     matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
         && at == 1
-        && chain.links().first().is_some_and(|cast| {
-            is(cast, "Expr.cast")
-                && matches!(cast.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")
+        && chain.links().first().is_some_and(|first| {
+            // A cast to text, or a fill with a text literal, which gives numbers the dtype text.
+            (is(first, "Expr.cast")
+                && matches!(first.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String"))
+                || is_a_fill_with_text(first)
         })
         && !values.is_empty()
         && values.iter().all(|name| {
