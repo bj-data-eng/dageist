@@ -386,7 +386,7 @@ fn a_replay_of_a_case_that_does_not_end_ends_with_the_status_of_a_timeout() {
         stopped.said
     );
     assert!(
-        stopped.said.contains("the replay of"),
+        stopped.said.contains("the replay of a kept case"),
         "a replay is not a case of a campaign: {}",
         stopped.said
     );
