@@ -185,6 +185,7 @@ fn frame() -> DataFrame {
         .expect("lists of three cast to arrays of three")
         .into(),
     );
+    columns.extend(depth_two_columns());
     columns.push(ints("a", [Some(1), Some(2), Some(3)]).into());
     // One group of all three rows, so that the first two values of it, which a window refuses where
     // they are not as many as the group, are not by chance as many as the group has.
@@ -1214,4 +1215,197 @@ fn arrays_of_other_widths_are_not_met_as_arrays_and_those_of_one_width_are() {
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+// ---------------------------------------------------------------------------
+// Receivers of two levels, which have no class
+
+/// The element dtypes under the second level.
+const DEPTH_TWO_ELEMENTS: [Inner; 4] = [Inner::Null, Inner::Date, Inner::String, Inner::Int64];
+
+/// The prefixes of the columns of two levels, where the outer one is an array or not.
+const DEPTH_TWO_KINDS: [(&str, bool); 4] = [
+    ("two_list_", false),
+    ("two_array_", false),
+    ("two_struct_", false),
+    ("two_alist_", true),
+];
+
+/// The name of the column of two levels of `prefix` over the element `element`.
+fn depth_two_name(prefix: &str, element: Inner) -> String {
+    format!("{prefix}{element:?}")
+}
+
+/// The columns of lists of lists, of lists of arrays, of lists of structs and of arrays of lists of
+/// each element dtype, where Polars builds them: a row holds one inner list, array or struct.
+fn depth_two_columns() -> Vec<Column> {
+    let mut columns = Vec::new();
+    for element in DEPTH_TWO_ELEMENTS {
+        let rows = |inner: &Series| {
+            ListChunked::from_iter([Some(inner.slice(0, 1)), None, Some(inner.slice(2, 1))])
+                .into_series()
+        };
+        let lists = nested(Representative::List(element), "");
+        let arrays = nested(Representative::Array(element), "");
+        let value = if element == Inner::Null {
+            Series::new_null("x".into(), 1)
+        } else {
+            Series::new("x".into(), [1_i64])
+                .cast(&element.class().dtype())
+                .expect("a whole number casts to the element")
+        };
+        let one_struct = StructChunked::from_series("".into(), 1, [value].iter())
+            .expect("a struct")
+            .into_series();
+        let list_rows = rows(&lists);
+        let built = [
+            ("two_list_", Some(list_rows.clone())),
+            ("two_array_", Some(rows(&arrays))),
+            (
+                "two_struct_",
+                Some(
+                    ListChunked::from_iter([Some(one_struct.clone()), None, Some(one_struct)])
+                        .into_series(),
+                ),
+            ),
+            (
+                "two_alist_",
+                list_rows
+                    .cast(&DataType::Array(
+                        Box::new(DataType::List(Box::new(element.class().dtype()))),
+                        1,
+                    ))
+                    .ok(),
+            ),
+        ];
+        for (prefix, series) in built {
+            if let Some(series) = series {
+                columns.push(
+                    series
+                        .with_name(depth_two_name(prefix, element).into())
+                        .into(),
+                );
+            }
+        }
+    }
+    columns
+}
+
+/// Every method of an expression the test can call, and each with the arguments it needs: a null
+/// and a `true` for each expression, and a whole number for a dtype's place.
+fn every_method_called() -> Vec<(String, Value)> {
+    let literal = |value: Option<bool>| {
+        chain(
+            call("polars.lit", json!({ "value": { "flag": value } })),
+            vec![],
+        )
+    };
+    let mut all = Vec::new();
+    for entry in catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == catalog::Applies::Expression)
+    {
+        let id = entry.id().as_str();
+        let needed: Vec<_> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.is_needed())
+            .collect();
+        let supported = needed.iter().all(|parameter| {
+            matches!(
+                parameter.kind(),
+                catalog::Kind::Expression(_) | catalog::Kind::Dtype
+            )
+        });
+        if !supported {
+            continue;
+        }
+        let variants: Vec<(&str, Option<bool>)> = if needed.is_empty() {
+            vec![("", None)]
+        } else {
+            vec![(" null", None), (" true", Some(true))]
+        };
+        for (word, other) in variants {
+            let mut arguments = serde_json::Map::new();
+            for parameter in &needed {
+                let value = match parameter.kind() {
+                    catalog::Kind::Dtype => json!({ "dtype": "Int64" }),
+                    _ if parameter.shape() == catalog::Shape::Many => many(vec![literal(other)]),
+                    _ => literal(other),
+                };
+                arguments.insert(parameter.name().to_owned(), value);
+            }
+            all.push((format!("{id}{word}"), call(id, Value::Object(arguments))));
+        }
+    }
+    all
+}
+
+/// A column of lists of lists, of lists of arrays, of lists of structs or of arrays of lists has
+/// no class, so the walk does not know the dtype of what follows `list.first` of it, and the calls
+/// after it were never judged. Polars panics on some of them, as on `diff` of an array of `Null`
+/// and the mean of an array of dates followed by `first`. None may be run. After the first panics
+/// Polars answers some later chains with an error where it would have panicked, so a failure lists
+/// the chains it saw and a fix is checked by asking again.
+#[test]
+fn no_receiver_of_two_levels_is_run_into_a_panic_of_polars() {
+    let calls = every_method_called();
+    let present = frame();
+    let mut panicked: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut asked = 0;
+    for (prefix, outer_is_array) in DEPTH_TWO_KINDS {
+        for element in DEPTH_TWO_ELEMENTS {
+            let column = depth_two_name(prefix, element);
+            if present.column(&column).is_err() {
+                continue;
+            }
+            let namespace = if outer_is_array { "arr" } else { "list" };
+            let mut starts: Vec<(String, Vec<Value>)> = vec![("alone".to_owned(), vec![])];
+            for name in ["first", "last"] {
+                starts.push((
+                    format!("{namespace}.{name}"),
+                    vec![call(&format!("Expr.{namespace}.{name}"), json!({}))],
+                ));
+            }
+            for (start, before) in &starts {
+                for (label, link) in &calls {
+                    for (place, after) in [
+                        (Place::Select, None),
+                        (Place::Select, Some(call("Expr.first", json!({})))),
+                        // A pivot's aggregate is one value of the values of a group.
+                        (Place::PivotAggregate, Some(call("Expr.first", json!({})))),
+                    ] {
+                        asked += 1;
+                        let mut links = before.clone();
+                        links.push(link.clone());
+                        links.extend(after);
+                        let (value, _) = step_of(place, &column, links);
+                        let Ok(document) = Document::read(&document(vec![value])) else {
+                            continue;
+                        };
+                        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            document.run_on(&inputs(), &frame())
+                        }));
+                        if ran.is_err() {
+                            panicked
+                                .entry(format!("{start} then {label}"))
+                                .or_default()
+                                .push(format!("{column} in {place:?}"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        panicked.is_empty(),
+        "{} chains of {asked} reach a panic of Polars':\n{}",
+        panicked.len(),
+        panicked
+            .iter()
+            .take(40)
+            .map(|(chain, columns)| format!("{chain}: {}", columns.join(", ")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
