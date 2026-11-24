@@ -400,6 +400,32 @@ fn a_choice_option_starts_with_the_first_word_that_is_not_its_default() {
 }
 
 #[test]
+fn an_option_that_polars_refuses_every_other_word_of_cannot_be_added_and_says_why() {
+    // Beside a cross join Polars refuses every way to validate that is not its default.
+    let cross = step(
+        "joined",
+        "LazyFrame.join",
+        json!({ "other": { "table": "members" }, "how": { "choice": "cross" } }),
+    );
+    let error = refused(read(vec![cross]).add_option(&step_at(0, "joined"), "validate"));
+    let EditProblem::CannotAdd(refusal) = error.problem() else {
+        panic!("{error:?}");
+    };
+    assert!(
+        matches!(
+            refusal.source(),
+            dageist_engine::allowed::RefusalSource::Polars(_)
+        ),
+        "{refusal:?}"
+    );
+    assert!(!refusal.reason().is_empty());
+    assert_eq!(
+        error.place(),
+        &inside(0, "joined", vec![parameter("validate")])
+    );
+}
+
+#[test]
 fn an_option_that_is_already_given_is_left_as_it_is() {
     let document = read(vec![sort(json!({ "descending": flag(false) }))]);
     let edited = document
