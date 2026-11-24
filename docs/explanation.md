@@ -589,7 +589,8 @@ out from that one value: `sum().head(2)` is the one value, and so are `tail(5)`,
 `mode`, but `head(0)`, `slice(1)`, `top_k(0)`, `gather_every(1, 1)` and a difference that drops the first value
 give none, which is a count of no values and not one value, and a select refuses it beside a column. The one
 value that such a method took is the value of no row of a group, so a window refuses it, where `sum()` and
-`sum().first()` are the value of every row of theirs. A `filter` of one value is a count, for its condition
+`sum().first()` are the value of every row of theirs. The value stays taken where a method meets it, as an operand, a bound, a fill
+or the value or the predicate of a condition, and is not taken again where an aggregate of it is. A `filter` of one value is a count, for its condition
 meets the one value with each of its own.
 
 The values a call meets must be as many as one another, or one, which is met by each of the others: the rows are

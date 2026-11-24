@@ -995,13 +995,23 @@ fn a_window_takes_no_value_that_a_method_took_of_one_value_by_whatever_it_meets_
         ),
         (
             "a value of a condition",
-            condition(on("f", Vec::new()), taken(), a_sum()),
+            condition(
+                on(
+                    "a",
+                    vec![
+                        call("Expr.sum", json!({})),
+                        call("Expr.gt", json!({ "other": whole(0) })),
+                    ],
+                ),
+                taken(),
+                a_sum(),
+            ),
         ),
         (
             "a predicate of a condition",
             condition(
                 on(
-                    "b",
+                    "k",
                     vec![
                         call("Expr.sum", json!({})),
                         head(1),
@@ -1014,10 +1024,14 @@ fn a_window_takes_no_value_that_a_method_took_of_one_value_by_whatever_it_meets_
         ),
     ];
     for (name, walk) in walks {
+        let refusal = walk
+            .refusal()
+            .unwrap_or_else(|| panic!("{name} is refused by the window"));
         assert_eq!(
-            refusal_source(&walk),
+            refusal.refusal().source(),
             RefusalSource::Rule(Rule::WindowInputIsNotCounted),
-            "{name}"
+            "{name}: {}",
+            refusal.refusal().reason()
         );
     }
     // What meets only aggregates is the value of each row of its group.

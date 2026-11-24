@@ -256,6 +256,9 @@ struct Operand {
     /// How many values it gives where its shape is [`Shape::Counted`], as far as the arguments
     /// fix it.
     count: Count,
+    /// Whether it is one value that a method took of one value, or one that meets such a value: the
+    /// first none or one of it, which no row of a group takes as the value of the group.
+    taken: bool,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
@@ -293,9 +296,6 @@ struct Around {
     /// Whether the value the link follows is one that a part widened: a value of one row that a method
     /// met with each of the many values of a part, which a window refuses.
     widened: bool,
-    /// Whether the value the link follows is one that a method took of one value: the first none or
-    /// one of it, which is one value that no row of a group takes as the value of the group.
-    taken: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
 }
@@ -307,6 +307,8 @@ enum Cur {
         dtype: Option<Representative>,
         shape: Shape,
         count: Count,
+        /// Whether it is one value that a method took of one value, or one that meets such a value.
+        taken: bool,
     },
     Condition {
         state: ConditionState,
@@ -314,6 +316,8 @@ enum Cur {
         /// What the predicates and values met so far give together: one value meets each of them,
         /// and the others are as many as one another.
         meeting: (Shape, Count),
+        /// Whether a predicate or a value so far is one that a method took of one value.
+        taken: bool,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
         /// Whether every predicate and value so far gives one value, which a
@@ -1269,6 +1273,7 @@ impl Walker<'_> {
             loose: None,
             shape: Shape::Many,
             count: Count::NotKnown,
+            taken: false,
             known: false,
             reliable: false,
             zone: None,
@@ -1387,6 +1392,7 @@ impl Walker<'_> {
                                         .filter(|(_, operand)| operand.known && operand.reliable)
                                         .map(|(_, operand)| (operand.shape, operand.count)),
                                 ),
+                                taken: start_arguments.iter().any(|(_, operand)| operand.taken),
                                 zones: Vec::new(),
                                 single: start_arguments
                                     .iter()
@@ -1399,6 +1405,7 @@ impl Walker<'_> {
                                 dtype: class,
                                 shape: allowance.shape(),
                                 count: Count::NotKnown,
+                                taken: false,
                             }
                         };
                     }
@@ -1416,6 +1423,7 @@ impl Walker<'_> {
                     dtype: None,
                     shape: Shape::Many,
                     count: Count::NotKnown,
+                    taken: false,
                 };
             }
             Start::Input(name) => {
@@ -1423,6 +1431,7 @@ impl Walker<'_> {
                     dtype: None,
                     shape: Shape::Many,
                     count: Count::NotKnown,
+                    taken: false,
                 };
                 let standing = self.input_start(name, context, &mut cur, &mut last_end);
                 calls.push(standing);
@@ -1484,7 +1493,6 @@ impl Walker<'_> {
                     receiver_loose,
                     unit,
                     widened,
-                    taken: taken_of_one_value(expression, at),
                     zone,
                 },
             );
@@ -1566,6 +1574,7 @@ impl Walker<'_> {
                 dtype: Some(_),
                 shape: Shape::Counted,
                 count,
+                ..
             } => Some(*count),
             _ => None,
         };
@@ -1584,6 +1593,7 @@ impl Walker<'_> {
                 dtype,
                 shape,
                 count,
+                taken,
             } => Operand {
                 dtype,
                 loose: match expression.start() {
@@ -1592,13 +1602,17 @@ impl Walker<'_> {
                 },
                 shape,
                 count,
+                taken,
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
                 reliable: dtype.is_some() && !branches_are_one,
                 zone,
             },
             Cur::Condition {
-                values, meeting, ..
+                values,
+                meeting,
+                taken,
+                ..
             } => Operand {
                 dtype: unify(&values),
                 loose: None,
@@ -1608,6 +1622,7 @@ impl Walker<'_> {
                     Shape::Many
                 },
                 count: meeting.1,
+                taken,
                 known: true,
                 reliable: !branches_are_one,
                 zone: None,
@@ -1662,6 +1677,7 @@ impl Walker<'_> {
                     dtype: Some(class),
                     shape: allowance.shape(),
                     count: Count::NotKnown,
+                    taken: false,
                 };
             }
         }
@@ -1687,7 +1703,6 @@ impl Walker<'_> {
             receiver_loose,
             unit,
             widened,
-            taken,
             zone,
         } = around;
         let entry = link.entry();
@@ -1709,12 +1724,12 @@ impl Walker<'_> {
         // A window takes a value as long as its group. One value that a method took of one value is
         // that of no row of it, where the aggregate of one value is the value of the group, unless
         // the window joins the values of a group or explodes them.
-        if taken
-            && entry.id().as_str() == "Expr.over"
+        if entry.id().as_str() == "Expr.over"
             && matches!(
                 &cur,
                 Cur::Value {
                     shape: Shape::One,
+                    taken: true,
                     ..
                 }
             )
@@ -1755,6 +1770,7 @@ impl Walker<'_> {
                 Cur::Value {
                     shape,
                     count,
+                    taken,
                     dtype: alone,
                 },
                 Some(number),
@@ -1788,6 +1804,7 @@ impl Walker<'_> {
                     dtype,
                     shape,
                     count,
+                    taken,
                 }
             }
             (other, _) => other,
@@ -1798,6 +1815,7 @@ impl Walker<'_> {
                 dtype: None,
                 shape,
                 count,
+                taken,
             } => {
                 self.blind(format!(
                     "the dtype before {} is not known",
@@ -1809,6 +1827,7 @@ impl Walker<'_> {
                         dtype: None,
                         shape: *shape,
                         count: *count,
+                        taken: *taken,
                     },
                     Standing::not_asked(),
                 );
@@ -2004,11 +2023,18 @@ impl Walker<'_> {
                 }
                 _ => (shape, Count::NotKnown),
             };
+            let taken = taken_after(
+                link,
+                matches!(&cur, Cur::Value { taken: true, .. }),
+                arguments,
+                shape,
+            );
             return (
                 Cur::Value {
                     dtype,
                     shape,
                     count,
+                    taken,
                 },
                 standing,
             );
@@ -2116,6 +2142,7 @@ impl Walker<'_> {
                 },
             );
         }
+        let receiver_taken = matches!(&cur, Cur::Value { taken: true, .. });
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
                 let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
@@ -2143,6 +2170,7 @@ impl Walker<'_> {
                     dtype: allowance.result().and_then(allowed::ResultDtype::class),
                     shape,
                     count,
+                    taken: taken_after(link, receiver_taken, arguments, shape),
                 }
             }
             (
@@ -2154,9 +2182,14 @@ impl Walker<'_> {
                     values_single,
                     known,
                     meeting,
+                    taken,
                     ..
                 },
             ) => {
+                let taken = taken
+                    || arguments.iter().any(|(name, operand)| {
+                        matches!(name.as_str(), "predicates" | "statement") && operand.taken
+                    });
                 // The predicates and the values a condition is given are as many as one another,
                 // unless the values are one expression, whose predicates Polars drops.
                 let mut meeting = meeting;
@@ -2238,6 +2271,7 @@ impl Walker<'_> {
                                 dtype,
                                 shape,
                                 count,
+                                taken: taken && shape == Shape::One,
                             },
                             standing,
                         );
@@ -2247,6 +2281,7 @@ impl Walker<'_> {
                     state,
                     values,
                     meeting,
+                    taken,
                     zones,
                     single,
                     values_single,
@@ -2366,16 +2401,30 @@ impl Walker<'_> {
     }
 }
 
-/// Whether the value after the first `at` links of `expression` is one that a method took of one value:
-/// a method that takes some of the values is among those links, after the last aggregate, which is
-/// one value that a window gives each row of its group. A value that is more than one is not asked.
-fn taken_of_one_value(expression: &Expression, at: usize) -> bool {
-    let links = &expression.links()[..at];
-    let since = links
-        .iter()
-        .rposition(is_one_value)
-        .map_or(0, |aggregate| aggregate + 1);
-    links[since..].iter().any(is_counting)
+/// Whether the one value a call gives is one that a method took of one value, or that meets such a
+/// value: a method that takes some of the values gives one, an aggregate gives one that is not, and
+/// a method that gives a value for each of the values it follows gives one where what it follows, or
+/// an operand it meets, is. No row of a group takes it as the value of the group, so a window
+/// refuses it.
+fn taken_after(
+    link: &Call,
+    receiver_taken: bool,
+    arguments: &[(String, Operand)],
+    shape: Shape,
+) -> bool {
+    if shape != Shape::One {
+        return false;
+    }
+    if is_counting(link) {
+        return true;
+    }
+    if is_one_value(link) {
+        return false;
+    }
+    receiver_taken
+        || arguments
+            .iter()
+            .any(|(name, operand)| operand.taken && meets_receiver(link.entry(), name, operand))
 }
 
 /// What two values that a call meets give together: one value is met by each of the other, and
