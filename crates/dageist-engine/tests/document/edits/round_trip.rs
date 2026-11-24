@@ -4,7 +4,7 @@
 //! every place the documents it makes have, and checks each document that an
 //! edit gives: that it reads back, and that the edit did what it is for.
 
-use dageist_engine::catalog::{self, Applies, Entry, Kind, Shape, StepFrame, ValueType};
+use dageist_engine::catalog::{self, Applies, Entry, Kind, Shape, StepFrame, ValueType, Variadic};
 use dageist_engine::document::{
     Call, Document, EditError, Expression, Place, Segment, Start, Value,
 };
@@ -278,32 +278,70 @@ fn parent_of(place: &Place) -> Place {
     )
 }
 
-/// Whether what is at `place` is in a call that keeps a value for each key beside what it holds,
-/// which edits of the keys change too, so that more than the part at `place` can differ.
-fn syncs(document: &Document, place: &Place) -> bool {
+/// How many keys `call` has for the parameters that hold a value for each of them: the items of
+/// the parameter `of` and of the starred parameter after it, counted from the arguments given.
+fn key_count(call: &Call, of: &str) -> usize {
+    let items = |name: &str| match call.argument(name) {
+        Some(Value::Many(items)) => items.len(),
+        Some(_) => 1,
+        None => 0,
+    };
+    let parameters = call.entry().parameters();
+    let starred = parameters
+        .iter()
+        .position(|parameter| parameter.name() == of)
+        .and_then(|at| parameters.get(at + 1))
+        .filter(|next| next.variadic() == Some(Variadic::Args));
+    items(of) + starred.map_or(0, |next| items(next.name()))
+}
+
+/// Takes the values that a call keeps for each key out of both documents' JSON when the edit changed
+/// how many keys the call nearest to `place` has, since the edit then changes those values too,
+/// which have tests of their own. When it changed no key, everything is compared.
+fn mask_per_key_values(
+    before: &Document,
+    after: &Document,
+    place: &Place,
+    expected: &mut Json,
+    actual: &mut Json,
+) {
     let path = place.path();
-    (0..=path.len()).rev().find_map(|kept| {
+    let nearest = (0..=path.len()).rev().find_map(|kept| {
         let prefix = path[..kept].iter().fold(
             Place::of_step(place.step_index()?, None),
             |parent, segment| parent.then(segment.clone()),
         );
-        match node_at(document, &prefix)? {
-            Node::Call(call) => Some(
-                call.entry()
-                    .parameters()
-                    .iter()
-                    .any(|parameter| matches!(parameter.shape(), Shape::PerItem(_))),
-            ),
+        match node_at(before, &prefix)? {
+            Node::Call(call) => Some((prefix, call)),
             Node::Value(_) => None,
         }
-    }) == Some(true)
+    });
+    let Some((call_place, was)) = nearest else {
+        return;
+    };
+    let Some(Node::Call(now)) = node_at(after, &call_place) else {
+        return;
+    };
+    for follower in was.entry().parameters() {
+        let Shape::PerItem(of) = follower.shape() else {
+            continue;
+        };
+        if key_count(was, of) == key_count(now, of) {
+            continue;
+        }
+        for json in [&mut *expected, &mut *actual] {
+            if let Some(arguments) = json_node(json, &call_place)
+                .and_then(|call| call.get_mut("arguments"))
+                .and_then(Json::as_object_mut)
+            {
+                arguments.remove(follower.name());
+            }
+        }
+    }
 }
 
 /// Asserts that `after` is `before` but for what is at `place`: everything else is as it was.
 fn assert_only_replaced(before: &Document, after: &Document, place: &Place) {
-    if syncs(before, place) {
-        return;
-    }
     let mut expected = json_of(before);
     let mut actual = json_of(after);
     let new = json_node(&mut actual, place)
@@ -319,15 +357,14 @@ fn assert_only_replaced(before: &Document, after: &Document, place: &Place) {
             .expect("the arguments")
             .remove(name);
     }
+    mask_per_key_values(before, after, place, &mut expected, &mut actual);
     assert_eq!(expected, actual, "more than {place} changed");
 }
 
 /// Asserts that `after` is `before` but for a parameter that is no longer given.
 fn assert_only_cleared(before: &Document, after: &Document, place: &Place) {
-    if syncs(before, place) {
-        return;
-    }
     let mut expected = json_of(before);
+    let mut actual = json_of(after);
     if let (Some(Segment::Parameter(name)), Some(call)) = (
         place.path().last(),
         json_node(&mut expected, &parent_of(place)),
@@ -337,7 +374,8 @@ fn assert_only_cleared(before: &Document, after: &Document, place: &Place) {
             .expect("the arguments")
             .remove(name);
     }
-    assert_eq!(expected, json_of(after), "more than {place} changed");
+    mask_per_key_values(before, after, place, &mut expected, &mut actual);
+    assert_eq!(expected, actual, "more than {place} changed");
 }
 
 /// Asserts that `after` is `before` but for the array at `keys` inside what is at `container`,
@@ -349,9 +387,6 @@ fn assert_only_array_changed(
     keys: &[&str],
     change: &dyn Fn(&mut Vec<Json>, &[Json]),
 ) {
-    if syncs(before, container) {
-        return;
-    }
     let mut expected = json_of(before);
     let mut actual = json_of(after);
     let theirs = array_in(
@@ -366,6 +401,7 @@ fn assert_only_array_changed(
     )
     .expect("the array");
     change(ours, &theirs);
+    mask_per_key_values(before, after, container, &mut expected, &mut actual);
     assert_eq!(
         expected, actual,
         "more than the array at {container} changed"
