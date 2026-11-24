@@ -391,6 +391,108 @@ fn a_step_the_document_lacks_is_refused_with_its_kind() {
     assert!(reply.message().contains("there is no step"));
 }
 
+/// The place of the step `index`, called `id`, as an edit names it.
+fn step_place(index: usize, id: &str) -> Value {
+    json!({ "stepIndex": index, "stepId": id, "path": [] })
+}
+
+#[test]
+fn an_edit_is_made_on_the_document_the_bridge_holds_and_the_next_request_sees_it() {
+    let folder = SampleFolder::new("edits");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "edit_document",
+        &json!({ "revision": 1, "edit": { "kind": "removeStep", "step": step_place(11, "pivot") } }),
+    );
+
+    assert_eq!(reply.status, 200);
+    let answer = reply.json();
+    assert_eq!(answer["status"], "edited");
+    assert_eq!(answer["revision"], 2);
+    assert_eq!(
+        answer["document"]["steps"].as_array().map(Vec::len),
+        Some(11)
+    );
+    assert_eq!(answer["run"]["steps"].as_array().map(Vec::len), Some(11));
+    // The document is kept between requests, and a request for it gives what the edit answered.
+    let held = call(&bridge, "node_document", &json!({}));
+    assert_eq!(held.status, 200);
+    assert_eq!(held.json()["revision"], 2);
+    assert_eq!(held.json()["document"], answer["document"]);
+    // Rows are asked of a revision: the old one is stale and the new one is the document now.
+    let old = call(
+        &bridge,
+        "rows_after_step",
+        &json!({ "revision": 1, "step": "days_open", "limit": 1 }),
+    );
+    assert_eq!(old.status, 422);
+    assert_eq!(old.json()["kind"], "stale");
+    let current = call(
+        &bridge,
+        "rows_after_step",
+        &json!({ "revision": 2, "step": "days_open", "limit": 1 }),
+    );
+    assert_eq!(current.status, 200);
+}
+
+#[test]
+fn an_edit_the_engine_refuses_is_a_200_that_says_so_and_leaves_the_document() {
+    let folder = SampleFolder::new("refused");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "edit_document",
+        &json!({ "revision": 1, "edit": { "kind": "removeStep", "step": step_place(1, "nobody") } }),
+    );
+
+    assert_eq!(reply.status, 200);
+    let answer = reply.json();
+    assert_eq!(answer["status"], "refused");
+    assert_eq!(answer["revision"], 1);
+    assert_eq!(
+        answer["problem"],
+        json!({ "kind": "stepChanged", "found": "step_index" })
+    );
+    assert_eq!(answer["place"], step_place(1, "nobody"));
+    let held = call(&bridge, "node_document", &json!({}));
+    assert_eq!(held.json(), fixture("node-document.json"));
+}
+
+#[test]
+fn an_edit_made_against_another_revision_is_a_422_that_is_stale_and_changes_nothing() {
+    let folder = SampleFolder::new("stale");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "edit_document",
+        &json!({ "revision": 5, "edit": { "kind": "removeStep", "step": step_place(11, "pivot") } }),
+    );
+
+    assert_eq!(reply.status, 422);
+    assert_eq!(reply.json()["kind"], "stale");
+    assert_eq!(reply.message(), "the document is at revision 1 now, not 5");
+    let held = call(&bridge, "node_document", &json!({}));
+    assert_eq!(held.json(), fixture("node-document.json"));
+}
+
+#[test]
+fn a_place_that_names_no_step_is_a_400() {
+    let folder = SampleFolder::new("noplace");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "edit_document",
+        &json!({ "revision": 1, "edit": { "kind": "removeStep", "step": { "path": [] } } }),
+    );
+
+    assert_eq!(reply.status, 400);
+}
+
 #[test]
 fn the_sample_commands_keep_the_open_table_between_requests() {
     let folder = SampleFolder::new("session");

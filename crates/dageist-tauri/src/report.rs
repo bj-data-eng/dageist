@@ -171,37 +171,44 @@ fn segment_view(segment: &Segment) -> SegmentView {
 
 /// A place in a document: a step, then the way down through its arguments.
 /// Both are absent for a place in the document outside its steps.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlaceView {
     step_index: Option<usize>,
     step_id: Option<String>,
     path: Vec<SegmentView>,
 }
 
-impl PlaceView {
-    /// The place this view names, which a request for an edit sends as the report gives it.
+/// A place an edit is asked at: a step by its number and its identifier, then the way down
+/// through its arguments, as the report gives a place. An edit works inside a step, so a request
+/// that names no step, or names one without its identifier, is not a request.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct EditPlace {
+    step_index: usize,
+    step_id: String,
+    path: Vec<SegmentView>,
+}
+
+impl EditPlace {
+    /// The place this view names.
     ///
     /// # Errors
     ///
     /// When it names a step by an empty identifier.
     pub(crate) fn place(&self) -> Result<Place, EmptyStepId> {
-        let id = self.step_id.as_deref().map(StepId::new).transpose()?;
-        let mut place = match self.step_index {
-            Some(index) => Place::of_step(index, id),
-            None => Place::default(),
-        };
-        for segment in &self.path {
-            place = place.then(match segment {
+        let id = StepId::new(&self.step_id)?;
+        let place = Place::of_step(self.step_index, Some(id));
+        Ok(self.path.iter().fold(place, |place, segment| {
+            place.then(match segment {
                 SegmentView::Parameter { name } => Segment::Parameter(name.clone()),
                 SegmentView::Item { index } => Segment::Item(*index),
                 SegmentView::Key { index } => Segment::Key(*index),
                 SegmentView::Value { index } => Segment::Value(*index),
                 SegmentView::Start => Segment::Start,
                 SegmentView::Link { index } => Segment::Link(*index),
-            });
-        }
-        Ok(place)
+            })
+        }))
     }
 }
 

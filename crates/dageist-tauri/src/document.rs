@@ -28,7 +28,7 @@ use dageist_engine::document::{
 use serde::{Deserialize, Serialize};
 
 use crate::offers::PlaceRequest;
-use crate::report::{PlaceView, RunView, place_view};
+use crate::report::{EditPlace, PlaceView, RunView, place_view};
 use crate::sample_table::{ErrorKind, ErrorView};
 
 /// One call of the document: the entry of the catalogue it uses and the arguments it was
@@ -363,76 +363,76 @@ pub(crate) enum EditRequest {
     },
     /// Another entry for a step, started afresh.
     SwapStep {
-        step: PlaceView,
+        step: EditPlace,
         entry: String,
         frame: FrameRequest,
     },
     /// A step taken away.
-    RemoveStep { step: PlaceView },
+    RemoveStep { step: EditPlace },
     /// A step moved to the position `to`.
-    MoveStep { step: PlaceView, to: usize },
+    MoveStep { step: EditPlace, to: usize },
     /// An argument set.
     SetArgument {
-        place: PlaceView,
+        place: EditPlace,
         value: ValueRequest,
     },
     /// An argument taken away.
-    ClearArgument { place: PlaceView },
+    ClearArgument { place: EditPlace },
     /// An option added with what the catalogue starts it with.
-    AddOption { call: PlaceView, parameter: String },
+    AddOption { call: EditPlace, parameter: String },
     /// One value of a parameter that holds one for each item of another.
     SetForItem {
-        call: PlaceView,
+        call: EditPlace,
         parameter: String,
         item: usize,
         value: ValueRequest,
     },
     /// An item put into a list.
     InsertItem {
-        list: PlaceView,
+        list: EditPlace,
         at: usize,
         item: ValueRequest,
     },
     /// An item taken out of a list.
-    RemoveItem { item: PlaceView },
+    RemoveItem { item: EditPlace },
     /// A new test put into a list of conditions.
-    InsertTest { list: PlaceView, at: usize },
+    InsertTest { list: EditPlace, at: usize },
     /// An entry put into pairs.
     InsertEntry {
-        pairs: PlaceView,
+        pairs: EditPlace,
         at: usize,
         key: ValueRequest,
         value: ValueRequest,
     },
     /// An entry taken out of pairs.
-    RemoveEntry { entry: PlaceView },
+    RemoveEntry { entry: EditPlace },
     /// What an expression starts from, changed.
     SetStart {
-        expression: PlaceView,
+        expression: EditPlace,
         start: StartRequest,
     },
     /// An expression made to start from a function.
     StartWith {
-        expression: PlaceView,
+        expression: EditPlace,
         entry: String,
     },
     /// A method put into an expression.
     InsertLink {
-        expression: PlaceView,
+        expression: EditPlace,
         at: usize,
         entry: String,
         standing: Option<PlaceRequest>,
     },
     /// A link made a link of another method.
     SwapLink {
-        link: PlaceView,
+        link: EditPlace,
         entry: String,
         standing: Option<PlaceRequest>,
     },
     /// A link taken away.
-    RemoveLink { link: PlaceView },
+    RemoveLink { link: EditPlace },
     /// A link moved to the position `to`.
-    MoveLink { link: PlaceView, to: usize },
+    MoveLink { link: EditPlace, to: usize },
 }
 
 fn bad_place(error: impl std::fmt::Display) -> ErrorView {
@@ -451,7 +451,7 @@ impl EditRequest {
     /// When the request names a place, a dtype or a position the engine has no word for: that is
     /// no edit of the engine's to refuse.
     fn make(&self, document: &Document) -> Result<Made, ErrorView> {
-        let place = |view: &PlaceView| view.place().map_err(bad_place);
+        let place = |view: &EditPlace| view.place().map_err(bad_place);
         let standing = |request: &Option<PlaceRequest>| -> Result<Option<OfferPlace>, ErrorView> {
             request.as_ref().map(PlaceRequest::place).transpose()
         };
@@ -861,36 +861,38 @@ impl Documents {
         }
     }
 
-    /// Makes `request` on the document at `revision`, and holds the edited document at the next
-    /// revision.
+    /// Makes `request` on the document at `revision` and answers it: the edited document at the
+    /// next revision with what `report` made of it, or why the engine refused.
+    ///
+    /// The edited document is held only once `report` has given its answer, and the lock is held
+    /// from the check of the revision to that, so that an answer that fails leaves the document
+    /// and its revision as they were and two edits made against one revision cannot both be made.
     fn edit(
         &self,
         revision: u64,
         request: &EditRequest,
-    ) -> Result<Result<(Document, u64), Refused>, ErrorView> {
+        report: impl FnOnce(&Document, u64) -> Result<DocumentStateView, ErrorView>,
+    ) -> Result<EditAnswerView, ErrorView> {
         let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
         if held.revision != revision {
             return Err(stale(revision, held.revision));
         }
         match request.make(&held.document)? {
             Ok(edited) => {
-                held.document = edited.clone();
-                held.revision += 1;
-                Ok(Ok((edited, held.revision)))
+                let next = held.revision + 1;
+                let state = report(&edited, next)?;
+                held.document = edited;
+                held.revision = next;
+                Ok(EditAnswerView::Edited(state))
             }
-            Err(error) => Ok(Err(Refused {
+            Err(error) => Ok(EditAnswerView::Refused {
                 revision: held.revision,
-                error,
-            })),
+                place: place_view(error.place()),
+                problem: problem_view(error.problem()),
+                message: error.to_string(),
+            }),
         }
     }
-}
-
-/// An edit the engine refused, and the revision the document stays at.
-#[derive(Debug)]
-struct Refused {
-    revision: u64,
-    error: EditError,
 }
 
 fn stale(asked: u64, current: u64) -> ErrorView {
@@ -926,15 +928,7 @@ pub fn edit_view(
     revision: u64,
     request: &EditRequest,
 ) -> Result<EditAnswerView, ErrorView> {
-    match documents.edit(revision, request)? {
-        Ok((document, revision)) => Ok(EditAnswerView::Edited(state_of(&document, revision)?)),
-        Err(Refused { revision, error }) => Ok(EditAnswerView::Refused {
-            revision,
-            place: place_view(error.place()),
-            problem: problem_view(error.problem()),
-            message: error.to_string(),
-        }),
-    }
+    documents.edit(revision, request, state_of)
 }
 
 #[cfg(test)]

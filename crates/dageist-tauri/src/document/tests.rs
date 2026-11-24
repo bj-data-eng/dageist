@@ -7,10 +7,11 @@ use dageist_engine::document::{Place, Segment};
 use serde_json::{Value, json};
 
 use super::{
-    Documents, EditRequest, ProblemView, ThingView, ValueKindView, WantedView, document_state_view,
-    edit_view,
+    Documents, EditAnswerView, EditRequest, ProblemView, ThingView, ValueKindView, WantedView,
+    document_state_view, edit_view,
 };
 use crate::node::tests::{documents_of, invoke_on, json};
+use crate::sample_table::{ErrorKind, ErrorView};
 
 /// Set to rewrite the snapshots instead of checking them.
 const REFRESH: &str = "DAGEIST_REFRESH_EDITS";
@@ -474,10 +475,97 @@ fn the_places_an_edit_is_asked_at_are_the_places_a_report_gives() {
         "earlier",
         json!([{ "kind": "parameter", "name": "named_exprs" }]),
     );
-    let view: crate::report::PlaceView = serde_json::from_value(sent.clone()).expect("a place");
+    let view: crate::report::EditPlace = serde_json::from_value(sent.clone()).expect("a place");
     let made: Place = view.place().expect("a place");
     assert_eq!(made.step_index(), Some(1));
     assert_eq!(made.step_id().map(|id| id.as_str()), Some("earlier"));
     assert_eq!(made.path(), [Segment::Parameter("named_exprs".to_owned())]);
     assert_eq!(json(&crate::report::place_view(&made)), sent);
+}
+
+#[test]
+fn a_place_that_names_no_step_or_names_one_without_its_identifier_is_not_a_request() {
+    // An edit works inside a step. A place with no step, or one without the identifier that
+    // checks it is the step the person saw, is refused when it is read, not answered as a step
+    // that is not there.
+    for place in [
+        json!({ "path": [] }),
+        json!({ "stepIndex": 0, "path": [] }),
+        json!({ "stepId": "sort", "path": [] }),
+        json!({ "stepIndex": 0, "stepId": null, "path": [] }),
+        json!({ "stepIndex": null, "stepId": "sort", "path": [] }),
+    ] {
+        assert!(
+            serde_json::from_value::<EditRequest>(json!({ "kind": "removeStep", "step": place }))
+                .is_err(),
+            "{place}"
+        );
+    }
+    // A step named by an empty identifier is a failed command.
+    let refused = edit(
+        documents_of(&small_text()),
+        1,
+        json!({ "kind": "removeStep", "step": step_place(0, "") }),
+    )
+    .expect_err("a failed command");
+    assert_eq!(refused["kind"], "unknownName");
+}
+
+#[test]
+fn an_edit_whose_answer_cannot_be_given_is_not_made() {
+    // The document is held only once the answer to it has been made, so an answer that fails
+    // leaves the document and its revision as they were.
+    let documents = documents_of(&small_text());
+    let before = state(&documents);
+    let request: EditRequest =
+        serde_json::from_value(json!({ "kind": "removeStep", "step": step_place(1, "earlier") }))
+            .expect("a request");
+
+    let failed = documents.edit(1, &request, |_, _| {
+        Err(ErrorView::of(ErrorKind::Failed, "the run failed"))
+    });
+
+    assert!(failed.is_err());
+    assert_eq!(state(&documents), before);
+    // The same edit then goes through, against the same revision.
+    let made = documents
+        .edit(1, &request, super::state_of)
+        .expect("an answer");
+    assert!(matches!(made, EditAnswerView::Edited(_)));
+    assert_eq!(state(&documents)["revision"], 2);
+}
+
+#[test]
+fn two_writers_on_one_revision_make_one_edit_and_the_other_is_stale() {
+    // Eight clients send an edit against revision 1 at once: one wins, and the revision moves by
+    // exactly one.
+    let documents = documents_of(&small_text());
+    let outcomes: Vec<Result<Value, Value>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                scope.spawn(|| {
+                    let request: EditRequest = serde_json::from_value(json!({
+                        "kind": "removeStep",
+                        "step": step_place(1, "earlier")
+                    }))
+                    .expect("a request");
+                    super::edit_view(&documents, 1, &request)
+                        .map(|answer| json(&answer))
+                        .map_err(|error| json(&error))
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().expect("a client"))
+            .collect()
+    });
+
+    assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
+    for outcome in outcomes.iter().filter_map(|outcome| outcome.as_ref().err()) {
+        assert_eq!(outcome["kind"], "stale");
+    }
+    let held = state(&documents);
+    assert_eq!(held["revision"], 2);
+    assert_eq!(held["document"]["steps"].as_array().map(Vec::len), Some(1));
 }
