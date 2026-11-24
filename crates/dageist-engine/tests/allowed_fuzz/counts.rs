@@ -135,4 +135,39 @@ mod tests {
         let case = kept("stricter-a-comparison-in-a-sort-key-of-one-value.case");
         assert_eq!(settle(&case, &refusal(&case)), None);
     }
+
+    #[test]
+    fn a_count_that_the_data_or_a_typed_number_make_one_value_is_refused_for_lengths_once_it_is_not()
+     {
+        // The values that occur most are one on the sample's rows, as are the first value that a
+        // typed 1 takes and the every first value, which is every row; made two by rows that tie
+        // or by the number, Polars refuses them for lengths. And a count that is one by chance in
+        // a part that Polars drops as a sort key is one the part alone shows.
+        for name in [
+            "by-design-the-values-that-occur-most-are-one-by-chance.case",
+            "by-design-a-count-typed-as-one-as-a-sort-key.case",
+            "by-design-a-count-typed-as-one-beside-the-rows.case",
+            "by-design-a-count-by-chance-in-a-sort-key-that-is-one-value.case",
+        ] {
+            let case = kept(name);
+            let settled = settle(&case, &refusal(&case)).unwrap_or_else(|| panic!("{name}"));
+            assert!(
+                is_a_refusal_of_lengths(&settled.reason),
+                "{name}: {settled:?}"
+            );
+        }
+    }
+
+    /// `with_columns(a.arg_sort().mode())`: the places that sort a column are all different, so
+    /// the values that occur most are as many as the rows whatever the rows are.
+    const THE_MODE_OF_PLACES: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.arg_sort","arguments":{}},{"entry":"Expr.mode","arguments":{}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_count_that_is_the_rows_whatever_they_are_is_not_settled() {
+        // Polars allows it with any rows, so no control refuses it: it is no count by chance, and
+        // the finding stays.
+        let case = Case::decode(THE_MODE_OF_PLACES.as_bytes()).expect("a case");
+        assert_eq!(settle(&case, &refusal(&case)), None);
+    }
 }
