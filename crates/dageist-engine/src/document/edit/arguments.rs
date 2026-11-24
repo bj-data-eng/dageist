@@ -310,9 +310,14 @@ impl Document {
                 let items = changed(held, change).map_err(|fault| fault.shifted(1))?;
                 let mut made = with_given(call, &name, Some(items))?;
                 for follower in call.entry().parameters() {
-                    if !matches!(follower.shape(), Shape::PerItem(of) if of == name) {
+                    // The values go with the keys: those of the list, and, for the list that
+                    // holds the first keys, the ones that follow.
+                    let Shape::PerItem(of) = follower.shape() else {
                         continue;
-                    }
+                    };
+                    let Some(offset) = call.key_offset(of, &name) else {
+                        continue;
+                    };
                     let Some(Value::Many(values)) = made.argument(follower.name()) else {
                         continue;
                     };
@@ -320,14 +325,14 @@ impl Document {
                     match change {
                         Change::Insert { at, .. } => {
                             if let Some(default) = default_value(follower)
-                                && *at <= values.len()
+                                && offset + *at <= values.len()
                             {
-                                values.insert(*at, default);
+                                values.insert(offset + *at, default);
                             }
                         }
                         Change::Remove { at } => {
-                            if *at < values.len() {
-                                values.remove(*at);
+                            if offset + *at < values.len() {
+                                values.remove(offset + *at);
                             }
                         }
                     }

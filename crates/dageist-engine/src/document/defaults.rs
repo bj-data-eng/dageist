@@ -5,7 +5,7 @@
 //! does not. Whether it is one is a rule about Polars' defaults, which the
 //! engine holds: the step editor shows it.
 
-use crate::catalog::{DefaultValue, Role, Shape, Variadic};
+use crate::catalog::{DefaultValue, Parameter, Role, Shape, Variadic};
 
 use super::error::{Place, Segment};
 use super::model::{Call, Expression, Start, Step, Value};
@@ -55,18 +55,43 @@ impl Call {
     /// that follows it in Python's signature, as `sort`'s `by` and `more_by`
     /// are the keys the flags for each key are given for.
     pub(super) fn key_count(&self, of: &str) -> usize {
-        let parameters = self.entry().parameters();
-        let items = |name: &str| match self.argument(name) {
+        self.items_of(of) + self.starred_after(of).map_or(0, |next| self.items_of(next))
+    }
+
+    /// Where the items of the parameter `name` begin among the keys of `of`,
+    /// which are the items of `of` and then those of the starred parameter after
+    /// it: at the first for `of` itself, after the items of `of` for the
+    /// starred parameter, and nowhere for any other.
+    pub(super) fn key_offset(&self, of: &str, name: &str) -> Option<usize> {
+        if name == of {
+            Some(0)
+        } else if self.starred_after(of) == Some(name) {
+            Some(self.items_of(of))
+        } else {
+            None
+        }
+    }
+
+    /// How many items the parameter `name` holds: those of a list, one for any
+    /// other argument, and none when it is not given.
+    fn items_of(&self, name: &str) -> usize {
+        match self.argument(name) {
             Some(Value::Many(items)) => items.len(),
             Some(_) => 1,
             None => 0,
-        };
-        let following = parameters
+        }
+    }
+
+    /// The name of the starred parameter that follows `of` in Python's
+    /// signature, if one does.
+    fn starred_after(&self, of: &str) -> Option<&'static str> {
+        let parameters = self.entry().parameters();
+        parameters
             .iter()
             .position(|parameter| parameter.name() == of)
             .and_then(|at| parameters.get(at + 1))
-            .filter(|next| next.variadic() == Some(Variadic::Args));
-        items(of) + following.map_or(0, |next| items(next.name()))
+            .filter(|next| next.variadic() == Some(Variadic::Args))
+            .map(Parameter::name)
     }
 }
 
