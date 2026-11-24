@@ -14,7 +14,7 @@
 //! joins, as the value a `shift` fills with, and in a pivot's aggregate; and with lists of nulls,
 //! empty lists, and lists beyond one level, which have no class.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use dageist_engine::allowed::{
     After, Count, Inner, RefusalSource, Representative, Shape, dtype_name,
@@ -947,5 +947,134 @@ fn a_call_the_tables_do_not_measure_is_refused_before_polars_is_asked() {
         reached.is_empty(),
         "{} of {asked} calls are not refused before Polars is asked: {reached:?}",
         reached.len()
+    );
+}
+
+/// The calls that follow a method, each by what it says: every method of an expression that needs
+/// no argument, and the few that cut or group by one the test gives.
+fn followers() -> Vec<(String, Value)> {
+    let mut all: Vec<(String, Value)> = catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == catalog::Applies::Expression)
+        .filter(|entry| {
+            entry
+                .parameters()
+                .iter()
+                .all(|parameter| !parameter.is_needed())
+        })
+        .map(|entry| {
+            (
+                entry.id().as_str().to_owned(),
+                call(entry.id().as_str(), json!({})),
+            )
+        })
+        .collect();
+    let given =
+        |entry: &str, arguments: Value| (format!("{entry} {arguments}"), call(entry, arguments));
+    all.extend([
+        given("Expr.head", json!({ "n": whole(1) })),
+        given("Expr.tail", json!({ "n": whole(1) })),
+        given("Expr.limit", json!({ "n": whole(1) })),
+        given("Expr.shift", json!({ "n": whole(1) })),
+        given("Expr.gather_every", json!({ "n": whole(1) })),
+        given("Expr.gather", json!({ "indices": whole(0) })),
+        given(
+            "Expr.slice",
+            json!({ "offset": whole(0), "length": whole(2) }),
+        ),
+        given("Expr.top_k", json!({ "k": whole(1) })),
+        given("Expr.filter", json!({ "predicate": field("f") })),
+        given(
+            "Expr.over",
+            json!({ "partition_by": many(vec![field("g")]) }),
+        ),
+        given(
+            "Expr.over join",
+            json!({
+                "partition_by": many(vec![field("g")]),
+                "mapping_strategy": { "choice": "join" },
+            }),
+        ),
+    ]);
+    all
+}
+
+/// No method of these, followed by any call, is run into a panic of Polars': a combination that
+/// panics is refused before Polars is asked, by a rule or by what the tables say, or the method is
+/// not offered. A panic on a thread of Polars' own can leave its streaming executor broken for every
+/// query after it, and the host does not catch one.
+#[test]
+fn no_method_followed_by_any_call_is_run_into_a_panic_of_polars() {
+    let classes: Vec<Representative> = [
+        Inner::Int64,
+        Inner::String,
+        Inner::Float64,
+        Inner::Date,
+        Inner::Null,
+    ]
+    .into_iter()
+    .flat_map(|inner| [Representative::List(inner), Representative::Array(inner)])
+    .collect();
+    let mut panicked: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut asked = 0;
+    let followers = followers();
+    for class in classes {
+        let column = column_of(class);
+        for (namespace, name, arguments) in methods() {
+            let base = call(&format!("Expr.{namespace}.{name}"), arguments.clone());
+            for (follower, link) in &followers {
+                for place in [Place::Select, Place::Sort, Place::PivotAggregate] {
+                    // The places are asked of the calls that cut or aggregate: a sort key and a
+                    // pivot's aggregate are one value or the rows.
+                    if place != Place::Select
+                        && ![
+                            "first", "last", "head", "tail", "n_unique", "sum", "min", "unique",
+                        ]
+                        .iter()
+                        .any(|word| follower.to_lowercase().contains(&format!("expr.{word}")))
+                    {
+                        continue;
+                    }
+                    asked += 1;
+                    let links = vec![base.clone(), link.clone()];
+                    let (value, _) = step_of(place, &column, links);
+                    let Ok(document) = Document::read(&document(vec![value])) else {
+                        continue;
+                    };
+                    let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        document.run_on(&inputs(), &frame())
+                    }));
+                    if ran.is_err() {
+                        panicked
+                            .entry(format!("{namespace}.{name} {arguments} then {follower}"))
+                            .or_default()
+                            .push(format!("{column} in {place:?}"));
+                    }
+                }
+            }
+        }
+    }
+    let mut by_method: BTreeMap<&str, (usize, BTreeSet<&str>, &str)> = BTreeMap::new();
+    for (chain, where_) in &panicked {
+        let (method, follower) = chain.split_once(" then ").unwrap_or((chain, ""));
+        let slot = by_method
+            .entry(method)
+            .or_insert_with(|| (0, BTreeSet::new(), where_[0].as_str()));
+        slot.0 += 1;
+        slot.1.extend(where_.iter().map(String::as_str).take(1));
+        slot.2 = follower;
+    }
+    assert!(
+        panicked.is_empty(),
+        "{} chains of {asked} reach a panic of Polars', of {} methods:\n{}",
+        panicked.len(),
+        by_method.len(),
+        by_method
+            .iter()
+            .map(|(method, (count, classes, follower))| format!(
+                "{method}: {count} chains, as {follower} on {classes:?}"
+            ))
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }
