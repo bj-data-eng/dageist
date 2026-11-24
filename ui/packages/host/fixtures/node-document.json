@@ -1100,6 +1100,13 @@
               }
             },
             {
+              "parameter": "maintain_order",
+              "value": {
+                "kind": "flag",
+                "value": true
+              }
+            },
+            {
               "parameter": "aggregate_function",
               "value": {
                 "kind": "expression",

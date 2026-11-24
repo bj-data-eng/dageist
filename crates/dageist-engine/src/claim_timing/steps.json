@@ -835,6 +835,9 @@
               "row_days"
             ]
           },
+          "maintain_order": {
+            "flag": true
+          },
           "aggregate_function": {
             "expression": {
               "start": {

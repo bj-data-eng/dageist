@@ -61,9 +61,9 @@
 //! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
 //! value of each condition is made a fill forward of what it was, so that the values differ, and
 //! Polars refusing that case for the tables' reason, or, for a call the tables judge by its parts,
-//! for any reason where the same case with the predicate that holds the refused call made `true` is allowed, shows the
-//! predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
-//! of it may be refused first.
+//! for any reason where the same case with the predicate that holds the refused call made `false`
+//! is allowed, shows the predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe
+//! of the part alone is no better, for an argument of it may be refused first.
 //!
 //! A predicate that the rule that it be a `Boolean` refused where no column of its dtype can be
 //! asked (Polars refuses it on its own for another call it holds, or it is in a pivot's aggregate)
@@ -1507,12 +1507,12 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
     // A call that the tables judge by its parts is refused by Polars for the first it meets, which
     // is not always the one the tables refused first, so a refusal of the case where the values
     // differ is the part's where it is the predicate that holds it that Polars refuses: with that
-    // predicate made `true`, and no other, the same case is allowed.
+    // predicate made `false`, and no other, the same case is allowed.
     let by_parts = judges_its_values_apart(case, &refused.place);
     let refusal = (0..RUNS).find_map(|_| {
         observe(&control).refusal.filter(|refusal| {
             refusal.reason == refused.reason
-                || (by_parts && is_refused_for_its_predicates(&control, &refused.place))
+                || (by_parts && is_refused_for_its_predicate(&control, &refused.place))
         })
     })?;
     Some(Settled {
@@ -1523,19 +1523,24 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
 }
 
 /// Whether `case`, which Polars refuses, is allowed every time it is run with the predicate that
-/// holds `place` made `true`, and no other: that predicate is why it is refused.
-fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
+/// holds `place` made `false`, and no other: that predicate is why it is refused.
+fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
     let path = place.path();
-    // The predicate is the item after the last `predicates` the place goes through.
+    // The predicate is the item after the last `predicates` the place goes through, and that is a
+    // condition's where a call of an expression holds it, the start or a link, and not the
+    // step's own, which a filter holds.
     let Some(at) = path
         .iter()
         .rposition(|segment| matches!(segment, Segment::Parameter(name) if name == "predicates"))
         .filter(|at| matches!(path.get(at + 1), Some(Segment::Item(_))))
+        .filter(|at| *at > 0 && matches!(path[at - 1], Segment::Start | Segment::Link(_)))
     else {
         return false;
     };
-    let Some(truth) = call("polars.lit", vec![("value", Value::Flag(Some(true)))])
-        .and_then(|truth| Expression::new(Start::Call(truth), Vec::new()).ok())
+    // Made `false`, the branch it guards is dropped and the others are still evaluated, which they
+    // would not be after a `true`, whose branch Polars takes whatever follows it.
+    let Some(falsity) = call("polars.lit", vec![("value", Value::Flag(Some(false)))])
+        .and_then(|falsity| Expression::new(Start::Call(falsity), Vec::new()).ok())
     else {
         return false;
     };
@@ -1548,7 +1553,7 @@ fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
         .iter()
         .map(|argument| {
             let value = if argument.parameter() == parameter {
-                replaced_deep_in_value(argument.value(), inside, &truth)?
+                replaced_deep_in_value(argument.value(), inside, &falsity)?
             } else {
                 argument.value().clone()
             };
@@ -3113,10 +3118,12 @@ mod tests {
 
     #[test]
     fn a_predicate_is_not_settled_by_the_refusal_of_another_predicate_of_the_condition() {
-        // `when(a.dt.replace(day=1).is_null()).then(a).when(f.dt.replace(day=g).is_null()).then(a)
+        // `when(a.dt.replace(day=1).is_null()).then(a).when(a.dt.replace(day=g).is_null()).then(a)
         // .otherwise(a)`: Polars drops the predicates. Where the last value differs it refuses the
         // second predicate, whose day is text, and the first it allows. The refusal the tables
         // are asked about is the first predicate's replacement, which that refusal does not show.
+        // With the first made `true` Polars folds the condition to its first value and never
+        // evaluates the second, which is no showing that the first is why it was refused.
         let col = |name: &str| {
             format!(
                 r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
@@ -3140,7 +3147,7 @@ mod tests {
 {{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{},{{"entry":"Then.when","arguments":{{"predicates":{{"many":[{}]}}}}}},{},{}]}}}}]}}}}}}}}]}}"#,
             predicate("a", one),
             value("When.then"),
-            predicate("f", col("g")),
+            predicate("a", col("g")),
             value("ChainedWhen.then"),
             value("ChainedThen.otherwise"),
         );
@@ -3165,6 +3172,42 @@ mod tests {
             observe(&case).refusal.is_none(),
             "Polars drops the predicates"
         );
+        assert_eq!(settle_by_values_that_differ(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_predicate_of_a_filter_is_not_settled_as_the_predicate_of_a_condition_is() {
+        // `filter(a.dt.replace(day=g).is_null(), when(f).then(f).otherwise(f))`: the refusal asked
+        // about is the first predicate of the filter, which is no predicate of a condition and
+        // which Polars does not drop. The case where the values of the condition differ is refused
+        // for it, and allowed with it made `false`, which is not that Polars skips it.
+        let col = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.filter","arguments":{{"predicates":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.dt.replace","arguments":{{"day":{}}}}},{{"entry":"Expr.is_null","arguments":{{}}}}]}}}},{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{{"entry":"When.then","arguments":{{"statement":{}}}}},{{"entry":"Then.otherwise","arguments":{{"statement":{}}}}}]}}}}]}}}}}}}}]}}"#,
+            col("g"),
+            col("f"),
+            col("f"),
+            col("f"),
+        );
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0));
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "`round` operation not supported for dtype `bool` (expected: date/datetime)"
+                .to_owned(),
+            argument_unknown: false,
+        };
         assert_eq!(settle_by_values_that_differ(&case, &refused), None);
     }
 

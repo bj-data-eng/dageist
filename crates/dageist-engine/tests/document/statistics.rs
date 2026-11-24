@@ -368,23 +368,42 @@ fn an_entropy_of_text_or_a_moment_is_refused_and_one_of_numbers_is_not() {
 }
 
 #[test]
-fn an_arg_max_and_an_arg_min_give_the_row_of_the_first_largest_and_smallest() {
+fn an_arg_max_and_an_arg_min_give_a_row_that_holds_the_largest_and_smallest() {
+    // Polars does not say which of equal values it gives the row of, and gives another at another
+    // number of threads, and another for text in memory, so the row is one of those that hold the
+    // value: the days are `0, 2, 2, 0, 2, 2, 1`, and the steps `Intake, Pending, Complete, Intake,
+    // Review, Complete, Review`.
+    let row_of = |expression: Value| -> String {
+        let mut rows = cells(&selecting(expression));
+        assert_eq!(rows.len(), 1);
+        rows.remove(0).expect("a row")
+    };
+    let one_of = |expression: Value, rows: &[&str]| {
+        let row = row_of(expression);
+        assert!(rows.contains(&row.as_str()), "{row} is none of {rows:?}");
+    };
     let largest = selecting(method("row_days", "Expr.arg_max", json!({})));
     assert_eq!(dtype_of(&largest), DataType::UInt32);
-    assert_eq!(cells(&largest), texts(&["1"]));
+    one_of(
+        method("row_days", "Expr.arg_max", json!({})),
+        &["1", "2", "4", "5"],
+    );
     let smallest = selecting(method("row_days", "Expr.arg_min", json!({})));
     assert_eq!(dtype_of(&smallest), DataType::UInt32);
-    assert_eq!(cells(&smallest), texts(&["0"]));
-    // Text is ordered too: `Review` is the largest of the steps, first at row 4, and `Complete`
-    // the smallest, first at row 2.
-    let last_in_order = selecting(method("step_to", "Expr.arg_max", json!({})));
-    assert_eq!(cells(&last_in_order), texts(&["4"]));
-    let first_in_order = selecting(method("step_to", "Expr.arg_min", json!({})));
-    assert_eq!(cells(&first_in_order), texts(&["2"]));
-    // The rows with no value are not the largest or the smallest: `0, null, null, 0, null, null, 1`.
+    one_of(method("row_days", "Expr.arg_min", json!({})), &["0", "3"]);
+    // Text is ordered too: `Review` is the largest of the steps, at rows 4 and 6, and `Complete`
+    // the smallest, at rows 2 and 5.
+    one_of(method("step_to", "Expr.arg_max", json!({})), &["4", "6"]);
+    one_of(method("step_to", "Expr.arg_min", json!({})), &["2", "5"]);
+    // The rows with no value are not the largest or the smallest: `0, null, null, 0, null, null, 1`,
+    // where the one largest is at row 6.
     let with_a_gap = |entry: &str| selecting(after(&with_gaps(), vec![call(entry, json!({}))]));
     assert_eq!(cells(&with_a_gap("Expr.arg_max")), texts(&["6"]));
-    assert_eq!(cells(&with_a_gap("Expr.arg_min")), texts(&["0"]));
+    let smallest_with_a_gap = cells(&with_a_gap("Expr.arg_min"));
+    assert!(
+        smallest_with_a_gap == texts(&["0"]) || smallest_with_a_gap == texts(&["3"]),
+        "{smallest_with_a_gap:?}"
+    );
 }
 
 #[test]
