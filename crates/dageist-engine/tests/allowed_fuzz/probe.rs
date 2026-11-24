@@ -163,6 +163,8 @@ impl Settled {
                 self.probe,
                 if is_refused_as_a_predicate_that_is_no_boolean(&self.reason) {
                     "for the rule's reason"
+                } else if is_a_refusal_of_lengths(&self.reason) {
+                    "for lengths that do not match, which a count of values is the cause of"
                 } else {
                     "for another reason than the rule's, in the predicate"
                 },
@@ -1862,7 +1864,12 @@ const CONDITION_RULE: &str = "condition-predicate-is-boolean";
 /// allows the condition alone, refuses it elsewhere than in the predicate, or refuses the control
 /// too.
 pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Option<Settled> {
-    if refused.source != Source::Rule(CONDITION_RULE) {
+    // The rule, or a count of values that may not end a condition's predicate, which Polars meets
+    // as lengths that do not match once it evaluates the predicate beside the values.
+    let counted = matches!(refused.source, Source::Polars)
+        && is_a_count_that_may_not_end(&refused.reason)
+        && refused.reason.contains("condition.predicate");
+    if refused.source != Source::Rule(CONDITION_RULE) && !counted {
         return None;
     }
     let found = find(case, &refused.place)?;
@@ -1913,9 +1920,10 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
     let value_control = run(with_truth)?;
     let tables = tables_of(&found, None);
     let refusal = (0..RUNS).find_map(|_| {
-        observe_probe(&probed, tables)
-            .refusal
-            .filter(|refusal| lies_in(refusal, &predicate_place))
+        observe_probe(&probed, tables).refusal.filter(|refusal| {
+            lies_in(refusal, &predicate_place)
+                && (!counted || is_a_refusal_of_lengths(&refusal.reason))
+        })
     })?;
     // The controls are allowed every time they run.
     if (0..RUNS).any(|_| {
