@@ -144,8 +144,10 @@ fn a_campaign_for_a_parent_to_watch() {
             .clone()
             .filter(|_| directory.join("replay").exists())
         {
-            super::replayed_in_time(&case, super::env_deadline(), || scripted.observe(&case))
-                .expect("a replay that does not end does not return");
+            super::replayed_in_time("a kept case", &case, super::env_deadline(), || {
+                scripted.observe(&case)
+            })
+            .expect("a replay that does not end does not return");
             return;
         }
         let report = run(&settings, &scripted);

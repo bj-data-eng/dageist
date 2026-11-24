@@ -102,14 +102,22 @@ impl Settings {
                 self.start
             ));
         }
-        if let Some(counted) = self.counted
-            && counted > u64::from(self.cases)
-        {
-            return Err(format!(
-                "DAGEIST_FUZZ_COUNTED is {counted}, more than DAGEIST_FUZZ_CASES={}: \
-                 the campaign had already made all its cases",
-                self.cases
-            ));
+        // The cases before the start that were counted, which are all of them where it is not
+        // said how many were, are not to be more than the campaign makes.
+        let counted = self.counted.unwrap_or(passed_over);
+        if counted > u64::from(self.cases) {
+            return Err(match self.counted {
+                Some(counted) => format!(
+                    "DAGEIST_FUZZ_COUNTED is {counted}, more than DAGEIST_FUZZ_CASES={}: the \
+                     campaign had already made all its cases by DAGEIST_FUZZ_START={}",
+                    self.cases, self.start
+                ),
+                None => format!(
+                    "DAGEIST_FUZZ_START={} is past the end of a campaign of DAGEIST_FUZZ_CASES={}: \
+                     the {counted} cases before it are more, and it would make none",
+                    self.start, self.cases
+                ),
+            });
         }
         let uncounted = passed_over - self.counted.unwrap_or(passed_over);
         let to_make = u64::from(self.cases)
@@ -401,8 +409,11 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     // The case is written down before it is run, so that one that does not
     // return is still found: it is the file `current.case`.
     std::fs::create_dir_all(&settings.keep).expect("a directory for kept evidence");
-    // What an earlier run said of going on is not what this one says.
-    let _ = std::fs::remove_file(settings.keep.join(super::watchdog::GO_ON));
+    // What an earlier timed run said of going on is not what this one says. A run that is not
+    // timed, as the fixed seed of the engine's tests is, leaves it for the run that goes on.
+    if settings.deadline.is_some() {
+        let _ = std::fs::remove_file(settings.keep.join(super::watchdog::GO_ON));
+    }
     let current = settings.keep.join("current.case");
     let mut capture = |bytes: &[u8]| {
         std::fs::write(&current, bytes).map_err(|error| {
@@ -419,6 +430,7 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
             seed: settings.seed,
             keep: Some(settings.keep.clone()),
             deadline,
+            replaying: None,
         })
     });
     if let Some(watchdog) = &watchdog {

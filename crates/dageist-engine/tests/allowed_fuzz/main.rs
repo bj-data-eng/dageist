@@ -207,11 +207,17 @@ fn a_campaign() {
 
 /// Runs `work` on the case written as `bytes`, which ends the process with the status of a
 /// campaign whose case did not end if it takes longer than `deadline`.
-fn replayed_in_time<T>(bytes: &[u8], deadline: std::time::Duration, work: impl FnOnce() -> T) -> T {
+fn replayed_in_time<T>(
+    replaying: &str,
+    bytes: &[u8],
+    deadline: std::time::Duration,
+    work: impl FnOnce() -> T,
+) -> T {
     let watchdog = watchdog::Watchdog::start(watchdog::Context {
         seed: 0,
         keep: None,
         deadline,
+        replaying: Some(replaying.to_owned()),
     });
     watchdog.timing(1, bytes, work)
 }
@@ -224,13 +230,14 @@ fn replay_a_case() {
     let path = std::env::var_os("DAGEIST_FUZZ_REPLAY")
         .expect("DAGEIST_FUZZ_REPLAY names the file of a kept case");
     let bytes = std::fs::read(&path).expect("the file of the case is read");
-    let (evaluation, described) = replayed_in_time(&bytes, env_deadline(), || {
-        let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
-            .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
-        let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
-        let described = on_a_large_stack(|| target::describe(&case));
-        (evaluation, described)
-    });
+    let (evaluation, described) =
+        replayed_in_time(&path.to_string_lossy(), &bytes, env_deadline(), || {
+            let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
+                .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
+            let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
+            let described = on_a_large_stack(|| target::describe(&case));
+            (evaluation, described)
+        });
     println!("{}", String::from_utf8_lossy(&evaluation.canonical));
     println!("{described}");
     println!("{:?}", evaluation.outcome);

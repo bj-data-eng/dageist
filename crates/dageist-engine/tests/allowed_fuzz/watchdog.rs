@@ -30,6 +30,8 @@ pub struct Context {
     /// Where it keeps what it knows, if it keeps anything.
     pub keep: Option<PathBuf>,
     pub deadline: Duration,
+    /// What a replay replays, if the timer times a replay and not a campaign.
+    pub replaying: Option<String>,
 }
 
 struct Current {
@@ -220,7 +222,10 @@ fn timed_out(shared: &Shared, timing: &Timing, number: u64, canonical: &[u8]) ->
     } else {
         (
             format!("{:016x}-{number}-timeout.case", context.seed),
-            format!("the case {number}"),
+            context.replaying.as_ref().map_or_else(
+                || format!("the case {number}"),
+                |what| format!("the replay of {what}"),
+            ),
         )
     };
     let mut said = format!(
@@ -300,6 +305,5 @@ fn timed_out(shared: &Shared, timing: &Timing, number: u64, canonical: &[u8]) ->
     let mut stderr = std::io::stderr().lock();
     let _ = stderr.write_all(said.as_bytes());
     let _ = stderr.flush();
-    let _ = std::io::stdout().flush();
     std::process::exit(TIMEOUT_STATUS)
 }
