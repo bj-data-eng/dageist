@@ -60,8 +60,9 @@
 //! A refusal in a predicate of a condition whose values are one expression, which Polars drops
 //! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
 //! value of each condition is made a fill forward of what it was, so that the values differ, and
-//! Polars refusing that case for the tables' reason shows the predicate is one it skips
-//! ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
+//! Polars refusing that case for the tables' reason, or, for a call the tables judge by its parts,
+//! for any reason where the same case with each predicate made `true` is allowed, shows the
+//! predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
 //! of it may be refused first.
 //!
 //! A predicate that the rule that it be a `Boolean` refused where no column of its dtype can be
@@ -1503,17 +1504,46 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
         return None;
     }
     let control = changed(case_with_values_that_differ(case), case)?;
-    (0..RUNS)
-        .find_map(|_| {
-            observe(&control)
-                .refusal
-                .filter(|refusal| refusal.reason == refused.reason)
+    // A call that the tables judge by its parts is refused by Polars for the first it meets, which
+    // is not always the one the tables refused first, so a refusal of the case where the values
+    // differ is the part's where it is the predicates that Polars refuses: with each predicate made
+    // `true` the same case is allowed.
+    let by_parts = judges_its_values_apart(case, &refused.place);
+    let refusal = (0..RUNS).find_map(|_| {
+        observe(&control).refusal.filter(|refusal| {
+            refusal.reason == refused.reason
+                || (by_parts && is_refused_for_its_predicates(&control))
         })
-        .map(|refusal| Settled {
-            probe: control.document.write(),
-            reason: refusal.reason,
-            showing: Showing::WhereTheValuesDiffer,
-        })
+    })?;
+    Some(Settled {
+        probe: control.document.write(),
+        reason: refusal.reason,
+        showing: Showing::WhereTheValuesDiffer,
+    })
+}
+
+/// Whether `case`, which Polars refuses, is allowed every time it is run with each predicate of
+/// each condition made `true`: the predicates are why it is refused.
+fn is_refused_for_its_predicates(case: &Case) -> bool {
+    let Some(truth) = call("polars.lit", vec![("value", Value::Flag(Some(true)))])
+        .and_then(|truth| Expression::new(Start::Call(truth), Vec::new()).ok())
+    else {
+        return false;
+    };
+    let made_true = case_changed(case, &|made| {
+        let id = made.entry().id().as_str();
+        if !matches!(id, "polars.when" | "Then.when" | "ChainedThen.when") {
+            return None;
+        }
+        call(
+            id,
+            vec![(
+                "predicates",
+                Value::Many(vec![Value::Expression(truth.clone())]),
+            )],
+        )
+    });
+    made_true.is_some_and(|made_true| (0..RUNS).all(|_| observe(&made_true).refusal.is_none()))
 }
 
 /// The entries that end a condition, or give a value: `then` and `otherwise` of each state.

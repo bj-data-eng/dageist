@@ -1114,15 +1114,19 @@ enum Node<'a> {
 }
 
 /// Whether the call at `place` is one that the tables judge by its values apart, each beside a
-/// companion that stands for the others: a replacement, an interval, and a test of closeness,
-/// which they judge by what it follows and by what it is given. Polars refuses the call for any
-/// of them, so what it says of the part is not the reason the tables gave for the first they
-/// refused.
+/// companion that stands for the others: a replacement, an interval, a test of closeness and a
+/// replacement of the parts of a date, which they judge by what it follows and by what it is
+/// given. Polars refuses the call for any of them, so what it says of the part is not the reason
+/// the tables gave for the first they refused.
 pub fn judges_its_values_apart(case: &Case, place: &Place) -> bool {
     locate(case, place).call.is_some_and(|call| {
         matches!(
             call.entry().id().as_str(),
-            "Expr.replace" | "Expr.replace_strict" | "Expr.is_between" | "Expr.is_close"
+            "Expr.replace"
+                | "Expr.replace_strict"
+                | "Expr.is_between"
+                | "Expr.is_close"
+                | "Expr.dt.replace"
         )
     })
 }
