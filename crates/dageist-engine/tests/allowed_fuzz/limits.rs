@@ -8945,6 +8945,96 @@ mod tests {
         );
     }
 
+    /// A moment counted from 1970 that is made of the number 1, one that is made of a null, or a
+    /// time of the day made of nothing: a value that literals alone make.
+    fn made_of_literals(which: &str) -> Call {
+        match which {
+            "from_epoch" => call(
+                "polars.from_epoch",
+                vec![(
+                    "column",
+                    Value::Expression(chain(
+                        call("polars.lit", vec![("value", Value::Integer(1))]),
+                        &[],
+                    )),
+                )],
+            ),
+            "from_epoch of a null" => call(
+                "polars.from_epoch",
+                vec![("column", Value::Expression(chain(null(), &[])))],
+            ),
+            "time" => call("polars.time", Vec::new()),
+            "from_epoch of a column" => call(
+                "polars.from_epoch",
+                vec![("column", Value::Expression(chain(column("k"), &[])))],
+            ),
+            other => panic!("{other}"),
+        }
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_value_that_literals_alone_make_and_for_none_that_reads_a_column()
+     {
+        for kept in [
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-moment-made-from-a-literal.case",
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--of-a-time-made-of-nothing.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(kept),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{kept}"
+            );
+        }
+        for which in ["from_epoch", "from_epoch of a null", "time"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), a_share_of_one(), true),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{which}"
+            );
+            // Where the approximate quantile stands in a select, Polars does not read it as null.
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), a_share_of_one(), false),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{which} in a select"
+            );
+            // A share that is a null is refused for a column as well: the value is no cause.
+            assert_eq!(
+                refused_for_a_bound(
+                    &branch_with_a_quantile(made_of_literals(which), chain(null(), &[]), true),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{which} with a null share"
+            );
+        }
+        // A function that reads a column makes values of the column's rows, which are no literal.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(
+                    made_of_literals("from_epoch of a column"),
+                    a_share_of_one(),
+                    true
+                ),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+    }
+
     // ----- A replacement of an aggregate in a window key
 
     const ANOTHER_LENGTH_OF_AN_AGGREGATE: &str =
