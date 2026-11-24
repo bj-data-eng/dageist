@@ -44,13 +44,18 @@ export function RoutedWire({
       (node.id === source || node.id === target) &&
       (node.dragging === true || node.resizing === true),
   );
+  const lane = data?.lane;
+  const lanes = data?.lanes;
   const path = useMemo(() => {
     const from = { x: sourceX, y: sourceY };
     const to = { x: targetX, y: targetY };
-    const lane = data === undefined ? (from.x + to.x) / 2 : laneAt(from, to, data.lane, data.lanes);
+    const turnAt =
+      lane === undefined || lanes === undefined
+        ? (from.x + to.x) / 2
+        : laneAt(from, to, lane, lanes);
     return pathOf(
-      ownMoving ? lanePath(from, to, lane) : orthogonalRoute({ from, to, boxes, laneX: lane }),
+      ownMoving ? lanePath(from, to, turnAt) : orthogonalRoute({ from, to, boxes, laneX: turnAt }),
     );
-  }, [sourceX, sourceY, targetX, targetY, data, ownMoving, boxes]);
+  }, [sourceX, sourceY, targetX, targetY, lane, lanes, ownMoving, boxes]);
   return <BaseEdge id={id} path={path} {...(style === undefined ? {} : { style })} />;
 }

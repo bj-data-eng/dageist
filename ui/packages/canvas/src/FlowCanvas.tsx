@@ -8,7 +8,7 @@
 import '@xyflow/react/dist/style.css';
 import './canvas.css';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   Background,
@@ -102,19 +102,25 @@ function wiresOf(graph: CanvasGraph): Wire[] {
  */
 function Flow({ graph }: { readonly graph: CanvasGraph }): React.JSX.Element {
   const [boxes, setBoxes] = useState<Box[]>(() => boxesOf(graph, guessedHeights(graph)));
+  // The boxes as last shown, which each batch of changes applies to, so that two batches that
+  // arrive before the next drawing build on each other.
+  const latest = useRef(boxes);
   // The boxes the wires are routed around, taken again only once nothing is moving.
   const [settled, setSettled] = useState<readonly RouteBox[]>([]);
   const stacked = useRef(false);
   const { fitView } = useReactFlow();
+  // The wires are the same for as long as the graph is, so each keeps its route while boxes move.
+  const wires = useMemo(() => wiresOf(graph), [graph]);
 
   /** Shows `next`, and routes the wires around it once no box in it is moving. */
   const show = (next: Box[]): void => {
+    latest.current = next;
     setBoxes(next);
     if (!anyMoving(next)) setSettled(obstaclesOf(next));
   };
 
   const onBoxesChange = (changes: NodeChangeset<Box>): void => {
-    const next = changes.applyTo(boxes);
+    const next = changes.applyTo(latest.current);
     if (stacked.current || !next.every((box) => box.measured?.height !== undefined)) {
       show(next);
       return;
@@ -141,12 +147,14 @@ function Flow({ graph }: { readonly graph: CanvasGraph }): React.JSX.Element {
         className="dageist-flow"
         forceColorMode="dark"
         nodes={boxes}
-        edges={wiresOf(graph)}
+        edges={wires}
         edgeTypes={EDGE_TYPES}
         nodeTypes={NODE_TYPES}
         onNodesChange={onBoxesChange}
         nodesConnectable={false}
         edgesFocusable={false}
+        // The boxes and wires are what the host reports: none can be deleted here.
+        deleteKeyCode={null}
         fitView
         fitViewOptions={{ padding: FIT_PADDING }}
         minZoom={0.2}

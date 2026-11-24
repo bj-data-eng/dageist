@@ -18,7 +18,7 @@
   --xy-controls-box-shadow: none;
   --xy-attribution-background-color: transparent;
   --xy-minimap-background-color: var(--color-panel);
-  --xy-minimap-mask-background-color: rgb(27 29 34 / 0.7);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--color-canvas) 70%, transparent);
   --xy-minimap-node-background-color: var(--color-line-strong);
 }
 

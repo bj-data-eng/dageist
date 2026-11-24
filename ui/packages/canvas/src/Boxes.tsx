@@ -116,7 +116,6 @@ function outputTitle(output: Output): string {
 function StepStandIns({ lines }: { readonly lines: readonly string[] }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2.5">
-      <span className="sr-only">Steps not loaded</span>
       {lines.map((width) => (
         <div key={width} className="flex items-center gap-2">
           <Skeleton className="h-3.5 w-12 shrink-0" />
@@ -128,8 +127,8 @@ function StepStandIns({ lines }: { readonly lines: readonly string[] }): React.J
 }
 
 /**
- * A small round button on the end of a pin's stalk, which will add something
- * there. Adding is not built yet, so it does nothing.
+ * A small round button on the end of a pin's stalk, where something will be
+ * added. Adding needs the engine, so the button is shown disabled.
  */
 function AddButton({
   describedAs,
@@ -142,8 +141,8 @@ function AddButton({
     <button
       type="button"
       aria-label={describedAs}
-      title={`${describedAs} (not built yet)`}
-      className="flex h-6 cursor-pointer items-center gap-1 rounded-full border border-line-strong bg-panel px-2 font-mono text-[11px] text-muted hover:border-muted hover:text-ink"
+      disabled
+      className="flex h-6 items-center gap-1 rounded-full border border-line-strong bg-panel px-2 font-mono text-[11px] text-muted"
     >
       <span aria-hidden="true">+</span>
       {label}
@@ -210,7 +209,7 @@ export function StepsBox({ data }: NodeProps<StepsNode>): React.JSX.Element {
             ƒx
           </span>
           <BaseNodeHeaderTitle>
-            <span className="sr-only">Node, name not loaded</span>
+            <span className="sr-only">Node</span>
             <Skeleton className="h-4 w-36" />
           </BaseNodeHeaderTitle>
         </BaseNodeHeader>
