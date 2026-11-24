@@ -1085,16 +1085,33 @@ fn is_single(call: &Call) -> bool {
 fn gives_one_value_of_literals(expression: &Expression, upto: usize) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
     wholly_single(expression, upto, true)
-        || (matches!(expression.start(), Start::Call(start)
-        if start.entry().applies() == catalog::Applies::Function
-            && !is(start, "polars.col")
-            && !is(start, "polars.element")
-            && !operands(start).into_iter().any(|(_, operand)| {
-                any_call(operand, &|call| {
-                    is(call, "polars.col") || is(call, "polars.element")
-                })
-            }))
+        || (matches!(expression.start(), Start::Call(start) if is_a_value_of_literals_alone(start))
             && links.iter().all(is_single))
+}
+
+/// The functions that start a chain and give one value of what they are given, which a column
+/// does not stand in for: the literal, and the ones that make a date, a time, a moment, a length
+/// of time or a moment from a count since 1970. A function is no value of literals alone until it
+/// is named here; the catalogue's functions are checked against this list, so that a new one is
+/// decided when it is added and not excused for what it gives many values of.
+const FUNCTIONS_OF_LITERALS: [&str; 6] = [
+    "polars.date",
+    "polars.datetime",
+    "polars.duration",
+    "polars.from_epoch",
+    "polars.lit",
+    "polars.time",
+];
+
+/// Whether the start `start` makes one value of literals alone: one of the
+/// [`FUNCTIONS_OF_LITERALS`] that is given no column and no group's values.
+fn is_a_value_of_literals_alone(start: &Call) -> bool {
+    FUNCTIONS_OF_LITERALS.contains(&start.entry().id().as_str())
+        && !operands(start).into_iter().any(|(_, operand)| {
+            any_call(operand, &|call| {
+                is(call, "polars.col") || is(call, "polars.element")
+            })
+        })
 }
 
 /// Where a place is in an expression that holds it: in what the chain starts
@@ -2802,15 +2819,7 @@ const A_NULL_QUANTILE: &str = "`quantile` should not contain null values";
 /// approximate quantile.
 fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
     matches!(expression.start(), Start::Call(start)
-    if is(start, "polars.lit")
-        || (start.entry().applies() == catalog::Applies::Function
-            && !is(start, "polars.col")
-            && !is(start, "polars.element")
-            && !operands(start).into_iter().any(|(_, operand)| {
-                any_call(operand, &|call| {
-                    is(call, "polars.col") || is(call, "polars.element")
-                })
-            })))
+    if is(start, "polars.lit") || is_a_value_of_literals_alone(start))
         && expression
             .links()
             .iter()
