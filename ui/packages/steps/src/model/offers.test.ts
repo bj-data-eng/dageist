@@ -287,12 +287,12 @@ describe('the options of an entry', () => {
     const join = catalogue.entries.get('LazyFrame.join');
     if (join === undefined) throw new Error('no join');
     expect(
-      chosenOptions(join, {
-        coalesce: { kind: 'flag', value: true },
-        how: { kind: 'word', value: 'cross' },
-        suffix: { kind: 'text', value: '_r', shown: '_r' },
-        left_on: { kind: 'list', items: [] },
-      }),
+      chosenOptions(join, [
+        { parameter: 'coalesce', value: { kind: 'flag', value: true } },
+        { parameter: 'how', value: { kind: 'choice', word: 'cross' } },
+        { parameter: 'suffix', value: { kind: 'string', value: '_r' } },
+        { parameter: 'left_on', value: { kind: 'many', items: [] } },
+      ]),
     ).toEqual([
       { parameter: 'how', word: 'cross' },
       { parameter: 'coalesce', word: 'true' },

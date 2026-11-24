@@ -1,34 +1,41 @@
 /**
- * @file The drawing of every kind of parameter the catalogue has, so that a
- * new operation needs data and not a new look. Each kind is written as text
- * in the colour of what it names. One click opens one searched list, and what
- * is typed goes into that list's search box: a number or text for a value, a
- * path, a duration. What is still to be given is written in the colour of a
- * mistake as soon as it exists.
+ * @file The drawing of every kind of parameter the catalogue has, so that a new operation needs
+ * data and not a new look. Each kind is written as text in the colour of what it names. One click
+ * opens one searched list, and what is typed goes into that list's search box: a number or text
+ * for a value, a path, a duration. What is still to be given is written in the colour of a mistake
+ * as soon as it exists.
  *
- * A parameter holds one of its kind, an ordered list of them, or one for each
- * item of another parameter. A method or a step shows the parameters that are
- * set. The others are added from the list its name opens and taken away
- * again from the same list, which puts them back to their default.
+ * A parameter holds one of its kind, an ordered list of them, or one for each item of another
+ * parameter. A method or a step shows the parameters it was given. The others are added from the
+ * list its name opens and taken away again from the same list, which puts them back to their
+ * default. What is drawn is what the document holds; each pick is sent as an edit, and the window
+ * draws the document the host answers with. What has no value yet, such as an option that needs
+ * text typed in, is held as a draft until it has one.
  */
 
 import { useContext } from 'react';
 
 import type {
   ArgumentRequest,
+  ArgumentView,
+  CallView,
   ChoiceView,
   EntryView,
   KindView,
+  LiteralView,
   NoneView,
   OfferPlaceView,
   ParameterView,
   TypedKind,
+  ValueRequest,
 } from '@dageist/host';
 import type { Entry, Offer, OfferGroup } from '@dageist/design';
 import { Block, Hint, ManySlot, Piece, Slot, Word } from '@dageist/design';
 
 import type { Asked } from './ask';
 import { useReadTyped } from './ask';
+import { useDrafts, draftKey } from './drafts';
+import { useStepAt, useStepEdits } from './editor';
 import { FreshContext, Line, Lines } from './Lists';
 import { useCatalogue, useNode } from './EngineProvider';
 import { ValueSlot } from './Values';
@@ -36,24 +43,23 @@ import { readingRows } from './engineLists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import { useListState, usePositions } from './positions';
+import { usePreparedStep } from './engine';
+import type { Path } from './model/doc';
+import { expressionOf, itemSegment, keySegment, pathKey, under, valueSegment } from './model/doc';
+import { parameterSegment } from './model/doc';
 import { findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
-import { placeRequest, within } from './model/place';
-import { literalSetting } from './model/literal';
-import type { PreparedOption, PreparedReading } from './model/offers';
 import { findInput } from './model/inputs';
-import type { LiteralSetting, Options, PairSetting, SetParameter, Setting } from './model/settings';
+import type { PreparedOption, PreparedReading } from './model/offers';
+import { placeRequest, within } from './model/place';
 import {
-  UNSET,
-  emptyPair,
-  isComplete,
-  setParameters,
-  withOption,
-  withoutOption,
-} from './model/settings';
-import { defaultOf, startOf } from './model/started';
-import { atDefaultKey } from './model/report';
-import { usePreparedStep } from './engine';
+  HOLE,
+  canBeLeftUnpicked,
+  flagArgument,
+  listArgument,
+  literalArgument,
+  wordArgument,
+} from './model/requests';
 
 /** Returns what a parameter is for, for assistive technology: its name, and its label when that adds to it. */
 function describe(parameter: ParameterView): string {
@@ -75,25 +81,49 @@ export interface Surroundings {
   readonly method?: { readonly entry: string; readonly place: OfferPlaceView | null } | undefined;
 }
 
-/** Returns how `setting` is written as a word. */
-function wordOfSetting(kind: KindView, setting: Setting): { label: string; quoted: boolean } {
-  switch (setting.kind) {
-    case 'flag':
-      return { label: setting.value ? 'true' : 'false', quoted: false };
-    case 'number':
-      return { label: setting.shown, quoted: false };
-    case 'text':
-      return { label: setting.shown, quoted: true };
-    case 'word': {
-      // A choice is shown by the words the catalogue gives it.
-      const shown =
-        kind.kind === 'choice'
-          ? kind.words.find((choice) => choice.word === setting.value)?.shown
-          : undefined;
-      return { label: shown ?? setting.value, quoted: false };
-    }
+/** The key a fresh thing at `path` of the step being drawn is known by, which a drawing opens at. */
+export function freshKey(stepId: string, path: Path): string {
+  return `${stepId}:${pathKey(path)}`;
+}
+
+/** Returns how a number or text typed in is shown by what the document holds there. */
+interface Shown {
+  readonly text: boolean;
+  readonly shown: string;
+}
+
+/** Returns the words the engine shows what the argument holds as, when it holds a number or text. */
+function shownOf(argument: ArgumentView | undefined): Shown | null {
+  switch (argument?.kind) {
+    case 'integer':
+    case 'float':
+      return { text: false, shown: argument.shown };
+    case 'string':
+      return { text: true, shown: argument.value };
+    case 'duration':
+    case 'pattern':
+    case 'path':
+      return { text: true, shown: argument.text };
+    case 'timeZone':
+      return argument.zone === null ? null : { text: true, shown: argument.zone };
     default:
-      return { label: '…', quoted: false };
+      return null;
+  }
+}
+
+/** Returns the one word a column, choice, dtype or table argument holds, or `null`. */
+function wordOf(argument: ArgumentView | undefined): string | null {
+  switch (argument?.kind) {
+    case 'columns':
+      return argument.names[0] ?? null;
+    case 'choice':
+      return argument.word;
+    case 'dtype':
+      return argument.name;
+    case 'table':
+      return argument.name;
+    default:
+      return null;
   }
 }
 
@@ -238,7 +268,8 @@ interface ColumnsDrawingProps {
   readonly openId?: string;
   /** Returns why a field of `dtype` cannot be picked, or `null` when it can. */
   readonly reasonFor?: (dtype: Dtype) => string | null;
-  readonly onChange: (names: readonly string[]) => void;
+  /** Picks the field `name`, which the list has not, or takes it away, which it has. */
+  readonly onToggle: (name: string, held: boolean) => void;
 }
 
 function noReason(): null {
@@ -257,7 +288,7 @@ function ColumnsDrawing({
   wide = false,
   openId,
   reasonFor = noReason,
-  onChange,
+  onToggle,
 }: ColumnsDrawingProps): React.JSX.Element {
   const entries: Entry[] = names.map((name) => ({
     id: name,
@@ -280,9 +311,7 @@ function ColumnsDrawing({
             chosen: names,
             renderExtra: () => null,
             onPick: (name) => {
-              onChange(
-                names.includes(name) ? names.filter((other) => other !== name) : [...names, name],
-              );
+              onToggle(name, names.includes(name));
             },
           }),
         ),
@@ -440,7 +469,7 @@ function literalOffers(
   type: LiteralType,
   typed: string,
   readings: Asked<readonly PreparedReading[]>,
-  onPick: (literal: LiteralSetting) => void,
+  onPick: (literal: LiteralView) => void,
 ): Offer[] {
   if (typed === '') {
     return [
@@ -451,9 +480,7 @@ function literalOffers(
       }),
     ];
   }
-  return readingRows(typed, readings, (literal) => {
-    onPick(literalSetting(literal));
-  });
+  return readingRows(typed, readings, onPick);
 }
 
 /** Draws something typed into the search box of its list: a value, a duration, a pattern or a path. */
@@ -464,7 +491,10 @@ export function LiteralDrawing({
   openId,
   value,
   onChange,
-}: DrawingProps<LiteralSetting | null> & { readonly type: LiteralType }): React.JSX.Element {
+}: Omit<DrawingProps<Shown | null>, 'onChange'> & {
+  readonly type: LiteralType;
+  readonly onChange: (literal: LiteralView) => void;
+}): React.JSX.Element {
   const placeholder = LITERAL_PLACEHOLDERS[type];
   const waiting = type === 'duration' || type === 'pattern' || type === 'path' ? type : 'value';
   const list = useListState();
@@ -472,10 +502,10 @@ export function LiteralDrawing({
   const readings = useReadTyped(
     list.open ? { text: list.typed, typed: typedInto(type), slot: null } : null,
   );
-  let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
-  if (value === null) shown = { label: waiting, look: 'none' };
-  else if (value.kind === 'number') shown = { label: value.shown, look: 'plain' };
-  else shown = { label: value.shown, look: 'quoted' };
+  const shown: { label: string; look: 'plain' | 'quoted' | 'none' } =
+    value === null
+      ? { label: waiting, look: 'none' }
+      : { label: value.shown, look: value.text ? 'quoted' : 'plain' };
   return (
     <Slot
       label={shown.label}
@@ -501,24 +531,24 @@ function TimeZoneDrawing({
   describedAs,
   names,
   openId,
-  setting,
+  argument,
   none,
-  onChange,
+  onPick,
 }: {
   readonly describedAs: string;
   readonly names?: boolean | undefined;
   readonly openId?: string | undefined;
-  readonly setting: Setting;
+  readonly argument: ArgumentView | undefined;
   readonly none: NoneView | null;
-  readonly onChange: (setting: Setting) => void;
+  readonly onPick: (request: ValueRequest) => void;
 }): React.JSX.Element {
   const list = useListState();
   // The engine reads what is typed, only while the list is open.
   const readings = useReadTyped(
     list.open ? { text: list.typed, typed: typedInto('timeZone'), slot: null } : null,
   );
-  const value = literalOf(setting);
-  const isNone = none !== null && setting.kind === 'word' && setting.value === none.shown;
+  const value = shownOf(argument);
+  const isNone = none !== null && argument?.kind === 'timeZone' && argument.zone === null;
   let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
   if (isNone) shown = { label: none.shown, look: 'plain' };
   else if (value === null) shown = { label: LITERAL_WAITING.timeZone, look: 'none' };
@@ -534,13 +564,18 @@ function TimeZoneDrawing({
       describedAs={describedAs}
       placeholder={LITERAL_PLACEHOLDERS.timeZone}
       offers={(typed) => [
-        titled('Value', literalOffers('timeZone', typed, readings, onChange)),
+        titled(
+          'Value',
+          literalOffers('timeZone', typed, readings, (literal) => {
+            onPick(literalArgument({ kind: 'timeZone', none }, literal));
+          }),
+        ),
         ...(none === null
           ? []
           : [
               titled('No time zone', [
                 offer(none.shown, 'value', none.hint, () => {
-                  onChange({ kind: 'word', value: none.shown });
+                  onPick({ kind: 'timeZone', zone: null });
                 }),
               ]),
             ]),
@@ -551,52 +586,44 @@ function TimeZoneDrawing({
   );
 }
 
-/** What drawing a setting of one kind needs to know. */
+/** What drawing an argument of one kind needs to know. */
 interface OneProps {
   readonly kind: KindView;
-  /** The parameter that holds the setting, which says where an expression it holds stands. */
+  /** The parameter that holds the argument, which says where an expression it holds stands. */
   readonly parameter: ParameterView;
-  readonly setting: Setting;
+  /** What the document holds there, or `undefined` where nothing is yet. */
+  readonly argument: ArgumentView | undefined;
+  /** The way to the argument in the step, or `null` for one that is not in the document yet. */
+  readonly path: Path | null;
   readonly describedAs: string;
   readonly around: Surroundings;
   readonly names?: boolean | undefined;
   readonly openId?: string | undefined;
-  /** Takes it away from where it stands, for a setting that is one of several. */
+  /** Takes it away from where it stands, for an argument that is one of several. */
   readonly onRemove?: (() => void) | undefined;
-  readonly onChange: (setting: Setting) => void;
+  /** Says what the person picked for it. */
+  readonly onSet: (request: ValueRequest) => void;
 }
 
-/** Returns the literal a setting holds, or `null` when it holds none. */
-function literalOf(setting: Setting): LiteralSetting | null {
-  return setting.kind === 'number' || setting.kind === 'text' ? setting : null;
-}
-
-/** Returns the word a setting holds, or `null` when it holds none. */
-function nameOf(setting: Setting): string | null {
-  return setting.kind === 'word' ? setting.value : null;
-}
-
-/** Draws one setting of one kind. Every kind has one drawing; `pairs` and the shapes are drawn around these. */
+/** Draws one argument of one kind. Every kind has one drawing; `pairs` and the shapes are drawn around these. */
 function OneDrawing({
   kind,
   parameter,
-  setting,
+  argument,
+  path,
   describedAs,
   around,
   names,
   openId,
   onRemove,
-  onChange,
+  onSet,
 }: OneProps): React.JSX.Element {
   const common = { describedAs, names, openId };
   const outer = usePositions();
-  const word = (name: string): void => {
-    onChange({ kind: 'word', value: name });
-  };
   // An expression a parameter holds stands where its position says, or else where the chain
   // that holds the parameter stands, and is the argument of the method the parameter is of.
   const stands = within(outer, parameter.position);
-  const argument: ArgumentRequest | null =
+  const asked: ArgumentRequest | null =
     around.method?.place == null
       ? null
       : {
@@ -608,31 +635,36 @@ function OneDrawing({
     case 'expression':
       return (
         <ValueSlot
-          value={setting.kind === 'expression' ? setting.value : { kind: 'unset' }}
+          expression={expressionOf(argument)}
+          path={path}
           frame={around.frame}
           label={describedAs}
-          lists={false}
           positions={stands.length === 0 ? null : stands}
-          argument={argument}
+          argument={asked}
           openId={openId}
           onRemove={onRemove}
-          onChange={(value) => {
-            onChange({ kind: 'expression', value });
-          }}
+          onSet={onSet}
         />
       );
     case 'column':
       return (
-        <ColumnDrawing {...common} frame={around.frame} value={nameOf(setting)} onChange={word} />
+        <ColumnDrawing
+          {...common}
+          frame={around.frame}
+          value={wordOf(argument)}
+          onChange={(name) => {
+            onSet(wordArgument(kind, name));
+          }}
+        />
       );
     case 'value':
       return (
         <LiteralDrawing
           {...common}
           type={kind.type}
-          value={literalOf(setting)}
+          value={shownOf(argument)}
           onChange={(literal) => {
-            onChange(literal);
+            onSet(literalArgument(kind, literal));
           }}
         />
       );
@@ -640,52 +672,55 @@ function OneDrawing({
       return (
         <FlagDrawing
           {...common}
-          value={setting.kind === 'flag' ? setting.value : null}
+          value={argument?.kind === 'flag' ? argument.value : null}
           onChange={(value) => {
-            onChange({ kind: 'flag', value });
+            onSet(flagArgument(value));
           }}
         />
       );
     case 'choice':
       return (
-        <ChoiceDrawing {...common} words={kind.words} value={nameOf(setting)} onChange={word} />
+        <ChoiceDrawing
+          {...common}
+          words={kind.words}
+          value={wordOf(argument)}
+          onChange={(word) => {
+            onSet(wordArgument(kind, word));
+          }}
+        />
       );
     case 'dtype':
-      return <DtypeDrawing {...common} value={nameOf(setting)} onChange={word} />;
+      return (
+        <DtypeDrawing
+          {...common}
+          value={wordOf(argument)}
+          onChange={(word) => {
+            onSet(wordArgument(kind, word));
+          }}
+        />
+      );
     case 'duration':
-      return (
-        <LiteralDrawing
-          {...common}
-          type="duration"
-          value={literalOf(setting)}
-          onChange={(literal) => {
-            onChange(literal);
-          }}
-        />
-      );
     case 'pattern':
-      return (
-        <LiteralDrawing
-          {...common}
-          type="pattern"
-          value={literalOf(setting)}
-          onChange={(literal) => {
-            onChange(literal);
-          }}
-        />
-      );
-    case 'timeZone':
-      return <TimeZoneDrawing {...common} setting={setting} none={kind.none} onChange={onChange} />;
-    case 'table':
-      return <TableDrawing {...common} value={nameOf(setting)} onChange={word} />;
     case 'path':
       return (
         <LiteralDrawing
           {...common}
-          type="path"
-          value={literalOf(setting)}
+          type={kind.kind}
+          value={shownOf(argument)}
           onChange={(literal) => {
-            onChange(literal);
+            onSet(literalArgument(kind, literal));
+          }}
+        />
+      );
+    case 'timeZone':
+      return <TimeZoneDrawing {...common} argument={argument} none={kind.none} onPick={onSet} />;
+    case 'table':
+      return (
+        <TableDrawing
+          {...common}
+          value={wordOf(argument)}
+          onChange={(name) => {
+            onSet(wordArgument(kind, name));
           }}
         />
       );
@@ -697,45 +732,52 @@ function OneDrawing({
   }
 }
 
-/** What a list of settings shows and reports. */
+/** What a list or pairs shows and reports. */
 interface ListProps {
   readonly parameter: ParameterView;
-  readonly setting: Setting;
+  /** What the document holds for the parameter, or `undefined` where it is not given. */
+  readonly argument: ArgumentView | undefined;
+  /** The way to the argument in the step. */
+  readonly path: Path;
   readonly around: Surroundings;
-  /** Tells what was just added from the rest. */
-  readonly keyPrefix: string;
-  readonly onChange: (setting: Setting) => void;
 }
 
 /** Draws several of one kind, in order: each can be taken away, and a faint word adds another. */
-function ManyDrawing({
-  parameter,
-  setting,
-  around,
-  keyPrefix,
-  onChange,
-}: ListProps): React.JSX.Element {
+function ManyDrawing({ parameter, argument, path, around }: ListProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const drafts = useDrafts();
   const { kind } = parameter;
-  const items = setting.kind === 'list' ? setting.items : [UNSET];
-  const set = (next: readonly Setting[]): void => {
-    onChange({ kind: 'list', items: next });
-  };
+  const items = argument?.kind === 'many' ? argument.items : [];
+  const draftAt = draftKey('item', step.id, pathKey(path));
+  const drafting = drafts.get(draftAt) !== undefined;
   if (kind.kind === 'column') {
     // Fields stand on the line and fold to the room there is.
+    const names = items.flatMap((item) => {
+      const name = wordOf(item);
+      return name === null ? [] : [name];
+    });
     return (
       <ColumnsDrawing
         frame={around.frame}
-        names={items.flatMap((item) => (item.kind === 'word' ? [item.value] : []))}
+        names={names}
         empty="field"
         describedAs={describe(parameter)}
-        openId={keyPrefix}
-        onChange={(names) => {
-          set(names.map((value) => ({ kind: 'word', value })));
+        openId={freshKey(step.id, path)}
+        onToggle={(name, held) => {
+          if (held) {
+            void edits.removeItem(under(path, itemSegment(names.indexOf(name))));
+          } else if (argument === undefined) {
+            void edits.setArgument(path, listArgument([wordArgument(kind, name)]));
+          } else {
+            void edits.insertItem(path, items.length, wordArgument(kind, name));
+          }
         }}
       />
     );
   }
+  const open = (at: number): string => freshKey(step.id, under(path, itemSegment(at)));
   return (
     <>
       {items.map((item, at) => (
@@ -745,20 +787,45 @@ function ManyDrawing({
           <OneDrawing
             kind={kind}
             parameter={parameter}
-            setting={item}
+            argument={item}
+            path={under(path, itemSegment(at))}
             describedAs={describe(parameter)}
             around={around}
             names
-            openId={at === 0 ? keyPrefix : `${keyPrefix}:${String(at)}`}
+            openId={open(at)}
             onRemove={() => {
-              set(items.filter((_other, place) => place !== at));
+              void edits.removeItem(under(path, itemSegment(at)));
             }}
-            onChange={(next) => {
-              set(items.map((other, place) => (place === at ? next : other)));
+            onSet={(request) => {
+              void edits.setArgument(under(path, itemSegment(at)), request);
             }}
           />
         </span>
       ))}
+      {drafting && (
+        // An item that has no value yet is not in the document: it waits here until it has one.
+        <span>
+          {items.length > 0 && <Word>,</Word>}
+          <OneDrawing
+            kind={kind}
+            parameter={parameter}
+            argument={undefined}
+            path={null}
+            describedAs={describe(parameter)}
+            around={around}
+            names
+            openId={open(items.length)}
+            onRemove={() => {
+              drafts.clear(draftAt);
+            }}
+            onSet={(request) => {
+              drafts.clear(draftAt);
+              if (argument === undefined) void edits.setArgument(path, listArgument([request]));
+              else void edits.insertItem(path, items.length, request);
+            }}
+          />
+        </span>
+      )}
       <Block
         label="+"
         tone="ink"
@@ -766,8 +833,14 @@ function ManyDrawing({
         waits
         describedAs={`Add one to ${parameter.shown}`}
         onPress={() => {
-          fresh.mark(`${keyPrefix}:${String(items.length)}`);
-          set([...items, UNSET]);
+          fresh.mark(open(items.length));
+          // An expression with nothing picked is in the document; any other kind waits for its value.
+          if (canBeLeftUnpicked(kind)) {
+            if (argument === undefined) void edits.setArgument(path, listArgument([HOLE]));
+            else void edits.insertItem(path, items.length, HOLE);
+          } else {
+            drafts.set(draftAt, { kind: 'item' });
+          }
         }}
       />
     </>
@@ -775,33 +848,45 @@ function ManyDrawing({
 }
 
 /** Draws the entries of a `pairs` parameter: the key of each beside its value. */
-function PairsDrawing({
-  parameter,
-  setting,
-  around,
-  keyPrefix,
-  onChange,
-}: ListProps): React.JSX.Element {
+function PairsDrawing({ parameter, argument, path, around }: ListProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const drafts = useDrafts();
   const { kind } = parameter;
   if (kind.kind !== 'pairs') return <></>;
-  const entries = setting.kind === 'pairs' ? setting.entries : [];
-  const set = (next: readonly PairSetting[]): void => {
-    onChange({ kind: 'pairs', entries: next });
-  };
+  const entries = argument?.kind === 'pairs' ? argument.entries : [];
+  const draftAt = draftKey('entry', step.id, pathKey(path));
+  const draft = drafts.get(draftAt);
   // Keyword arguments are named; a dictionary maps one thing to another.
   const between = parameter.default.kind === 'empty' ? '=' : '→';
+  const described = describe(parameter);
+  /** Puts a new entry in the document once both sides are known: an expression may wait as a hole. */
+  const send = (key: ValueRequest | null, value: ValueRequest | null): void => {
+    const held = value ?? (canBeLeftUnpicked(kind.value) ? HOLE : null);
+    if (key === null || held === null) {
+      drafts.set(draftAt, { kind: 'entry', key, value });
+      return;
+    }
+    drafts.clear(draftAt);
+    if (argument === undefined) {
+      void edits.setArgument(path, { kind: 'pairs', entries: [{ key, value: held }] });
+    } else {
+      void edits.insertEntry(path, entries.length, key, held);
+    }
+  };
   return (
     <>
-      {entries.map((entry) => {
-        const describedAs = describe(parameter);
+      {entries.map((entry, at) => {
+        const keyPath = under(path, keySegment(at));
+        const valuePath = under(path, valueSegment(at));
         return (
           <Piece
-            key={entry.id}
+            key={at}
             remove={{
               label: 'Remove this entry',
               onPress: () => {
-                set(entries.filter((other) => other.id !== entry.id));
+                void edits.removeEntry(keyPath);
               },
             }}
             add={null}
@@ -809,29 +894,69 @@ function PairsDrawing({
             <OneDrawing
               kind={kind.key}
               parameter={parameter}
-              setting={entry.key}
-              describedAs={`${describedAs}, the name`}
+              argument={entry.key}
+              path={keyPath}
+              describedAs={`${described}, the name`}
               around={around}
               names
-              openId={`${keyPrefix}:${entry.id}`}
-              onChange={(key) => {
-                set(entries.map((other) => (other.id === entry.id ? { ...other, key } : other)));
+              openId={freshKey(step.id, keyPath)}
+              onSet={(request) => {
+                void edits.setArgument(keyPath, request);
               }}
             />
             <Word>{between}</Word>
             <OneDrawing
               kind={kind.value}
               parameter={parameter}
-              setting={entry.value}
-              describedAs={`${describedAs}, what it holds`}
+              argument={entry.value}
+              path={valuePath}
+              describedAs={`${described}, what it holds`}
               around={around}
-              onChange={(value) => {
-                set(entries.map((other) => (other.id === entry.id ? { ...other, value } : other)));
+              onSet={(request) => {
+                void edits.setArgument(valuePath, request);
               }}
             />
           </Piece>
         );
       })}
+      {draft?.kind === 'entry' && (
+        // An entry with a side still to be picked is not in the document: it waits here.
+        <Piece
+          remove={{
+            label: 'Remove this entry',
+            onPress: () => {
+              drafts.clear(draftAt);
+            },
+          }}
+          add={null}
+        >
+          <OneDrawing
+            kind={kind.key}
+            parameter={parameter}
+            argument={undefined}
+            path={null}
+            describedAs={`${described}, the name`}
+            around={around}
+            names
+            openId={freshKey(step.id, under(path, keySegment(entries.length)))}
+            onSet={(request) => {
+              send(request, draft.value);
+            }}
+          />
+          <Word>{between}</Word>
+          <OneDrawing
+            kind={kind.value}
+            parameter={parameter}
+            argument={undefined}
+            path={null}
+            describedAs={`${described}, what it holds`}
+            around={around}
+            onSet={(request) => {
+              send(draft.key, request);
+            }}
+          />
+        </Piece>
+      )}
       <Block
         label="+"
         tone="ink"
@@ -839,9 +964,8 @@ function PairsDrawing({
         waits
         describedAs={`Add one to ${parameter.shown}`}
         onPress={() => {
-          const added = emptyPair();
-          fresh.mark(`${keyPrefix}:${added.id}`);
-          set([...entries, added]);
+          fresh.mark(freshKey(step.id, under(path, keySegment(entries.length))));
+          drafts.set(draftAt, { kind: 'entry', key: null, value: null });
         }}
       />
     </>
@@ -857,8 +981,8 @@ function EachControl({
 }: {
   readonly parameter: ParameterView;
   readonly item: string;
-  readonly value: Setting | null;
-  readonly onChange: (setting: Setting) => void;
+  readonly value: string;
+  readonly onChange: (request: ValueRequest) => void;
 }): React.JSX.Element {
   const { kind } = parameter;
   const label = `${parameter.shown} for ${item}`;
@@ -871,23 +995,19 @@ function EachControl({
             { word: 'false', shown: 'false' },
           ]
         : kind.words;
-    const current =
-      value?.kind === 'flag' ? String(value.value) : value?.kind === 'word' ? value.value : '';
     return (
       <select
         aria-label={label}
         className="dg-given"
-        value={current}
+        value={value}
         onChange={(event) => {
           const chosen = event.currentTarget.value;
           onChange(
-            kind.kind === 'flag'
-              ? { kind: 'flag', value: chosen === 'true' }
-              : { kind: 'word', value: chosen },
+            kind.kind === 'flag' ? flagArgument(chosen === 'true') : wordArgument(kind, chosen),
           );
         }}
       >
-        {current === '' && <option value="">{'—'}</option>}
+        {value === '' && <option value="">{'—'}</option>}
         {options.map((choice) => (
           <option key={choice.word} value={choice.word}>
             {choice.shown}
@@ -903,36 +1023,46 @@ function EachControl({
   );
 }
 
+/** Returns the word a flag or choice argument is, as the controls hold it, or the empty text. */
+function heldWord(argument: ArgumentView | undefined): string {
+  if (argument?.kind === 'flag') return argument.value === null ? '' : String(argument.value);
+  return argument?.kind === 'choice' ? argument.word : '';
+}
+
+/** Returns what a parameter that is not given holds, as the controls hold it, or the empty text. */
+function defaultWord(parameter: ParameterView): string {
+  const held = parameter.defaultSetting;
+  if (held?.kind === 'flag') return String(held.value);
+  return held?.kind === 'word' ? held.value : '';
+}
+
 /**
- * Draws a parameter that holds one value for each item of another, such as
- * the way each field of a sort is ordered. Its list sets one value for every
- * item, or a value for each.
+ * Draws a parameter that holds one value for each item of another, such as the way each field of a
+ * sort is ordered. Its list sets one value for every item, or a value for each.
  */
-function EachDrawing({ parameter, setting, around, onChange }: ListProps): React.JSX.Element {
+function EachDrawing({ parameter, argument, path, around }: ListProps): React.JSX.Element {
+  const edits = useStepEdits();
   const { kind, shape } = parameter;
   const items = shape.shape === 'perItem' ? around.items(shape.of) : [];
-  const fallback = defaultOf(parameter);
-  const own = setting.kind === 'each' ? setting.items : {};
-  const valueFor = (item: string): Setting | null => {
-    if (Object.hasOwn(own, item)) return own[item] ?? null;
-    return setting.kind === 'each' ? fallback : setting;
+  // The path of the call the parameter is of: the way to the parameter, without it.
+  const callPath = path.slice(0, -1);
+  const fallback = defaultWord(parameter);
+  const valueFor = (index: number): string => {
+    const own = argument?.kind === 'many' ? argument.items[index] : argument;
+    const held = heldWord(own);
+    return held === '' ? fallback : held;
   };
-  const setItem = (item: string, next: Setting): void => {
-    // The items that had no setting of their own keep the one they shared.
-    const shared = Object.fromEntries(
-      items.flatMap((name) => {
-        const held = valueFor(name);
-        return held === null ? [] : [[name, held] as const];
-      }),
-    );
-    onChange({ kind: 'each', items: { ...shared, [item]: next } });
+  const shownWord = (word: string): { label: string; quoted: boolean } => {
+    if (word === '') return { label: 'default', quoted: false };
+    const shown =
+      kind.kind === 'choice' ? kind.words.find((choice) => choice.word === word)?.shown : undefined;
+    return { label: shown ?? word, quoted: false };
   };
-  const entries: Entry[] = items.map((item) => {
-    const held = valueFor(item);
-    const word = held === null ? { label: 'default', quoted: false } : wordOfSetting(kind, held);
+  const entries: Entry[] = items.map((item, index) => {
+    const word = shownWord(valueFor(index));
     return {
       id: item,
-      wrong: held !== null && !isComplete(held),
+      wrong: false,
       blocks: [
         { label: item, tone: 'column', look: 'plain' },
         { label: word.label, tone: 'value', look: word.quoted ? 'quoted' : 'plain' },
@@ -947,7 +1077,7 @@ function EachDrawing({ parameter, setting, around, onChange }: ListProps): React
             'value',
             '',
             () => {
-              onChange({ kind: 'flag', value: flag });
+              void edits.setArgument(path, flagArgument(flag));
             },
             { id: `all:${String(flag)}` },
           ),
@@ -959,7 +1089,7 @@ function EachDrawing({ parameter, setting, around, onChange }: ListProps): React
               'value',
               '',
               () => {
-                onChange({ kind: 'word', value: choice.word });
+                void edits.setArgument(path, wordArgument(kind, choice.word));
               },
               { id: `all:${choice.word}` },
             ),
@@ -980,16 +1110,24 @@ function EachDrawing({ parameter, setting, around, onChange }: ListProps): React
         counted(
           'One for each',
           items
-            .filter((item) => matches(typed, item))
-            .map((item) => {
-              const held = valueFor(item);
+            .map((item, index) => ({ item, index }))
+            .filter(({ item }) => matches(typed, item))
+            .map(({ item, index }) => {
+              const word = valueFor(index);
               return offer(
                 item,
                 'column',
-                held === null ? 'default' : wordOfSetting(kind, held).label,
+                shownWord(word).label,
                 () => {
                   // A flag turns over when its row is pressed; anything else is set in the control.
-                  if (held?.kind === 'flag') setItem(item, { kind: 'flag', value: !held.value });
+                  if (kind.kind === 'flag' && word !== '') {
+                    void edits.setForItem(
+                      callPath,
+                      parameter.name,
+                      index,
+                      flagArgument(word !== 'true'),
+                    );
+                  }
                 },
                 {
                   id: `each:${item}`,
@@ -998,9 +1136,9 @@ function EachDrawing({ parameter, setting, around, onChange }: ListProps): React
                     <EachControl
                       parameter={parameter}
                       item={item}
-                      value={held}
-                      onChange={(next) => {
-                        setItem(item, next);
+                      value={word}
+                      onChange={(request) => {
+                        void edits.setForItem(callPath, parameter.name, index, request);
                       }}
                     />
                   ),
@@ -1016,11 +1154,11 @@ function EachDrawing({ parameter, setting, around, onChange }: ListProps): React
 /** What a parameter shows and reports. */
 export interface ParameterDrawingProps {
   readonly parameter: ParameterView;
-  readonly setting: Setting;
+  /** What the document holds for the parameter, or `undefined` where it is not given. */
+  readonly argument: ArgumentView | undefined;
+  /** The way to the argument in the step. */
+  readonly path: Path;
   readonly around: Surroundings;
-  /** Tells what was just added from the rest, such as the step's id and the parameter's name. */
-  readonly keyPrefix: string;
-  readonly onChange: (setting: Setting) => void;
 }
 
 /**
@@ -1030,54 +1168,36 @@ export interface ParameterDrawingProps {
  */
 export function ParameterDrawing({
   parameter,
-  setting,
+  argument,
+  path,
   around,
-  keyPrefix,
-  onChange,
 }: ParameterDrawingProps): React.JSX.Element {
+  const edits = useStepEdits();
+  const step = useStepAt();
   const { kind, shape } = parameter;
   const notes = [`${parameter.shown} · ${parameter.label}`];
   let drawing: React.JSX.Element;
   if (shape.shape === 'perItem') {
-    drawing = (
-      <EachDrawing
-        parameter={parameter}
-        setting={setting}
-        around={around}
-        keyPrefix={keyPrefix}
-        onChange={onChange}
-      />
-    );
+    drawing = <EachDrawing parameter={parameter} argument={argument} path={path} around={around} />;
   } else if (kind.kind === 'pairs') {
     drawing = (
-      <PairsDrawing
-        parameter={parameter}
-        setting={setting}
-        around={around}
-        keyPrefix={keyPrefix}
-        onChange={onChange}
-      />
+      <PairsDrawing parameter={parameter} argument={argument} path={path} around={around} />
     );
   } else if (shape.shape === 'many') {
-    drawing = (
-      <ManyDrawing
-        parameter={parameter}
-        setting={setting}
-        around={around}
-        keyPrefix={keyPrefix}
-        onChange={onChange}
-      />
-    );
+    drawing = <ManyDrawing parameter={parameter} argument={argument} path={path} around={around} />;
   } else {
     drawing = (
       <OneDrawing
         kind={kind}
         parameter={parameter}
-        setting={setting}
+        argument={argument}
+        path={path}
         describedAs={describe(parameter)}
         around={around}
-        openId={keyPrefix}
-        onChange={onChange}
+        openId={freshKey(step.id, path)}
+        onSet={(request) => {
+          void edits.setArgument(path, request);
+        }}
       />
     );
   }
@@ -1091,43 +1211,32 @@ export function ParameterDrawing({
 /**
  * Returns what a parameter that is added is first set to, and why it cannot
  * be: the engine says which word a flag or a choice starts with, and where
- * Polars refuses every word but the default, the reason. Any other kind
- * starts as it always has. While the engine has not said, a flag or a choice
- * waits for it.
+ * Polars refuses every word but the default, the reason. Any other kind is added by asking
+ * the engine to start it. While the engine has not said, a flag or a choice waits for it.
  */
-function starting(
+function reasonToWait(
   parameter: ParameterView,
   engine: Asked<ReadonlyMap<string, PreparedOption>>,
-): { readonly setting: Setting | null; readonly reason: string | null } {
+): string | null {
   const { kind } = parameter;
-  if (kind.kind !== 'flag' && kind.kind !== 'choice') {
-    return { setting: startOf(parameter), reason: null };
-  }
-  if (engine.state === 'failed') return { setting: null, reason: engine.reason };
-  if (engine.state !== 'ready') return { setting: null, reason: 'waiting for the engine' };
+  if (kind.kind !== 'flag' && kind.kind !== 'choice') return null;
+  if (engine.state === 'failed') return engine.reason;
+  if (engine.state !== 'ready') return 'waiting for the engine';
   const option = engine.answer.get(parameter.name);
-  if (option === undefined) return { setting: startOf(parameter), reason: null };
-  if (option.starter === null) return { setting: null, reason: option.stuck };
-  return {
-    setting:
-      kind.kind === 'flag'
-        ? { kind: 'flag', value: option.starter === 'true' }
-        : { kind: 'word', value: option.starter },
-    reason: null,
-  };
+  if (option === undefined) return null;
+  return option.starter === null ? option.stuck : null;
 }
 
 /**
- * Lists the parameters that can be added, with those that are set ticked:
- * picking one sets it or takes it away. A flag or a choice starts with the
- * word the engine says it may have beside what is already set, and cannot be
- * added where Polars refuses every other word.
+ * Lists the parameters that can be added, with those that are given ticked: picking one adds it or
+ * takes it away. A flag or a choice starts with the word the engine says it may have beside what is
+ * already set, and cannot be added where Polars refuses every other word.
  */
 export function optionOffers(
   parameters: readonly ParameterView[],
-  options: Options,
+  given: ReadonlySet<string>,
   typed: string,
-  onChange: (options: Options, added: string | null) => void,
+  onToggle: (parameter: ParameterView, given: boolean) => void,
   engine: Asked<ReadonlyMap<string, PreparedOption>>,
 ): OfferGroup {
   return counted(
@@ -1135,73 +1244,134 @@ export function optionOffers(
     parameters
       .filter((parameter) => matches(typed, parameter.shown, parameter.label, parameter.name))
       .map((parameter) => {
-        const set = Object.hasOwn(options, parameter.name);
-        const first = set ? { setting: null, reason: null } : starting(parameter, engine);
+        const set = given.has(parameter.name);
         return offer(
           parameter.shown,
           'ink',
           parameter.label,
           () => {
-            if (set) {
-              onChange(withoutOption(options, parameter.name), null);
-            } else if (first.setting !== null) {
-              onChange(withOption(options, parameter.name, first.setting), parameter.name);
-            }
+            onToggle(parameter, set);
           },
-          { id: `option:${parameter.name}`, ticked: set, reason: first.reason },
+          {
+            id: `option:${parameter.name}`,
+            ticked: set,
+            reason: set ? null : reasonToWait(parameter, engine),
+          },
         );
       }),
   );
 }
 
+/**
+ * Returns what toggles an option of the call at `callPath`: a given one is taken away, and one that
+ * is not is added as the engine starts it. An option that starts with nothing a document holds, such
+ * as text still to be typed, waits as a draft until it has its value.
+ */
+export function useOptionToggle(
+  callPath: Path,
+): (parameter: ParameterView, given: boolean) => void {
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const drafts = useDrafts();
+  const fresh = useContext(FreshContext);
+  return (parameter, given) => {
+    const path = under(callPath, parameterSegment(parameter.name));
+    const draftAt = draftKey('option', step.id, pathKey(path));
+    if (given || drafts.get(draftAt) !== undefined) {
+      drafts.clear(draftAt);
+      if (given) void edits.clearArgument(path);
+      return;
+    }
+    fresh.mark(freshKey(step.id, path));
+    void edits.addOption(callPath, parameter.name).then((sent) => {
+      if (sent.status === 'refused' && sent.problem.kind === 'needsValue') {
+        drafts.set(draftAt, { kind: 'option' });
+      }
+    });
+  };
+}
+
 /** What the parameters that are set show and report. */
 export interface OptionRowsProps {
-  /** Tells what was just added from the rest: the id of the method or step. */
-  readonly ownerId: string;
   readonly entry: EntryView | null;
+  /** The call the parameters are of. */
+  readonly call: CallView;
+  /** The way to the call in the step. */
+  readonly callPath: Path;
   /** The parameters that may be added: the entry's, less those the owner draws itself. */
   readonly parameters: readonly ParameterView[];
-  readonly options: Options;
   readonly around: Surroundings;
   /** Whether each parameter stands on a line of its own beneath the owner, or all follow it on its line. */
   readonly layout: 'inline' | 'lines';
-  readonly onChange: (options: Options) => void;
 }
 
-/** Draws every parameter of an owner that is set. */
+/** Draws every parameter of an owner that is set, and any that is waiting for its value. */
 export function OptionRows({
-  ownerId,
   entry,
+  call,
+  callPath,
   parameters,
-  options,
   around,
   layout,
-  onChange,
 }: OptionRowsProps): React.JSX.Element | null {
   // Whether a parameter is at what Polars holds when it is not given is the engine's to say.
   const atDefault = usePreparedStep()?.atDefault;
+  const drafts = useDrafts();
+  const step = useStepAt();
+  const edits = useStepEdits();
   if (entry === null) return null;
-  const drawn: SetParameter[] = setParameters(entry, options).filter(({ parameter }) =>
-    parameters.some((offered) => offered.name === parameter.name),
+  const given = entry.parameters.flatMap((parameter) => {
+    const held = call.arguments.find((candidate) => candidate.parameter === parameter.name);
+    return held === undefined || !parameters.some((offered) => offered.name === parameter.name)
+      ? []
+      : [{ parameter, argument: held.value }];
+  });
+  const waiting = parameters.filter(
+    (parameter) =>
+      !given.some((held) => held.parameter.name === parameter.name) &&
+      drafts.get(
+        draftKey('option', step.id, pathKey(under(callPath, parameterSegment(parameter.name)))),
+      ) !== undefined,
   );
-  const rows = drawn.map(({ parameter, setting }) => (
+  const row = (
+    parameter: ParameterView,
+    argument: ArgumentView | undefined,
+    path: Path,
+  ): React.JSX.Element => (
     <Row key={parameter.name} layout={layout}>
       <Word>{parameter.shown}</Word>
-      <ParameterDrawing
-        parameter={parameter}
-        setting={setting}
-        around={around}
-        keyPrefix={`${ownerId}:${parameter.name}`}
-        onChange={(next) => {
-          onChange(withOption(options, parameter.name, next));
-        }}
-      />
-      {isComplete(setting) && atDefault?.has(atDefaultKey(ownerId, parameter.name)) === true && (
+      {argument === undefined ? (
+        // An option that has no value yet is not in the document: it waits here until it has one.
+        <OneDrawing
+          kind={parameter.kind}
+          parameter={parameter}
+          argument={undefined}
+          path={null}
+          describedAs={describe(parameter)}
+          around={around}
+          openId={freshKey(step.id, path)}
+          onSet={(request) => {
+            drafts.clear(draftKey('option', step.id, pathKey(path)));
+            void edits.setArgument(path, request);
+          }}
+        />
+      ) : (
+        <ParameterDrawing parameter={parameter} argument={argument} path={path} around={around} />
+      )}
+      {argument !== undefined && atDefault?.has(pathKey(path)) === true && (
         <span className="font-sans text-xs text-muted">same as the default</span>
       )}
     </Row>
-  ));
-  if (drawn.length === 0) return null;
+  );
+  const rows = [
+    ...given.map(({ parameter, argument }) =>
+      row(parameter, argument, under(callPath, parameterSegment(parameter.name))),
+    ),
+    ...waiting.map((parameter) =>
+      row(parameter, undefined, under(callPath, parameterSegment(parameter.name))),
+    ),
+  ];
+  if (rows.length === 0) return null;
   return layout === 'lines' ? <Lines>{rows}</Lines> : <>{rows}</>;
 }
 

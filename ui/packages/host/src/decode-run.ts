@@ -18,7 +18,6 @@ import type {
   OuterPosition,
   OutcomeView,
   PlaceView,
-  ReadProblemView,
   RefusalSourceView,
   RefusalView,
   ResolutionView,
@@ -88,7 +87,7 @@ const readSegment: Decode<SegmentView> = readTagged<SegmentView>('kind', {
   },
 });
 
-const readPlace: Decode<PlaceView> = readRecord(
+export const readPlace: Decode<PlaceView> = readRecord(
   ['stepIndex', 'stepId', 'path'],
   (fields, path) => ({
     stepIndex: readField(fields, path, 'stepIndex', readNullable(readCount)),
@@ -391,46 +390,14 @@ const readStepReport: Decode<StepReportView> = readRecord(
   }),
 );
 
-const readReadProblem: Decode<ReadProblemView> = readTagged<ReadProblemView>('kind', {
-  syntax: {
-    fields: ['line', 'column', 'reason'],
-    read: (fields, path) => ({
-      kind: 'syntax',
-      line: readField(fields, path, 'line', readCount),
-      column: readField(fields, path, 'column', readCount),
-      reason: readField(fields, path, 'reason', readString),
-    }),
-  },
-  refused: {
-    fields: ['place', 'reason'],
-    read: (fields, path) => ({
-      kind: 'refused',
-      place: readField(fields, path, 'place', readPlace),
-      reason: readField(fields, path, 'reason', readString),
-    }),
-  },
-});
-
-const readRun: Decode<RunView> = readTagged<RunView>('status', {
-  run: {
-    fields: ['source', 'steps'],
-    read: (fields, path) => ({
-      status: 'run',
-      source: readField(fields, path, 'source', readList(readFieldView)),
-      steps: readField(fields, path, 'steps', readList(readStepReport)),
-    }),
-  },
-  unreadable: {
-    fields: ['problem'],
-    read: (fields, path) => ({
-      status: 'unreadable',
-      problem: readField(fields, path, 'problem', readReadProblem),
-    }),
-  },
-});
+/** Reads what running a document reported: the columns it starts from, and each step. */
+export const readRun: Decode<RunView> = readRecord(['source', 'steps'], (fields, path) => ({
+  source: readField(fields, path, 'source', readList(readFieldView)),
+  steps: readField(fields, path, 'steps', readList(readStepReport)),
+}));
 
 /**
- * Reads what the host's `run_document` command sent.
+ * Reads what a command sent as the report of a run.
  *
  * @throws {DecodeError} When it is not a report of a run, saying where and why.
  */

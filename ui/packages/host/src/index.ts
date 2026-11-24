@@ -8,6 +8,25 @@ export type {
   AfterView,
   AppliesView,
   ArgumentRequest,
+  ArgumentView,
+  CallView,
+  DocumentStateView,
+  DocumentStepView,
+  DocumentView,
+  EditAnswerView,
+  EditRequest,
+  ExpressionRequest,
+  FrameRequest,
+  GivenView,
+  LiteralRequest,
+  PairsEntryView,
+  ProblemView,
+  StartRequest,
+  StartView,
+  ThingView,
+  ValueKindView,
+  ValueRequest,
+  WantedView,
   CandidateRequest,
   ChosenOption,
   BlockRequest,
@@ -56,7 +75,6 @@ export type {
   PlaceRequest,
   PlaceView,
   PositionView,
-  ReadProblemView,
   ReadingView,
   ReadingsView,
   RefusalSourceView,
@@ -101,6 +119,7 @@ export {
   decodeReadings,
   decodeStepStarts,
 } from './decode-offers';
+export { decodeDocumentState, decodeEditAnswer } from './decode-document';
 export { decodeRun } from './decode-run';
 export { decodeBlock } from './decode-block';
 export { decodeIdentity, decodeTable } from './decode-sample';

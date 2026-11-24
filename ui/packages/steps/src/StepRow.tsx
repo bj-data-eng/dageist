@@ -1,330 +1,366 @@
 /**
- * @file One step of the list, written as a line of code: its number, its
- * name, what it takes, and at the end of the row what it returns. Nothing
- * about the row changes when it is pointed at. The step's name is the word
- * that names it: its list changes what the step does, and ends with adding
- * a step after it and removing it. The number drags the step to another
- * place. What a step takes that is more than one thing is set out on lines
- * beneath it.
+ * @file One step of the list, written as a line of code: its number, its name, what it takes, and
+ * at the end of the row what it returns. Nothing about the row changes when it is pointed at. The
+ * step's name is the word that names it: its list changes what the step does, and ends with adding
+ * a step after it and removing it. The number drags the step to another place. What a step takes
+ * that is more than one thing is set out on lines beneath it. What is drawn is the step the
+ * document holds, and each change is sent as an edit.
  */
 
 import { useSortable } from '@dnd-kit/react/sortable';
-import { useCallback, useContext, useState } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 
-import type { StepStartView } from '@dageist/host';
 import type { OfferGroup } from '@dageist/design';
+import type { ArgumentView, CallView, DocumentStepView, FrameRequest } from '@dageist/host';
 import { Hint, OfferList, Peek, Piece, Popover, Slot, TypedBlock, Word, cx } from '@dageist/design';
 
+import { StepProvider, useListEdits, useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { FreshContext } from './Lists';
 import {
-  ColumnDrawing,
   OptionRows,
   ParameterDrawing,
   TableDrawing,
   optionOffers,
+  useOptionToggle,
 } from './Parameters';
 import { ConditionBlocks, ValueSlot } from './Values';
 import { matches, offer, titled } from './offers';
-import type { Frame } from './model/frame';
-import { findColumn } from './model/frame';
-import type {
-  FilterStep,
-  JoinStep,
-  PivotStep,
-  RenameStep,
-  SelectStep,
-  SortStep,
-  Step,
-  Verb,
-  WithColumnsStep,
-} from './model/steps';
-import type { PreparedStep } from './model/report';
-import { VERBS, fieldKeys, stepItems, stepOptionParameters } from './model/steps';
-import { optionOf, withOption } from './model/settings';
-import type { StepStarts } from './model/started';
-import { startOf, startedStep } from './model/started';
-import { chosenOptions } from './model/offers';
-import { NO_POSITIONS, within } from './model/place';
 import type { Asked } from './ask';
 import { useOptions, useStepStarts } from './ask';
 import { useListState } from './positions';
+import { stepColour, stepHead, stepNote } from './verbs';
 import type { Catalogue } from './model/catalogue';
-import { positionOfParameter, verbEntry, verbId } from './model/catalogue';
-import { findTable } from './model/inputs';
-import { VERB_COLOURS, verbHead, verbNote } from './verbs';
+import { VERBS, positionOfParameter, stepOptionParameters, verbId } from './model/catalogue';
+import {
+  NO_PATH,
+  expressionOf,
+  givenOf,
+  keySegment,
+  parameterSegment,
+  shapeOf,
+  valueSegment,
+} from './model/doc';
+import type { Frame } from './model/frame';
+import { findColumn } from './model/frame';
+import { findTable, tablesOf } from './model/inputs';
+import { chosenOptions } from './model/offers';
+import type { PreparedStep } from './model/report';
+import { NO_POSITIONS, within } from './model/place';
+import { fieldArgument, listArgument } from './model/requests';
+import { PreparedStepProvider } from './engine';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
 
 /**
- * Says why the step `verb` cannot be picked yet, or `null` when it can: the engine has not said
+ * Says why the step of `entry` cannot be picked yet, or `null` when it can: the engine has not said
  * what it starts with, or has none to say.
  */
-function startReason(catalogue: Catalogue, verb: Verb, starts: Asked<StepStarts>): string | null {
-  // A verb the editor has and the catalogue lacks cannot be chosen.
-  if (verbEntry(catalogue, verb) === null) return 'not in the catalogue';
+function startReason(
+  catalogue: Catalogue,
+  entry: string,
+  starts: Asked<ReadonlySet<string>>,
+): string | null {
+  // A step the editor has and the catalogue lacks cannot be chosen.
+  if (!catalogue.entries.has(entry)) return 'not in the catalogue';
   switch (starts.state) {
     case 'failed':
       return starts.reason;
     case 'ready':
-      return starts.answer.has(verbId(verb)) ? null : 'the engine gives this step no start';
+      return starts.answer.has(entry) ? null : 'the engine gives this step no start';
     default:
       return 'waiting for the engine';
   }
 }
 
 /**
- * Lists the steps that can be added or changed to, in the words of the catalogue. A step is
- * picked with what the engine says it starts with, so it waits for the engine's answer.
+ * Lists the steps that can be added or changed to, in the words of the catalogue. A step is picked
+ * with what the engine says it starts with, so it waits for the engine's answer.
  */
-export function verbOffers(
+export function stepOffers(
   catalogue: Catalogue,
   typed: string,
-  starts: Asked<StepStarts>,
-  onPick: (verb: Verb, start: StepStartView) => void,
+  starts: Asked<ReadonlySet<string>>,
+  onPick: (entry: string) => void,
 ): OfferGroup[] {
   return [
     titled(
       'Step',
-      VERBS.filter((verb) =>
-        matches(typed, verbHead(catalogue, verb), verbNote(catalogue, verb)),
-      ).map((verb) =>
-        offer(
-          verbHead(catalogue, verb),
-          'ink',
-          verbNote(catalogue, verb),
-          () => {
-            const start = starts.state === 'ready' ? starts.answer.get(verbId(verb)) : undefined;
-            if (start !== undefined) onPick(verb, start);
-          },
-          { look: 'verb', reason: startReason(catalogue, verb, starts) },
+      VERBS.map((verb) => verbId(verb))
+        .filter((entry) => matches(typed, stepHead(catalogue, entry), stepNote(catalogue, entry)))
+        .map((entry) =>
+          offer(
+            stepHead(catalogue, entry),
+            'ink',
+            stepNote(catalogue, entry),
+            () => {
+              if (starts.state === 'ready' && starts.answer.has(entry)) onPick(entry);
+            },
+            { look: 'verb', reason: startReason(catalogue, entry, starts) },
+          ),
         ),
-      ),
     ),
   ];
 }
 
-interface HeadProps<S extends Step> {
-  readonly step: S;
+/** Returns what the engine needs to know to start a step on `frame`: its columns, and the tables to bring in. */
+export function frameRequest(
+  frame: Frame,
+  tables: ReadonlyArray<{ readonly name: string }>,
+): FrameRequest {
+  return { columns: frame.map((column) => column.name), tables: tables.map((table) => table.name) };
+}
+
+/**
+ * Returns the items a parameter that follows the parameter `of` holds one value for each of: the
+ * keys of a sort that are given, each by the name of its field or else its place in the list.
+ */
+function keyLabels(call: CallView, of: string): readonly string[] {
+  const keys = givenOf(call, of);
+  if (keys?.kind !== 'many') return [];
+  return keys.items.flatMap((item, index) => {
+    const expression = expressionOf(item);
+    const shape = expression === null ? null : shapeOf(expression);
+    if (shape === null || shape.kind === 'unset') return [];
+    return [shape.kind === 'column' ? shape.name : `key ${String(index + 1)}`];
+  });
+}
+
+interface HeadProps {
+  readonly call: CallView;
   readonly frame: Frame;
-  readonly onChange: (step: Step) => void;
 }
 
-function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const catalogue = useCatalogue();
-  // What the new column holds is an item of what the step selects.
-  const holds = positionOfParameter(verbEntry(catalogue, 'with_columns'), 'named_exprs');
-  return (
-    <>
-      <TypedBlock
-        value={step.alias}
-        kind="name"
-        label="Name of the new column"
-        wrong={step.alias.trim() === ''}
-        focusNow={fresh.id === step.id}
-        accepts={(typed) => typed.trim() !== ''}
-        onCommit={(alias) => {
-          onChange({ ...step, alias: alias.trim() });
-        }}
-      />
-      <Word>=</Word>
-      <ValueSlot
-        value={step.value}
-        frame={frame}
-        label={`What ${step.alias === '' ? 'the column' : step.alias} holds`}
-        lists={false}
-        positions={within(NO_POSITIONS, holds)}
-        argument={null}
-        onChange={(value) => {
-          onChange({ ...step, value });
-        }}
-      />
-    </>
-  );
-}
-
-interface StepParameterProps {
-  readonly step: Step;
-  /** The Python name of the parameter, which the step holds in its options. */
-  readonly name: string;
-  /** The rows the parameter's fields are picked from. */
-  readonly frame: Frame;
-  /** Tells what was just added from the rest. */
-  readonly keyPrefix: string;
-  readonly onChange: (step: Step) => void;
-}
-
-/** Draws the parameter `name` of `step` by its kind and shape, as the catalogue gives them. */
+/** Draws the parameter `name` of the step by its kind and shape, as the catalogue gives them. */
 function StepParameter({
-  step,
+  call,
   name,
   frame,
-  keyPrefix,
-  onChange,
-}: StepParameterProps): React.JSX.Element {
+}: HeadProps & { readonly name: string }): React.JSX.Element {
   const catalogue = useCatalogue();
-  const parameter = verbEntry(catalogue, step.verb)?.parameters.find(
-    (candidate) => candidate.name === name,
-  );
+  const parameter = catalogue.entries
+    .get(call.entry)
+    ?.parameters.find((candidate) => candidate.name === name);
   if (parameter === undefined) {
     return (
       <span className="font-sans text-xs text-wrong">
-        {`The catalogue has no parameter ${name} of ${verbId(step.verb)}.`}
+        {`The catalogue has no parameter ${name} of ${call.entry}.`}
       </span>
     );
   }
   return (
     <ParameterDrawing
       parameter={parameter}
-      setting={optionOf(step.options, name) ?? startOf(parameter)}
-      around={{ frame, items: (of) => stepItems(step, of) }}
-      keyPrefix={keyPrefix}
-      onChange={(setting) => {
-        onChange({ ...step, options: withOption(step.options, name, setting) });
-      }}
+      argument={givenOf(call, name)}
+      path={[parameterSegment(name)]}
+      around={{ frame, items: (of) => keyLabels(call, of) }}
     />
   );
 }
 
-function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Element {
+/** Draws one new column of an `Add column` step: its name, and what it holds. */
+function NamedColumn({
+  call,
+  frame,
+  at,
+  alias,
+  value,
+  fresh,
+}: HeadProps & {
+  readonly at: number;
+  readonly alias: ArgumentView | undefined;
+  readonly value: ArgumentView | undefined;
+  readonly fresh: boolean;
+}): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const edits = useStepEdits();
+  const name = alias?.kind === 'columns' ? (alias.names[0] ?? '') : '';
+  // What the new column holds is an item of what the step selects.
+  const holds = positionOfParameter(catalogue.entries.get(call.entry) ?? null, 'named_exprs');
+  const valuePath = [parameterSegment('named_exprs'), valueSegment(at)];
   return (
     <>
-      <Word>by</Word>
-      <StepParameter step={step} name="by" frame={frame} keyPrefix={step.id} onChange={onChange} />
+      <TypedBlock
+        value={name}
+        kind="name"
+        label="Name of the new column"
+        wrong={name.trim() === ''}
+        focusNow={fresh}
+        accepts={(typed) => typed.trim() !== ''}
+        onCommit={(typed) => {
+          void edits.setArgument([parameterSegment('named_exprs'), keySegment(at)], {
+            kind: 'columns',
+            names: [typed.trim()],
+          });
+        }}
+      />
+      <Word>=</Word>
+      <ValueSlot
+        expression={expressionOf(value)}
+        path={valuePath}
+        frame={frame}
+        label={`What ${name === '' ? 'the column' : name} holds`}
+        positions={within(NO_POSITIONS, holds)}
+        argument={null}
+        onSet={(request) => {
+          void edits.setArgument(valuePath, request);
+        }}
+      />
     </>
   );
 }
 
-function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX.Element {
+function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
+  const fresh = useContext(FreshContext);
+  const step = useStepAt().id;
+  const named = givenOf(call, 'named_exprs');
+  const entries = named?.kind === 'pairs' ? named.entries : [];
+  const [first, ...more] = entries;
   return (
-    <StepParameter step={step} name="exprs" frame={frame} keyPrefix={step.id} onChange={onChange} />
+    <>
+      {first === undefined ? (
+        // No new column is in the document: the list of them is drawn with what adds one.
+        <StepParameter call={call} name="named_exprs" frame={frame} />
+      ) : (
+        <NamedColumn
+          call={call}
+          frame={frame}
+          at={0}
+          alias={first.key}
+          value={first.value}
+          fresh={fresh.id === step}
+        />
+      )}
+      {more.map((entry, at) => (
+        <span key={at + 1} className="dg-line">
+          <NamedColumn
+            call={call}
+            frame={frame}
+            at={at + 1}
+            alias={entry.key}
+            value={entry.value}
+            fresh={false}
+          />
+        </span>
+      ))}
+      {givenOf(call, 'exprs') !== undefined && (
+        <StepParameter call={call} name="exprs" frame={frame} />
+      )}
+    </>
   );
 }
 
-function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX.Element {
+function SortHead({ call, frame }: HeadProps): React.JSX.Element {
   return (
-    <StepParameter
-      step={step}
-      name="mapping"
-      frame={frame}
-      keyPrefix={step.id}
-      onChange={onChange}
-    />
+    <>
+      <Word>by</Word>
+      <StepParameter call={call} name="by" frame={frame} />
+    </>
   );
 }
 
-function FilterHead({ step, frame, onChange }: HeadProps<FilterStep>): React.JSX.Element {
+function FilterHead({ call, frame }: HeadProps): React.JSX.Element {
   const catalogue = useCatalogue();
   return (
     <ConditionBlocks
-      condition={step.condition}
+      path={[parameterSegment('predicates')]}
+      argument={givenOf(call, 'predicates')}
       frame={frame}
       positions={within(
         NO_POSITIONS,
-        positionOfParameter(verbEntry(catalogue, 'filter'), 'predicates'),
+        positionOfParameter(catalogue.entries.get(call.entry) ?? null, 'predicates'),
       )}
       tone="verb"
-      onChange={(condition) => {
-        onChange({ ...step, condition });
-      }}
     />
   );
 }
 
-function JoinHead({ step, frame, onChange }: HeadProps<JoinStep>): React.JSX.Element {
+function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
   const node = useNode();
-  const table = findTable(node, step.table);
+  const edits = useStepEdits();
+  const other = givenOf(call, 'other');
+  const name = other?.kind === 'table' ? other.name : null;
+  const table = name === null ? null : findTable(node, name);
   return (
     <>
       <TableDrawing
         describedAs="The table that is joined"
-        value={step.table}
-        onChange={(name) => {
-          const joined = findTable(node, name);
-          // The keys belonged to the old table, so start from the new table's first field.
-          onChange({
-            ...step,
-            table: name,
-            options: withOption(
-              step.options,
-              'right_on',
-              fieldKeys([joined?.columns[0]?.name ?? '']),
-            ),
-          });
+        value={name}
+        onChange={(picked) => {
+          const joined = findTable(node, picked);
+          const first = joined?.columns[0]?.name;
+          // The keys belonged to the old table, so start from the new table's first field: two
+          // edits, one after the other.
+          void edits.setArgument([parameterSegment('other')], { kind: 'table', name: picked });
+          if (first !== undefined) {
+            void edits.setArgument(
+              [parameterSegment('right_on')],
+              listArgument([fieldArgument(first)]),
+            );
+          }
         }}
       />
       <Word>on</Word>
-      <StepParameter
-        step={step}
-        name="left_on"
-        frame={frame}
-        keyPrefix={`${step.id}:left_on`}
-        onChange={onChange}
-      />
+      <StepParameter call={call} name="left_on" frame={frame} />
       <span data-tone="compare" data-look="compare" className="dg-block dg-fixed">
         ==
       </span>
-      <StepParameter
-        step={step}
-        name="right_on"
-        frame={table?.columns ?? []}
-        keyPrefix={`${step.id}:right_on`}
-        onChange={onChange}
-      />
+      <StepParameter call={call} name="right_on" frame={table?.columns ?? []} />
     </>
   );
 }
 
-function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.Element {
-  const field = (
-    word: string,
-    current: string,
-    describedAs: string,
-    update: (name: string) => PivotStep,
-  ): React.JSX.Element => (
-    <>
-      <Word>{word}</Word>
-      <ColumnDrawing
-        frame={frame}
-        describedAs={describedAs}
-        value={current}
-        onChange={(name) => {
-          onChange(update(name));
-        }}
-      />
-    </>
-  );
+function PivotHead({ call, frame }: HeadProps): React.JSX.Element {
   return (
     <>
-      {field('on', step.on, 'The field whose values become columns', (on) => ({ ...step, on }))}
-      {field('index', step.index, 'The field that stays as rows', (index) => ({
-        ...step,
-        index,
-      }))}
-      {field('values', step.values, 'The field the cells are filled from', (chosen) => ({
-        ...step,
-        values: chosen,
-      }))}
+      <Word>on</Word>
+      <StepParameter call={call} name="on" frame={frame} />
+      <Word>index</Word>
+      <StepParameter call={call} name="index" frame={frame} />
+      <Word>values</Word>
+      <StepParameter call={call} name="values" frame={frame} />
       <Word>aggregate_function</Word>
-      <StepParameter
-        step={step}
-        name="aggregate_function"
-        frame={frame}
-        keyPrefix={`${step.id}:aggregate_function`}
-        onChange={onChange}
-      />
+      <StepParameter call={call} name="aggregate_function" frame={frame} />
     </>
   );
+}
+
+/** Draws what a step takes, by the step it is. */
+function Head({ call, frame }: HeadProps): React.JSX.Element | null {
+  switch (call.entry) {
+    case 'LazyFrame.with_columns':
+      return <AddColumnHead call={call} frame={frame} />;
+    case 'LazyFrame.filter':
+      return <FilterHead call={call} frame={frame} />;
+    case 'LazyFrame.sort':
+      return <SortHead call={call} frame={frame} />;
+    case 'LazyFrame.select':
+      return <StepParameter call={call} name="exprs" frame={frame} />;
+    case 'LazyFrame.rename':
+      return <StepParameter call={call} name="mapping" frame={frame} />;
+    case 'LazyFrame.join':
+      return <JoinHead call={call} frame={frame} />;
+    case 'LazyFrame.pivot':
+      return <PivotHead call={call} frame={frame} />;
+    default:
+      return null;
+  }
 }
 
 /** What the band above a step says when the engine collects the rows so far there. */
 const COLLECT_NOTE = 'The lazy query stops here. The rows so far are loaded into memory.';
 
 interface OutcomeProps {
-  readonly step: Step;
+  readonly call: CallView;
   readonly result: PreparedStep;
+}
+
+/** Returns the name of the column an `Add column` step adds. */
+function addedAlias(call: CallView): string | null {
+  const named = givenOf(call, 'named_exprs');
+  const key = named?.kind === 'pairs' ? named.entries[0]?.key : undefined;
+  return key?.kind === 'columns' ? (key.names[0] ?? null) : null;
 }
 
 /** Returns the names of the columns `result` says its step added. */
@@ -333,11 +369,11 @@ function addedBy(result: PreparedStep): string[] {
 }
 
 /** Draws what stands at the end of a step's row: the dtype it returns, what it adds, or the rows it keeps. */
-function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
-  if (result.problem !== null || result.status !== 'valid') return null;
+function Outcome({ call, result }: OutcomeProps): React.JSX.Element | null {
+  if (result.status !== 'valid') return null;
   const dtypeOf = (name: string): string => findColumn(result.after, name)?.dtype ?? '';
   const added = addedBy(result);
-  if (step.verb === 'pivot') {
+  if (call.entry === 'LazyFrame.pivot') {
     return (
       <Peek
         describedAs="The columns the pivot returns"
@@ -351,19 +387,20 @@ function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
       </Peek>
     );
   }
-  if (step.verb === 'with_columns') {
-    const dtype = findColumn(result.after, step.alias)?.dtype;
-    if (dtype === undefined) return null;
-    const first = result.first.get(step.alias);
+  if (call.entry === 'LazyFrame.with_columns') {
+    const alias = addedAlias(call);
+    const dtype = alias === null ? undefined : findColumn(result.after, alias)?.dtype;
+    if (alias === null || dtype === undefined) return null;
+    const first = result.first.get(alias);
     // The first values come from the rows the engine ran; without them the dtype is all there is.
     if (first === undefined) return <span className="dg-dtype">{dtype}</span>;
     return (
-      <Peek describedAs={`${step.alias} is ${dtype}: show its first values`} lines={[first]} code>
+      <Peek describedAs={`${alias} is ${dtype}: show its first values`} lines={[first]} code>
         <span className="dg-dtype">{dtype}</span>
       </Peek>
     );
   }
-  if (step.verb === 'join') {
+  if (call.entry === 'LazyFrame.join') {
     const [only] = added;
     return (
       <Peek
@@ -383,7 +420,7 @@ function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
       </Peek>
     );
   }
-  if (step.verb === 'filter' && result.rows !== null) {
+  if (call.entry === 'LazyFrame.filter' && result.rows !== null) {
     return (
       <span className="text-xs text-muted">
         keeps{' '}
@@ -394,40 +431,17 @@ function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
   return null;
 }
 
-function Head({ step, frame, onChange }: HeadProps<Step>): React.JSX.Element | null {
-  switch (step.verb) {
-    case 'with_columns':
-      return <AddColumnHead step={step} frame={frame} onChange={onChange} />;
-    case 'filter':
-      return <FilterHead step={step} frame={frame} onChange={onChange} />;
-    case 'sort':
-      return <SortHead step={step} frame={frame} onChange={onChange} />;
-    case 'select':
-      return <SelectHead step={step} frame={frame} onChange={onChange} />;
-    case 'rename':
-      return <RenameHead step={step} frame={frame} onChange={onChange} />;
-    case 'join':
-      return <JoinHead step={step} frame={frame} onChange={onChange} />;
-    case 'pivot':
-      return <PivotHead step={step} frame={frame} onChange={onChange} />;
-    default:
-      return null;
-  }
-}
-
 /** What a step row shows and reports. */
 export interface StepRowProps {
-  readonly step: Step;
+  readonly step: DocumentStepView;
   readonly index: number;
   /** The frame this step is given. */
   readonly frame: Frame;
   readonly result: PreparedStep;
   readonly selected: boolean;
   readonly onSelect: () => void;
-  readonly onChange: (step: Step) => void;
-  readonly onRemove: () => void;
-  /** Adds a new step of the chosen verb directly after this one. */
-  readonly onInsertAfter: (verb: Verb, start: StepStartView) => void;
+  /** Adds a step of `entry` as the `at`th, started on `frame`. */
+  readonly onAdd: (at: number, entry: string, frame: FrameRequest) => void;
 }
 
 /** Draws one step as a row that can be edited, selected, dragged and removed. */
@@ -438,13 +452,40 @@ export function StepRow({
   result,
   selected,
   onSelect,
-  onChange,
-  onRemove,
-  onInsertAfter,
+  onAdd,
+}: StepRowProps): React.JSX.Element {
+  const at = useMemo(() => ({ index, id: step.id }), [index, step.id]);
+  return (
+    <StepProvider value={at}>
+      <PreparedStepProvider value={result}>
+        <Row
+          step={step}
+          index={index}
+          frame={frame}
+          result={result}
+          selected={selected}
+          onSelect={onSelect}
+          onAdd={onAdd}
+        />
+      </PreparedStepProvider>
+    </StepProvider>
+  );
+}
+
+function Row({
+  step,
+  index,
+  frame,
+  result,
+  selected,
+  onSelect,
+  onAdd,
 }: StepRowProps): React.JSX.Element {
   const catalogue = useCatalogue();
-  const fresh = useContext(FreshContext);
+  const node = useNode();
   const list = useListState();
+  const listEdits = useListEdits();
+  const toggle = useOptionToggle(NO_PATH);
   const { ref, handleRef, isDragSource } = useSortable({
     id: step.id,
     index,
@@ -457,35 +498,40 @@ export function StepRow({
     setAdding(null);
   }, []);
   const number = String(index + 1);
-  const name = verbHead(catalogue, step.verb);
-  const entry = verbEntry(catalogue, step.verb);
+  const { call } = step;
+  const name = stepHead(catalogue, call.entry);
+  const entry = catalogue.entries.get(call.entry) ?? null;
   const missing = entry === null;
   // What the step's options may be set to, asked of the engine while the step's list is open.
   const optionsAsked = useOptions(
     list.open && entry !== null
-      ? { entry: entry.id, chosen: chosenOptions(entry, step.options) }
+      ? {
+          entry: entry.id,
+          chosen: chosenOptions(entry, call.arguments),
+        }
       : null,
   );
-  const node = useNode();
   // What each step starts with, asked of the engine while the list of steps is open, to change
   // this step into another, or to add one after it.
   const changeStarts = useStepStarts(list.open, frame, node);
   const addStarts = useStepStarts(adding !== null, result.after, node);
-  const parameters = stepOptionParameters(catalogue, step.verb);
+  const parameters = stepOptionParameters(catalogue, call.entry);
+  const given = new Set(call.arguments.map((held) => held.parameter));
+  const tables = tablesOf(node);
   return (
     <div
       ref={ref}
       data-step-id={step.id}
       className={cx(
         'dg-ground border-b border-line bg-panel first:rounded-t-lg last:rounded-b-lg last:border-b-0',
-        VERB_COLOURS[step.verb],
+        stepColour(call.entry),
         selected && 'bg-row [--ground:var(--color-row)]',
         isDragSource && 'opacity-60',
       )}
       onPointerDownCapture={onSelect}
       onFocusCapture={onSelect}
     >
-      {result.lazy === false && (
+      {!result.lazy && (
         <div className="flex items-center gap-2 border-b border-dashed border-operator px-3 py-0.5 text-[11px] text-muted">
           <span className="rounded-sm bg-invalid px-1.5 font-mono font-semibold text-operator">
             collect
@@ -506,13 +552,15 @@ export function StepRow({
         <div data-dg-flow className="dg-code">
           {/* The step's name is the word that names it: its list adds a step after and removes it. */}
           <Piece
-            remove={{ label: `Remove ${name}`, onPress: onRemove }}
+            remove={{
+              label: `Remove ${name}`,
+              onPress: () => {
+                void listEdits.removeStep({ index, id: step.id });
+              },
+            }}
             add={{ label: `Add a step after ${name}`, onPress: setAdding }}
           >
-            <Hint
-              lines={result.summary === null || result.summary === '' ? [] : [result.summary]}
-              code={false}
-            >
+            <Hint lines={result.summary === '' ? [] : [result.summary]} code={false}>
               <Slot
                 label={name}
                 tone="verb"
@@ -524,24 +572,14 @@ export function StepRow({
                   // The parameters the step can be given, then the steps it can be changed to.
                   ...(parameters.length === 0
                     ? []
-                    : [
-                        optionOffers(
-                          parameters,
-                          step.options,
-                          typed,
-                          (options, added) => {
-                            onChange({ ...step, options });
-                            if (added !== null) fresh.mark(`${step.id}:${added}`);
-                          },
-                          optionsAsked,
-                        ),
-                      ]),
-                  ...verbOffers(catalogue, typed, changeStarts, (verb, start) => {
-                    if (verb !== step.verb) {
-                      onChange({
-                        ...startedStep(verb, start, catalogue.comparisons),
-                        id: step.id,
-                      });
+                    : [optionOffers(parameters, given, typed, toggle, optionsAsked)]),
+                  ...stepOffers(catalogue, typed, changeStarts, (picked) => {
+                    if (picked !== call.entry) {
+                      void listEdits.swapStep(
+                        { index, id: step.id },
+                        picked,
+                        frameRequest(frame, tables),
+                      );
                     }
                   }),
                 ]}
@@ -549,21 +587,18 @@ export function StepRow({
               />
             </Hint>
           </Piece>
-          <Head step={step} frame={frame} onChange={onChange} />
+          <Head call={call} frame={frame} />
           <OptionRows
-            ownerId={step.id}
             entry={entry}
+            call={call}
+            callPath={NO_PATH}
             parameters={parameters}
-            options={step.options}
-            around={{ frame, items: (of) => stepItems(step, of) }}
+            around={{ frame, items: (of) => keyLabels(call, of) }}
             layout="lines"
-            onChange={(options) => {
-              onChange({ ...step, options });
-            }}
           />
           {missing && (
             <span className="dg-line font-sans text-xs text-wrong">
-              {`The catalogue has no entry ${verbId(step.verb)}, so this step has no words to show.`}
+              {`The catalogue has no entry ${call.entry}, so this step has no words to show.`}
             </span>
           )}
           {result.problem !== null && (
@@ -574,14 +609,18 @@ export function StepRow({
           )}
         </div>
         <span className="shrink-0 pl-3 text-xs text-muted">
-          <Outcome step={step} result={result} />
+          <Outcome call={call} result={result} />
         </span>
       </div>
       {adding !== null && (
         <Popover anchor={adding} onDismiss={closeList}>
           <OfferList
             placeholder="Search the steps"
-            groups={(typed) => verbOffers(catalogue, typed, addStarts, onInsertAfter)}
+            groups={(typed) =>
+              stepOffers(catalogue, typed, addStarts, (picked) => {
+                onAdd(index + 1, picked, frameRequest(result.after, tables));
+              })
+            }
             keepOpen={false}
             wide={false}
             onDone={closeList}

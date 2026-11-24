@@ -10,17 +10,17 @@ import { useEffect } from 'react';
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { EngineProvider, useCatalogue } from './EngineProvider';
-import { moved } from './Chain';
-import { useRun } from './engine';
+import { DraftsProvider } from './drafts';
+import { EditorProvider, useListEdits } from './editor';
+import { EngineProvider } from './EngineProvider';
 import { InputsStrip } from './InputsStrip';
 import { StepList } from './StepList';
 import { StepNavigator } from './StepNavigator';
-import { useSharedSteps } from './shared';
+import { useEditorWindow } from './window';
 
 /** What the steps window needs from the shell. */
 export interface StepsWindowProps {
-  /** Carries the steps between this window and the main one. */
+  /** Carries the chosen step between this window and the main one. */
   readonly host: Host;
   /**
    * The nonce the page's content security policy accepts for injected styles,
@@ -39,9 +39,27 @@ export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.E
 }
 
 function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
-  const { steps, selectedId, change } = useSharedSteps(host, 'steps', useCatalogue().comparisons);
-  const run = useRun(host, steps);
-  const results = run.prepared.steps;
+  const window = useEditorWindow(host, 'steps');
+  return (
+    <EditorProvider value={window.editor}>
+      <DraftsProvider value={window.drafts}>
+        <Body window={window} styleNonce={styleNonce} />
+      </DraftsProvider>
+    </EditorProvider>
+  );
+}
+
+function Body({
+  window,
+  styleNonce,
+}: {
+  readonly window: ReturnType<typeof useEditorWindow>;
+  readonly styleNonce: string | null;
+}): React.JSX.Element {
+  const { editor, selection, steps, run } = window;
+  const listEdits = useListEdits();
+  const results = run?.steps ?? [];
+  const { selectedId } = selection;
 
   // The chosen step is brought into view, whichever window chose it.
   useEffect(() => {
@@ -69,25 +87,37 @@ function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
             results={results}
             selectedId={selectedId}
             styleNonce={styleNonce}
-            onSelect={(id) => {
-              change(steps, id);
-            }}
+            onSelect={selection.choose}
             onMove={(from, to) => {
-              change(moved(steps, from, to), selectedId);
+              const moved = steps[from];
+              if (moved !== undefined) void listEdits.moveStep({ index: from, id: moved.id }, to);
             }}
             onOpen={null}
           />
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-3">
           <InputsStrip />
-          {run.failure !== null && <p className="m-0 mb-3 text-xs text-wrong">{run.failure}</p>}
-          <StepList
-            steps={steps}
-            results={results}
-            selectedId={selectedId}
-            styleNonce={styleNonce}
-            onChange={change}
-          />
+          {editor.failure !== null && (
+            <p className="m-0 mb-3 text-xs text-wrong">{editor.failure}</p>
+          )}
+          {editor.notice !== null && (
+            <p className="m-0 mb-3 text-xs text-wrong">
+              {editor.notice}{' '}
+              <button type="button" className="cursor-pointer underline" onClick={editor.dismiss}>
+                Dismiss
+              </button>
+            </p>
+          )}
+          {run !== null && (
+            <StepList
+              steps={steps}
+              results={results}
+              source={run.source}
+              selectedId={selectedId}
+              styleNonce={styleNonce}
+              onChoose={selection.choose}
+            />
+          )}
         </div>
       </div>
     </Panel>

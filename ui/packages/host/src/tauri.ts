@@ -14,7 +14,7 @@ import {
   decodeReadings,
   decodeStepStarts,
 } from './decode-offers';
-import { decodeRun } from './decode-run';
+import { decodeDocumentState, decodeEditAnswer } from './decode-document';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
@@ -54,9 +54,11 @@ export function tauriHost(): Host | null {
     coreIdentity: async () => invokeDecoded('core_identity', decodeIdentity),
     operationCatalogue: async () => invokeDecoded('operation_catalogue', decodeCatalogue),
     nodeInputs: async () => invokeDecoded('node_inputs', decodeNode),
-    runDocument: async (document) => invokeDecoded('run_document', decodeRun, { document }),
-    rowsAfterStep: async (document, step, limit) =>
-      invokeDecoded('rows_after_step', decodeRows, { document, step, limit }),
+    nodeDocument: async () => invokeDecoded('node_document', decodeDocumentState),
+    editDocument: async (revision, edit) =>
+      invokeDecoded('edit_document', decodeEditAnswer, { revision, edit }),
+    rowsAfterStep: async (revision, step, limit) =>
+      invokeDecoded('rows_after_step', decodeRows, { revision, step, limit }),
     offersAt: async (place) =>
       invokeDecoded('offers_at', decodeOffers, { positions: place.positions, after: place.after }),
     candidateFits: async (request) =>

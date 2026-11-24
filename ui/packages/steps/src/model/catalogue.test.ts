@@ -4,12 +4,13 @@ import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import {
-  comparisonChoices,
+  VERBS,
   comparisonOption,
   comparisonOptions,
   indexCatalogue,
+  stepOptionParameters,
+  verbOf,
 } from './catalogue';
-import { IS_IN, asComparison } from './source';
 
 // The catalogue as the host wrote it, with the signs of the language file.
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
@@ -26,7 +27,7 @@ describe('the comparisons of a test', () => {
     ]);
   });
 
-  it('are the entries the catalogue lists, which a test may hold besides membership in a list', () => {
+  it('are the entries the catalogue lists as comparisons', () => {
     expect([...catalogue.comparisons]).toEqual([
       'Expr.eq',
       'Expr.ne',
@@ -35,31 +36,35 @@ describe('the comparisons of a test', () => {
       'Expr.lt',
       'Expr.le',
     ]);
-    expect(asComparison('Expr.ge', catalogue.comparisons)).toBe('Expr.ge');
-    expect(asComparison(IS_IN, catalogue.comparisons)).toBe(IS_IN);
-    // `>=` is how Python spells it, and `Expr.shift` is an entry that does not compare.
-    expect(asComparison('>=', catalogue.comparisons)).toBeNull();
-    expect(asComparison('Expr.shift', catalogue.comparisons)).toBeNull();
-    expect(asComparison('', catalogue.comparisons)).toBeNull();
   });
 
-  it('are shown by the sign and meaning of the entry that compares, and membership by its own name', () => {
-    const ge = asComparison('Expr.ge', catalogue.comparisons);
-    if (ge === null) throw new Error('Expr.ge compares');
-    expect(comparisonOption(catalogue, ge)).toEqual({ entry: ge, sign: '≥', hint: 'at least' });
-    expect(comparisonChoices(catalogue).map((choice) => choice.sign)).toEqual([
-      '==',
-      '≠',
-      '>',
-      '≥',
-      '<',
-      '≤',
-      'is_in',
-    ]);
-    expect(comparisonOption(catalogue, IS_IN)).toEqual({
-      entry: IS_IN,
-      sign: 'is_in',
-      hint: 'one of a list',
+  it('are shown by the sign and meaning of the entry that compares, and any other entry by its name', () => {
+    expect(comparisonOption(catalogue, 'Expr.ge')).toEqual({
+      entry: 'Expr.ge',
+      sign: '≥',
+      hint: 'at least',
     });
+    expect(comparisonOption(catalogue, 'Expr.shift')).toMatchObject({
+      entry: 'Expr.shift',
+      sign: 'Expr.shift',
+    });
+  });
+});
+
+/** The names of the parameters of `entry` that a step of it offers as options. */
+const names = (entry: string): string[] =>
+  stepOptionParameters(catalogue, entry).map((parameter) => parameter.name);
+
+describe('the verbs of the steps the editor offers', () => {
+  it('are the seven, each with the parameters its own structure draws left out of its options', () => {
+    expect(VERBS).toHaveLength(7);
+    expect(verbOf('LazyFrame.sort')).toBe('sort');
+    expect(verbOf('LazyFrame.head')).toBeNull();
+    // A sort's keys are drawn by the step, so they are not an option; how each is ordered is.
+    expect(names('LazyFrame.sort')).toContain('descending');
+    expect(names('LazyFrame.sort')).not.toContain('by');
+    expect(names('LazyFrame.sort')).not.toContain('more_by');
+    // A step the editor draws by its parameters alone offers all it has that the engine offers.
+    expect(names('LazyFrame.head')).toContain('n');
   });
 });

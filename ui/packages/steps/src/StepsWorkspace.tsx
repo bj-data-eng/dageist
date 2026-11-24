@@ -9,16 +9,16 @@
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { EngineProvider, useCatalogue } from './EngineProvider';
-import { moved } from './Chain';
-import { useRows, useRun } from './engine';
+import { DraftsProvider } from './drafts';
+import { EditorProvider, useListEdits } from './editor';
+import { EngineProvider } from './EngineProvider';
 import { RowsPreview } from './RowsPreview';
 import { StepNavigator } from './StepNavigator';
-import { useSharedSteps } from './shared';
+import { useEditorWindow } from './window';
 
 /** What the steps workspace needs from the shell. */
 export interface StepsWorkspaceProps {
-  /** Opens the steps window and carries the steps between the windows. */
+  /** Opens the steps window and carries the chosen step between the windows. */
   readonly host: Host;
   /**
    * The nonce the page's content security policy accepts for injected styles,
@@ -37,15 +37,48 @@ export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React
 }
 
 function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const { steps, selectedId, stepsOpen, change } = useSharedSteps(
-    host,
-    'main',
-    useCatalogue().comparisons,
+  const window = useEditorWindow(host, 'main');
+  const { editor, drafts, selection, steps, run, selectedIndex, rows } = window;
+  return (
+    <EditorProvider value={editor}>
+      <DraftsProvider value={drafts}>
+        <Body
+          host={host}
+          styleNonce={styleNonce}
+          window={window}
+          steps={steps}
+          selectedIndex={selectedIndex}
+          rows={rows}
+          run={run}
+          selection={selection}
+        />
+      </DraftsProvider>
+    </EditorProvider>
   );
-  const run = useRun(host, steps);
-  const rows = useRows(host, run, selectedId);
-  const results = run.prepared.steps;
-  const selectedIndex = steps.findIndex((step) => step.id === selectedId);
+}
+
+interface BodyProps extends StepsWorkspaceProps {
+  readonly window: ReturnType<typeof useEditorWindow>;
+  readonly steps: ReturnType<typeof useEditorWindow>['steps'];
+  readonly selectedIndex: number;
+  readonly rows: ReturnType<typeof useEditorWindow>['rows'];
+  readonly run: ReturnType<typeof useEditorWindow>['run'];
+  readonly selection: ReturnType<typeof useEditorWindow>['selection'];
+}
+
+function Body({
+  host,
+  styleNonce,
+  window,
+  steps,
+  selectedIndex,
+  rows,
+  run,
+  selection,
+}: BodyProps): React.JSX.Element {
+  const listEdits = useListEdits();
+  const { editor } = window;
+  const results = run?.steps ?? [];
   const shown = results[selectedIndex];
   const openSteps = (): void => {
     // A window that cannot be opened leaves the table as it was; there is nothing to undo.
@@ -73,7 +106,7 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
             <RowsPreview
               display={rows.display}
               changes={shown?.changes ?? []}
-              settled={rows.settled && run.settled}
+              settled={rows.settled}
             />
           </div>
         </section>
@@ -87,32 +120,43 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
               className="ml-auto cursor-pointer rounded-md border border-line-strong px-2 py-0.5 text-xs font-semibold text-ink hover:border-accent hover:bg-hover"
               onClick={openSteps}
             >
-              {stepsOpen ? 'Go to the editor' : 'Open the editor'}
+              {selection.stepsOpen ? 'Go to the editor' : 'Open the editor'}
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <StepNavigator
               steps={steps}
               results={results}
-              selectedId={selectedId}
+              selectedId={selection.selectedId}
               styleNonce={styleNonce}
               onSelect={(id) => {
                 // Choosing a step only shows its rows. The editor is asked for on its own.
-                change(steps, id);
+                selection.choose(id);
               }}
               onMove={(from, to) => {
-                change(moved(steps, from, to), selectedId);
+                const moved = steps[from];
+                if (moved !== undefined) void listEdits.moveStep({ index: from, id: moved.id }, to);
               }}
               onOpen={(id) => {
-                change(steps, id);
+                selection.choose(id);
                 openSteps();
               }}
             />
           </div>
-          {run.failure !== null && (
-            <p className="m-0 border-t border-line px-3 py-2 text-xs text-wrong">{run.failure}</p>
+          {editor.failure !== null && (
+            <p className="m-0 border-t border-line px-3 py-2 text-xs text-wrong">
+              {editor.failure}
+            </p>
           )}
-          {stepsOpen && (
+          {editor.notice !== null && (
+            <p className="m-0 border-t border-line px-3 py-2 text-xs text-wrong">
+              {editor.notice}{' '}
+              <button type="button" className="cursor-pointer underline" onClick={editor.dismiss}>
+                Dismiss
+              </button>
+            </p>
+          )}
+          {selection.stepsOpen && (
             <p className="m-0 border-t border-line px-3 py-2 text-xs text-muted">
               The editor is open in its own window. What is changed there shows here.
             </p>

@@ -12,7 +12,6 @@ import type { Asked, CandidateFits, Fits } from './ask';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import type { Catalogue } from './model/catalogue';
 import { methodNameOf } from './model/catalogue';
-import type { MethodName } from './model/expr';
 import type { Frame } from './model/frame';
 import type { PreparedFamily, PreparedOffer, PreparedReading } from './model/offers';
 import { candidateKey, prepareOffers, refusalWords } from './model/offers';
@@ -234,7 +233,7 @@ export function methodGroups(
   asked: Asked<OffersView>,
   known: boolean,
   typed: string,
-  onPick: (name: MethodName, offered: PreparedOffer) => void,
+  onPick: (name: string, offered: PreparedOffer) => void,
 ): OfferGroup[] {
   const unanswered = unlessAnswered(asked, known);
   if (unanswered !== null) return [unanswered];

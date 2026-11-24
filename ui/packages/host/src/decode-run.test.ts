@@ -6,22 +6,19 @@ import { decodeRun } from './decode-run';
 import incompleteFixture from '../fixtures/step-report-incomplete.json';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
-import unreadableFixture from '../fixtures/step-report-unreadable.json';
 import variantsFixture from '../fixtures/step-report-variants.json';
 import { replaced, withField, without } from '../test-support/tamper';
 
-// The fixtures are what the host's `run_document` command answers for the claim-timing steps,
-// for a document with a step Polars refuses, and for text that is not a document, written from
-// Rust by its snapshot test. They are read as `unknown`, as the host's answer is, and the
+// The fixtures are what the report of the host's `node_document` command holds for the claim-timing steps,
+// for a document with a step Polars refuses, and for one with a step still to be picked, written
+// from Rust by its snapshot test. They are read as `unknown`, as the host's answer is, and the
 // decoder is what says what they are.
 const report: unknown = reportFixture;
 const refused: unknown = refusedFixture;
-const unreadable: unknown = unreadableFixture;
 const variants: unknown = variantsFixture;
 
-/** The steps of a run that was read. */
+/** The steps of a run. */
 function stepsOf(run: RunView): readonly StepReportView[] {
-  if (run.status !== 'run') throw new Error('the document was not read');
   return run.steps;
 }
 
@@ -81,7 +78,7 @@ describe('the report of running the claim-timing steps', () => {
   });
 
   it('gives the columns each step leaves, by the engine short dtype', () => {
-    expect(run.status === 'run' && run.source.map((column) => column.name)).toEqual([
+    expect(run.source.map((column) => column.name)).toEqual([
       'dcn',
       'timestamp',
       'step_to',
@@ -187,7 +184,7 @@ describe('the report of running the claim-timing steps', () => {
   it('asks the tables about every step of the sample, so none says it could not be asked', () => {
     // A number typed without a dtype, as `shift(1)` and `otherwise 0` hold, is asked as the dtype
     // Polars gives it, and a connected input as a literal of its dtype.
-    for (const step of run.status === 'run' ? run.steps : []) {
+    for (const step of run.steps) {
       expect(step.walk.notKnown, step.id).toBeNull();
     }
   });
@@ -318,7 +315,7 @@ describe('the report of a document with a step Polars refuses', () => {
 
 describe('the report of a document with a step that holds something still to be picked', () => {
   const run = decodeRun(incompleteFixture);
-  const steps = run.status === 'run' ? run.steps : [];
+  const steps = run.steps;
 
   it('says the step is incomplete at the start of the expression that is a hole', () => {
     expect(steps.map((step) => step.outcome.status)).toEqual(['valid', 'incomplete', 'notRun']);
@@ -350,27 +347,6 @@ describe('the report of a document with a step that holds something still to be 
       context: { outer: 'select', nested: null },
       after: { kind: 'value', dtype: 'Datetime(us)', shape: 'many' },
     });
-  });
-});
-
-describe('the report of text that is not a document', () => {
-  it('has the place and the reason, and no steps', () => {
-    expect(decodeRun(unreadable)).toEqual({
-      status: 'unreadable',
-      problem: {
-        kind: 'refused',
-        place: { stepIndex: null, stepId: null, path: [] },
-        reason: 'version 2 is not one this engine reads; it reads version 1',
-      },
-    });
-  });
-
-  it('reads a syntax problem with its line and column', () => {
-    const syntax = {
-      status: 'unreadable',
-      problem: { kind: 'syntax', line: 2, column: 10, reason: 'the text ends too soon' },
-    };
-    expect(decodeRun(syntax)).toEqual(syntax);
   });
 });
 
@@ -463,9 +439,6 @@ describe('the report built by hand for the variants no document gives together',
 
 describe('a report that is not what the host sends', () => {
   it('is refused where the status is not one the host has', () => {
-    expect(refusal(replaced(report, ['status'], 'halted')).message).toBe(
-      '$.status: must be one of "run", "unreadable", not "halted"',
-    );
     expect(refusal(replaced(report, ['steps', 3, 'outcome', 'status'], 'skipped')).message).toBe(
       '$.steps[3].outcome.status: must be one of "valid", "refused", "incomplete", "notRun", not "skipped"',
     );
@@ -516,14 +489,11 @@ describe('a report that is not what the host sends', () => {
     ).toBe('$.steps[4].expressions[0].start.kind');
   });
 
-  it('is refused where the fields of one variant are those of another', () => {
-    expect(refusal(withField(unreadable, ['problem'], 'line', 1)).message).toBe(
-      '$.problem: has the field "line", which the contract lacks',
+  it('is refused where a field is one the contract lacks or is missing one it has', () => {
+    expect(refusal(withField(report, [], 'status', 'run')).message).toBe(
+      '$: has the field "status", which the contract lacks',
     );
-    expect(
-      refusal(replaced(unreadable, ['problem'], { kind: 'syntax', place: null, reason: 'x' }))
-        .message,
-    ).toBe('$.problem: is missing the field "line"');
+    expect(refusal(without(report, [], 'source')).message).toBe('$: is missing the field "source"');
   });
 });
 
@@ -560,7 +530,7 @@ const COUNTED = {
 };
 
 function runOf(count: unknown): unknown {
-  return { status: 'run', source: [], steps: [handWrittenStep(count)] };
+  return { source: [], steps: [handWrittenStep(count)] };
 }
 
 describe('the columns a step changed and how its rows were counted', () => {

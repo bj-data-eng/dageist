@@ -29,8 +29,6 @@ import { Latest } from './model/latest';
 import type { Frame } from './model/frame';
 import { tablesOf } from './model/inputs';
 import { candidateKey, prepareFits, prepareOptions, prepareReadings } from './model/offers';
-import { startsByEntry } from './model/started';
-import type { StepStarts } from './model/started';
 import type { PreparedFit, PreparedOption, PreparedReading } from './model/offers';
 
 /** How long a request is held for the next one, in milliseconds. */
@@ -138,17 +136,25 @@ export function useOptions(ask: OptionsAsk | null): Asked<ReadonlyMap<string, Pr
 }
 
 /**
- * Asks what each step starts with when it is added to the table `frame` with the connected
- * tables of `node`, while `open`: the engine decides every argument.
+ * Asks which steps the engine can start on the table `frame` with the connected tables of
+ * `node`, while `open`: the engine decides what each starts with, and the host makes the edit.
  */
-export function useStepStarts(open: boolean, frame: Frame, node: NodeView): Asked<StepStarts> {
+export function useStepStarts(
+  open: boolean,
+  frame: Frame,
+  node: NodeView,
+): Asked<ReadonlySet<string>> {
   const request: StepStartsRequest | null = open
     ? {
         columns: frame.map((column) => column.name),
         tables: tablesOf(node).map((table) => table.name),
       }
     : null;
-  return useAsk(request, async (host, asked) => startsByEntry(await host.stepStarts(asked)));
+  return useAsk(
+    request,
+    async (host, asked) =>
+      new Set((await host.stepStarts(asked)).starts.map((start) => start.entry)),
+  );
 }
 
 /** What the fits of candidates are asked about. */

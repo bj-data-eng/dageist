@@ -7,16 +7,22 @@ import {
   ERROR_KINDS,
   NESTED_POSITIONS,
   OUTER_POSITIONS,
+  PROBLEM_KINDS,
   RULE_NAMES,
   SETTING_KINDS,
   STAGES,
+  THING_KINDS,
+  VALUE_KINDS,
   VALUE_SHAPES,
   VALUE_TYPES,
+  WANTED,
 } from './contract';
 import { decodeCatalogue } from './decode-catalogue';
+import { decodeEditAnswer } from './decode-document';
 import { decodeRun } from './decode-run';
 import { decodeFailure } from './failure';
 import catalogueFixture from '../fixtures/catalogue.json';
+import refusedEditFixture from '../fixtures/edit-refused.json';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
 import variantsFixture from '../fixtures/step-report-variants.json';
@@ -31,6 +37,7 @@ const report: unknown = reportFixture;
 const refused: unknown = refusedFixture;
 const variants: unknown = variantsFixture;
 const catalogue: unknown = catalogueFixture;
+const refusedEdit: unknown = refusedEditFixture;
 
 /** The words the host lists under `name`. */
 function listed(name: string): readonly string[] {
@@ -138,6 +145,45 @@ describe('the words the decoders read', () => {
         ),
     },
     {
+      list: 'valueKinds',
+      words: VALUE_KINDS,
+      accepts: (word) =>
+        decodeEditAnswer(
+          replaced(refusedEdit, ['problem'], {
+            kind: 'doesNotFit',
+            found: { kind: 'value', of: word },
+          }),
+        ),
+    },
+    {
+      list: 'wanted',
+      words: WANTED,
+      accepts: (word) =>
+        decodeEditAnswer(
+          replaced(refusedEdit, ['problem'], {
+            kind: 'wrongPlace',
+            needs: word,
+            found: { kind: 'step' },
+          }),
+        ),
+    },
+    {
+      list: 'thingKinds',
+      words: THING_KINDS,
+      accepts: (word) =>
+        decodeEditAnswer(
+          replaced(refusedEdit, ['problem'], {
+            kind: 'doesNotFit',
+            found: word === 'value' ? { kind: word, of: 'flag' } : { kind: word },
+          }),
+        ),
+    },
+    {
+      list: 'problemKinds',
+      words: PROBLEM_KINDS,
+      accepts: (word) => decodeEditAnswer(replaced(refusedEdit, ['problem'], problemOfKind(word))),
+    },
+    {
       list: 'valueTypes',
       words: VALUE_TYPES,
       accepts: (word) =>
@@ -163,6 +209,29 @@ describe('the words the decoders read', () => {
     });
   }
 });
+
+/** A refusal of the kind `kind`, with what that kind holds. */
+function problemOfKind(kind: string): unknown {
+  const thing = { kind: 'step' };
+  const held: Readonly<Record<string, unknown>> = {
+    noStep: { kind: 'noStep', steps: 2 },
+    stepChanged: { kind: 'stepChanged', found: 'sort' },
+    nothing: { kind: 'nothing' },
+    doesNotFit: { kind: 'doesNotFit', found: thing },
+    wrongPlace: { kind: 'wrongPlace', needs: 'list', found: thing },
+    notPerItem: { kind: 'notPerItem' },
+    noDefault: { kind: 'noDefault' },
+    outOfRange: { kind: 'outOfRange', index: 5, len: 2 },
+    unknownEntry: { kind: 'unknownEntry', entry: 'Expr.nope' },
+    noStart: { kind: 'noStart', entry: 'Expr.abs' },
+    cannotAdd: { kind: 'cannotAdd', reason: 'because' },
+    needsValue: { kind: 'needsValue', parameter: 'name' },
+    refused: { kind: 'refused', reason: 'because' },
+  };
+  const found = held[kind];
+  if (found === undefined) throw new Error(`no problem of the kind ${kind}`);
+  return found;
+}
 
 /** A setting of the kind `kind`, with what that kind holds. */
 function settingOfKind(kind: string): unknown {

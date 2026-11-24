@@ -12,12 +12,12 @@ import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { useMemo } from 'react';
 
 import { cx } from '@dageist/design';
+import type { DocumentStepView } from '@dageist/host';
 
 import { dragSettingsFor } from './Chain';
 import { useCatalogue } from './EngineProvider';
 import type { PreparedStep } from './model/report';
-import type { Step } from './model/steps';
-import { VERB_COLOURS, verbHead } from './verbs';
+import { stepColour, stepHead } from './verbs';
 
 /** The sortable group the names of the steps belong to. */
 const NAME_GROUP = 'step-names';
@@ -34,7 +34,7 @@ const NAME_SENSORS = [
 ];
 
 interface StepNameProps {
-  readonly step: Step;
+  readonly step: DocumentStepView;
   readonly index: number;
   /** Why the step cannot be worked out, or `null` when it can. */
   readonly problem: string | null;
@@ -73,7 +73,7 @@ function StepName({
         className={cx(
           'flex w-full cursor-pointer touch-none items-baseline gap-2 border-b border-line bg-raised px-3 py-1.5 text-left text-[13px] select-none',
           'hover:bg-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-          VERB_COLOURS[step.verb],
+          stepColour(step.call.entry),
           selected && 'bg-row shadow-[inset_2px_0_0_var(--color-accent)]',
           problem !== null && !selected && 'shadow-[inset_2px_0_0_var(--color-wrong)]',
         )}
@@ -84,7 +84,7 @@ function StepName({
           {index + 1}
         </span>
         <span className="shrink-0 font-semibold text-(--verb)">
-          {verbHead(catalogue, step.verb)}
+          {stepHead(catalogue, step.call.entry)}
         </span>
         <span
           className={cx(
@@ -101,7 +101,7 @@ function StepName({
 
 /** What a step navigator shows and reports. */
 export interface StepNavigatorProps {
-  readonly steps: readonly Step[];
+  readonly steps: readonly DocumentStepView[];
   /** What each step produced, in the same order. */
   readonly results: readonly PreparedStep[];
   readonly selectedId: string | null;

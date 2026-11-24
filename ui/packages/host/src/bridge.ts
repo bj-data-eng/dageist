@@ -18,7 +18,7 @@ import {
   decodeReadings,
   decodeStepStarts,
 } from './decode-offers';
-import { decodeRun } from './decode-run';
+import { decodeDocumentState, decodeEditAnswer } from './decode-document';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
@@ -102,9 +102,11 @@ export function bridgeHost(): Host {
     coreIdentity: async () => call('core_identity', decodeIdentity),
     operationCatalogue: async () => call('operation_catalogue', decodeCatalogue),
     nodeInputs: async () => call('node_inputs', decodeNode),
-    runDocument: async (document) => call('run_document', decodeRun, { document }),
-    rowsAfterStep: async (document, step, limit) =>
-      call('rows_after_step', decodeRows, { document, step, limit }),
+    nodeDocument: async () => call('node_document', decodeDocumentState),
+    editDocument: async (revision, edit) =>
+      call('edit_document', decodeEditAnswer, { revision, edit }),
+    rowsAfterStep: async (revision, step, limit) =>
+      call('rows_after_step', decodeRows, { revision, step, limit }),
     offersAt: async (place) =>
       call('offers_at', decodeOffers, { positions: place.positions, after: place.after }),
     candidateFits: async (request) =>
