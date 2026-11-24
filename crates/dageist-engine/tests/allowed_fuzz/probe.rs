@@ -3400,11 +3400,11 @@ mod tests {
 
     #[test]
     fn a_predicate_is_not_settled_where_the_value_it_guards_is_refused_only_when_the_rows_run() {
-        // `sort(by=when(f).then(g.cast(Int8)).otherwise(k.cast(Int8)))`: the rule is asked about the
-        // predicate, and Polars refuses the condition alone for the value the predicate guards, a
-        // text that is no number, when the rows run, with a refusal that has no place. Made `false`
-        // the predicate drops that value with its branch, so the control is allowed, and the case
-        // would be settled as the predicate's fault if the dropping were not seen.
+        // `sort(by=when(f).then(g.cast(Int8)).otherwise(k.cast(Int8)))`: the rule is asked about
+        // the predicate, and Polars refuses the condition alone for the value the predicate
+        // guards, a text that is no number, when the rows run, with a refusal that has no place.
+        // Made `false` the predicate drops that value with its branch, so the control is allowed,
+        // and the case would be settled as the predicate's fault if the dropping were not seen.
         let to_a_whole_number = |name: &str| {
             format!(
                 r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[{{"entry":"Expr.cast","arguments":{{"dtype":{{"dtype":"Int8"}}}}}}]}}}}"#

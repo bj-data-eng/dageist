@@ -5599,9 +5599,9 @@ mod tests {
             refused_by_the_tables_at(&filled_dates, at_the_call(1), text),
             vec![]
         );
-        // The text is the cast's only where it follows the values and what stands between keeps each
-        // of them: a call before the cast, one between that changes the text, or another cast is
-        // the sample's.
+        // The text is the cast's only where it follows the values and what stands between keeps
+        // each of them: a call before the cast, one between that changes the text, or another cast
+        // is the sample's.
         let numbers = Representative::Int8;
         let reversed = chain_after(
             numbers,
