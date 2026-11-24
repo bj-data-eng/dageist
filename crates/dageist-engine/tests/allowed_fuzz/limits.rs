@@ -6285,8 +6285,12 @@ mod tests {
 
     #[test]
     fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
-        // A subtraction, a negation, the bits of a number flipped and a number typed below zero
-        // take the values of a column below zero.
+        // A subtraction, a negation, the bits of a number flipped, a difference of the numbers and a
+        // number typed below zero take the values of a column below zero.
+        assert_eq!(
+            excused_by_kept("uncovered-a-negative-exponent--a-difference.case"),
+            vec![Limit::ANegativeExponent]
+        );
         for exponent in [
             chain_of(
                 column("b"),
@@ -6294,6 +6298,7 @@ mod tests {
             ),
             chain(column("k"), &["Expr.neg"]),
             chain(column("k"), &["Expr.not_"]),
+            chain(column("k"), &["Expr.diff"]),
             chain_of(column("k"), vec![compared_with("Expr.add", whole(-3))]),
             chain_of(column("k"), vec![compared_with("Expr.mul", whole(-1))]),
         ] {
