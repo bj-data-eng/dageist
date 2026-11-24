@@ -244,6 +244,42 @@ impl Step {
     }
 }
 
+/// What a value that a method took of one value is to Polars. It is one value that no row of a group
+/// takes as the value of the group, which a window refuses, and one that Polars cannot tell is one
+/// before the rows run, which the parameters that must be a scalar refuse. The two are carried by
+/// what a call reads, and not by the same parameters of it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Taken {
+    /// Whether a window refuses it.
+    window: bool,
+    /// Whether a parameter that must be a scalar refuses it.
+    scalar: bool,
+}
+
+impl Taken {
+    /// What a method that takes some of the values gives of one value.
+    const ALL: Self = Self {
+        window: true,
+        scalar: true,
+    };
+
+    fn or(self, other: Self) -> Self {
+        Self {
+            window: self.window || other.window,
+            scalar: self.scalar || other.scalar,
+        }
+    }
+
+    /// Only where the value is one: a count and the rows are refused by their shape.
+    fn if_one(self, shape: Shape) -> Self {
+        if shape == Shape::One {
+            self
+        } else {
+            Self::default()
+        }
+    }
+}
+
 /// What an expression held by an argument has: the class it gives, if known,
 /// and whether it gives one value.
 #[derive(Clone, Copy)]
@@ -258,7 +294,7 @@ struct Operand {
     count: Count,
     /// Whether it is one value that a method took of one value, or one that meets such a value: the
     /// first none or one of it, which no row of a group takes as the value of the group.
-    taken: bool,
+    taken: Taken,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
@@ -308,7 +344,7 @@ enum Cur {
         shape: Shape,
         count: Count,
         /// Whether it is one value that a method took of one value, or one that meets such a value.
-        taken: bool,
+        taken: Taken,
     },
     Condition {
         state: ConditionState,
@@ -317,7 +353,7 @@ enum Cur {
         /// and the others are as many as one another.
         meeting: (Shape, Count),
         /// Whether a predicate or a value so far is one that a method took of one value.
-        taken: bool,
+        taken: Taken,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
         /// Whether every predicate and value so far gives one value, which a
@@ -1273,7 +1309,7 @@ impl Walker<'_> {
             loose: None,
             shape: Shape::Many,
             count: Count::NotKnown,
-            taken: false,
+            taken: Taken::default(),
             known: false,
             reliable: false,
             zone: None,
@@ -1392,7 +1428,11 @@ impl Walker<'_> {
                                         .filter(|(_, operand)| operand.known && operand.reliable)
                                         .map(|(_, operand)| (operand.shape, operand.count)),
                                 ),
-                                taken: start_arguments.iter().any(|(_, operand)| operand.taken),
+                                taken: start_arguments
+                                    .iter()
+                                    .fold(Taken::default(), |all, (_, operand)| {
+                                        all.or(operand.taken)
+                                    }),
                                 zones: Vec::new(),
                                 single: start_arguments
                                     .iter()
@@ -1407,8 +1447,12 @@ impl Walker<'_> {
                                 count: Count::NotKnown,
                                 // A function that makes a value of what it is given gives one that
                                 // was taken where one of them is.
-                                taken: allowance.shape() == Shape::One
-                                    && start_arguments.iter().any(|(_, operand)| operand.taken),
+                                taken: start_arguments
+                                    .iter()
+                                    .fold(Taken::default(), |all, (_, operand)| {
+                                        all.or(operand.taken)
+                                    })
+                                    .if_one(allowance.shape()),
                             }
                         };
                     }
@@ -1426,7 +1470,7 @@ impl Walker<'_> {
                     dtype: None,
                     shape: Shape::Many,
                     count: Count::NotKnown,
-                    taken: false,
+                    taken: Taken::default(),
                 };
             }
             Start::Input(name) => {
@@ -1434,7 +1478,7 @@ impl Walker<'_> {
                     dtype: None,
                     shape: Shape::Many,
                     count: Count::NotKnown,
-                    taken: false,
+                    taken: Taken::default(),
                 };
                 let standing = self.input_start(name, context, &mut cur, &mut last_end);
                 calls.push(standing);
@@ -1680,7 +1724,7 @@ impl Walker<'_> {
                     dtype: Some(class),
                     shape: allowance.shape(),
                     count: Count::NotKnown,
-                    taken: false,
+                    taken: Taken::default(),
                 };
             }
         }
@@ -1732,7 +1776,7 @@ impl Walker<'_> {
                 &cur,
                 Cur::Value {
                     shape: Shape::One,
-                    taken: true,
+                    taken: Taken { window: true, .. },
                     ..
                 }
             )
@@ -2026,12 +2070,11 @@ impl Walker<'_> {
                 }
                 _ => (shape, Count::NotKnown),
             };
-            let taken = taken_after(
-                link,
-                matches!(&cur, Cur::Value { taken: true, .. }),
-                arguments,
-                shape,
-            );
+            let receiver_taken = match &cur {
+                Cur::Value { taken, .. } => *taken,
+                _ => Taken::default(),
+            };
+            let taken = taken_after(link, receiver_taken, arguments, shape);
             return (
                 Cur::Value {
                     dtype,
@@ -2161,7 +2204,10 @@ impl Walker<'_> {
                 },
             );
         }
-        let receiver_taken = matches!(&cur, Cur::Value { taken: true, .. });
+        let receiver_taken = match &cur {
+            Cur::Value { taken, .. } => *taken,
+            _ => Taken::default(),
+        };
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
                 let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
@@ -2205,10 +2251,10 @@ impl Walker<'_> {
                     ..
                 },
             ) => {
-                let taken = taken
-                    || arguments.iter().any(|(name, operand)| {
-                        matches!(name.as_str(), "predicates" | "statement") && operand.taken
-                    });
+                let taken = arguments
+                    .iter()
+                    .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
+                    .fold(taken, |all, (_, operand)| all.or(operand.taken));
                 // The predicates and the values a condition is given are as many as one another,
                 // unless the values are one expression, whose predicates Polars drops.
                 let mut meeting = meeting;
@@ -2290,7 +2336,7 @@ impl Walker<'_> {
                                 dtype,
                                 shape,
                                 count,
-                                taken: taken && shape == Shape::One,
+                                taken: taken.if_one(shape),
                             },
                             standing,
                         );
@@ -2427,35 +2473,40 @@ impl Walker<'_> {
 /// refuses it.
 fn taken_after(
     link: &Call,
-    receiver_taken: bool,
+    receiver_taken: Taken,
     arguments: &[(String, Operand)],
     shape: Shape,
-) -> bool {
+) -> Taken {
     if shape != Shape::One {
-        return false;
+        return Taken::default();
     }
-    let operands = arguments
+    let read = arguments
         .iter()
-        .any(|(name, operand)| operand.taken && carries_taken(link.entry(), name, operand));
+        .fold(Taken::default(), |all, (name, operand)| {
+            all.or(Taken {
+                window: operand.taken.window && carries_to_a_window(link.entry(), name, operand),
+                scalar: operand.taken.scalar && carries_to_a_scalar(link.entry(), name),
+            })
+        });
     if is_counting(link) {
-        return true;
+        return Taken::ALL;
     }
     // An aggregate reduces what it follows, and keeps what it is given to read, as a statistic its share.
     if is_one_value(link) {
-        return operands;
+        return read;
     }
-    receiver_taken || operands
+    receiver_taken.or(read)
 }
 
 /// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
-/// what the call gives one that was taken. It does wherever the call reads the value, as a part of
-/// a moment, a bound, a fill, a statistic's share or a strict replacement's default, and whether or
+/// what the call gives one that a window refuses. It does wherever the call reads the value, as a part
+/// of a moment, a bound, a fill, a statistic's share or a strict replacement's default, and whether or
 /// not Polars meets it with each of the values the call follows. It does not where the call only
 /// looks up in it or by it: the keys of a sort order the values and are no part of them, what a
 /// replacement lists is a table of values it looks up, and a column of the dtype of the values that
 /// `is_in` is given is their set, whole, which is not read value by value as a list is. The share
 /// of a quantile is read once, before the groups, where an approximate quantile reads it in each.
-fn carries_taken(entry: &Entry, name: &str, operand: &Operand) -> bool {
+fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
     match (entry.id().as_str(), name) {
         ("Expr.sort_by", "by" | "more_by")
         | ("Expr.replace" | "Expr.replace_strict", "old" | "new")
@@ -2463,6 +2514,15 @@ fn carries_taken(entry: &Entry, name: &str, operand: &Operand) -> bool {
         ("Expr.is_in", "other") => is_met_by_its_dtype(entry, name, operand),
         _ => true,
     }
+}
+
+/// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
+/// what the call gives one that Polars cannot tell is one before the rows run. It does for every
+/// parameter, the keys of a sort, what a replacement lists and the set `is_in` is given included, for
+/// Polars asks only whether what a call is made of is a scalar. The share of the exact quantile is
+/// the one it reads once, before the rest, and does not count.
+fn carries_to_a_scalar(entry: &Entry, name: &str) -> bool {
+    !(entry.id().as_str() == "Expr.quantile" && name == "quantile")
 }
 
 /// What two values that a call meets give together: one value is met by each of the other, and
@@ -2704,7 +2764,7 @@ fn given_other_than_one_value<'a>(
         let given = match operand.shape {
             Shape::Many => "the rows",
             Shape::Counted => "a count of values",
-            Shape::One if operand.taken && how == catalog::OneValue::Scalar => {
+            Shape::One if operand.taken.scalar && how == catalog::OneValue::Scalar => {
                 "one value that a method took of one value"
             }
             Shape::One => return None,

@@ -596,13 +596,17 @@ again once an aggregate of it is, and the call of a method that takes some of th
 is given. A few parameters do not carry it, for the call only looks up in it or by it: the keys of a sort,
 which order the values and are no part of them; what a replacement lists, a table of values it looks up; the
 values `is_in` is given as a column of their own dtype, which is their set, whole; and the share of the exact
-quantile, which Polars reads once, before the groups. A test asks Polars and the walk of every expression
-parameter of the methods and of the functions that start an expression, apart from those of `over`, of the
-methods that take some of the values, whose call is a count and is refused whatever it is given, and of the links
-of a condition, which tests of their own ask, with such a value given to it, so a parameter is not left to a case
-that came to mind. The parameters that Polars reads as one value are asked as well in a select, with the rows, a
-count and such a value, and refuse what `parameter-takes-one-value` says. A `filter` of one value is a count, for
-its condition meets the one value with each of its own.
+quantile, which Polars reads once, before the groups. What a parameter that must be a scalar refuses is a
+second state of the same value, carried differently: Polars asks only whether what a call is made of is a
+scalar, so the value stays taken for it through every parameter, the keys of a sort, what a replacement
+lists and the set `is_in` is given included, and only the share of the exact quantile leaves a call that is
+given one a scalar. A test asks Polars and the walk of every expression parameter of the methods and of the
+functions that start an expression, apart from those of `over`, of the methods that take some of the values,
+whose call is a count and is refused whatever it is given, and of the links of a condition, which tests of
+their own ask, with such a value given to it, in a window and as the fill of a `shift`, so a parameter is not
+left to a case that came to mind. The parameters that Polars reads as one value are asked as well in a
+select, with the rows, a count and such a value, and refuse what `parameter-takes-one-value` says. A
+`filter` of one value is a count, for its condition meets the one value with each of its own.
 
 The values a call meets must be as many as one another, or one, which is met by each of the others: the rows are
 no count, and two counts that are fixed and differ are not the same. The rule `values-meet-in-count` says so,
