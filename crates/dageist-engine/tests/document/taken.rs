@@ -259,9 +259,19 @@ enum Found {
     ItselfTaken,
 }
 
-fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Found {
+/// What was found of one parameter in a window, and as the fill of a `shift`, which Polars reads as
+/// one value that it can tell is one before the rows run.
+struct Checked {
+    window: Found,
+    fill: Found,
+}
+
+fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Checked {
     if Counting::of(entry, &[]).is_some() {
-        return Found::ItselfTaken;
+        return Checked {
+            window: Found::ItselfTaken,
+            fill: Found::ItselfTaken,
+        };
     }
     let is_a_start = entry.applies() == Applies::Function;
     let mut why = String::from("no receiver and filler gave a call that Polars runs");
@@ -284,28 +294,51 @@ fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Found 
             Some("tm"),
         ] {
             let filler = one_value(filler_column);
-            let build = |given: &Expression| -> Option<Document> {
+            // The call of one value given `given` for the parameter, windowed or not.
+            let make = |given: &Expression, windowed: bool| -> Option<Expression> {
                 let given_arguments = arguments(entry, tested, given, &filler, &receiver_dtype)?;
                 let called = Call::new(entry, given_arguments).ok()?;
-                let expression = if is_a_start {
-                    let Start::Call(_) = Start::Call(called.clone()) else {
-                        return None;
-                    };
-                    Expression::new(Start::Call(called), vec![over()]).ok()?
+                let mut links = if is_a_start {
+                    Vec::new()
                 } else {
-                    let name = receiver?;
-                    Expression::new(
-                        Start::Call(column(name)),
-                        vec![call("Expr.first", Vec::new()), called, over()],
-                    )
-                    .ok()?
+                    vec![call("Expr.first", Vec::new())]
                 };
-                Some(document_of(expression))
+                let start = if is_a_start {
+                    Start::Call(called)
+                } else {
+                    links.push(called);
+                    Start::Call(column(receiver?))
+                };
+                if windowed {
+                    links.push(over());
+                }
+                Expression::new(start, links).ok()
+            };
+            let build =
+                |given: &Expression| -> Option<Document> { make(given, true).map(document_of) };
+            // The call of one value, with the call given `given` as the fill of its own shift.
+            let as_a_fill = |given: &Expression| -> Option<Document> {
+                let control = make(&filler, false)?;
+                let mut links = control.links().to_vec();
+                links.push(
+                    Call::new(
+                        function("Expr.shift"),
+                        vec![
+                            ("n", Value::Expression(chain(number(1), Vec::new()))),
+                            ("fill_value", Value::Expression(make(given, false)?)),
+                        ],
+                    )
+                    .ok()?,
+                );
+                Expression::new(control.start().clone(), links)
+                    .ok()
+                    .map(document_of)
             };
             let Some(control) = build(&filler) else {
                 why = "the arguments of the call could not be built".to_owned();
                 continue;
             };
+            let fill = scalar_found(&as_a_fill, &filler, &taken(&filler), frame);
             match polars_says(&control, frame) {
                 Said::Accepts => {}
                 Said::Other(text) => {
@@ -318,19 +351,25 @@ fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Found 
                 }
             }
             if walk_says(&control, frame) != Said::Accepts {
-                return Found::Disagrees(format!(
-                    "the walk refuses the call of one value {receiver:?} {filler_column:?}: {:?}",
-                    walk_says(&control, frame)
-                ));
+                return Checked {
+                    window: Found::Disagrees(format!(
+                        "the walk refuses the call of one value {receiver:?} {filler_column:?}: {:?}",
+                        walk_says(&control, frame)
+                    )),
+                    fill,
+                };
             }
             let Some(taken_document) = build(&taken(&filler)) else {
-                return Found::Unbuildable("the taken value could not be given".to_owned());
+                return Checked {
+                    window: Found::Unbuildable("the taken value could not be given".to_owned()),
+                    fill,
+                };
             };
             let (polars, walk) = (
                 polars_says(&taken_document, frame),
                 walk_says(&taken_document, frame),
             );
-            return match (&polars, &walk) {
+            let window = match (&polars, &walk) {
                 // Both refuse it, by another reason than the window's, which the walk names.
                 (Said::Other(_), Said::Other(reason)) => {
                     Found::TakenRefusedOtherwise(reason.clone())
@@ -340,9 +379,47 @@ fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Found 
                     "Polars {polars:?} and the walk {walk:?}, with {receiver:?} and {filler_column:?}"
                 )),
             };
+            return Checked { window, fill };
         }
     }
-    Found::Unbuildable(why)
+    Checked {
+        window: Found::Unbuildable(why.clone()),
+        fill: Found::Unbuildable(why),
+    }
+}
+
+/// The value of one `shift`'s fill: the call of one value given one that a method took of one value
+/// for its fill, which Polars refuses, as scalar or not; Polars and the walk must say the same.
+fn scalar_found(
+    as_a_fill: &dyn Fn(&Expression) -> Option<Document>,
+    filler: &Expression,
+    taken: &Expression,
+    frame: &DataFrame,
+) -> Found {
+    let Some(control) = as_a_fill(filler) else {
+        return Found::Unbuildable("the call could not be given as a fill".to_owned());
+    };
+    match polars_says(&control, frame) {
+        Said::Accepts => {}
+        Said::Other(text) => return Found::Unbuildable(text),
+        Said::RefusesTheWindow => return Found::Unbuildable("a window".to_owned()),
+    }
+    if walk_says(&control, frame) != Said::Accepts {
+        // The tables measure a fill by the number 1 of the dtype it fills, which a list is not.
+        return Found::Unbuildable(format!(
+            "the walk refuses the call of one value as a fill: {:?}",
+            walk_says(&control, frame)
+        ));
+    }
+    let Some(document) = as_a_fill(taken) else {
+        return Found::Unbuildable("the taken value could not be given".to_owned());
+    };
+    let (polars, walk) = (polars_says(&document, frame), walk_says(&document, frame));
+    match (&polars, &walk) {
+        (Said::Accepts, Said::Accepts) => Found::Agrees,
+        (Said::Other(_), Said::Other(reason)) => Found::TakenRefusedOtherwise(reason.clone()),
+        _ => Found::Disagrees(format!("Polars {polars:?} and the walk {walk:?}")),
+    }
 }
 
 #[test]
@@ -354,6 +431,11 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
     let mut otherwise: BTreeMap<String, String> = BTreeMap::new();
     let mut itself_taken: Vec<String> = Vec::new();
     let (mut agreed, mut asked) = (0, 0);
+    // What the fill of a `shift` says: the parameters whose taken value both accept, the number both
+    // refuse, and the calls that cannot be given as a fill.
+    let mut fill_accepted: Vec<String> = Vec::new();
+    let mut fill_unbuildable: BTreeMap<String, String> = BTreeMap::new();
+    let (mut fills_agreed, mut fills_refused) = (0, 0);
     for entry in catalog::entries() {
         let applies = entry.applies();
         // A window is the value under test, and a condition is built link by link, which the tests
@@ -376,16 +458,29 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
         {
             let name = format!("{} {}", entry.id().as_str(), parameter.name());
             asked += 1;
-            match check(entry, parameter, &frame) {
+            let checked = check(entry, parameter, &frame);
+            match checked.window {
                 Found::Agrees => agreed += 1,
                 Found::Disagrees(text) => disagreements.push(format!("{name}: {text}")),
                 Found::Unbuildable(text) => {
-                    unbuildable.insert(name, text);
+                    unbuildable.insert(name.clone(), text);
                 }
                 Found::TakenRefusedOtherwise(text) => {
-                    otherwise.insert(name, text);
+                    otherwise.insert(name.clone(), text);
                 }
-                Found::ItselfTaken => itself_taken.push(name),
+                Found::ItselfTaken => itself_taken.push(name.clone()),
+            }
+            match checked.fill {
+                Found::Agrees => {
+                    fills_agreed += 1;
+                    fill_accepted.push(name);
+                }
+                Found::Disagrees(text) => disagreements.push(format!("{name} as a fill: {text}")),
+                Found::Unbuildable(text) => {
+                    fill_unbuildable.insert(name, text);
+                }
+                Found::TakenRefusedOtherwise(_) => fills_refused += 1,
+                Found::ItselfTaken => {}
             }
         }
     }
@@ -398,6 +493,23 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
         "{} parameters disagree:\n{}",
         disagreements.len(),
         disagreements.join("\n")
+    );
+    eprintln!(
+        "fills: {fills_agreed} accepted, {fills_refused} refused, accepted {fill_accepted:?}"
+    );
+    for (name, text) in &fill_unbuildable {
+        eprintln!("fill unbuildable {name}: {text}");
+    }
+    // Polars reads the fill of a `shift` as a scalar, which only an exact quantile's share leaves a
+    // value that a method took of one value to be, of all the parameters there are.
+    assert_eq!(fill_accepted, SCALAR_EXCEPTIONS, "{fill_accepted:?}");
+    assert_eq!(
+        fill_unbuildable
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        UNBUILDABLE_AS_A_FILL,
+        "{fill_unbuildable:?}"
     );
     // What could not be asked is said, and checked by name: these are all there is.
     assert_eq!(
@@ -529,3 +641,14 @@ fn parameter_name(entry: &Entry, name: &str) -> &'static str {
         .map(Parameter::name)
         .expect("the entry has the parameter")
 }
+
+/// The parameters that leave the call a scalar given a value that a method took of one value.
+const SCALAR_EXCEPTIONS: [&str; 1] = ["Expr.quantile quantile"];
+
+/// The calls that cannot be asked as the fill of a `shift` beside themselves, which Polars refuses
+/// for the dtype it gives, with why.
+const UNBUILDABLE_AS_A_FILL: [&str; 1] = [
+    // A list: Polars fills a list with a list, where the tables measure a fill by the number 1 of
+    // the dtype it fills, which a list is not, so they refuse it.
+    "Expr.str.split by",
+];
