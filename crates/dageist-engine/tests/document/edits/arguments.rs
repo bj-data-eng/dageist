@@ -355,6 +355,25 @@ fn a_per_key_option_that_was_one_value_for_every_key_keeps_it_for_the_others() {
 }
 
 #[test]
+fn a_per_key_option_that_held_too_few_values_gives_the_default_to_the_keys_it_had_none_for() {
+    // Two keys and one value: the second key holds Polars' default of `descending`, which is false.
+    let edited = read(vec![sort(json!({ "descending": many(vec![flag(true)]) }))])
+        .set_for_item(
+            &step_at(0, "order"),
+            "descending",
+            0,
+            Value::Flag(Some(true)),
+        )
+        .expect("set");
+    assert_steps(
+        &edited,
+        vec![sort(
+            json!({ "descending": many(vec![flag(true), flag(false)]) }),
+        )],
+    );
+}
+
+#[test]
 fn a_flag_option_starts_with_the_word_that_is_not_its_default() {
     let edited = read(vec![sort(json!({}))])
         .add_option(&step_at(0, "order"), "descending")
