@@ -26,16 +26,16 @@ function cells(): Cell[] {
 const FURTHER_CASE = 'the editor draws one case of a when; a further case follows otherwise';
 
 describe('the places the engine was asked about', () => {
-  it('are every context, and for each of them nothing, each dtype in two shapes, and each state of a condition', () => {
+  it('are every context, and for each of them nothing, each dtype in three shapes, and each state of a condition', () => {
     // Six positions of a step, alone and with each of four positions inside an expression.
     expect(grid.contexts).toHaveLength(30);
-    // Nothing; twenty-six dtypes, each of one value and of many; four states of a condition.
-    expect(grid.afters).toHaveLength(1 + 26 * 2 + 4);
-    expect(cells()).toHaveLength(30 * 57);
+    // Nothing; twenty-six dtypes, each of one value, of many and of a count; four states of a condition.
+    expect(grid.afters).toHaveLength(1 + 26 * 3 + 4);
+    expect(cells()).toHaveLength(30 * 83);
   });
 
   it('hold every entry that stands in an expression, and no step', () => {
-    expect(grid.entries).toHaveLength(210);
+    expect(grid.entries).toHaveLength(225);
     expect(grid.entries.filter((id) => id.startsWith('LazyFrame.'))).toEqual([]);
     for (const id of grid.entries) {
       expect(catalogue.entries.has(id), id).toBe(true);

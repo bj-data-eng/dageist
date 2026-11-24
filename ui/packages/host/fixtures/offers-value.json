@@ -301,6 +301,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.arg_unique",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.backward_fill",
       "verdict": {
         "kind": "allowed",
@@ -455,6 +469,27 @@
         }
       },
       "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bottom_k",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "k",
+        "literal": {
+          "kind": "integer",
+          "value": 5,
+          "shown": "5"
+        }
+      },
       "leftOut": null,
       "slots": []
     },
@@ -1462,6 +1497,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.filter",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.first",
       "verdict": {
         "kind": "allowed",
@@ -1522,6 +1571,34 @@
       "slots": []
     },
     {
+      "entry": "Expr.gather",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.gather_every",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["n"]
+    },
+    {
       "entry": "Expr.ge",
       "verdict": {
         "kind": "allowed",
@@ -1560,6 +1637,27 @@
         }
       },
       "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.head",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 10,
+          "shown": "10"
+        }
+      },
       "leftOut": null,
       "slots": []
     },
@@ -1623,6 +1721,20 @@
     },
     {
       "entry": "Expr.is_first_distinct",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.is_in",
       "verdict": {
         "kind": "allowed",
         "result": "Boolean",
@@ -1796,6 +1908,27 @@
       "slots": []
     },
     {
+      "entry": "Expr.limit",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 10,
+          "shown": "10"
+        }
+      },
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.log",
       "verdict": {
         "kind": "refused",
@@ -1907,6 +2040,20 @@
             "stage": "schema"
           },
           "reason": "% not allowed on datetime[μs] and i8"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.mode",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
@@ -2261,6 +2408,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.search_sorted",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.shift",
       "verdict": {
         "kind": "allowed",
@@ -2335,6 +2496,20 @@
         "kind": "allowed",
         "result": "Float64",
         "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.slice",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
         "ending": {
           "kind": "allowed"
         }
@@ -2912,6 +3087,27 @@
       "slots": []
     },
     {
+      "entry": "Expr.tail",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 10,
+          "shown": "10"
+        }
+      },
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.tan",
       "verdict": {
         "kind": "refused",
@@ -2944,6 +3140,27 @@
       "slots": []
     },
     {
+      "entry": "Expr.top_k",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "k",
+        "literal": {
+          "kind": "integer",
+          "value": 5,
+          "shown": "5"
+        }
+      },
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.truediv",
       "verdict": {
         "kind": "refused",
@@ -2969,6 +3186,34 @@
             "stage": "rows"
           },
           "reason": "truncation ('to_zero') operation not supported for dtype `datetime[μs]` (expected: numeric)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.unique",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.unique_counts",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,

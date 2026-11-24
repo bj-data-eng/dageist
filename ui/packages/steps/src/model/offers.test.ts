@@ -51,18 +51,17 @@ describe('the methods the engine offers after a timestamp', () => {
     families.flatMap((family) => family.offers).find((offer) => offer.name === name);
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
-    // The methods of each family: window one, conversion three, order, cumulative, rounding and the
-    // search of text five, rows six, maths and pieces of text seven, checks and nulls eight, logic
-    // ten, arithmetic eleven, trigonometry, text and compare fifteen, aggregate twenty-six, and
-    // temporal forty-three.
+    // The methods of each family: window one, conversion three, cumulative, rounding and the
+    // search of text five, order six, maths and pieces of text seven, checks and nulls eight, logic
+    // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows nineteen,
+    // aggregate twenty-six, and temporal forty-three.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['conversion', 3],
-      ['order', 5],
       ['cumulative', 5],
       ['rounding', 5],
       ['search', 5],
-      ['rows', 6],
+      ['order', 6],
       ['maths', 7],
       ['pieces', 7],
       ['checks', 8],
@@ -71,7 +70,8 @@ describe('the methods the engine offers after a timestamp', () => {
       ['arithmetic', 11],
       ['trigonometry', 15],
       ['text', 15],
-      ['compare', 15],
+      ['compare', 16],
+      ['rows', 19],
       ['aggregate', 26],
       ['temporal', 43],
     ]);
@@ -81,7 +81,27 @@ describe('the methods the engine offers after a timestamp', () => {
   it('carry the hint of the catalogue and are offered in the engine’s order', () => {
     expect(
       families.find((family) => family.key === 'rows')?.offers.map((offer) => offer.name),
-    ).toEqual(['diff', 'first', 'last', 'pct_change', 'rle_id', 'shift']);
+    ).toEqual([
+      'arg_unique',
+      'bottom_k',
+      'diff',
+      'filter',
+      'first',
+      'gather',
+      'gather_every',
+      'head',
+      'last',
+      'limit',
+      'mode',
+      'pct_change',
+      'rle_id',
+      'shift',
+      'slice',
+      'tail',
+      'top_k',
+      'unique',
+      'unique_counts',
+    ]);
     expect(offerNamed('shift')?.hint).toBe('value n rows earlier');
   });
 
