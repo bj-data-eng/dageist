@@ -97,7 +97,9 @@ pub enum Limit {
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
     ///   made by a fill with a text literal after the call that counts, or of the numbers of a
     ///   group cast or filled to text by the first call, which a fill, a reverse, a sort, a drop
-    ///   of the nulls or one value picked may follow, and which read as the numbers, or of what
+    ///   of the nulls or one value picked may follow, and which read as the numbers, or of the
+    ///   values of a group written by a first call with a format of digits alone, as the year,
+    ///   which read as numbers, or of what
     ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -845,6 +847,63 @@ fn makes_text_of_a_count(links: &[Call]) -> bool {
         .is_some_and(|counted| links[counted + 1..].iter().any(is_a_fill_with_text))
 }
 
+/// Whether every call of `links` keeps each value as it is and takes none away.
+fn keeps_each_value(links: &[Call]) -> bool {
+    links.iter().all(|link| {
+        matches!(
+            link.entry().id().as_str(),
+            "Expr.forward_fill"
+                | "Expr.backward_fill"
+                | "Expr.reverse"
+                | "Expr.sort"
+                | "Expr.drop_nulls"
+                | "Expr.first"
+                | "Expr.last"
+                | "Expr.min"
+                | "Expr.max"
+        )
+    })
+}
+
+/// The directives of a format that write digits alone.
+const DIRECTIVES_OF_DIGITS: &str = "YymdHMSIjfuwCUWGgV";
+
+/// Whether the call writes a moment with a format of digits alone, directives that write digits
+/// and digits, so that the text it gives reads as a number.
+fn writes_digits_alone(call: &Call) -> bool {
+    if !(is(call, "Expr.dt.to_string") || is(call, "Expr.dt.strftime")) {
+        return false;
+    }
+    let Some(Value::String(format)) = call.argument("format") else {
+        return false;
+    };
+    let mut characters = format.chars();
+    let mut written = false;
+    while let Some(character) = characters.next() {
+        let digits = match character {
+            '%' => characters
+                .next()
+                .is_some_and(|directive| DIRECTIVES_OF_DIGITS.contains(directive)),
+            other => other.is_ascii_digit(),
+        };
+        if !digits {
+            return false;
+        }
+        written = true;
+    }
+    written
+}
+
+/// Whether the call at `at` of the aggregate `chain` of a pivot follows the values of a group
+/// written with a format of digits alone, and nothing else that takes a value away: the text reads
+/// as a number, which the sample's does not.
+fn is_a_date_written_as_digits(chain: &Expression, at: usize) -> bool {
+    matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
+        && at >= 1
+        && keeps_each_value(&chain.links()[1..at])
+        && chain.links().first().is_some_and(writes_digits_alone)
+}
+
 /// Whether the call at `at` of the aggregate `chain` of the pivot `step` follows the numbers of the
 /// group cast to text and nothing else: the values the pivot reads are columns of numbers, the
 /// first call casts them to text or fills them with a text literal, and any that follow it keep
@@ -861,20 +920,7 @@ fn is_text_of_the_numbers_of_a_group(
     matches!(chain.start(), Start::Call(start) if is(start, "polars.element"))
         && at >= 1
         // What stands between keeps each value as it is and takes none away.
-        && chain.links()[1..at].iter().all(|link| {
-            matches!(
-                link.entry().id().as_str(),
-                "Expr.forward_fill"
-                    | "Expr.backward_fill"
-                    | "Expr.reverse"
-                    | "Expr.sort"
-                    | "Expr.drop_nulls"
-                    | "Expr.first"
-                    | "Expr.last"
-                    | "Expr.min"
-                    | "Expr.max"
-            )
-        })
+        && keeps_each_value(&chain.links()[1..at])
         && chain.links().first().is_some_and(|first| {
             // A cast to text, or a fill with a text literal, which gives numbers the dtype text.
             (is(first, "Expr.cast")
@@ -4723,6 +4769,7 @@ fn applies(
                                         // The text of a count or a position, which reads as it.
                                         || (is_a_failed_conversion_of_text(&refused.reason)
                                             && (makes_text_of_a_count(&chain.links()[..at])
+                                                || is_a_date_written_as_digits(chain, at)
                                                 || is_text_of_the_numbers_of_a_group(
                                                     &frames, step, chain, at,
                                                 )))
