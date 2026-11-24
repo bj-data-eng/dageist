@@ -97,7 +97,16 @@ export function useEditor(host: Host): Editor {
           : null;
       if (typeof said === 'number') made.heard(said);
     });
+    // A window that has been away, or whose host was restarted, may draw an old document: ask
+    // again when it is looked at.
+    const looked = (): void => {
+      if (document.visibilityState === 'visible') void made.load();
+    };
+    window.addEventListener('focus', looked);
+    document.addEventListener('visibilitychange', looked);
     return () => {
+      window.removeEventListener('focus', looked);
+      document.removeEventListener('visibilitychange', looked);
       made.close();
       session.current = null;
       stop();

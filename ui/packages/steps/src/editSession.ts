@@ -74,8 +74,7 @@ function wordsOf(error: unknown): string {
 }
 
 /** The words for an edit made against a document that has since changed. */
-const CHANGED_ELSEWHERE =
-  'The steps were changed in another window, so this was not done. Try again.';
+const CHANGED_SINCE = 'The steps changed since you did this, so it was not done. Try again.';
 
 /** Opens the session of one window over `port`, which tells `listener` what it learns. */
 export function createSession(port: SessionPort, listener: SessionListener): Session {
@@ -130,11 +129,13 @@ export function createSession(port: SessionPort, listener: SessionListener): Ses
         last = { status: 'edited', state: answer };
       } catch (error) {
         if (error instanceof HostError && error.kind === 'stale') {
-          tell(CHANGED_ELSEWHERE);
+          tell(CHANGED_SINCE);
           await load();
           return { status: 'stale' };
         }
         tell(wordsOf(error));
+        // What was drawn may be old, as after the host was restarted: ask for the document again.
+        await load();
         return { status: 'failed', reason: wordsOf(error) };
       }
     }
