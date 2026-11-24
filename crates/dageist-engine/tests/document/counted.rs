@@ -1069,3 +1069,30 @@ fn a_method_that_is_not_told_how_many_takes_what_python_takes_of_the_rows() {
         );
     }
 }
+
+#[test]
+fn is_in_given_a_taken_array_is_refused_by_a_window_and_given_an_array_is_not() {
+    // Python Polars 2.1.0: the sum of `a` asked of the first array of a column of arrays is the value
+    // of every row of its group, and asked of the first one that `head` took of it is not. A list is
+    // the same, and a column of the values' own dtype is their set, which carries nothing.
+    let asked_of = |other: Value| {
+        select_of(vec![on(
+            "a",
+            vec![
+                call("Expr.sum", json!({})),
+                call("Expr.is_in", json!({ "other": other })),
+                call(
+                    "Expr.over",
+                    json!({ "partition_by": many(vec![field("k")]) }),
+                ),
+            ],
+        )])
+    };
+    let first = on("arr", vec![call("Expr.first", json!({}))]);
+    assert_eq!(asked_of(first).refusal(), None);
+    let taken = on("arr", vec![call("Expr.first", json!({})), head(1)]);
+    assert_eq!(
+        refusal_source(&asked_of(taken)),
+        RefusalSource::Rule(Rule::WindowInputIsNotCounted)
+    );
+}

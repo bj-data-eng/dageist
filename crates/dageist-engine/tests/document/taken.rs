@@ -32,6 +32,8 @@ fn sample() -> DataFrame {
         3,
         vec![
             ints("a").into(),
+            // Shares, which a quantile takes.
+            Series::new("q".into(), [0.1_f64, 0.5, 0.9]).into(),
             Series::new("s".into(), ["1d", "2d", "3d"]).into(),
             Series::new("f".into(), [true, false, true]).into(),
             // Two rows in a group of two and one in a group of one, so a value of one row is not the
@@ -208,7 +210,11 @@ fn walk_says(document: &Document, frame: &DataFrame) -> Said {
         {
             Said::RefusesTheWindow
         }
-        Some(refusal) => Said::Other(refusal.refusal().reason().to_owned()),
+        // A rule is named, and Polars' words are given as they were, so what refused it is plain.
+        Some(refusal) => Said::Other(match refusal.refusal().source() {
+            RefusalSource::Rule(rule) => rule.name().to_owned(),
+            _ => refusal.refusal().reason().to_owned(),
+        }),
     }
 }
 
@@ -325,8 +331,9 @@ fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Found 
                 walk_says(&taken_document, frame),
             );
             return match (&polars, &walk) {
-                (Said::Other(text), _) | (_, Said::Other(text)) => {
-                    Found::TakenRefusedOtherwise(text.clone())
+                // Both refuse it, by another reason than the window's, which the walk names.
+                (Said::Other(_), Said::Other(reason)) => {
+                    Found::TakenRefusedOtherwise(reason.clone())
                 }
                 _ if polars == walk => Found::Agrees,
                 _ => Found::Disagrees(format!(
@@ -399,8 +406,11 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
         "{unbuildable:?}"
     );
     assert_eq!(
-        otherwise.keys().map(String::as_str).collect::<Vec<_>>(),
-        REFUSED_BY_BOTH_OTHERWISE.map(|(name, _)| name),
+        otherwise
+            .iter()
+            .map(|(name, reason)| (name.as_str(), reason.as_str()))
+            .collect::<Vec<_>>(),
+        REFUSED_BY_BOTH_OTHERWISE,
         "{otherwise:?}"
     );
     assert!(asked > 90 && agreed > 50, "asked {asked}, agreed {agreed}");
@@ -410,15 +420,112 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
 /// receiver and filler tried, so a taken value was not asked of them, and why. None.
 const UNBUILDABLE: [(&str, &str); 0] = [];
 
-/// The parameters that Polars and the walk refuse a taken value for, and not by the window: they
-/// are read as one value, which a value that was taken of one value is, but Polars refuses a call
-/// that is given an expression of a length that is not that of the group before it asks of the
-/// window.
+/// The parameters that Polars and the walk both refuse a taken value for, and not by the window,
+/// with the rule the walk names: Polars reads each as one value that it can tell is one, with "'n'
+/// must be a scalar value", which the first value that `head` took of one value is not, though it is
+/// one value, and a literal and an aggregate are.
 const REFUSED_BY_BOTH_OTHERWISE: [(&str, &str); 3] = [
-    ("Expr.diff n", "'n' must be a scalar value"),
-    (
-        "Expr.shift fill_value",
-        "'fill_value' must be a scalar value",
-    ),
-    ("Expr.shift n", "'n' must be a scalar value"),
+    ("Expr.diff n", "parameter-takes-one-value"),
+    ("Expr.shift fill_value", "parameter-takes-one-value"),
+    ("Expr.shift n", "parameter-takes-one-value"),
 ];
+
+/// The parameters that Polars reads as one value, with the column the values given to them are of
+/// and whether Polars refuses even a value that a method took of one value, as `shift` and `diff`
+/// do, where the others take it and refuse a count and the rows.
+const ONE_VALUE_PARAMETERS: [(&str, &str, &str, bool); 7] = [
+    ("Expr.shift", "n", "a", true),
+    ("Expr.shift", "fill_value", "a", true),
+    ("Expr.diff", "n", "a", true),
+    ("Expr.pct_change", "n", "a", false),
+    ("Expr.quantile", "quantile", "q", false),
+    ("Expr.top_k", "k", "a", false),
+    ("Expr.bottom_k", "k", "a", false),
+];
+
+#[test]
+fn a_parameter_that_polars_reads_as_one_value_is_given_one_as_polars_asks_in_a_select_and_a_window()
+{
+    let frame = sample();
+    let mut failures = Vec::new();
+    for (id, parameter, name, strict) in ONE_VALUE_PARAMETERS {
+        let entry = function(id);
+        let first = || chain(column(name), vec![call("Expr.first", Vec::new())]);
+        let forms: [(&str, Expression, bool); 4] = [
+            ("one value", first(), false),
+            ("a value taken of one value", taken(&first()), strict),
+            (
+                "a count",
+                chain(
+                    column(name),
+                    vec![call(
+                        "Expr.head",
+                        vec![("n", Value::Expression(chain(number(2), Vec::new())))],
+                    )],
+                ),
+                true,
+            ),
+            ("the rows", chain(column(name), Vec::new()), true),
+        ];
+        for (form, given, refused) in forms {
+            for windowed in [false, true] {
+                let mut links = vec![call("Expr.first", Vec::new())];
+                links.push(
+                    Call::new(
+                        entry,
+                        vec![(
+                            parameter_name(entry, parameter),
+                            Value::Expression(given.clone()),
+                        )],
+                    )
+                    .expect("the call"),
+                );
+                if windowed {
+                    links.push(over());
+                }
+                let document =
+                    document_of(Expression::new(Start::Call(column("a")), links).expect("a chain"));
+                let (polars, walk) = (polars_says(&document, &frame), walk_says(&document, &frame));
+                let accepted = |said: &Said| *said == Said::Accepts;
+                // A window refuses a value that a method took of one value even where the call
+                // takes it, and a count or the rows are refused before the window is asked of.
+                // The share of the exact quantile is read once, before the groups, so a window takes
+                // what was taken of one value for it, and `top_k` and `bottom_k` take some of the
+                // values, so a window refuses their call whatever it is given.
+                let carries = id != "Expr.quantile";
+                let itself_taken = matches!(id, "Expr.top_k" | "Expr.bottom_k");
+                let expected_refusal = refused
+                    || (windowed
+                        && ((form == "a value taken of one value" && carries) || itself_taken));
+                if accepted(&polars) == expected_refusal || accepted(&walk) == expected_refusal {
+                    failures.push(format!(
+                        "{id} {parameter} given {form}{}: Polars {polars:?}, the walk {walk:?}, \
+                         expected {}",
+                        if windowed { " in a window" } else { "" },
+                        if expected_refusal {
+                            "a refusal"
+                        } else {
+                            "no refusal"
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} cases disagree:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// The name of the parameter `name` of `entry`, as the entry holds it.
+fn parameter_name(entry: &Entry, name: &str) -> &'static str {
+    entry
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.name() == name)
+        .map(Parameter::name)
+        .expect("the entry has the parameter")
+}
