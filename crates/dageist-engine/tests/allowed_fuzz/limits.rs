@@ -5336,6 +5336,105 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_aggregate_is_excused_for_the_text_of_the_numbers_of_a_group_and_for_no_other() {
+        // The values of a group of numbers, cast to text, read as the numbers again, where the
+        // tables measured the sample's text, which no number reads.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--text-made-of-the-numbers-of-a-group.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let chain_after = |receiver: Representative, links: Vec<Call>| {
+            pivot_of(
+                receiver,
+                chain_of(call("polars.element", Vec::new()), links),
+            )
+        };
+        let to_text = || cast_to(Representative::String, Vec::new());
+        let at_the_call = |link: usize| at(&[parameter("aggregate_function"), Segment::Link(link)]);
+        for entry in ["Expr.skew", "Expr.kurtosis"] {
+            for receiver in [
+                Representative::Int8,
+                Representative::UInt64,
+                Representative::Float64,
+            ] {
+                let case = chain_after(receiver, vec![to_text(), call(entry, Vec::new())]);
+                assert_eq!(
+                    refused_by_the_tables_at(&case, at_the_call(1), text),
+                    vec![Limit::AGroupAggregate],
+                    "{entry} of {receiver}"
+                );
+            }
+            // The values of a group that are not numbers have the text the tables measured.
+            for receiver in [
+                Representative::Date,
+                Representative::String,
+                Representative::Boolean,
+            ] {
+                let case = chain_after(receiver, vec![to_text(), call(entry, Vec::new())]);
+                assert_eq!(
+                    refused_by_the_tables_at(&case, at_the_call(1), text),
+                    vec![],
+                    "{entry} of {receiver}"
+                );
+            }
+        }
+        // The text is the cast's only where it follows the values: another call between them, or
+        // before the cast, or another cast, is the sample's.
+        let numbers = Representative::Int8;
+        let reversed = chain_after(
+            numbers,
+            vec![
+                call("Expr.reverse", Vec::new()),
+                to_text(),
+                call("Expr.skew", Vec::new()),
+            ],
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&reversed, at_the_call(2), text),
+            vec![]
+        );
+        let upper = chain_after(
+            numbers,
+            vec![
+                to_text(),
+                call("Expr.str.to_uppercase", Vec::new()),
+                call("Expr.skew", Vec::new()),
+            ],
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&upper, at_the_call(2), text),
+            vec![]
+        );
+        let to_date = chain_after(
+            numbers,
+            vec![
+                cast_to(Representative::Date, Vec::new()),
+                call("Expr.skew", Vec::new()),
+            ],
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&to_date, at_the_call(1), text),
+            vec![]
+        );
+        // A select has no group.
+        let selected = select(vec![chain_of(
+            column("a"),
+            vec![to_text(), call("Expr.skew", Vec::new())],
+        )]);
+        assert_eq!(
+            refused_by_the_tables_at(
+                &selected,
+                at(&[parameter("exprs"), Segment::Item(0), Segment::Link(1)]),
+                text
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_a_cast_of_what_a_column_of_nulls_is_compared_with() {
         // The values of a group of a column of the dtype Null are nulls, which a comparison leaves
         // null and a cast converts, where the tables measured the comparison of a column that holds
