@@ -316,13 +316,13 @@ mod tests {
     #[test]
     fn a_request_is_read_with_its_headers_and_the_body_its_length_states() {
         let request = read(
-            b"POST /bridge/run_document HTTP/1.1\r\nHost: 127.0.0.1:1\r\nContent-Length: 5\r\n\
+            b"POST /bridge/edit_document HTTP/1.1\r\nHost: 127.0.0.1:1\r\nContent-Length: 5\r\n\
               X-Spaced:   value \t\r\n\r\nhelloEXTRA",
         )
         .expect("a request");
 
         assert_eq!(request.method, "POST");
-        assert_eq!(request.target, "/bridge/run_document");
+        assert_eq!(request.target, "/bridge/edit_document");
         assert_eq!(request.body, b"hello");
         assert_eq!(request.header("host"), Some("127.0.0.1:1"));
         assert_eq!(request.header("HOST"), Some("127.0.0.1:1"));

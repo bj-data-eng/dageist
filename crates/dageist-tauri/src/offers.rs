@@ -158,7 +158,7 @@ pub(crate) struct PlaceRequest {
 }
 
 impl PlaceRequest {
-    fn place(&self) -> Result<Place, ErrorView> {
+    pub(crate) fn place(&self) -> Result<Place, ErrorView> {
         Ok(Place::new(context_of(&self.positions)?, self.after.into()))
     }
 }

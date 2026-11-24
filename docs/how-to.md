@@ -39,8 +39,8 @@ in `ui/packages/host`, which read what the host sends and are tested against
 the [snapshots written from Rust](#refresh-the-step-report-snapshots) with
 expectations written by hand, the bridge host in the same package, against a
 stand-in for `fetch`, and the step editor's functions that translate steps
-into a step document, prepare the engine's report for display and schedule
-requests, against the same snapshots. React components have no tests. Name a file to run only its tests,
+out of the document the host holds, prepare the engine's report for display and
+schedule requests, against the same snapshots. React components have no tests. Name a file to run only its tests,
 as in `npm --prefix ui run test -- decode-run`.
 
 Add a development dependency with
@@ -154,15 +154,18 @@ view's tests decode and the bridge's tests compare its answers with, is current.
 
 The node commands are tested through the same IPC layer, on the claim-timing
 sample node: `node_inputs` gives the table the steps start from and each
-other input with its columns or dtype; `run_document` reports each step of a
-document, whether valid, refused at the link Polars names, or not run behind a
-refused one, with the dtype after each link and what the tables of allowed
-combinations say of each call, and reports text that is not a document with
-its place instead of failing; `rows_after_step` gives the rows after a step as
-text, a null as `null`, and rejects a limit above 1,000 rows, a step that is not
-in the document and a step that was not run. Every expected value is written by
-hand from the sample's seven rows. The tests also prove that the step report
-snapshots in `ui/packages/host/fixtures/` are current.
+other input with its columns or dtype; `node_document` gives the document the
+host holds, its revision and the report of each step, whether valid, refused at
+the link Polars names, incomplete, or not run behind a refused one, with the
+dtype after each link and what the tables of allowed combinations say of each
+call; `edit_document` makes each of the engine's edits, answers with the edited
+document at its next revision or with the engine's refusal as a kind and its
+words, and fails as `stale` for a revision that is not the current one;
+`rows_after_step` gives the rows after a step of a revision as text, a null as
+`null`, and rejects a limit above 1,000 rows, a step that is not in the document,
+a step that was not run and a stale revision. Every expected value is written by
+hand from the sample's seven rows. The tests also prove that the snapshots in
+`ui/packages/host/fixtures/` are current.
 
 The bridge is tested without a socket and through one on a loopback port. The
 tests send requests as bytes to the bridge's handling and read the answers
@@ -211,21 +214,21 @@ Never edit the files by hand.
 
 After a change to the sample node, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
-snapshot test fails and names the file that differs. Nine files in
+snapshot test fails and names the file that differs. Eight files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
-`node_inputs`, `step-document.json`, the claim-timing sample's own steps as the
-engine's document, which the view's tests compare the editor's starting steps
-with, `step-report.json` from running the claim-timing steps,
+`node_inputs`, `node-document.json` from `node_document`, the claim-timing
+sample's own steps as the host holds them with the report of running them,
+`step-report.json` from running the claim-timing steps,
 `step-report-refused.json` from a document whose second step Polars refuses and
 whose third is not run, `step-report-incomplete.json` from one whose second step
-holds something still to be picked, which the third waits for, `step-report-unreadable.json` from text that is not a
-document, `step-rows.json` from the rows after the `days_open` step,
+holds something still to be picked, which the third waits for,
+`step-rows.json` from the rows after the `days_open` step,
 `step-report-variants.json`, a report the host builds by hand to hold the
 variants no real document gives together, and `vocabulary.json`, the words of
-every closed list in a report and in the catalogue, written from the engine's
-own lists of variants. The view's tests compare the decoders' word lists with
-`vocabulary.json`, so a variant the engine adds makes them fail until the
-contract and the decoders name it. Write the files from the host's own
+every closed list in a report, an edit and the catalogue, written from the
+engine's own lists of variants. The view's tests compare the decoders' word
+lists with `vocabulary.json`, so a variant the engine adds makes them fail until
+the contract and the decoders name it. Write the files from the host's own
 serializer, then format them, then run the view's tests, which decode them:
 
 ```sh
@@ -237,6 +240,24 @@ npm --prefix ui run test
 The test compares the files with the views by value. Review the diff: a change
 that the decoders refuse is a change of shape the view has to follow, in the
 contract and in `ui/packages/host/src/`. Never edit the files by hand.
+
+### Refresh The Edit Snapshots
+
+After a change to the engine's edits, their requests or the views of the
+document and of an answer to an edit,
+`document::tests::the_snapshots_are_what_the_commands_return` fails and names
+the file that differs. Two files in `ui/packages/host/fixtures/` are written by
+it from `edit_document`: `edit-edited.json`, the answer to an edit that was
+made, and `edit-refused.json`, the answer to one the engine refuses. Write them
+from the host's own serializer, format them, then run the view's tests:
+
+```sh
+DAGEIST_REFRESH_EDITS=1 cargo test --offline --locked -p dageist-tauri document::tests::the_snapshots_are_what_the_commands_return
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
+Review the diff and never edit the files by hand.
 
 ### Refresh The Offers Snapshots
 

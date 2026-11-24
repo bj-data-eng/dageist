@@ -60,7 +60,7 @@ and current source establishes behavior.
 | Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
-| IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
+| IPC commands and their serialized views; the node's document, its revision and its edits | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs), [document.rs](crates/dageist-tauri/src/document.rs) |
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
@@ -135,7 +135,8 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
 | `ui/packages/host/fixtures/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
-| `ui/packages/host/fixtures/{node-inputs,step-report,step-report-refused,step-report-incomplete,step-report-unreadable,step-report-variants,step-rows,vocabulary}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
+| `ui/packages/host/fixtures/{node-inputs,node-document,step-report,step-report-refused,step-report-incomplete,step-report-variants,step-rows,vocabulary}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
+| `ui/packages/host/fixtures/{edit-edited,edit-refused}.json` | the host's answers to an edit that was made and one the engine refused, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-edit-snapshots) |
 | `ui/packages/host/fixtures/{offers-start,offers-value,offers-condition,fits-start,fits-argument,options,offers-grid}.json` | the host's offers commands' views, and the grid of every call at every place from which the view lists what it cannot offer, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-offers-snapshots) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |

@@ -165,8 +165,8 @@ pub enum ErrorKind {
     Refused,
     /// More was asked for than the window of a command holds.
     Limit,
-    /// The text sent is not a document the engine reads.
-    Unreadable,
+    /// The document is at another revision than the one the request was made for.
+    Stale,
     /// The request names an entry or a parameter the catalogue lacks, or a way
     /// down to an expression that starts at no position of a step. A position
     /// or a dtype that the engine has no word for is not an argument at all, and
@@ -185,7 +185,7 @@ impl ErrorKind {
         Self::NotRun,
         Self::Refused,
         Self::Limit,
-        Self::Unreadable,
+        Self::Stale,
         Self::UnknownName,
         Self::Failed,
     ];
@@ -815,8 +815,8 @@ mod tests {
             ErrorKind::NoSuchStep => Some(ErrorKind::NotRun),
             ErrorKind::NotRun => Some(ErrorKind::Refused),
             ErrorKind::Refused => Some(ErrorKind::Limit),
-            ErrorKind::Limit => Some(ErrorKind::Unreadable),
-            ErrorKind::Unreadable => Some(ErrorKind::UnknownName),
+            ErrorKind::Limit => Some(ErrorKind::Stale),
+            ErrorKind::Stale => Some(ErrorKind::UnknownName),
             ErrorKind::UnknownName => Some(ErrorKind::Failed),
             ErrorKind::Failed => None,
         }

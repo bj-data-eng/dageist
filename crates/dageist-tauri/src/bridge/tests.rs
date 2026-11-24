@@ -14,9 +14,11 @@ use std::time::{Duration, Instant};
 
 use dageist_engine::SampleSpec;
 use dageist_engine::claim_timing::ClaimTiming;
+use dageist_engine::document::Document;
 use serde_json::{Value, json};
 
 use super::{Bridge, Deadlines, Session, admits, bind, serve, serve_connection};
+use crate::document::Documents;
 use crate::sample_table::Sample;
 use crate::test_support::split_block;
 
@@ -56,8 +58,18 @@ impl Drop for SampleFolder {
     }
 }
 
+/// The documents of the sample node, as the host starts with them.
+fn sample_documents() -> Documents {
+    Documents::of(
+        Document::read(ClaimTiming::STEPS_JSON).expect("the sample's steps are a document"),
+    )
+}
+
 fn bridge(folder: &SampleFolder, port: u16) -> Bridge {
-    Bridge::new(port, Session::new(Sample::new(folder.path.clone(), SMALL)))
+    Bridge::new(
+        port,
+        Session::new(Sample::new(folder.path.clone(), SMALL), sample_documents()),
+    )
 }
 
 /// What came back: the status, the head's text and the body.
@@ -164,26 +176,15 @@ fn the_commands_answer_the_views_the_application_answers() {
     assert_eq!(reply.status, 200);
     assert_eq!(reply.json(), fixture("catalogue.json"));
 
-    let reply = call(
-        &bridge,
-        "run_document",
-        &json!({ "document": ClaimTiming::STEPS_JSON }),
-    );
+    let reply = call(&bridge, "node_document", &json!({}));
     assert_eq!(reply.status, 200);
-    assert_eq!(reply.json(), fixture("step-report.json"));
-
-    let reply = call(
-        &bridge,
-        "run_document",
-        &json!({ "document": r#"{"version":2,"steps":[]}"# }),
-    );
-    assert_eq!(reply.status, 200);
-    assert_eq!(reply.json(), fixture("step-report-unreadable.json"));
+    assert_eq!(reply.json(), fixture("node-document.json"));
+    assert_eq!(reply.json()["run"], fixture("step-report.json"));
 
     let reply = call(
         &bridge,
         "rows_after_step",
-        &json!({ "document": ClaimTiming::STEPS_JSON, "step": "days_open", "limit": 7 }),
+        &json!({ "revision": 1, "step": "days_open", "limit": 7 }),
     );
     assert_eq!(reply.status, 200);
     assert_eq!(reply.json(), fixture("step-rows.json"));
@@ -363,7 +364,7 @@ fn a_command_that_fails_answers_its_error_view_with_a_422() {
     let reply = call(
         &bridge,
         "rows_after_step",
-        &json!({ "document": ClaimTiming::STEPS_JSON, "step": "days_open", "limit": 1001 }),
+        &json!({ "revision": 1, "step": "days_open", "limit": 1001 }),
     );
 
     assert_eq!(reply.status, 422);
@@ -382,7 +383,7 @@ fn a_step_the_document_lacks_is_refused_with_its_kind() {
     let reply = call(
         &bridge,
         "rows_after_step",
-        &json!({ "document": ClaimTiming::STEPS_JSON, "step": "nowhere", "limit": 1 }),
+        &json!({ "revision": 1, "step": "nowhere", "limit": 1 }),
     );
 
     assert_eq!(reply.status, 422);
@@ -672,15 +673,22 @@ fn no_answer_carries_a_cross_origin_header() {
 fn a_body_that_is_not_the_commands_arguments_is_a_400() {
     let folder = SampleFolder::new("malformed");
     let bridge = bridge(&folder, PORT);
-    let bodies: [(&str, &[u8]); 8] = [
-        ("run_document", b"{not json"),
-        ("run_document", b""),
-        ("run_document", b"[]"),
-        ("run_document", br#"{"document": 5}"#),
-        ("run_document", br#"{"document": "{}", "extra": true}"#),
+    let bodies: [(&str, &[u8]); 9] = [
+        ("edit_document", b"{not json"),
+        ("edit_document", b""),
+        ("edit_document", b"[]"),
+        ("edit_document", br#"{"revision": 5}"#),
+        (
+            "edit_document",
+            br#"{"revision": 1, "edit": {"kind": "removeStep", "step": {"stepIndex": 0, "stepId": null, "path": []}}, "extra": true}"#,
+        ),
+        (
+            "edit_document",
+            br#"{"revision": 1, "edit": {"kind": "levitate"}}"#,
+        ),
         (
             "rows_after_step",
-            br#"{"document": "{}", "step": "a", "limit": -1}"#,
+            br#"{"revision": 1, "step": "a", "limit": -1}"#,
         ),
         ("table_block", br#"{"offset": 0, "length": 5}"#),
         ("core_identity", br#"{"unexpected": 1}"#),
@@ -727,7 +735,7 @@ fn what_is_not_a_request_is_answered_or_dropped_without_running_a_command() {
 
     let huge = exchange(
         &bridge,
-        b"POST /bridge/run_document HTTP/1.1\r\nHost: 127.0.0.1:7878\r\n\
+        b"POST /bridge/edit_document HTTP/1.1\r\nHost: 127.0.0.1:7878\r\n\
           Content-Type: application/json\r\nContent-Length: 9000000\r\n\r\n"
             .to_vec(),
     );
@@ -841,7 +849,7 @@ fn through_a_socket_the_bridge_answers_a_command_and_refuses_a_wrong_host_and_ty
         listener_port,
         &raw_request(
             "POST",
-            "/bridge/run_document",
+            "/bridge/edit_document",
             &[("Host", &own_host), ("Content-Type", "application/json")],
             b"{not json",
         ),
@@ -900,7 +908,7 @@ fn the_bridge_listens_on_the_loopback_address_only() {
             &listener,
             Bridge::new(
                 address.port(),
-                Session::new(Sample::new(std::env::temp_dir(), SMALL)),
+                Session::new(Sample::new(std::env::temp_dir(), SMALL), sample_documents()),
             ),
         );
     });

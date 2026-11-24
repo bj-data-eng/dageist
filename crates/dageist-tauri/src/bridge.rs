@@ -39,8 +39,9 @@ use serde::de::DeserializeOwned;
 
 use crate::block::CONTENT_TYPE;
 use crate::catalogue::english_catalogue;
+use crate::document::{Documents, EditRequest, document_state_view, edit_view};
 use crate::identity::identity_view;
-use crate::node::{node_view, rows_view, run_view};
+use crate::node::{node_view, rows_view};
 use crate::offers::{
     AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PositionRequest,
     TypedRequest, fits_view, offers_view, options_view, read_view, step_starts_view,
@@ -76,15 +77,17 @@ pub struct Session {
     sample: Sample,
     gate: SampleGate,
     open: OpenTable,
+    documents: Documents,
 }
 
 impl Session {
-    /// A session with no table open, over the sample table `sample`.
-    pub fn new(sample: Sample) -> Self {
+    /// A session with no table open, over the sample table `sample` and the node's `documents`.
+    pub fn new(sample: Sample, documents: Documents) -> Self {
         Self {
             sample,
             gate: SampleGate::default(),
             open: OpenTable::default(),
+            documents,
         }
     }
 }
@@ -96,14 +99,15 @@ struct NoArguments {}
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RunArguments {
-    document: String,
+struct EditArguments {
+    revision: u64,
+    edit: EditRequest,
 }
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RowsArguments {
-    document: String,
+    revision: u64,
     step: String,
     limit: usize,
 }
@@ -200,7 +204,8 @@ enum Command {
     CoreIdentity,
     OperationCatalogue,
     NodeInputs,
-    RunDocument,
+    NodeDocument,
+    EditDocument,
     RowsAfterStep,
     OffersAt,
     CandidateFits,
@@ -219,7 +224,8 @@ impl Command {
             "core_identity" => Self::CoreIdentity,
             "operation_catalogue" => Self::OperationCatalogue,
             "node_inputs" => Self::NodeInputs,
-            "run_document" => Self::RunDocument,
+            "node_document" => Self::NodeDocument,
+            "edit_document" => Self::EditDocument,
             "rows_after_step" => Self::RowsAfterStep,
             "offers_at" => Self::OffersAt,
             "candidate_fits" => Self::CandidateFits,
@@ -249,17 +255,21 @@ impl Command {
                 arguments::<NoArguments>(body)?;
                 json(&node_view()?)
             }
-            Self::RunDocument => {
-                let RunArguments { document } = arguments(body)?;
-                json(&run_view(&document)?)
+            Self::NodeDocument => {
+                arguments::<NoArguments>(body)?;
+                json(&document_state_view(&session.documents)?)
+            }
+            Self::EditDocument => {
+                let EditArguments { revision, edit } = arguments(body)?;
+                json(&edit_view(&session.documents, revision, &edit)?)
             }
             Self::RowsAfterStep => {
                 let RowsArguments {
-                    document,
+                    revision,
                     step,
                     limit,
                 } = arguments(body)?;
-                json(&rows_view(&document, &step, limit)?)
+                json(&rows_view(&session.documents, revision, &step, limit)?)
             }
             Self::OffersAt => {
                 let OffersArguments { positions, after } = arguments(body)?;
@@ -578,7 +588,7 @@ pub fn serve(listener: &TcpListener, bridge: Bridge) -> io::Result<()> {
 /// # Errors
 ///
 /// Returns why the bridge cannot start or stops.
-pub fn run(port: u16, identifier: &str) -> io::Result<()> {
+pub fn run(port: u16, identifier: &str, documents: Documents) -> io::Result<()> {
     let cache = cache::application_cache(identifier).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
@@ -588,6 +598,6 @@ pub fn run(port: u16, identifier: &str) -> io::Result<()> {
     let listener = bind(port)?;
     let address = listener.local_addr()?;
     println!("dageist bridge listening on http://{address}");
-    let session = Session::new(Sample::in_cache(&cache));
+    let session = Session::new(Sample::in_cache(&cache), documents);
     serve(&listener, Bridge::new(address.port(), session))
 }
