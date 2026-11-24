@@ -106,6 +106,25 @@ fn column(dtype: Representative, name: &str) -> Series {
     }
 }
 
+/// `dtype` as a column can hold it: a list whose element dtype Polars has not worked out is a list
+/// of nulls, for Polars panics making a column of the one it has not.
+fn resolved(dtype: &DataType) -> DataType {
+    match dtype {
+        DataType::List(inner) => DataType::List(Box::new(match &**inner {
+            DataType::Unknown(_) => DataType::Null,
+            other => resolved(other),
+        })),
+        DataType::Array(inner, width) => DataType::Array(
+            Box::new(match &**inner {
+                DataType::Unknown(_) => DataType::Null,
+                other => resolved(other),
+            }),
+            *width,
+        ),
+        other => other.clone(),
+    }
+}
+
 /// The tables of one case, with rows and without.
 pub struct Frames {
     /// The left table, with rows.
@@ -144,7 +163,9 @@ impl Frames {
                 Series::new("u".into(), [1_i64, 2, 3]).into(),
             ];
             for (at, key) in keys.unwrap_or_default().iter().enumerate() {
-                columns.push(Series::full_null(key_column(at).as_str().into(), 3, key).into());
+                columns.push(
+                    Series::full_null(key_column(at).as_str().into(), 3, &resolved(key)).into(),
+                );
             }
             DataFrame::new(3, columns).expect("columns of three rows")
         };
