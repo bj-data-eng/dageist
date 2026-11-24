@@ -3806,4 +3806,28 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn a_count_as_the_predicate_of_a_condition_is_settled_where_the_condition_is_evaluated() {
+        // `sort(by=when(k.diff(drop) > 1).then(u).otherwise(u).n_unique())`: the predicate is two
+        // values beside values of three, which Polars never evaluates as the key is one value and
+        // the values of the condition are one expression. Made to differ, the condition alone is
+        // refused for the lengths in its predicate, and allowed with the predicate made false.
+        let case = kept(
+            "stricter-a-count-as-the-predicate-of-a-condition-in-a-sort-key-of-one-value.case",
+        );
+        let refused = refusal(&case);
+        assert!(matches!(refused.source, Source::Polars));
+        let found = settle_by_evaluating_the_condition(&case, &refused)
+            .expect("a condition that Polars refuses once it is evaluated");
+        assert_eq!(found.showing, Showing::WhereTheConditionIsEvaluated);
+        assert!(is_a_refusal_of_lengths(&found.reason), "{}", found.reason);
+    }
+
+    #[test]
+    fn a_count_given_to_a_value_of_a_condition_is_no_predicate_to_evaluate() {
+        let case = kept("stricter-a-count-given-to-a-condition-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert_eq!(settle_by_evaluating_the_condition(&case, &refused), None);
+    }
 }
