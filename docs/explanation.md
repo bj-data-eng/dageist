@@ -1921,6 +1921,26 @@ wherever it refuses, which is about half of the pivot cases (61 of the 144 of
 the fixed seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
+A refusal of a [count of values](#a-count-of-values) that Polars allows is of two kinds, and neither is
+a disagreement. Where Polars drops the part, as a sort key that is one value, the probe asks about the part
+alone: the chain through the refused call, or, for a count that may not end a value or a predicate of a
+condition, the chain of the call that takes it, is refused by Polars for lengths that do not match, in the
+words of either engine, where it stands in a `select`, and the part before it is not. Where Polars evaluates
+the part and allows it because its count is the table's rows, or one value, by chance, as `head(10)` of three
+rows is, the tables are stricter by design: a count is no number the editor can know. What shows it is the
+case run again with the count made another and nothing else changed, which Polars refuses for lengths: on
+twelve rows, which are the sample's three four times over; on four rows that tie, the second and the third
+twice, where the values that occur most and the values that differ are two, as the sample leaves them one or
+all; and with the number that decides each first, last, nth or placed count made 2, which is neither one value,
+which Polars broadcasts, nor the three rows. A part that Polars drops and whose count is by chance is asked
+apart from the case, where it is allowed on the sample. A refusal that stays when the count differs is
+not this: a count that is the rows whatever they are, as the values that occur most of the places that sort a
+column are, which Polars allows with any rows, stays a finding, as does a count met by a part Polars folds
+to a null. Only the rules for counts and the table of counts are asked, and a second count elsewhere in the
+case that Polars refuses with the count made another would be taken for the first, which the reduction of a
+case makes unlikely. Such a case is kept as `regressions/by-design-<what it shows>.case`, counted as refused
+where a count is the rows by chance, and is an expected rejection.
+
 A case that the tables and Polars both refuse is evidence of agreement about the
 refusal only where Polars refuses it for the reason the tables gave: the objection
 and the call it names, as for a probe, or, for a named rule, what Polars says of what
@@ -1937,7 +1957,7 @@ an expected rejection that names both reasons.
 
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
-part, that a rule stricter by design refused, and that disagreed. The fixed seed's
+part, that a rule stricter by design refused, that were refused where a count is the rows by chance, and that disagreed. The fixed seed's
 1000 cases give none disagreeing; 9 of those that agree are refused by the rule against a
 repeated pair of key names, and the tables could not be asked past a point in 29 more. These
 counts are the same at one thread, at two and at the machine's own, and so are the 42 cases
@@ -1947,14 +1967,24 @@ gives where the tables and Polars both refuse, and a case in which Polars panics
 not at others moves a case between them. The test
 asserts none of those.
 
-The methods that give [a count of values](#a-count-of-values) are drawn only where `DAGEIST_FUZZ_FOCUS` names
-them, until every shape of a count that the catalogue is to have exists, so the fixed seed does not draw them.
-A campaign focused on them finds disagreements of two kinds that no limit excuses. A count is taken for not the
-table's rows, so a chain that Polars allows because the count is by chance the rows, as `head(10)` of three
-rows is, is refused where the table of counts refuses a count, and a step that meets such a count with the
-rows or with a window is refused by the rules `values-meet-in-count` and `window-input-is-not-counted`:
-those are most of what such a campaign finds, and the rows of the fuzz target's tables are few. And `gather`
-refuses a place beyond the rows, which the rows decide, and which a table of no rows has for every place.
+The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
+drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
+two kinds that a focused campaign found are now settled: a count that is the table's rows, or one value, by chance
+is stricter by design, and a count that Polars never evaluates is asked of the part apart from the case, both as
+above, and a `gather` that takes a place beyond the rows is a limit. Drawn in broad campaigns, the methods and the
+functions found fifty-four disagreements in two campaigns of 20000 cases, at the machine's own thread count and at
+two, which no control settles, so broad campaigns would not pass. They are of these kinds:
+
+- a count that is the rows, or one value, whatever the rows are, and so is no count by chance: the values that
+  occur most, the values that differ and their first places, of a column whose values are all different or all
+  alike, as the places that sort a column, a running count, a shift or a test for a null leave them;
+- a count met by a part that Polars folds to a null, which the controls for a count do not remove;
+- a count that is a value that Polars broadcasts, as the predicate of a condition is, beside values of a count;
+- a range that Polars refuses by the values its bounds hold when the rows run, or when the table has none:
+  a time or a start out of range, a number of samples that is no whole number, a null given to `int_range`,
+  a step of the wrong sign, and a number of repeats typed as text, which Polars converts and the tables refuse.
+
+These are what remains of the fuzz items of #129. The gate is lifted when a campaign without a focus agrees.
 
 | Limit | Excuses |
 | --- | --- |
@@ -1996,6 +2026,7 @@ refuses a place beyond the rows, which the rows decide, and which a table of no 
 | An approximate quantile of a literal in a condition | Polars' streaming engine refuses the approximate quantile of a literal, of a value that literals alone make (a date, a time, a moment or a length of time that reads no column), or of a value it folds into a null literal (a comparison or an arithmetic given the null literal, such as `mean() >= null`), which is one value, where it stands in a value of a branch of a condition, or in the predicate of a `when` after the first, and meets it in a select, a filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column in the condition: it reads the quantile as null. The tables measured the call in a condition on columns. Polars refusing the rows or the empty table with the refusal that the quantile must not contain null values, which has no place, in a case with a condition that holds in a value or in a later predicate a chain that starts from a literal, or from such a function, or has such a fold before it, and takes an approximate quantile: the case run again with each such start a column is allowed, or, for a fold, with every such fold left out, or, where that is refused for what follows the quantile, cut after the quantile or with a column of the dtype of its own literal, chosen for each quantile (a `Boolean` literal's `f`, a text one's `g`, any other's `k`, cast to the dtype the literal is given where no column has it, such as a time of the day, and in a join's key the column `u` or `key`, whichever no other key of the join is named for), it is allowed (a refusal of a call after the quantile, which Polars would give once the quantile is not refused, is then not seen), so a share that is a null, which a column is refused for as well, is excused by nothing. |
 | A moment of one value filled in another zone | A shift of a moment that is one value, which a function of literals alone or an aggregate of a column makes, takes the number it is filled with whatever the zone of the fill is. Polars' schema names the zone of the receiver, and so do the rows in memory; the streaming engine gives rows in the zone of the fill for an aggregate and for a moment of literals in `with_columns`, and in the zone of the receiver for a moment of literals in a `select`. The streaming engine panics when the same shift follows a column of moments (in memory it shifts them), which the named rule that moments share a zone refuses for every receiver. The rule is the tables' own, so the disagreement is of a rule that refuses what Polars allows: the rule `moments-share-a-zone` refusing a shift that is filled, whose receiver gives one value (a literal moment, or an aggregate of a column such as its `max` or `first`), is excused, and a shift of a column or of what keeps a column's many values is not. |
 | A part Polars folds to a null | Polars folds a call that carries nulls, given the null literal as an operand, or as the receiver of the first call of a chain, into a null before it runs what the call followed, so `h + null` is a null whatever `h` holds and what follows it is run on a null. As observed, it folds the comparisons and the `add` of text; for text it refuses `sub`, `mul`, `floordiv`, `mod` and `truediv` before it folds, so a case with one of them is excused only where the control, which runs Polars, shows the fold is why. The tables judge a call for the dtype of what it is given, as written. Polars allowing the step, where the call the tables refused is given an expression that holds such a call, at any depth, with another call after it (a fold that ends a chain leaves a null literal, which is a literal's, and a call after a fold in its own chain is asked of a value of its dtype), and Polars refusing the case run again with every such call left out for the reason the tables gave, at no place or inside the expression that holds the refused call: the fold is then why Polars allows it. The control puts the other operand in the place of a null receiver. A panic is never excused here: it stays with the limit for a panic. A case that is the same without the folds, or that Polars still allows or refuses for another reason, is excused by nothing. |
+| A gather beyond the rows | A gather takes places, and Polars refuses one beyond what it follows when the rows run, and every place when the table has none. The tables measured a gather that gives a null for such a place. Polars refusing the rows or the empty table with the words for a place out of bounds, with no place, in a case with a gather that is not told to give a null, where the case run again with each gather told to give one is no longer refused for them: the places the rows leave it are why. A case with no gather, another reason, or a gather that already gives a null is excused by nothing. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |
 
 
