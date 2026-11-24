@@ -31,9 +31,22 @@ fn frame() -> DataFrame {
             .cast(&dtype)
             .unwrap_or_else(|error| panic!("whole numbers cast to {dtype}: {error}"))
     };
+    // A list of one whole number in each row, and an array of two.
+    let lists = Series::new(
+        "l".into(),
+        [4_i64, 5, 6, 7, 1, 2, 3].map(|number| Series::new("".into(), [number])),
+    );
+    let arrays = Series::new(
+        "arr".into(),
+        [4_i64, 5, 6, 7, 1, 2, 3].map(|number| Series::new("".into(), [number, number + 1])),
+    )
+    .cast(&DataType::Array(Box::new(DataType::Int64), 2))
+    .expect("lists of two cast to arrays of two");
     DataFrame::new(
         7,
         vec![
+            lists.into(),
+            arrays.into(),
             ints("a").into(),
             // The number of values of a count that the data decide: three, which no row count is.
             Series::new("n".into(), [3_i64; 7]).into(),
@@ -1831,4 +1844,121 @@ fn every_expression_parameter_of_a_range_is_in_the_sweep() {
             .collect();
         assert_eq!(&held, names, "the expression parameters of {id}");
     }
+}
+
+// ---------------------------------------------------------------------------
+// What the editor refuses that Polars takes, pinned
+
+/// The refusal of the walk by the name of its rule.
+fn refused_by(report: &Report, rule: &str) -> bool {
+    walk_says(report) == Said::Refuses(rule.to_owned())
+}
+
+#[test]
+fn an_interval_of_nothing_is_refused_where_polars_gives_no_values_for_the_end_before_the_start() {
+    // Stricter by design: Polars gives no values where the end is before the start, whatever the
+    // interval is, and refuses an interval of nothing or below nothing only where it is not. The
+    // editor is strict where the data decide, so it refuses the interval whatever the bounds are.
+    let backwards = |first: &str, last: &str| vec![("start", date(first)), ("end", date(last))];
+    let with = |mut arguments: Vec<(&'static str, Value)>, interval_text: &str| {
+        arguments.push(("interval", interval(interval_text)));
+        arguments
+    };
+    let cases = [
+        (
+            "date_range of nothing",
+            date_range(with(backwards("2024-02-01", "2024-01-01"), "0d")),
+        ),
+        (
+            "date_range below nothing",
+            date_range(with(backwards("2024-02-01", "2024-01-01"), "-1d")),
+        ),
+        (
+            "datetime_range of nothing",
+            datetime_range(with(
+                vec![
+                    ("start", moment("2024-01-02 00:00:00")),
+                    ("end", moment("2024-01-01 00:00:00")),
+                ],
+                "0h",
+            )),
+        ),
+        (
+            "time_range below nothing",
+            time_range(with(
+                vec![
+                    ("start", time_of_day("05:00:00")),
+                    ("end", time_of_day("00:00:00")),
+                ],
+                "-1h",
+            )),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, start) in cases {
+        let report = select_of(vec![start]);
+        let StepRows::Counted(rows) = report.steps()[0].rows() else {
+            found.push(format!(
+                "{name}: Polars does not give the table: {:?}",
+                polars_says(&report)
+            ));
+            continue;
+        };
+        if rows.kept() != 0 {
+            found.push(format!("{name}: Polars gives {} values", rows.kept()));
+        }
+        if !refused_by(&report, "range-is-valid") {
+            found.push(format!("{name}: the walk says {:?}", walk_says(&report)));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+#[test]
+fn a_count_of_exactly_one_is_refused_beside_every_kind_of_place_that_polars_broadcasts_it_to() {
+    // Stricter by design, as for a select beside the rows: the streaming engine meets a count of one
+    // with each of the values of an operand, a fill, an exponent and a share, where Python's
+    // in-memory engine refuses it. A count is not one value, and the editor refuses all of them.
+    let one = || int_range(vec![("start", whole(0)), ("end", whole(1))]);
+    let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
+    let share = linear_space(vec![
+        ("start", whole(0)),
+        ("end", whole(1)),
+        ("num_samples", whole(1)),
+    ]);
+    let cases = [
+        (
+            "an operand",
+            on_start(&four(), vec![call("Expr.add", json!({ "other": one() }))]),
+        ),
+        (
+            "a fill",
+            on_column("a", vec![call("Expr.fill_null", json!({ "value": one() }))]),
+        ),
+        (
+            "an exponent",
+            on_column("a", vec![call("Expr.pow", json!({ "exponent": one() }))]),
+        ),
+        (
+            "a share",
+            on_column(
+                "a",
+                vec![call("Expr.quantile", json!({ "quantile": share }))],
+            ),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, expression) in cases {
+        let report = select_of(vec![expression]);
+        if !polars_says(&report).accepts() {
+            found.push(format!(
+                "{name}: the engine of steps refuses it too, which ends this exception: {:?}",
+                polars_says(&report)
+            ));
+        }
+        if walk_says(&report).accepts() {
+            found.push(format!("{name}: the walk takes it"));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
 }
