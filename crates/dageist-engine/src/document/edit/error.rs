@@ -297,7 +297,7 @@ impl Thing {
         }
     }
 
-    /// What is there where an edit that needs `found` finds `value`.
+    /// What `value` is, as a thing a place names.
     pub(super) const fn of_value(value: &Value) -> Self {
         Self::Value(ValueKind::of(value))
     }
