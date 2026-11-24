@@ -72,12 +72,12 @@ export function literalArgument(kind: KindView, literal: LiteralView): ValueRequ
       // Text holds no number for a parameter that takes one, and a number that is not one is
       // nothing the engine could read.
       if (kind.type === 'integer' || kind.type === 'float') {
-        if (Number.isNaN(number)) return null;
+        if (!Number.isFinite(number)) return null;
         return { kind: kind.type, value: number };
       }
       // A typed value of any type, as `lit` takes: its own kind.
       if (literal.kind === 'text') return { kind: 'string', value: literal.value };
-      if (Number.isNaN(number)) return null;
+      if (!Number.isFinite(number)) return null;
       return literal.kind === 'float' || !Number.isSafeInteger(number)
         ? { kind: 'float', value: number }
         : { kind: 'integer', value: number };
