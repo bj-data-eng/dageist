@@ -561,6 +561,16 @@ fn on_receiver(
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    // A method that depends on the element is refused after a class it is not measured on, whether
+    // it is given an expression or an option in place of one, which no line of the dtype table says.
+    if let Some(class) = receiver
+        && read_as(id, class).is_none()
+    {
+        return Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {class}"),
+        ));
+    }
     let stood_in_for = stood_in_for(entry, options);
     let missing = || match receiver {
         Some(receiver) => {
