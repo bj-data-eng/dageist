@@ -465,11 +465,12 @@ pub enum Limit {
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
     /// case run again with each such start a column is allowed, or, where that is refused for what
     /// follows the quantile, cut after the quantile it is allowed, or with a column of the
-    /// literal's own dtype for each quantile, which a filter's rule asks for. For a quantile that
-    /// follows a fold the case is asked with every such fold left out, which the other controls
-    /// are then made of. The cut control leaves a gap: a refusal of a call after the quantile that Polars would give the case once
-    /// the quantile is no longer refused is not seen, for what follows the quantile is not asked
-    /// of the column.
+    /// literal's own dtype for each quantile (the number cast to it where the literal is given a
+    /// dtype that no column has, such as a time of the day), which a filter's rule asks for. For a
+    /// quantile that follows a fold the case is asked with every such fold left out, which the
+    /// other controls are then made of. The cut control leaves a gap: a refusal of a call after
+    /// the quantile that Polars would give the case once the quantile is no longer refused is not
+    /// seen, for what follows the quantile is not asked of the column.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -2864,21 +2865,23 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| false)
+    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| None, &|_| false)
 }
 
-/// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, and
-/// each chain made so is cut after its first call that `cut_after` accepts: what follows is no
-/// part of what the column stands in for.
+/// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, cast
+/// to the dtype `cast_to` says of it, if it does, and each chain made so is cut after its first
+/// call that `cut_after` accepts: what follows is no part of what the column stands in for.
 fn call_with_columns_cut_for(
     call: &Call,
     is_it: &dyn Fn(&Expression) -> bool,
     column_of: &dyn Fn(&Expression) -> String,
+    cast_to: &dyn Fn(&Expression) -> Option<Value>,
     cut_after: &dyn Fn(&Call) -> bool,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
         column_of: &'a dyn Fn(&Expression) -> String,
+        cast_to: &'a dyn Fn(&Expression) -> Option<Value>,
         cut_after: &'a dyn Fn(&Call) -> bool,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
@@ -2921,6 +2924,9 @@ fn call_with_columns_cut_for(
             }
         };
         let mut links = Vec::new();
+        if replaced && let Some(dtype) = (replacing.cast_to)(expression) {
+            links.push(Call::new(catalog::entry("Expr.cast")?, vec![("dtype", dtype)]).ok()?);
+        }
         for link in expression.links() {
             links.push(call_replaced(link, replacing)?);
             if replaced && (replacing.cut_after)(link) {
@@ -2942,6 +2948,7 @@ fn call_with_columns_cut_for(
         &Replacing {
             is_it,
             column_of,
+            cast_to,
             cut_after,
         },
     )
@@ -3002,6 +3009,19 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
+/// The dtype a literal is given, where no column of the sample has it: the number cast to it
+/// stands in for the literal. `None` for a literal that has no dtype of its own or a column of its
+/// dtype, a `Boolean` or text.
+fn dtype_of_the_literal_with_no_column(start: &Call) -> Option<Value> {
+    if !is(start, "polars.lit") || column_of_the_dtype_of(start).is_some() {
+        return None;
+    }
+    match start.argument("dtype") {
+        Some(dtype @ Value::Dtype(_)) => Some(dtype.clone()),
+        _ => None,
+    }
+}
+
 /// The column that stands in for the literal an approximate quantile starts from, of the literal's
 /// own dtype: `f`, which holds booleans, for a `Boolean`, and `g`, which holds text, for text.
 /// `None` for another dtype, where the column `k` of numbers stands in.
@@ -3035,8 +3055,9 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// be, for a join refuses two keys named alike, and other places read the column `k`. The cut
 /// control leaves a gap: a refusal of a call after the quantile that Polars would give is not
 /// seen. The column of the literal's own dtype is chosen for each quantile from its own literal, a
-/// `Boolean` one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case
-/// start from, and so whichever comes first.
+/// `Boolean` one `f`, a text one `g`, and any other `k`, cast to the dtype the literal is given
+/// where no column of the sample has it, whatever the other quantiles of the case start from, and
+/// so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     // Where a quantile follows a value that Polars folds into a null literal, no column stands in
     // for a literal there: the control leaves every such fold out, which is what the column of
@@ -3062,16 +3083,19 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
         let found = is_an_approximate_quantile_of_literals(expression);
         if found
             && let Start::Call(start) = expression.start()
-            && column_of_the_dtype_of(start).is_some()
+            && (column_of_the_dtype_of(start).is_some()
+                || dtype_of_the_literal_with_no_column(start).is_some())
         {
             owned.set(true);
         }
         found
     };
-    let control = |column_of: &dyn Fn(&Expression) -> String, cut_after: &dyn Fn(&Call) -> bool| {
+    let control = |column_of: &dyn Fn(&Expression) -> String,
+                   cast_to: &dyn Fn(&Expression) -> Option<Value>,
+                   cut_after: &dyn Fn(&Call) -> bool| {
         let rebuilt = Step::new(
             step.id().clone(),
-            call_with_columns_cut_for(step.call(), &recording, column_of, cut_after)?,
+            call_with_columns_cut_for(step.call(), &recording, column_of, cast_to, cut_after)?,
         )
         .ok()?;
         let control = Case {
@@ -3090,19 +3114,25 @@ fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
         Start::Call(start) => column_of_the_dtype_of(start).unwrap_or(numbers).to_owned(),
         Start::Input(_) | Start::Hole => numbers.to_owned(),
     };
+    // The number cast to the dtype of a literal that no column has, for the quantile's own.
+    let own_cast = |expression: &Expression| match expression.start() {
+        Start::Call(start) => dtype_of_the_literal_with_no_column(start),
+        Start::Input(_) | Start::Hole => None,
+    };
+    let no_cast = |_: &Expression| None;
     let mut refused = true;
     for column in columns {
         let numeric = |_: &Expression| (*column).to_owned();
-        let mut refused_here = control(&numeric, &never)?;
+        let mut refused_here = control(&numeric, &no_cast, &never)?;
         if refused_here {
-            refused_here = control(&numeric, &after_the_quantile)?;
+            refused_here = control(&numeric, &no_cast, &after_the_quantile)?;
         }
         refused = refused && refused_here;
     }
     if refused && !joins && owned.get() {
-        refused = control(&own, &never)?;
+        refused = control(&own, &own_cast, &never)?;
         if refused {
-            refused = control(&own, &after_the_quantile)?;
+            refused = control(&own, &own_cast, &after_the_quantile)?;
         }
     }
     Some(refused)
