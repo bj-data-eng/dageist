@@ -496,15 +496,16 @@ pub enum Limit {
     AMomentOfOneValueFilledInAnotherZone,
     /// Polars folds a comparison or an arithmetic with the null literal into a null before it runs
     /// what the call followed or what an argument was made of, so a part inside it is never met:
-    /// `h + null` is a null whatever `h` is, and what is made of it is made of a null. The tables
-    /// judge the part as written and refuse a call for the dtype of what it is given. Polars
-    /// allowing the step, where the refused call is given an expression that holds such a call, at
-    /// any depth, with another call after it (a fold that ends a chain leaves a null literal, a
-    /// literal's), and Polars refusing the case run again with each such call left out for the
-    /// reason the tables gave, where it lies inside the expression that holds the refused call or
-    /// has no place: the fold is then why Polars allows it. A case that is the same without them,
-    /// or that Polars still allows or refuses for another reason, is excused by nothing, and a call
-    /// that follows a fold in its own chain is a probe's, which asks it of a value of its dtype.
+    /// `h + null` and `null + h` are a null whatever `h` is, and what is made of it is made of a
+    /// null. The tables judge the part as written and refuse a call for the dtype of what it is
+    /// given. Polars allowing the step, where the refused call is given an expression that holds
+    /// such a call, at any depth, with another call after it (a fold that ends a chain leaves a
+    /// null literal, a literal's), and Polars refusing the case run again with each such call left
+    /// out (a null receiver is replaced by the other operand) for the reason the tables gave,
+    /// where it lies inside the expression that holds the refused call or has no place: the fold
+    /// is then why Polars allows it. A case that is the same without them, or that Polars still
+    /// allows or refuses for another reason, is excused by nothing, and a call that follows a fold
+    /// in its own chain is a probe's, which asks it of a value of its dtype.
     APartPolarsFoldsToANull,
 }
 
@@ -4027,11 +4028,7 @@ fn refused_for_lengths_without_explodes(case: &Case) -> Option<bool> {
 /// ends a chain leaves a null literal, which is a literal's.
 fn holds_a_fold_before_a_link(expression: &Expression) -> bool {
     let count = expression.links().len();
-    expression
-        .links()
-        .iter()
-        .enumerate()
-        .any(|(at, link)| at + 1 < count && compares_with_a_null(link))
+    (0..count.saturating_sub(1)).any(|at| is_a_fold_at(expression, at))
         || std::iter::once(expression.start())
             .filter_map(|start| match start {
                 Start::Call(call) => Some(call),
@@ -4043,6 +4040,20 @@ fn holds_a_fold_before_a_link(expression: &Expression) -> bool {
                     .into_iter()
                     .any(|(_, inside)| holds_a_fold_before_a_link(inside))
             })
+}
+
+/// Whether the link at `at` of the chain is one that Polars folds into a null: a comparison or an
+/// arithmetic given the null literal, or the first link where the chain starts from the null
+/// literal and the link is one that carries nulls.
+fn is_a_fold_at(expression: &Expression, at: usize) -> bool {
+    let Some(link) = expression.links().get(at) else {
+        return false;
+    };
+    compares_with_a_null(link)
+        || (at == 0
+            && carries_nulls(link.entry().id().as_str())
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None)))))
 }
 
 /// The call with every link that Polars folds into a null left out, in the call and in the
@@ -4062,12 +4073,27 @@ fn call_without_folds(call: &Call) -> Option<Call> {
         })
     }
     fn expression(held: &Expression) -> Option<Expression> {
-        let start = match held.start() {
-            Start::Call(start) => Start::Call(call_without_folds(start)?),
-            other => other.clone(),
+        // A fold whose receiver is the null literal leaves the other operand in its place.
+        let (start, rest) = match (held.start(), held.links().first()) {
+            (Start::Call(_), Some(first))
+                if is_a_fold_at(held, 0) && !compares_with_a_null(first) =>
+            {
+                let others = operands(first);
+                let [(_, other)] = others.as_slice() else {
+                    return None;
+                };
+                let other = expression(other)?;
+                let mut links = other.links().to_vec();
+                links.extend(held.links()[1..].iter().cloned());
+                (other.start().clone(), links)
+            }
+            (Start::Call(start), _) => (
+                Start::Call(call_without_folds(start)?),
+                held.links().to_vec(),
+            ),
+            (other, _) => (other.clone(), held.links().to_vec()),
         };
-        let links = held
-            .links()
+        let links = rest
             .iter()
             .filter(|link| !compares_with_a_null(link))
             .map(call_without_folds)
