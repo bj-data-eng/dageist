@@ -9570,6 +9570,41 @@ mod tests {
         );
     }
 
+    const DIFFERENCE_NOT_HELD: &str = "conversion from `u64` to `i64` failed in column 'g' for 1 out of 1 values: [18446744073709551614]";
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_difference_of_unsigned_numbers_is_why() {
+        // `diff` converts what it follows to the signed dtype of its result, strictly, so the
+        // number that a subtraction of unsigned numbers wraps to is refused where the sample's
+        // is not, and Polars stops refusing once nothing is a difference.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-cast-of-a-value-the-dtype-cannot-hold--a-difference-of-unsigned-numbers.case"
+            ),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        let difference = select(vec![chain_of(
+            column("k"),
+            vec![
+                compared_with("Expr.sub", chain(column("k"), &[])),
+                call("Expr.diff", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&difference, None, Stage::Rows, DIFFERENCE_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A subtraction with no difference after it is no cause of the failure.
+        let subtraction = select(vec![chain_of(
+            column("k"),
+            vec![compared_with("Expr.sub", chain(column("k"), &[]))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&subtraction, None, Stage::Rows, DIFFERENCE_NOT_HELD),
+            vec![]
+        );
+    }
+
     const COUNT_NOT_HELD: &str =
         "conversion from `f64` to `u64` failed in column 'k' for 1 out of 1 values: [-2.262654]";
 
