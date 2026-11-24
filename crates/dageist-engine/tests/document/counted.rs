@@ -17,6 +17,14 @@ use serde_json::{Value, json};
 use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
+    // A column of arrays of two whole numbers each, which a list casts to.
+    let lists = Series::new(
+        "arr".into(),
+        [[1_i64, 2], [3, 4], [5, 6]].map(|pair| Series::new("".into(), pair)),
+    );
+    let arrays = lists
+        .cast(&DataType::Array(Box::new(DataType::Int64), 2))
+        .expect("lists of two cast to arrays of two");
     df!(
         "a" => [1_i64, 2, 3],
         "b" => ["x", "y", "z"],
@@ -24,6 +32,8 @@ fn source() -> DataFrame {
         "k" => [1_i64, 1, 2],
     )
     .expect("the table")
+    .hstack(&[arrays.into()])
+    .expect("a column of three rows")
 }
 
 /// A table another table joins: `rk` holds whole numbers.
@@ -264,22 +274,257 @@ fn a_chain_that_goes_on_to_an_aggregate_is_one_value_whatever_count_its_first_me
 }
 
 #[test]
-fn one_value_that_a_method_takes_some_of_is_one_value() {
-    let walk = select_of(vec![
-        on("a", vec![call("Expr.sum", json!({})), head(2)]),
-        chain(
-            call("polars.lit", json!({ "value": { "integer": 1 } })),
-            vec![call("Expr.tail", json!({ "n": whole(3) }))],
+fn what_a_method_takes_of_one_value_is_one_value_only_where_it_keeps_the_value() {
+    // Python Polars 2.1.0, of the sum of `a`, one value: the first `n` of it, or from a place, or
+    // every nth from a place, or the top `k`, leave the value where the count and the place leave
+    // one, and none where they leave none, which a select refuses beside a column. What is
+    // different or most common in one value is that value, and a difference that drops the first
+    // value of one value drops it.
+    let sum = || call("Expr.sum", json!({}));
+    let literal = || call("polars.lit", json!({ "value": { "integer": 1 } }));
+    let gather_every = |n: i64, offset: i64| {
+        call(
+            "Expr.gather_every",
+            json!({ "n": { "integer": n }, "offset": { "integer": offset } }),
+        )
+    };
+    let cases: Vec<(&str, Value, Representative, Shape, Option<Count>)> = vec![
+        (
+            "head(2)",
+            on("a", vec![sum(), head(2)]),
+            Representative::Int64,
+            Shape::One,
+            None,
         ),
-    ]);
-    // A number typed without a dtype is an `Int32` where nothing beside it says another.
-    for (at, dtype) in [(0, Representative::Int64), (1, Representative::Int32)] {
+        (
+            "head()",
+            on("a", vec![sum(), call("Expr.head", json!({}))]),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "head(0)",
+            on("a", vec![sum(), head(0)]),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "tail(0)",
+            on(
+                "a",
+                vec![sum(), call("Expr.tail", json!({ "n": whole(0) }))],
+            ),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "tail(5)",
+            on(
+                "a",
+                vec![sum(), call("Expr.tail", json!({ "n": whole(5) }))],
+            ),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "slice(1)",
+            on(
+                "a",
+                vec![sum(), call("Expr.slice", json!({ "offset": whole(1) }))],
+            ),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "slice(0)",
+            on(
+                "a",
+                vec![sum(), call("Expr.slice", json!({ "offset": whole(0) }))],
+            ),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "top_k(0)",
+            on(
+                "a",
+                vec![sum(), call("Expr.top_k", json!({ "k": whole(0) }))],
+            ),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "top_k(1)",
+            on(
+                "a",
+                vec![sum(), call("Expr.top_k", json!({ "k": whole(1) }))],
+            ),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "gather_every(1, 1)",
+            on("a", vec![sum(), gather_every(1, 1)]),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "gather_every(2)",
+            on("a", vec![sum(), gather_every(2, 0)]),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "unique",
+            on("a", vec![sum(), call("Expr.unique", json!({}))]),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "mode",
+            on("a", vec![sum(), call("Expr.mode", json!({}))]),
+            Representative::Int64,
+            Shape::One,
+            None,
+        ),
+        (
+            "arg_unique",
+            on("a", vec![sum(), call("Expr.arg_unique", json!({}))]),
+            Representative::UInt32,
+            Shape::One,
+            None,
+        ),
+        (
+            "diff that drops",
+            on(
+                "a",
+                vec![
+                    sum(),
+                    call(
+                        "Expr.diff",
+                        json!({ "null_behavior": { "choice": "drop" } }),
+                    ),
+                ],
+            ),
+            Representative::Int64,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "the head(0) of a literal",
+            chain(literal(), vec![head(0)]),
+            Representative::Int32,
+            Shape::Counted,
+            Some(Count::Exactly(0)),
+        ),
+        (
+            "the tail(3) of a literal",
+            chain(literal(), vec![call("Expr.tail", json!({ "n": whole(3) }))]),
+            Representative::Int32,
+            Shape::One,
+            None,
+        ),
+    ];
+    for (name, expression, dtype, shape, count) in cases {
+        let walk = select_of(vec![expression]);
+        assert_eq!(last_after(item(&walk, 0)), after(dtype, shape), "{name}");
+        assert_eq!(item(&walk, 0).count(), count, "{name}");
+    }
+}
+
+#[test]
+fn a_select_is_refused_one_value_that_is_none_beside_the_rows() {
+    // The sum of `a`, the first none of it, beside a column: Polars refuses the lengths, and takes
+    // the first one of it, which is one value.
+    for (name, taken, refused) in [("head(0)", head(0), true), ("head(2)", head(2), false)] {
+        let walk = select_of(vec![
+            on("a", vec![call("Expr.sum", json!({})), taken]),
+            field("k"),
+        ]);
+        assert_eq!(walk.refusal().is_some(), refused, "{name}");
+    }
+}
+
+#[test]
+fn a_window_takes_no_one_value_that_a_method_took_of_one_value_but_the_aggregate_of_it() {
+    // Polars 2.1.0 refuses these windows with "expressions must have matching group lengths": the
+    // value is one of each group, and no value is given to the rows, where `sum().over` and
+    // `sum().first().over` are accepted, for an aggregate is one value that every row of its group
+    // takes.
+    let window = |calls: Vec<Value>| {
+        let mut all = vec![call("Expr.sum", json!({}))];
+        all.extend(calls);
+        all.push(call(
+            "Expr.over",
+            json!({ "partition_by": many(vec![field("k")]) }),
+        ));
+        select_of(vec![on("a", all)])
+    };
+    let search = call(
+        "Expr.search_sorted",
+        json!({ "element": { "expression": { "start": call("polars.lit", json!({
+            "value": { "integer": 2 }, "dtype": { "dtype": "Int64" } })), "then": [] } } }),
+    );
+    for (name, calls) in [
+        ("head(2)", vec![head(2)]),
+        ("unique", vec![call("Expr.unique", json!({}))]),
+        ("tail(5)", vec![call("Expr.tail", json!({ "n": whole(5) }))]),
+        ("mode", vec![call("Expr.mode", json!({}))]),
+        (
+            "top_k(1)",
+            vec![call("Expr.top_k", json!({ "k": whole(1) }))],
+        ),
+        (
+            "slice(0)",
+            vec![call("Expr.slice", json!({ "offset": whole(0) }))],
+        ),
+        ("arg_unique", vec![call("Expr.arg_unique", json!({}))]),
+        ("unique_counts", vec![call("Expr.unique_counts", json!({}))]),
+        (
+            "a method of what it took",
+            vec![head(2), call("Expr.abs", json!({}))],
+        ),
+        ("search_sorted(2)", vec![search]),
+    ] {
         assert_eq!(
-            last_after(item(&walk, at)),
-            after(dtype, Shape::One),
-            "item {at}"
+            refusal_source(&window(calls)),
+            RefusalSource::Rule(Rule::WindowInputIsNotCounted),
+            "{name}"
         );
     }
+    assert_eq!(window(Vec::new()).refusal(), None);
+    assert_eq!(
+        window(vec![head(2), call("Expr.sum", json!({}))]).refusal(),
+        None,
+        "an aggregate of what it took is one value of each group"
+    );
+    // A window that joins the values of a group takes it.
+    let joined = select_of(vec![on(
+        "a",
+        vec![
+            call("Expr.sum", json!({})),
+            head(2),
+            call(
+                "Expr.over",
+                json!({
+                    "partition_by": many(vec![field("k")]),
+                    "mapping_strategy": { "choice": "join" },
+                }),
+            ),
+        ],
+    )]);
+    assert_eq!(joined.refusal(), None);
 }
 
 #[test]
@@ -656,5 +901,33 @@ fn is_in_gives_the_values_it_follows_unless_it_is_given_a_list_of_each() {
     assert_eq!(
         last_after(item(&is_in(sum(), lists), 0)),
         after(Representative::Boolean, Shape::Many)
+    );
+}
+
+#[test]
+fn is_in_meets_an_array_column_row_by_row_as_it_does_a_list() {
+    // Python Polars 2.1.0: the sum of `a` asked of a column of arrays of two is one answer for each
+    // row, three of them, and so many as the rows are, where a count is not.
+    let is_in = |receiver: Vec<Value>| {
+        on(
+            "a",
+            [
+                receiver,
+                vec![call("Expr.is_in", json!({ "other": field("arr") }))],
+            ]
+            .concat(),
+        )
+    };
+    let sum = || vec![call("Expr.sum", json!({}))];
+    let one_asked = select_of(vec![is_in(sum())]);
+    assert_eq!(
+        last_after(item(&one_asked, 0)),
+        after(Representative::Boolean, Shape::Many)
+    );
+    assert_eq!(select_of(vec![is_in(sum()), field("k")]).refusal(), None);
+    let beside_a_count = select_of(vec![is_in(sum()), on("k", vec![head(2)])]);
+    assert_eq!(
+        refusal_source(&beside_a_count),
+        RefusalSource::Rule(Rule::ValuesMeetInCount)
     );
 }
