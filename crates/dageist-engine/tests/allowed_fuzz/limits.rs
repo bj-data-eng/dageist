@@ -445,15 +445,16 @@ pub enum Limit {
     /// `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds,
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
-    /// Polars' streaming engine refuses the approximate quantile of a literal, which is one value,
-    /// where it stands in a value of a branch of a condition, or in the predicate of a `when` after
-    /// the first, with the reason that the quantile holds a null. It meets it in a select, a
-    /// filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column
-    /// in the condition. The tables measured the call in a condition on columns. Polars refusing
-    /// the rows or the empty table with that refusal, which has no place, in a case with a
-    /// condition that holds in a value or in a later predicate a chain that starts from a literal
-    /// and takes an approximate quantile: the case run again with each such literal a column is not
-    /// refused for it.
+    /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
+    /// literals alone make, which is one value, where it stands in a value of a branch of a
+    /// condition, or in the predicate of a `when` after the first, with the reason that the quantile
+    /// holds a null. It meets it in a select, a filter, a sort key, a join key, a window, the
+    /// predicate of the first `when`, and on a column in the condition. The tables measured the call
+    /// in a condition on columns. Polars refusing the rows or the empty table with that refusal,
+    /// which has no place, in a case with a condition that holds in a value or in a later predicate
+    /// a chain that starts from a literal, or from a function that makes a date, a time, a moment or
+    /// a length of time and reads no column, and takes an approximate quantile: the case run again
+    /// with each such start a column is not refused for it.
     AnApproximateQuantileOfALiteralInACondition,
 }
 
@@ -636,7 +637,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::AnApproximateQuantileOfALiteralInACondition => {
-                "Polars reads the quantile of an approximate quantile of a literal as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+                "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -2674,9 +2675,20 @@ fn call_with_columns_for(
 /// What Polars says of a quantile that holds a null.
 const A_NULL_QUANTILE: &str = "`quantile` should not contain null values";
 
-/// Whether the chain starts from a literal and takes an approximate quantile.
-fn is_a_literal_approximate_quantile(expression: &Expression) -> bool {
-    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+/// Whether the chain starts from a value that literals alone make, a literal or a function that
+/// makes a date, a time, a moment or a length of time and reads no column, and takes an
+/// approximate quantile.
+fn is_an_approximate_quantile_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+    if is(start, "polars.lit")
+        || (start.entry().applies() == catalog::Applies::Function
+            && !is(start, "polars.col")
+            && !is(start, "polars.element")
+            && !operands(start).into_iter().any(|(_, operand)| {
+                any_call(operand, &|call| {
+                    is(call, "polars.col") || is(call, "polars.element")
+                })
+            })))
         && expression
             .links()
             .iter()
@@ -2708,13 +2720,13 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
 }
 
 /// Whether Polars refuses the case for a null quantile still when the receiver of each
-/// approximate quantile that starts from a literal is the column `k`: the literal is then no
-/// cause.
+/// approximate quantile that starts from literals alone is the column `k`: the literals are then
+/// no cause.
 fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let rebuilt = Step::new(
         step.id().clone(),
-        call_with_columns_for(step.call(), &is_a_literal_approximate_quantile, "k")?,
+        call_with_columns_for(step.call(), &is_an_approximate_quantile_of_literals, "k")?,
     )
     .ok()?;
     let control = Case {
@@ -3896,14 +3908,15 @@ fn applies(
             Limit::AnApproximateQuantileOfALiteralInACondition,
             Disagreement::PolarsRefuses(refusal),
         ) => {
-            // The literal is the cause where Polars stops refusing the quantile as null once the
-            // receiver of each such approximate quantile is a column.
+            // The literal, or the value literals alone make, is the cause where Polars stops
+            // refusing the quantile as null once the receiver of each such approximate quantile is
+            // a column.
             unplaced(refusal)
                 && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains(A_NULL_QUANTILE)
-                && held
-                    .iter()
-                    .any(|(_, held)| holds_in_a_branch(held, &is_a_literal_approximate_quantile))
+                && held.iter().any(|(_, held)| {
+                    holds_in_a_branch(held, &is_an_approximate_quantile_of_literals)
+                })
                 && refused_for_a_null_quantile_with_columns(case) == Some(false)
         }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
