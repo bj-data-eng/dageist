@@ -2974,10 +2974,10 @@ fn column_of_the_dtype_of(start: &Call) -> Option<&'static str> {
 /// `Boolean` where the quantile of a literal is one and that of a column of numbers is not. A
 /// join's keys read the columns both tables hold, `u` and `key`, either of which the control may
 /// be, for a join refuses two keys named alike, and other places read the column `k`. The cut
-/// control leaves a gap: a refusal of a call after the quantile that Polars would give is not seen. The
-/// column of the literal's own dtype is chosen for each quantile from its own literal, a `Boolean`
-/// one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case start
-/// from, and so whichever comes first.
+/// control leaves a gap: a refusal of a call after the quantile that Polars would give is not
+/// seen. The column of the literal's own dtype is chosen for each quantile from its own literal, a
+/// `Boolean` one `f`, a text one `g`, and any other `k`, whatever the other quantiles of the case
+/// start from, and so whichever comes first.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
     let joins = is(step.call(), "LazyFrame.join");
