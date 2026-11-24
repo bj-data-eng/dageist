@@ -5464,6 +5464,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn the_functions_that_make_one_value_of_literals_are_the_ones_the_catalogue_holds_and_named() {
+        // A function that gives many values of literals, as a range of dates would, must not be
+        // excused as one value: a new function of the catalogue fails here until it is decided.
+        let mut functions: Vec<&str> = catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == catalog::Applies::Function)
+            .map(|entry| entry.id().as_str())
+            .filter(|id| !matches!(*id, "polars.col" | "polars.element"))
+            .collect();
+        functions.sort_unstable();
+        assert_eq!(
+            functions,
+            [
+                "polars.date",
+                "polars.datetime",
+                "polars.duration",
+                "polars.from_epoch",
+                "polars.lit",
+                "polars.time",
+            ]
+        );
+        assert_eq!(functions, FUNCTIONS_OF_LITERALS);
+        // The value is of literals alone where no column is given to the function.
+        let part = |start: Call| Value::Expression(chain_of(start, Vec::new()));
+        let one = || call("polars.lit", vec![("value", Value::Integer(1))]);
+        let of_literals = call("polars.datetime", vec![("year", part(one()))]);
+        let of_a_column = call("polars.datetime", vec![("year", part(column("a")))]);
+        assert!(is_a_value_of_literals_alone(&of_literals));
+        assert!(!is_a_value_of_literals_alone(&of_a_column));
+        // A column and a condition are no function of literals.
+        assert!(!is_a_value_of_literals_alone(&column("a")));
+    }
+
     /// `datetime(2000, 1, 1, time_zone=zone)`, a moment of one value.
     fn a_moment_in(zone: &str) -> Call {
         let part = |number: i64| {
