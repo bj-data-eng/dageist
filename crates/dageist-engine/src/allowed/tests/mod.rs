@@ -11,6 +11,7 @@ mod nested;
 mod nulls;
 mod offers;
 mod oracle;
+mod panics;
 mod probe;
 mod rebuilt;
 mod sample;
