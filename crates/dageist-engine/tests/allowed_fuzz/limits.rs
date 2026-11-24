@@ -801,6 +801,25 @@ fn gives_a_number_of_its_own(call: &Call) -> bool {
     )
 }
 
+/// Whether `links` give numbers of their own and then turn them to text: a call that gives a count
+/// or positions, and after it a fill with a text literal, which makes the numbers the text of
+/// themselves. The text then reads as the numbers, which the sample's text does not.
+fn makes_text_of_a_count(links: &[Call]) -> bool {
+    links
+        .iter()
+        .position(gives_a_number_of_its_own)
+        .is_some_and(|counted| links[counted + 1..].iter().any(is_a_fill_with_text))
+}
+
+/// Whether `call` fills with a text literal, which gives the dtype text to what it fills.
+fn is_a_fill_with_text(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.fill_null" | "Expr.fill_nan"
+    ) && matches!(call.argument("value"), Some(Value::Expression(value))
+        if is_a_literal_of_text(value))
+}
+
 /// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
 /// columns that are all of the dtype Null and only compare them, do arithmetic with them, pick one
 /// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables measured the
@@ -4298,9 +4317,7 @@ fn applies(
                                             && converts_when_selected(&frames, chain, at + 1))
                                         // The text of a count or a position, which reads as it.
                                         || (is_a_failed_conversion_of_text(&refused.reason)
-                                            && chain.links()[..at]
-                                                .iter()
-                                                .any(gives_a_number_of_its_own))
+                                            && makes_text_of_a_count(&chain.links()[..at]))
                                         // The values of a column of nulls, which stay null.
                                         || leaves_nulls_of_a_column_of_nulls(
                                             &frames, step, chain, at,
