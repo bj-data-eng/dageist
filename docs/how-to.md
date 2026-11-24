@@ -545,7 +545,7 @@ of the method of an expression. A campaign focused on steps draws one of them fo
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the
 rest of the case is drawn as without a focus. A case that still holds none is drawn again, and the tally
-counts how many were. Unset or empty, the variable names no focus, and a seed makes the
+counts how many were, and so is a case whose text is longer than the 65536 bytes the target admits. Unset or empty, the variable names no focus, and a seed makes the
 same cases as without it. A name that is no method of an expression and no function that
 makes a moment is refused, and the refusal names it. A campaign focused on the methods of `dt` and on `replace_strict`:
 

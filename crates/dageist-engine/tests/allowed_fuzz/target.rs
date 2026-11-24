@@ -481,6 +481,14 @@ impl CaseTarget for AllowedTarget {
                 "the case holds no method in focus",
             )?));
         }
+        // The engine ends the whole run for an input over the ceiling the descriptor declares,
+        // so a case that long is drawn again, as one that holds no method in focus is.
+        if case.encode().len() as u64 > self.descriptor.limits().bytes() {
+            tally("drawn again: longer than the target admits");
+            return Ok(Generation::Rejected(GenerationRejection::new(
+                "the case is longer than the target admits",
+            )?));
+        }
         Ok(Generation::Generated(case))
     }
 
