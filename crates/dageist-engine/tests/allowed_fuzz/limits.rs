@@ -457,7 +457,8 @@ pub enum Limit {
     /// refusal, which has no place, in a case with a condition that holds in a value or in a later
     /// predicate a chain that starts from a literal, or from a function that makes a date, a time,
     /// a moment or a length of time and reads no column, and takes an approximate quantile: the
-    /// case run again with each such start a column is allowed.
+    /// case run again with each such start a column is allowed, or, where that is refused for what
+    /// follows the quantile, cut after the quantile it is allowed.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
@@ -2782,60 +2783,83 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    fn value(held: &Value, is_it: &dyn Fn(&Expression) -> bool, column: &str) -> Option<Value> {
+    call_with_columns_cut_for(call, is_it, column, &|_| false)
+}
+
+/// As [`call_with_columns_for`], and each chain made so is cut after its first call that
+/// `cut_after` accepts: what follows is no part of what the column stands in for.
+fn call_with_columns_cut_for(
+    call: &Call,
+    is_it: &dyn Fn(&Expression) -> bool,
+    column: &str,
+    cut_after: &dyn Fn(&Call) -> bool,
+) -> Option<Call> {
+    struct Replacing<'a> {
+        is_it: &'a dyn Fn(&Expression) -> bool,
+        column: &'a str,
+        cut_after: &'a dyn Fn(&Call) -> bool,
+    }
+    fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
         Some(match held {
             Value::Expression(expression) => {
-                Value::Expression(expression_of_columns(expression, is_it, column)?)
+                Value::Expression(expression_of_columns(expression, replacing)?)
             }
             Value::Many(items) => Value::Many(
                 items
                     .iter()
-                    .map(|item| value(item, is_it, column))
+                    .map(|item| value(item, replacing))
                     .collect::<Option<Vec<_>>>()?,
             ),
             Value::Pairs(pairs) => Value::Pairs(
                 pairs
                     .iter()
-                    .map(|(key, entry)| {
-                        Some((value(key, is_it, column)?, value(entry, is_it, column)?))
-                    })
+                    .map(|(key, entry)| Some((value(key, replacing)?, value(entry, replacing)?)))
                     .collect::<Option<Vec<_>>>()?,
             ),
             other => other.clone(),
         })
     }
-    fn expression_of_columns(
-        expression: &Expression,
-        is_it: &dyn Fn(&Expression) -> bool,
-        column: &str,
-    ) -> Option<Expression> {
-        let start = if is_it(expression) {
+    fn expression_of_columns(expression: &Expression, replacing: &Replacing) -> Option<Expression> {
+        let replaced = (replacing.is_it)(expression);
+        let start = if replaced {
             Start::Call(
                 Call::new(
                     catalog::entry("polars.col")?,
-                    vec![("name", Value::Columns(vec![column.to_owned()]))],
+                    vec![("name", Value::Columns(vec![replacing.column.to_owned()]))],
                 )
                 .ok()?,
             )
         } else {
             match expression.start() {
-                Start::Call(start) => Start::Call(call_with_columns_for(start, is_it, column)?),
+                Start::Call(start) => Start::Call(call_replaced(start, replacing)?),
                 other => other.clone(),
             }
         };
-        let links = expression
-            .links()
-            .iter()
-            .map(|link| call_with_columns_for(link, is_it, column))
-            .collect::<Option<Vec<_>>>()?;
+        let mut links = Vec::new();
+        for link in expression.links() {
+            links.push(call_replaced(link, replacing)?);
+            if replaced && (replacing.cut_after)(link) {
+                break;
+            }
+        }
         Expression::new(start, links).ok()
     }
-    let given = call
-        .arguments()
-        .iter()
-        .map(|given| Some((given.parameter(), value(given.value(), is_it, column)?)))
-        .collect::<Option<Vec<_>>>()?;
-    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    fn call_replaced(call: &Call, replacing: &Replacing) -> Option<Call> {
+        let given = call
+            .arguments()
+            .iter()
+            .map(|given| Some((given.parameter(), value(given.value(), replacing)?)))
+            .collect::<Option<Vec<_>>>()?;
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    }
+    call_replaced(
+        call,
+        &Replacing {
+            is_it,
+            column,
+            cut_after,
+        },
+    )
 }
 
 /// What Polars says of a quantile that holds a null.
@@ -2877,23 +2901,44 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
     })
 }
 
-/// Whether Polars refuses the case, for any reason, still when the receiver of each approximate
-/// quantile that starts from literals alone is the column `k`: the literals are then no cause, or
-/// not shown to be. `Some(false)` is a control that is allowed every time it runs.
+/// Whether Polars refuses the case, for any reason, still when each approximate quantile that
+/// starts from literals alone is a column's: the literals are then no cause, or not shown to be.
+/// `Some(false)` is a control that is allowed every time it runs. The case with the column in the
+/// literal's place is asked first, and where that is refused for what follows the quantile, which
+/// a column of numbers may not be given where a literal of text was, the case is asked again cut
+/// after the quantile, so that the column stands in for the literal and not for the dtype of what
+/// follows it. A join's keys read the column both tables hold, and other places the column `k`.
 fn refused_with_columns_for_a_quantile(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(
-        step.id().clone(),
-        call_with_columns_for(step.call(), &is_an_approximate_quantile_of_literals, "k")?,
-    )
-    .ok()?;
-    let control = Case {
-        receiver: case.receiver,
-        argument: case.argument,
-        document: Document::new(vec![rebuilt]).ok()?,
+    let column = if is(step.call(), "LazyFrame.join") {
+        "u"
+    } else {
+        "k"
     };
-    changed(Some(control), case)
-        .map(|control| (0..RUNS).any(|_| observe(&control).refusal.is_some()))
+    let control = |cut_after: &dyn Fn(&Call) -> bool| {
+        let rebuilt = Step::new(
+            step.id().clone(),
+            call_with_columns_cut_for(
+                step.call(),
+                &is_an_approximate_quantile_of_literals,
+                column,
+                cut_after,
+            )?,
+        )
+        .ok()?;
+        let control = Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: Document::new(vec![rebuilt]).ok()?,
+        };
+        changed(Some(control), case)
+            .map(|control| (0..RUNS).any(|_| observe(&control).refusal.is_some()))
+    };
+    let whole = control(&|_| false)?;
+    if !whole {
+        return Some(false);
+    }
+    control(&|link| is(link, "Expr.approx_quantile"))
 }
 
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
@@ -9477,12 +9522,13 @@ mod tests {
     /// a plain chain in a select, `start` being the chain's own start and `share` the share it is
     /// given.
     fn branch_with_a_quantile(start: Call, share: Expression, in_a_branch: bool) -> Case {
-        branch_with_a_quantile_and(start, share, in_a_branch, Vec::new())
+        branch_with_a_quantile_and(start, Vec::new(), share, in_a_branch, Vec::new())
     }
 
     /// As [`branch_with_a_quantile`], with the calls `after` following the approximate quantile.
     fn branch_with_a_quantile_and(
         start: Call,
+        before: Vec<Call>,
         share: Expression,
         in_a_branch: bool,
         after: Vec<Call>,
@@ -9491,7 +9537,8 @@ mod tests {
             "Expr.approx_quantile",
             vec![("quantile", Value::Expression(share))],
         );
-        let mut links = vec![quantile];
+        let mut links = before;
+        links.push(quantile);
         links.extend(after);
         let quantiled = chain_of(start, links);
         if !in_a_branch {
@@ -9683,23 +9730,36 @@ mod tests {
     }
 
     #[test]
-    fn a_null_quantile_is_not_excused_where_the_case_with_a_column_is_refused_for_another_reason() {
+    fn a_null_quantile_is_excused_where_the_column_is_refused_after_it_and_not_before_it() {
         // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
-        // no longer refused for the quantile, and is refused for the year of a number. The literal
-        // is then no more shown to be the cause than the call after it, so the case is excused of
-        // nothing.
-        let case = branch_with_a_quantile_and(
+        // refused for the year of a number, which a literal that is no number was not asked, and
+        // not for the quantile. Cut after the quantile the column is allowed, so the literal is why
+        // the quantile is refused.
+        let after = branch_with_a_quantile_and(
             a_literal_true(),
+            Vec::new(),
             a_share_of_one(),
             true,
             vec![call("Expr.dt.year", Vec::new())],
         );
         assert_eq!(
-            refused_for_a_bound(&case, None, Stage::Rows, NULL_QUANTILE),
+            refused_for_a_bound(&after, None, Stage::Rows, NULL_QUANTILE),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        // `lit(true).str.to_uppercase().approx_quantile(1)`: the column is refused for the call
+        // before the quantile, cut or not, so the literal is not shown to be the cause.
+        let before = branch_with_a_quantile_and(
+            a_literal_true(),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+            a_share_of_one(),
+            true,
+            Vec::new(),
+        );
+        assert_eq!(
+            refused_for_a_bound(&before, None, Stage::Rows, NULL_QUANTILE),
             vec![]
         );
-        // Without the call after it the case with a column is allowed, and the literal is the
-        // cause.
+        // Without a call before or after it the case with a column is allowed.
         let plain = branch_with_a_quantile(a_literal_true(), a_share_of_one(), true);
         assert_eq!(
             refused_for_a_bound(&plain, None, Stage::Rows, NULL_QUANTILE),
