@@ -2961,6 +2961,39 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_of_a_call_judged_by_its_parts_is_settled_by_any_refusal_of_the_call() {
+        // `when(k.is_nan().dt.replace(year=b, day=g)).then(a)..otherwise(a)`: Polars drops the
+        // predicates, and where the last value differs refuses the day it converts, a text that
+        // is no whole number, before it meets the `Boolean` the tables refused the replacement of.
+        let name = "stricter-a-predicate-that-is-dropped--a-part-of-a-date-refused-first.case";
+        let case = kept(name);
+        let refused = refusal(&case);
+        let found = settle_by_values_that_differ(&case, &refused)
+            .expect("a predicate that Polars refuses where the values differ");
+        assert_eq!(found.showing, Showing::WhereTheValuesDiffer);
+        assert_ne!(found.reason, refused.reason);
+        assert!(
+            found.reason.contains("conversion from `str`"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.forward_fill"), "{}", found.probe);
+        // A call that the tables judge as a whole, the test for a NaN before it, is one that Polars
+        // names a reason of its own for: the tables' words must be the same.
+        let path = refused.place.path();
+        let before = path[..path.len() - 1]
+            .iter()
+            .cloned()
+            .fold(Place::of_step(0, StepId::new(STEP).ok()), Place::then)
+            .then(Segment::Link(0));
+        let of_the_test = Refused {
+            place: before,
+            ..refused.clone()
+        };
+        assert_eq!(settle_by_values_that_differ(&case, &of_the_test), None);
+    }
+
+    #[test]
     fn a_predicate_is_not_settled_where_the_values_made_to_differ_are_not_refused_for_its_reason() {
         let case = kept("stricter-a-predicate-that-is-dropped.case");
         let refused = refusal(&case);
