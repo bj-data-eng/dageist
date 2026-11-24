@@ -142,9 +142,8 @@ export const SETTING_KINDS = [
 
 /**
  * What a parameter holds, in the one shape every kind of parameter is drawn from. The engine
- * decides every setting it reports: what a parameter holds when it is not given, what it is set
- * to when it is first added, and what a new step starts with. A number or text comes with the
- * words the engine shows it as. Mirrors `SettingView` in crates/dageist-tauri/src/catalogue.rs.
+ * decides every setting it reports, such as what a parameter holds when it is not given. A number
+ * or text comes with the words the engine shows it as. Mirrors `SettingView` in crates/dageist-tauri/src/catalogue.rs.
  */
 export type SettingView =
   /** Still to be given. */
@@ -364,6 +363,18 @@ export interface PlaceView {
   /** Where the step is in the document, counted from zero. */
   readonly stepIndex: number | null;
   readonly stepId: string | null;
+  readonly path: readonly SegmentView[];
+}
+
+/**
+ * A place an edit is asked at: the step by its position and its identifier, which the host checks
+ * against each other, then the way down through its arguments. An edit works inside a step, so
+ * neither is absent. Mirrors `EditPlace` in crates/dageist-tauri/src/report.rs.
+ */
+export interface EditPlace {
+  /** Where the step is in the document, counted from zero. */
+  readonly stepIndex: number;
+  readonly stepId: string;
   readonly path: readonly SegmentView[];
 }
 
@@ -900,55 +911,55 @@ export type EditRequest =
     }
   | {
       readonly kind: 'swapStep';
-      readonly step: PlaceView;
+      readonly step: EditPlace;
       readonly entry: string;
       readonly frame: FrameRequest;
     }
-  | { readonly kind: 'removeStep'; readonly step: PlaceView }
-  | { readonly kind: 'moveStep'; readonly step: PlaceView; readonly to: number }
-  | { readonly kind: 'setArgument'; readonly place: PlaceView; readonly value: ValueRequest }
-  | { readonly kind: 'clearArgument'; readonly place: PlaceView }
-  | { readonly kind: 'addOption'; readonly call: PlaceView; readonly parameter: string }
+  | { readonly kind: 'removeStep'; readonly step: EditPlace }
+  | { readonly kind: 'moveStep'; readonly step: EditPlace; readonly to: number }
+  | { readonly kind: 'setArgument'; readonly place: EditPlace; readonly value: ValueRequest }
+  | { readonly kind: 'clearArgument'; readonly place: EditPlace }
+  | { readonly kind: 'addOption'; readonly call: EditPlace; readonly parameter: string }
   | {
       readonly kind: 'setForItem';
-      readonly call: PlaceView;
+      readonly call: EditPlace;
       readonly parameter: string;
       readonly item: number;
       readonly value: ValueRequest;
     }
   | {
       readonly kind: 'insertItem';
-      readonly list: PlaceView;
+      readonly list: EditPlace;
       readonly at: number;
       readonly item: ValueRequest;
     }
-  | { readonly kind: 'removeItem'; readonly item: PlaceView }
-  | { readonly kind: 'insertTest'; readonly list: PlaceView; readonly at: number }
+  | { readonly kind: 'removeItem'; readonly item: EditPlace }
+  | { readonly kind: 'insertTest'; readonly list: EditPlace; readonly at: number }
   | {
       readonly kind: 'insertEntry';
-      readonly pairs: PlaceView;
+      readonly pairs: EditPlace;
       readonly at: number;
       readonly key: ValueRequest;
       readonly value: ValueRequest;
     }
-  | { readonly kind: 'removeEntry'; readonly entry: PlaceView }
-  | { readonly kind: 'setStart'; readonly expression: PlaceView; readonly start: StartRequest }
-  | { readonly kind: 'startWith'; readonly expression: PlaceView; readonly entry: string }
+  | { readonly kind: 'removeEntry'; readonly entry: EditPlace }
+  | { readonly kind: 'setStart'; readonly expression: EditPlace; readonly start: StartRequest }
+  | { readonly kind: 'startWith'; readonly expression: EditPlace; readonly entry: string }
   | {
       readonly kind: 'insertLink';
-      readonly expression: PlaceView;
+      readonly expression: EditPlace;
       readonly at: number;
       readonly entry: string;
       readonly standing: PlaceRequest | null;
     }
   | {
       readonly kind: 'swapLink';
-      readonly link: PlaceView;
+      readonly link: EditPlace;
       readonly entry: string;
       readonly standing: PlaceRequest | null;
     }
-  | { readonly kind: 'removeLink'; readonly link: PlaceView }
-  | { readonly kind: 'moveLink'; readonly link: PlaceView; readonly to: number };
+  | { readonly kind: 'removeLink'; readonly link: EditPlace }
+  | { readonly kind: 'moveLink'; readonly link: EditPlace; readonly to: number };
 
 /**
  * Where a call would stand, as a request names it: the positions that hold

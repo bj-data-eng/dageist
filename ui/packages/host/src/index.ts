@@ -14,6 +14,7 @@ export type {
   DocumentStepView,
   DocumentView,
   EditAnswerView,
+  EditPlace,
   EditRequest,
   ExpressionRequest,
   FrameRequest,

@@ -329,7 +329,7 @@ describe('the comparisons of a test', () => {
   });
 });
 
-describe('the default and the first setting of a parameter', () => {
+describe('the default setting of a parameter', () => {
   const decoded = decodeCatalogue(catalogue);
   const parameterOf = (id: string, name: string) => {
     const found = decoded.entries

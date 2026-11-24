@@ -9,7 +9,7 @@ import type {
   ArgumentView,
   CallView,
   DocumentStepView,
-  PlaceView,
+  EditPlace,
   SegmentView,
   StartView,
 } from '@dageist/host';
@@ -89,8 +89,8 @@ export interface StepAt {
   readonly id: string;
 }
 
-/** Returns the place of `path` in the step `step`, as the host names places. */
-export function placeOf(step: StepAt, path: Path): PlaceView {
+/** Returns the place of `path` in the step `step`, as an edit names it. */
+export function placeOf(step: StepAt, path: Path): EditPlace {
   return { stepIndex: step.index, stepId: step.id, path };
 }
 
