@@ -505,7 +505,8 @@ pub enum Limit {
     /// where it lies inside the expression that holds the refused call or has no place: the fold
     /// is then why Polars allows it. A case that is the same without them, or that Polars still
     /// allows or refuses for another reason, is excused by nothing, and a call that follows a fold
-    /// in its own chain is a probe's, which asks it of a value of its dtype.
+    /// in its own chain is a probe's, which asks it of a value of its dtype. A panic is the panic
+    /// limit's, whatever its control shows.
     APartPolarsFoldsToANull,
 }
 
@@ -5136,12 +5137,15 @@ fn applies(
             // The refused call is given an expression that holds a call that Polars folds, which
             // a call follows, and Polars refuses the case, with every such call left out, for the
             // tables' reason. A call that follows a fold in its own chain is asked of a value of
-            // its dtype instead ([`super::probe::settle_on_a_value`]).
-            locate(case, &refused.place).call.is_some_and(|call| {
-                operands(call)
-                    .into_iter()
-                    .any(|(_, given)| holds_a_fold_before_a_link(given))
-            }) && refused_without_folds(case, refused) == Some(true)
+            // its dtype instead ([`super::probe::settle_on_a_value`]), and a panic is the panic
+            // limit's.
+            !is_panic(&refused.reason)
+                && locate(case, &refused.place).call.is_some_and(|call| {
+                    operands(call)
+                        .into_iter()
+                        .any(|(_, given)| holds_a_fold_before_a_link(given))
+                })
+                && refused_without_folds(case, refused) == Some(true)
         }
         _ => false,
     }
