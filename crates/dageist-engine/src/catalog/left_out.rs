@@ -103,55 +103,28 @@ pub fn left_out() -> &'static [LeftOut] {
 // - `Expr.dt.add_business_days` and `is_business_day` take `week_mask` and `holidays`, a week of seven
 //   flags and a list of dates, which are lists of literals, and a list of literals typed in, of
 //   flags or of dates, is a kind of its own that does not exist yet.
-// - `polars.date_range`, `datetime_range` and `time_range` make as many values as their bounds and
-//   their interval fit, from bounds that are one value each, and what a step may put beside them
-//   depends on how many that is: Polars refuses a range beside a column, in a select, a filter's
-//   predicate, a sort key or the key of a window, unless it makes one value or as many as the table
-//   has rows, and refuses it as a join's key, which is not elementwise. The tables measure a call
-//   on three rows and say `one` or `many` of it, and `many` is the table's rows, so a range has no
-//   shape that the walk can say: a count of values that its arguments decide, which `int_range`,
-//   `repeat` and `linear_space` need as well, is a shape of its own. The `*_ranges` functions give
-//   a list of each and wait for a list kind too.
-// - `Expr.filter`, `unique`, `head`, `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`,
-//   `gather`, `arg_unique`, `mode` and `unique_counts`, and `Expr.diff`'s `null_behavior` of `drop`,
-//   give as many values as the data and their arguments decide: a `filter` the rows that hold, a
-//   `head(2)` two of them or fewer, a `unique` as many as there are different values, a `mode` the
-//   values that occur most often, and a `diff` that drops the first `n`. The tables say `one` or
-//   `many` of a call, and `many` is the table's rows, which none of them gives but by chance of
-//   the three rows or the arguments the harness picks. Polars refuses them beside a column, in a
-//   select, a filter's predicate, a sort key or the key of a window, unless they give one value or
-//   exactly the table's rows, with "zip node received non-equal length inputs", in a window that
-//   does not join with "expressions must have matching group lengths" unless they give as many as
-//   the group has, and as a join's key, which is not elementwise. Which of those a call meets is
-//   for the rows and the arguments to say, so the walk has no shape for it: the count of values
-//   that `date_range` and its kin decide above is the same shape, so these wait for it, as
-//   `Expr.diff`'s `drop` does, which the editor does not offer, so `diff` is catalogued with
-//   `ignore` only. A chain that goes on to an aggregate is one value whatever count its first
-//   method gives, but the method itself stands in a place of its own first.
+// - `polars.date_range`, `datetime_range`, `time_range`, `int_range`, `linear_space` and `repeat` give as
+//   many values as their bounds, their step or interval and their count fit, from arguments that are one
+//   value each, and Polars refuses a count beside a column in the places the table of counts measures.
+//   The shape of a count exists now, in the walk and the tables, and the methods that take some of the
+//   values of a column use it. These are functions that start an expression, whose count is the
+//   arguments' own: it is worked out from bounds that are numbers, dates or times typed in, and from a
+//   duration string for the interval, which a function of the catalogue does not yet say from its
+//   arguments, and the tables measure a function that takes expressions by the dtype of its first.
+//   The `*_ranges` functions give a list of each and wait for a list kind too.
 // - `Expr.interpolate` gives as many values as it follows, but whether Polars takes a column depends
 //   on its rows: it interpolates a column of `Boolean` that holds no null to a `Float64` and panics
 //   on one that holds a null, and the method `nearest` does the same for text and arrays, where the
 //   tables measured the sample's rows, which hold a null, and refuse them. A column that holds no
 //   null is accepted by Polars and refused by the tables, so it waits for a way to say that a
 //   column holds no null.
-// - `Expr.is_in` takes `other` as a list column, whose row is met by the receiver's, or as a
-//   column of the receiver's own dtype, which Python Polars 2.1 deprecates as ambiguous and Rust
-//   reads as the whole column's set of values. The first gives as many values as the two meet, a
-//   receiver of one value given a list column of many values giving many, and the second gives as
-//   many as the receiver, one value given a column of many giving one, so the number of values
-//   depends on the dtype of `other` where `broadcasts` says it for the parameter alone. A
-//   Python list given as `other` is a list of literals, which waits for a list kind too.
 // - `Expr.item` gives the single value of an expression and refuses one that has none or more than
 //   one, with "aggregation 'item' expected a single value, got 4 values": whether a column or a
-//   chain of many values is accepted depends on how many rows the table holds, which is a count of
-//   values that the data decide, the shape that `Expr.filter` and its kin wait for. Polars takes
-//   it after an aggregate, which is one value, and refuses it after a column of the sample's three
-//   rows, so the tables would refuse it where a table of one row takes it. `allow_empty` only
-//   admits a table of no rows. It waits for that shape.
-// - `Expr.search_sorted` gives a place for each value of `element` and not for each value it
-//   follows: a column of many values searched for one value gives one, and one value searched
-//   for a column gives many, so the count of values is the argument's, which the walk, that gives
-//   a method the count of what it follows and lets an operand widen it, does not state.
+//   chain of many values is accepted depends on how many rows the table holds, which no shape of
+//   the walk says: the table's rows are not a count. Polars takes it after an aggregate, which is
+//   one value, and refuses it after a column of the sample's three rows, so the tables would refuse
+//   it where a table of one row takes it. `allow_empty` only admits a table of no rows. It waits for
+//   a way to say how many rows a table has.
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.

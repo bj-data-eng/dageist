@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// What is known of how many values a chain of the shape [`Shape::Counted`] gives.
+/// What is known of how many values a chain of the shape [`Shape::Counted`](super::Shape::Counted) gives.
 ///
 /// The count is for the data and the arguments to say, and the walk states it only where the
 /// arguments fix it: `head(2)` of a column gives two values or fewer, a range from its bounds

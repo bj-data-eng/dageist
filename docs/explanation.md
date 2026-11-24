@@ -548,17 +548,52 @@ What Polars does with each is what the tables say, and some of it is not what a 
   meets a receiver of one value with each value of the keys of many (a `DataFrame.select` run at once
   refuses it), so the sum of a column sorted by a column is as many values as the column; a column sorted
   by a key of one value is the column.
-- `diff` has a `null_behavior`, whose `drop` leaves out the first `n` values and so gives fewer values than
-  the table has rows, which the tables cannot say. The catalogue holds the one word `ignore`, which is
-  Python's default, and does not offer the parameter, so a step always keeps every row.
-- The methods of an expression that give as many values as the rows or the arguments decide, `filter`,
-  `unique`, `head`, `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique`,
-  `mode` and `unique_counts`, are not catalogued (the steps of a table that share some of their names are,
-  [below](#the-steps-that-cut-and-number-a-table)), and neither are `is_in`, `search_sorted` and `interpolate`. `left_out.rs` gives the reason
-  of each: Polars refuses a method that gives some other number of values beside a column, in a filter's
-  predicate, a sort key or a window's key, with a message about lengths, and the walk has a shape for
-  one value and for as many as the table has rows only. [Issue 129](https://github.com/bj-data-eng/dageist/issues/129)
-  is the shape that holds them.
+- `diff` has a `null_behavior`, whose `drop` leaves out the first `n` values and so gives as many values as the
+  rows less `n`, a count the data decide. The catalogue holds both of Python's words, `ignore` by default, and the
+  option table measures `drop` as counted.
+- The methods of an expression that give as many values as the data or the arguments decide, `filter`,
+  `unique`, `head`, `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique`, `mode`
+  and `unique_counts`, are catalogued with the shape of [a count](#a-count-of-values), and so is `diff` that is told
+  to drop the first values, `null_behavior` of `drop`. The steps of a table that share some of their names are
+  [below](#the-steps-that-cut-and-number-a-table). `search_sorted` gives a place for each value of `element`, so its
+  count is the argument's, and so is `gather`'s of its `indices`. `is_in` takes a column of the dtype of the values it
+  follows as their set, whole, so it gives the count of the values it follows, and a list column row by row, as the
+  operand of a method is met, so it gives as many as the two meet; a Python list given as `other` waits for a list kind.
+  `interpolate` and the functions that make a range wait; `left_out.rs` gives the reason of each.
+
+### A Count Of Values
+
+A chain gives one value, as many values as the table has rows, or another number of them. The tables measure
+the three, and the walk follows them as the shape of a value: `one`, `many` and `counted`. The first values of
+a column, the rows that pass a filter, the values that differ and the places of a range are counted: the data
+or the arguments decide how many, which is neither one nor the rows. A method that takes some of the values it
+follows says so in the catalogue, as [`Counting`](../crates/dageist-engine/src/catalog/counting.rs) names what decides:
+the count a parameter holds, a place and a length, every nth value, the data, a condition, or an argument's
+values. Three rows decide the count of such a method by chance, so the dtype and option tables write `counted`
+for it whatever the sample gives, and the context table measures it going on to one value, which every place
+takes, and ends it as the table of counts says.
+
+The table of counts, `counts.txt`, measures a chain of each shape ending in each context, of the values of a
+column, one value of it, or its first two. Polars takes one value or the rows in a filter's predicate, a sort
+key, the key of a window and a join's key, and refuses another count there with a message about lengths; a
+select takes a count beside no column; a condition's value takes a count where the condition's predicate and
+values are as many. A chain of a count that ends where the table of counts refuses it is refused, in the words
+of the count and Polars'. The table cannot say when the count is by chance the rows, as a filter that passes
+every row is, so a count is taken for not the rows, which is how a step of a table of many rows runs.
+
+What the walk says of a count, where the arguments fix it, is a `Count`: the first values of a column, `head(2)`,
+are at most two; the first five taken every second are at most three; the values that differ of a column are
+not known, of the first five at most five; a count of one value is one value, which `head` of one value gives, an
+aggregate gives one value of any count, and a `filter` of one value is a count, for its condition meets the one
+value with each of its own. A method that gives a value for each of the values it follows keeps the count.
+
+The values a call meets must be as many as one another, or one, which is met by each of the others: the rows are
+no count, and two counts that are fixed and differ are not the same. The rule `values-meet-in-count` says so,
+and the walk applies it to the operands of a method, to the predicates and values of a condition, and to the items
+of a select, where a step that adds columns, `with_columns`, meets them with the rows. A window takes a value as long
+as its group, so `window-input-is-not-counted` refuses a count unless the window joins the values of a group into a
+list or explodes them. A join's key that holds a method that takes some of the values is not elementwise, unless it
+goes on to an aggregate: the key `a.head(2).sum()` is one value.
 
 The statistics of a column, the places of its largest and smallest values, the tests of truth, the
 approximations and the bitwise methods are more of three families that exist. Aggregate gains `mean`, `median`,
@@ -1356,7 +1391,7 @@ not a duration, and a comparison of text with a whole number are the same.
 So the step editor cannot learn what it may offer from a schema.
 
 The engine instead runs every combination of the catalogue in Polars, once,
-and keeps what it found as three text artifacts in
+and keeps what it found as four text artifacts in
 [api/catalogue/](../api/catalogue/dtypes.txt), one combination to a line,
 sorted, so that a Polars upgrade shows as a readable diff. A combination counts
 as allowed only when Polars resolved its schema, ran it on three rows that
@@ -1365,10 +1400,11 @@ line records where it did and its own message, cut at the first blank line, with
 no plan, address or timing in it. The stage is `schema`, `rows` (the schema
 resolved and the rows were refused: a mistake only running shows) or `empty`.
 An allowed line records the dtype of the result and whether it is `one` value
-for the three rows or `many`.
+for the three rows, `many` or `counted`.
 
 | Table | One line for |
 | --- | --- |
+| `counts.txt` | A chain that ends in each context and gives one value, as many values as the table has rows, or another number of them, the first two of the three rows: [a count of values](#a-count-of-values). One line for each context and each of the three. |
 | `dtypes.txt` | A method of an expression on a receiver of each of the representative dtypes, and for each of its expression parameters, with an argument of each of them. Parameters are varied one at a time, the others at a fitting default. A function that starts an expression and takes expressions has no receiver: its lines write a dash for it, one for each argument of each of its expression parameters. |
 | `contexts.txt` | An entry in each context: a position that holds an expression, or such a position inside an expression that stands in one. Two lines for each, one for the chain going on from the entry and one for the chain ending at it. |
 | `options.txt` | A method that has options, on a receiver of each of the representative dtypes, or a step, or a function that starts an expression, on each dtype of its first expression, with each pair of values of its options, the flags, the words of a choice and the dtype a call gives; with one value of its option when it has only one. A call that needs a dtype, as a cast needs the one it gives, has a line for each dtype alone and with each value of another option that is not its default. |
@@ -1430,10 +1466,12 @@ and referenced from the lines of the context table they govern:
 | `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
 | `join-key-names-are-not-repeated` | A join pairs no two output column names twice. Polars names a key by the column its chain starts from, whatever methods follow it, `literal` for a literal and by its first value for a condition, and refuses a join in which the key of one side and the key it is paired with repeat the names of an earlier pair: `left_on=[k, k.sum()]` with `right_on=[rk, rk.sum()]` is refused, and with `right_on=[rk, ra]` is not, for the pairs differ. A name repeated on one side only is allowed. `on` pairs each key with itself. An alias is refused in a join's key by Polars, and the catalogue holds none. The rule is asked by the walk, which finds the names of the whole join and places the refusal at the later left key that makes the pair again. Polars pairs the keys after expanding each side, so a key that may expand to several columns (a `col` of several names or a pattern), a key that starts from an input or is not picked yet (a hole), and an item that is no expression shift every pair after them. The rule judges only the pairs before the first such key on either side, and none after it. |
-| `key-is-elementwise` | A join's own key holds no aggregate beside a column and no column compared with a null literal, `is_between` being two comparisons of its value with each bound, so a bound that is a null literal with no dtype is one and a null it follows, or a bound of a dtype, is not. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A key holds no replacement whose old or new values read a column, which Polars calls elementwise only where they are literals, except where a fold drops it as it drops an aggregate: `a.replace_strict(old=b, new=1).sum() < null` in a condition's predicate is taken, for Polars never evaluates the replacement, and the same replacement given a number to compare with is refused. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, a column compared with a null inside the one value that a comparison of a null is given (`null != (f != null).min()` is a null whatever it is given, and `null != f` leaves a null where a column was), a column compared with a null that a later comparison with a null drops with the one value it follows (`(null > h).last() >= null` drops `null > h`, which `(null > h) >= null` does not), and in the key of a window in a select, a filter or a sort an aggregate beside a column. `and_` and `or_` given no operand are the expression they follow, so a null followed by one is still the null a comparison is given, and a comparison that follows it is the first Polars meets. A comparison of missing values, `eq_missing` or `ne_missing`, with a whole number that some dtype cannot hold, below zero or above 127, is one Polars decides at once where the dtype of what it compares cannot hold the number, as an unsigned count cannot hold one below zero, so what it follows is a literal and an aggregate in it is not met: `len() ne_missing -1` less a column is taken, and a number from zero to 127, or any other comparison, is not decided, so the key is refused; which dtype it is the document does not decide, so a limit covers it. A column of the dtype Null holds a null in every row, so comparing it with a null or a column leaves no value of it to replace, though it is a column to an aggregate beside it. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it, and so does an interval with a null bound of a dtype or a whole number below zero as a bound. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
+| `key-is-elementwise` | A join's own key holds no aggregate beside a column, no method that takes some of the values, as `head` and `filter` do, unless it goes on to an aggregate, which makes the key one value (it is refused of a literal too), and no column compared with a null literal, `is_between` being two comparisons of its value with each bound, so a bound that is a null literal with no dtype is one and a null it follows, or a bound of a dtype, is not. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A key holds no replacement whose old or new values read a column, which Polars calls elementwise only where they are literals, except where a fold drops it as it drops an aggregate: `a.replace_strict(old=b, new=1).sum() < null` in a condition's predicate is taken, for Polars never evaluates the replacement, and the same replacement given a number to compare with is refused. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, a column compared with a null inside the one value that a comparison of a null is given (`null != (f != null).min()` is a null whatever it is given, and `null != f` leaves a null where a column was), a column compared with a null that a later comparison with a null drops with the one value it follows (`(null > h).last() >= null` drops `null > h`, which `(null > h) >= null` does not), and in the key of a window in a select, a filter or a sort an aggregate beside a column. `and_` and `or_` given no operand are the expression they follow, so a null followed by one is still the null a comparison is given, and a comparison that follows it is the first Polars meets. A comparison of missing values, `eq_missing` or `ne_missing`, with a whole number that some dtype cannot hold, below zero or above 127, is one Polars decides at once where the dtype of what it compares cannot hold the number, as an unsigned count cannot hold one below zero, so what it follows is a literal and an aggregate in it is not met: `len() ne_missing -1` less a column is taken, and a number from zero to 127, or any other comparison, is not decided, so the key is refused; which dtype it is the document does not decide, so a limit covers it. A column of the dtype Null holds a null in every row, so comparing it with a null or a column leaves no value of it to replace, though it is a column to an aggregate beside it. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it, and so does an interval with a null bound of a dtype or a whole number below zero as a bound. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
 | `folded-function-is-no-join-key` | A moment or a length of time made of numbers typed in is no part of a join's key. Polars makes a literal of a `polars.datetime` of no zone, or a `polars.duration`, whose every part is a number typed in or not given, and names it by an alias, which a join's key may not hold anywhere, in a condition of it as well: it refuses the key with `'alias' is not allowed in a join key`. A column among the parts, or a zone, leaves the call a call. The values may stop the folding, as a month of 13 does, and Polars then refuses the call when the rows run, which both refuse. The walk asks the rule of each such start in a key; `polars.date` and `polars.time` are always named by an alias, so the tables refuse them in a key. |
 | `pattern-is-valid` | A pattern is a regular expression Polars can compile, unless a flag such as `literal` makes it plain text. The rule is not a combination of dtypes the tables measure but a value, so it asks Polars: the walk gives `offer` the patterns a call is given, and `offer` refuses one that `check_pattern` refuses, in the rule's words followed by Polars', before the tables are read and whatever the receiver is. Polars refuses the same pattern with the words `regex error` where a method that takes it runs, which the target holds the rule to. |
 | `replacement-values-match-in-number` | A replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one. One value given an operand of many values, or put over a window that does not explode, is as many values, for the window gives each row of its group what it gives the group, while a window that explodes gives one row for each group; what a replacement lists is a table it looks values up in, so it gives as many values as what it follows. A condition whose predicates and values are each one value gives one value, whether or not Polars drops its predicates, so what follows it is counted; where only its values are one, the number depends on what Polars drops, and is not counted. Polars refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of one, when the rows run. The walk finds how many values an expression gives from its shape, and does not judge one that is not walked to its end or whose count Polars's plan decides, as a condition with one expression for all its values. |
+| `values-meet-in-count` | The values a call meets are one value, which is met by each of the others, or as many as one another: the operands of a method, the predicates and values of a condition, and the items of a select. The rows are no count of values that the data or the arguments decide, and two such counts that are fixed and differ are not the same; a step that adds columns meets its items with the rows. Polars refuses them with "zip node received non-equal length inputs" when the rows run, except where the count is by chance the rows. |
+| `window-input-is-not-counted` | A window takes a value as long as its group, which a count of values that the data or the arguments decide is not. Polars refuses it with "expressions must have matching group lengths", unless the window joins the values of a group into a list or explodes them. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
 given the context and what the expression has so far: nothing, a value of a
@@ -1790,15 +1828,23 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 4 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 31 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 51 cases
-refused by the rule that is stricter by design, of 145 pivot cases, the 5 that a limit excused, the
-824 that agree and the 94 refused by both for another reason; the 10 refused where Polars does not
-evaluate the part are 11 at one thread. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
+1000 cases give none disagreeing; 9 of those that agree are refused by the rule against a
+repeated pair of key names, and the tables could not be asked past a point in 29 more. These
+counts are the same at one thread, at two and at the machine's own, and so are the 42 cases
+refused by the rule that is stricter by design, of 144 pivot cases, the 842 that agree, the 87 refused by both for
+another reason and the 9 refused where Polars does not evaluate the part; the cases that a limit excused are 6, and 5 at one thread. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
 gives where the tables and Polars both refuse, and a case in which Polars panics at some counts and
 not at others moves a case between them. The test
 asserts none of those.
+
+The methods that give [a count of values](#a-count-of-values) are drawn only where `DAGEIST_FUZZ_FOCUS` names
+them, until every shape of a count that the catalogue is to have exists, so the fixed seed does not draw them.
+A campaign focused on them finds disagreements of two kinds that no limit excuses. A count is taken for not the
+table's rows, so a chain that Polars allows because the count is by chance the rows, as `head(10)` of three
+rows is, is refused where the table of counts refuses a count, and a step that meets such a count with the
+rows or with a window is refused by the rules `values-meet-in-count` and `window-input-is-not-counted`:
+those are most of what such a campaign finds, and the rows of the fuzz target's tables are few. And `gather`
+refuses a place beyond the rows, which the rows decide, and which a table of no rows has for every place.
 
 | Limit | Excuses |
 | --- | --- |

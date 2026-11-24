@@ -35,7 +35,7 @@ pub enum Shape {
     Many,
     /// Another number of values, which the data or the arguments decide: the rows that pass a
     /// filter, the first `n` of them, the places of a range. It is neither one value nor the
-    /// table's rows, so a place that takes only those refuses it. [`Count`] says what is known
+    /// table's rows, so a place that takes only those refuses it. [`Count`](super::Count) says what is known
     /// of the number.
     Counted,
 }
