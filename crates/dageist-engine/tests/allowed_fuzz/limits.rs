@@ -291,9 +291,10 @@ pub enum Limit {
     /// give as one thing, and refuse a method whose schema says one dtype and whose rows give
     /// another, as the cube root of a null does, which is the target's own comparison and shows
     /// only where rows are given. The tables refusing, when they run rows, with the reason that
-    /// the schema says one dtype and the rows give another, at a call after a `drop_nulls` in
-    /// its chain, which Polars allows; the drop is why where Polars, asked again with each drop
-    /// a fill of nulls forward, refuses the case for that reason.
+    /// the schema says one dtype and the rows give another, at a call after a `drop_nulls` or a
+    /// `drop_nans` in its chain, or in what the chain's start is given, which Polars allows; the
+    /// drop is why where Polars, asked again with each drop a fill of nulls forward, refuses the
+    /// case for that reason.
     ADropLeavesNoRows,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
@@ -5011,9 +5012,13 @@ fn applies(
             refused.stage == Some(TableStage::Rows)
                 && refused.reason.starts_with(SCHEMA_SAYS)
                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                    chain.links()[..at]
-                        .iter()
-                        .any(|call| is(call, "Expr.drop_nulls"))
+                    // A drop of nulls or of NaNs before the call in its chain, or in what the
+                    // start of the chain is given, which the start is made of.
+                    chain.links()[..at].iter().any(is_a_drop)
+                        || matches!(chain.start(), Start::Call(start)
+                            if operands(start)
+                                .into_iter()
+                                .any(|(_, given)| any_call(given, &is_a_drop)))
                 })
                 && refused_with_each_drop_a_fill(case, &refused.reason)
         }
