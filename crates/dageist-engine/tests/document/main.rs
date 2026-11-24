@@ -27,6 +27,7 @@ mod statistics;
 mod summary;
 mod support;
 mod syntax;
+mod taken;
 mod text;
 mod untyped;
 mod walk;
