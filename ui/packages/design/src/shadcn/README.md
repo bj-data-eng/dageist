@@ -5,12 +5,12 @@ Copyright (c) 2023 shadcn. They come from the repository's `new-york-v4`
 registry, which is built on Radix Primitives and written in plain Tailwind
 classes, at commit `055aa6b7837b1808456a24beb4c97a677864aa82`:
 
-| File                                                                                   | From                                                                   |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `sidebar.tsx`                                                                          | `apps/v4/registry/new-york-v4/ui/sidebar.tsx`                          |
-| `button.tsx`, `input.tsx`, `separator.tsx`, `sheet.tsx`, `skeleton.tsx`, `tooltip.tsx` | `apps/v4/registry/new-york-v4/ui/`                                     |
-| `use-mobile.ts`                                                                        | `apps/v4/registry/new-york-v4/hooks/use-mobile.ts`                     |
-| `cn.ts`                                                                                | shadcn/ui's `cn` helper, written here with `clsx` and `tailwind-merge` |
+| File                                                                                                      | From                                                                   |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `sidebar.tsx`                                                                                             | `apps/v4/registry/new-york-v4/ui/sidebar.tsx`                          |
+| `button.tsx`, `collapsible.tsx`, `input.tsx`, `separator.tsx`, `sheet.tsx`, `skeleton.tsx`, `tooltip.tsx` | `apps/v4/registry/new-york-v4/ui/`                                     |
+| `use-mobile.ts`                                                                                           | `apps/v4/registry/new-york-v4/hooks/use-mobile.ts`                     |
+| `cn.ts`                                                                                                   | shadcn/ui's `cn` helper, written here with `clsx` and `tailwind-merge` |
 
 They are kept close to the originals so a later version can be compared with
 them. The changes made here:

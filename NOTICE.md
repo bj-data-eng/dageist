@@ -189,6 +189,18 @@ distributed by shadcn:
 * License: [MIT License](licenses/shadcn-ui/LICENSE.md)
 * Homepage: [shadcn/ui](https://ui.shadcn.com)
 
+This product's view includes components adapted from React Flow UI (`base-node`,
+`base-handle`, `labeled-handle` and `button-handle`), copied as source code,
+not as a package, from its registry at `https://ui.reactflow.dev/registry/` on
+2026-11-24 and modified. They are in
+[ui/packages/canvas/src/react-flow-ui](ui/packages/canvas/src/react-flow-ui).
+They are distributed by webkid GmbH. React Flow UI's pages give the MIT License
+and link to the React Flow repository's licence, which is the text below; the
+source repository of the registry itself is not public:
+
+* License: [MIT License](licenses/react-flow/LICENSE)
+* Homepage: [React Flow UI](https://reactflow.dev/ui)
+
 This product's view includes the upright variable font of the Inter typeface
 4.1, unmodified, distributed by The Inter Project Authors:
 

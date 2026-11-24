@@ -29,7 +29,6 @@ export type { ToggleButtonProps } from './ToggleButton';
 export { TypedBlock } from './TypedBlock';
 export type { TypedBlockProps, TypedKind } from './TypedBlock';
 export { cx } from './cx';
-export { FLOATING_SURFACE } from './surface';
 
 // Components copied from shadcn/ui, with the changes their files note.
 export {
@@ -47,4 +46,6 @@ export {
   SidebarTrigger,
   useSidebar,
 } from './shadcn/sidebar';
+export { Collapsible, CollapsibleContent, CollapsibleTrigger } from './shadcn/collapsible';
 export { Skeleton } from './shadcn/skeleton';
+export { cn } from './shadcn/cn';

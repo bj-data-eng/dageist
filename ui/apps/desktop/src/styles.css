@@ -54,6 +54,8 @@
    */
   --color-background: var(--color-canvas);
   --color-foreground: var(--color-ink);
+  --color-card: var(--color-panel);
+  --color-card-foreground: var(--color-ink);
   --color-primary: var(--color-ink);
   --color-primary-foreground: var(--color-canvas);
   --color-secondary: var(--color-raised);

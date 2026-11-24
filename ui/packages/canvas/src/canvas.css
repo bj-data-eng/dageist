@@ -32,3 +32,52 @@
 .dageist-flow .react-flow__attribution a {
   color: var(--color-muted);
 }
+
+/*
+ * Resizing a box. React Flow's small square handles and one-pixel edges are
+ * hidden and made wide. Each edge can be grabbed within 9 pixels outside it
+ * and 3 inside, so the zone stays clear of a scrollbar along the inside of
+ * the edge, and each corner within 9 pixels of it. The zones lie above the
+ * box's content, so the resize cursor shows as soon as the pointer nears the
+ * box's outline. Nothing is drawn; pointing at the box lights its outline.
+ */
+.dageist-flow .react-flow__resize-control.line {
+  z-index: 1;
+  border-width: 0;
+  border-color: transparent;
+}
+
+.dageist-flow .react-flow__resize-control.line.left,
+.dageist-flow .react-flow__resize-control.line.right {
+  width: 12px;
+}
+
+.dageist-flow .react-flow__resize-control.line.left {
+  transform: translate(-75%, 0);
+}
+
+.dageist-flow .react-flow__resize-control.line.right {
+  transform: translate(-25%, 0);
+}
+
+.dageist-flow .react-flow__resize-control.line.top,
+.dageist-flow .react-flow__resize-control.line.bottom {
+  height: 12px;
+}
+
+.dageist-flow .react-flow__resize-control.line.top {
+  transform: translate(0, -75%);
+}
+
+.dageist-flow .react-flow__resize-control.line.bottom {
+  transform: translate(0, -25%);
+}
+
+.dageist-flow .react-flow__resize-control.handle {
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}

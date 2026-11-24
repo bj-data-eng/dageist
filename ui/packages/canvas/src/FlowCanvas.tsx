@@ -41,6 +41,9 @@ const FIT_PADDING = { top: '84px', bottom: '48px', x: '64px' } as const;
 /** How React Flow draws each kind of box. */
 const NODE_TYPES: NodeTypes = { supplier: SupplierBox, steps: StepsBox };
 
+/** The size the node's box starts at. */
+const STEPS_START = { width: 340, height: 520 } as const;
+
 /** A box of either kind, as React Flow holds it. */
 type Box = SupplierNode | StepsNode;
 
@@ -54,7 +57,16 @@ function boxesOf(graph: CanvasGraph, heights: Heights): Box[] {
       position: places.suppliers.get(supplier.id) ?? { x: 0, y: 0 },
       data: { supplier },
     })),
-    { id: NODE, type: 'steps', position: places.node, data: { inputs: graph.inputs } },
+    {
+      id: NODE,
+      type: 'steps',
+      position: places.node,
+      // The node's box has a size of its own, which resizing it changes, so its list of steps
+      // has a height to scroll within.
+      width: STEPS_START.width,
+      height: STEPS_START.height,
+      data: { inputs: graph.inputs },
+    },
   ];
 }
 
