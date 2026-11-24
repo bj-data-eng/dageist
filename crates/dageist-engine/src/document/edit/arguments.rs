@@ -34,6 +34,9 @@ impl Document {
     /// does, keeps one for each: a new key holds the default, those of keys that
     /// are gone go, and one value shared by every key stays. So do
     /// [`clear_argument`](Self::clear_argument) and [`add_option`](Self::add_option).
+    /// A list of values that has another number of values than there are keys is
+    /// not made right: the stretch of the keys that changed is taken as far as the
+    /// list goes, and the values beyond it stay, strays included.
     ///
     /// # Errors
     ///

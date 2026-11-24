@@ -104,6 +104,11 @@ pub(super) enum Leaf<'a> {
 /// do: a new key holds the parameter's default, those of keys that are gone go, and the
 /// values of the keys of the other stay where they were. One value for every key stays
 /// as it is.
+///
+/// A list of values that does not have as many values as there are keys is not made right:
+/// the stretch of the keys that changed is taken as far as the list goes, and what lies
+/// beyond it stays, a stray value included. A list that ends before the stretch starts is
+/// left as it is, and nothing is made up for it.
 pub(super) fn with_given(
     call: &Call,
     parameter: &str,
