@@ -3381,6 +3381,29 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_is_not_settled_where_the_value_it_guards_is_refused_only_when_the_rows_run() {
+        // `sort(by=when(f).then(g.cast(Int8)).otherwise(k.cast(Int8)))`: the rule is asked about the
+        // predicate, and Polars refuses the condition alone for the value the predicate guards, a
+        // text that is no number, when the rows run, with a refusal that has no place. Made `false`
+        // the predicate drops that value with its branch, so the control is allowed, and the case
+        // would be settled as the predicate's fault if the dropping were not seen.
+        let to_a_whole_number = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[{{"entry":"Expr.cast","arguments":{{"dtype":{{"dtype":"Int8"}}}}}}]}}}}"#
+            )
+        };
+        let case = sorted_by_a_condition(
+            &col_json("f"),
+            &to_a_whole_number("g"),
+            Some(&to_a_whole_number("k")),
+            &[],
+        );
+        let settled =
+            settle_by_evaluating_the_condition(&case, &refused_as_a_predicate_that_is_no_boolean());
+        assert_eq!(settled, None);
+    }
+
+    #[test]
     fn a_non_boolean_predicate_in_a_pivot_aggregate_is_asked_in_the_pivot() {
         // There is no column to stand in for the predicate, so the condition stands alone as the
         // aggregate of the same pivot.
