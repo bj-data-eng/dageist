@@ -850,8 +850,9 @@ parameter, or the person gives it its value.
 
 A revision belongs to one lifetime of a host. It goes up by one with each edit, and a
 host starts at the milliseconds since the Unix epoch when it started, so a page that
-outlives its host, as one open across a restart does, holds a revision no later host is at
-and its next edit is stale, not made on a document it never saw. The window asks for the
+outlives its host, as one open across a restart does, holds a revision a later host is not
+at as long as edits are slower than a millisecond and the clock does not step back, and its
+next edit is stale, not made on a document it never saw. The window asks for the
 document when it gains focus or becomes visible, and after an action fails, so it draws the
 new host's document before the person acts, and takes it whatever its revision is.
 

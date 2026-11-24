@@ -719,7 +719,7 @@ export interface DocumentView {
  * crates/dageist-tauri/src/document.rs.
  */
 export interface DocumentStateView {
-  /** Counts the documents the host has held. An edit carries the revision it was made against. */
+  /** Goes up by one with each edit, from the milliseconds since the Unix epoch when the host started. An edit carries the revision it was made against. */
   readonly revision: number;
   readonly document: DocumentView;
   readonly run: RunView;
