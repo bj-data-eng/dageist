@@ -1,0 +1,2 @@
+{"a":"Array(Null, 2)","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.arr.unique","arguments":{}},{"entry":"Expr.cast","arguments":{"dtype":{"dtype":"List(Int64)"}}}]}}]}}}}]}

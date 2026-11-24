@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use polars::prelude::{DataType, TimeUnit, TimeZone};
 
-use crate::allowed::dtype::{Representative, ResultDtype, dtype_name};
+use crate::allowed::dtype::{Inner, Representative, ResultDtype, dtype_name};
 
 /// The twenty-two scalar dtypes the tables cover, each as Polars writes it: every whole number,
 /// the floats, text, truth, the moments and lengths of time, the dtype of nothing and a decimal.
@@ -153,6 +153,43 @@ fn a_list_or_an_array_of_a_nested_dtype_has_no_class() {
             );
             assert_eq!(Representative::of_name(&dtype_name(&nested)), None);
             assert_eq!(ResultDtype::from_name(&dtype_name(&nested)).class(), None);
+        }
+    }
+}
+
+#[test]
+fn a_cast_gives_the_dtype_it_is_given_whichever_list_or_array_it_follows() {
+    use crate::allowed::offers::{After, Chosen, Place, Verdict, offer};
+    use crate::allowed::{Context, Outer, Shape};
+    let cast = crate::catalog::entry("Expr.cast").expect("an entry");
+    for receiver in [
+        Representative::List(Inner::Duration),
+        Representative::List(Inner::Null),
+        Representative::List(Inner::Float32),
+        Representative::Array(Inner::Date),
+        Representative::Array(Inner::Null),
+    ] {
+        let place = Place::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: receiver,
+                shape: Shape::Many,
+            },
+        );
+        for given in ["List(Int64)", "List(String)", "Int64"] {
+            let verdict = offer(
+                cast,
+                &place,
+                &Chosen::default().with_options(&[("dtype", given)]),
+            );
+            let Verdict::Allowed(allowance) = &verdict else {
+                continue;
+            };
+            assert_eq!(
+                allowance.result().map(ResultDtype::name),
+                Some(given),
+                "a cast of {receiver} to {given}"
+            );
         }
     }
 }
