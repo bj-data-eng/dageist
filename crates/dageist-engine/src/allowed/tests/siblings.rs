@@ -19,7 +19,12 @@ use crate::allowed::table::{
     Looked, Outcome, Produces, SENSITIVE, Tables, measured_classes, restored,
 };
 
-use super::generate::{dtype_jobs_over, dtype_line, in_parallel};
+use super::generate::{
+    DtypeIndex, dtype_jobs_over, dtype_line, in_parallel, option_candidate, option_line,
+    option_parameters, option_sets,
+};
+use crate::allowed::table::DtypeLine;
+use crate::catalog::{self, Applies, Kind};
 
 /// Set in the process that measures, to the file it writes what differs to.
 const OUT: &str = "DAGEIST_SIBLINGS_OUT";
@@ -122,9 +127,75 @@ fn measure_the_siblings() {
             )
         })
     });
+    // The option table too: what a method gives with its options set, on the lists and arrays
+    // that it is not measured on, is judged by the line of the class that stands for them.
+    let dtype_lines: Vec<DtypeLine> = tables
+        .dtypes
+        .iter()
+        .map(
+            |((entry, parameter, receiver, argument), outcome)| DtypeLine {
+                entry,
+                parameter: *parameter,
+                receiver: *receiver,
+                argument: *argument,
+                outcome: outcome.clone(),
+            },
+        )
+        .collect();
+    let index = DtypeIndex::new(&dtype_lines);
+    let mut option_jobs = Vec::new();
+    for entry in catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == Applies::Expression)
+    {
+        let id = entry.id().as_str();
+        let parameters = option_parameters(entry);
+        if parameters.is_empty() {
+            continue;
+        }
+        let sets = option_sets(&parameters);
+        for class in Representative::ALL
+            .into_iter()
+            .filter(|class| class.is_nested() && !measured_classes(id).contains(class))
+        {
+            let candidate = option_candidate(entry, class, &index);
+            for set in &sets {
+                option_jobs.push((entry, set.clone(), candidate.clone(), class));
+            }
+        }
+    }
+    let by_options = in_parallel(&option_jobs, |(entry, set, candidate, class)| {
+        let line = option_line(entry, set, Some(candidate));
+        let sibling = class.sibling();
+        let table = tables
+            .options
+            .get(&(line.entry, Some(sibling), line.options.clone()))?;
+        // What a call given the dtype it gives gives is that dtype, whatever it follows.
+        let by_a_word = line.options.iter().any(|(name, _)| {
+            entry
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.name() == *name && parameter.kind() == Kind::Dtype)
+        });
+        let table = if by_a_word {
+            table.clone()
+        } else {
+            restored(table, &[Some(*class)], &[Some(sibling)])
+        };
+        difference(&line.outcome, &table).map(|said| {
+            (
+                entry.id().as_str(),
+                format!("options {:?} on {class}: {said}", line.options),
+            )
+        })
+    });
     let mut text = String::new();
     let mut entries = BTreeSet::new();
-    for (entry, said) in found.into_iter().flatten() {
+    for (entry, said) in found
+        .into_iter()
+        .flatten()
+        .chain(by_options.into_iter().flatten())
+    {
         if entries.insert(entry) {
             text.push_str(&format!("{entry} | {said}\n"));
         }

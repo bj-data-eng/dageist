@@ -158,17 +158,20 @@ fn a_list_or_an_array_of_a_nested_dtype_has_no_class() {
 }
 
 #[test]
-fn a_cast_gives_the_dtype_it_is_given_whichever_list_or_array_it_follows() {
-    use crate::allowed::offers::{After, Chosen, Place, Verdict, offer};
+fn a_cast_is_allowed_as_polars_allows_it_and_gives_the_dtype_it_is_given_after_any_list_or_array() {
+    use polars::prelude::{DataType, Expr, IntoLazy, col};
+
+    use crate::allowed::offers::{After, Chosen, Place, RefusalSource, Verdict, offer};
     use crate::allowed::{Context, Outer, Shape};
+
+    use super::probe::measure;
+    use super::sample::Frames;
     let cast = crate::catalog::entry("Expr.cast").expect("an entry");
-    for receiver in [
-        Representative::List(Inner::Duration),
-        Representative::List(Inner::Null),
-        Representative::List(Inner::Float32),
-        Representative::Array(Inner::Date),
-        Representative::Array(Inner::Null),
-    ] {
+    let mut wrong = Vec::new();
+    for receiver in Representative::ALL
+        .into_iter()
+        .filter(|class| class.is_nested())
+    {
         let place = Place::new(
             Context::step(Outer::Select),
             After::Value {
@@ -176,22 +179,57 @@ fn a_cast_gives_the_dtype_it_is_given_whichever_list_or_array_it_follows() {
                 shape: Shape::Many,
             },
         );
-        for given in ["List(Int64)", "List(String)", "Int64"] {
+        // The dtypes the tables hold a word for: a cast to an array needs rows of its width, which
+        // the data decide.
+        for given in [
+            Representative::List(Inner::Int64),
+            Representative::List(Inner::String),
+            Representative::Int64,
+            Representative::String,
+        ] {
+            let target: Expr = col("a").strict_cast(given.dtype());
+            let frames = Frames::new(receiver, receiver, &DataType::Int64);
+            let polars = measure(
+                &|frames, empty| Ok(frames.left(empty).select([target.clone()])),
+                &frames,
+            );
             let verdict = offer(
                 cast,
                 &place,
-                &Chosen::default().with_options(&[("dtype", given)]),
+                &Chosen::default().with_options(&[("dtype", given.name())]),
             );
-            let Verdict::Allowed(allowance) = &verdict else {
-                continue;
+            let said = match (&verdict, &polars) {
+                // What a rule refuses is stricter than Polars, and is not asked of it.
+                (Verdict::Refused(refusal), _)
+                    if matches!(refusal.source(), RefusalSource::Rule(_)) =>
+                {
+                    None
+                }
+                (Verdict::Allowed(allowance), Ok(_)) => {
+                    (allowance.result().map(crate::allowed::ResultDtype::name)
+                        != Some(given.name()))
+                    .then(|| format!("gives {:?}", allowance.result()))
+                }
+                (Verdict::Allowed(_), Err(reason)) => {
+                    Some(format!("is allowed and Polars refuses it: {}", reason.text))
+                }
+                (Verdict::Refused(refusal), Ok(_)) => Some(format!(
+                    "is refused and Polars allows it: {}",
+                    refusal.reason()
+                )),
+                (Verdict::Refused(_), Err(_)) => None,
             };
-            assert_eq!(
-                allowance.result().map(ResultDtype::name),
-                Some(given),
-                "a cast of {receiver} to {given}"
-            );
+            if let Some(said) = said {
+                wrong.push(format!("a cast of {receiver} to {given} {said}"));
+            }
         }
     }
+    assert!(
+        wrong.is_empty(),
+        "{} casts differ from Polars:\n{}",
+        wrong.len(),
+        wrong.join("\n")
+    );
 }
 
 #[test]

@@ -562,19 +562,19 @@ pub(super) fn dtype_lines() -> Vec<DtypeLine> {
 
 /// A receiver and the arguments that make a method run, with what it gives.
 #[derive(Clone)]
-struct Candidate {
+pub(super) struct Candidate {
     receiver: Representative,
     /// Each expression parameter that must be given, and the dtype of its argument.
     arguments: Vec<(&'static str, Representative)>,
     produces: Option<Produces>,
 }
 
-struct DtypeIndex {
+pub(super) struct DtypeIndex {
     lines: HashMap<DtypeKey, Outcome>,
 }
 
 impl DtypeIndex {
-    fn new(lines: &[DtypeLine]) -> Self {
+    pub(super) fn new(lines: &[DtypeLine]) -> Self {
         Self {
             lines: lines
                 .iter()
@@ -1537,7 +1537,7 @@ fn count_line(context: Context, shape: Shape) -> CountLine {
 // The option table
 
 /// One option of an entry and the values it is given.
-struct OptionParameter {
+pub(super) struct OptionParameter {
     name: &'static str,
     values: Vec<(String, Argument)>,
     /// Whether every call needs it to mean anything, as a cast needs the dtype it gives.
@@ -1559,7 +1559,7 @@ fn dtype_classes() -> Vec<Representative> {
 /// a table of no rows has for every place, unless it is told to give a null there.
 pub(super) const NOT_MEASURED: [(&str, &str); 1] = [("Expr.gather", "null_on_oob")];
 
-fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
+pub(super) fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
     entry
         .parameters()
         .iter()
@@ -1602,13 +1602,13 @@ fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
 }
 
 /// One set of options, each by the parameter, the word the table writes and the argument.
-type OptionSet = Vec<(&'static str, String, Argument)>;
+pub(super) type OptionSet = Vec<(&'static str, String, Argument)>;
 
 /// The sets of options to run: every value of the option when an entry has
 /// one, every pair of values of two options when it has more. An option that a call needs, as a
 /// cast needs its dtype, is in every set, alone and with each value that is not the default of
 /// each of the other options.
-fn option_sets(parameters: &[OptionParameter]) -> Vec<OptionSet> {
+pub(super) fn option_sets(parameters: &[OptionParameter]) -> Vec<OptionSet> {
     let single = |parameter: &OptionParameter| -> Vec<OptionSet> {
         parameter
             .values
@@ -1698,7 +1698,7 @@ fn option_step(
 /// The candidate of `entry` that follows `receiver` for the option table: the one the dtype table
 /// says runs there, and otherwise one whose arguments are of the receiver's own dtype, for the
 /// option table measures a method on every dtype, whether or not it runs there without options.
-fn option_candidate(
+pub(super) fn option_candidate(
     entry: &'static Entry,
     receiver: Representative,
     index: &DtypeIndex,
@@ -1718,7 +1718,7 @@ fn option_candidate(
         })
 }
 
-fn option_line(
+pub(super) fn option_line(
     entry: &'static Entry,
     set: &[(&'static str, String, Argument)],
     candidate: Option<&Candidate>,
