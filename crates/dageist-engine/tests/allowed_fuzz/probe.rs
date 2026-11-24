@@ -61,7 +61,7 @@
 //! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
 //! value of each condition is made a fill forward of what it was, so that the values differ, and
 //! Polars refusing that case for the tables' reason, or, for a call the tables judge by its parts,
-//! for any reason where the same case with the predicate that holds the refused call made `true`
+//! for any reason where the same case with the predicate that holds the refused call made `false`
 //! is allowed, shows the predicate is one it skips ([`Showing::WhereTheValuesDiffer`]). A probe
 //! of the part alone is no better, for an argument of it may be refused first.
 //!
@@ -1507,12 +1507,12 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
     // A call that the tables judge by its parts is refused by Polars for the first it meets, which
     // is not always the one the tables refused first, so a refusal of the case where the values
     // differ is the part's where it is the predicate that holds it that Polars refuses: with that
-    // predicate made `true`, and no other, the same case is allowed.
+    // predicate made `false`, and no other, the same case is allowed.
     let by_parts = judges_its_values_apart(case, &refused.place);
     let refusal = (0..RUNS).find_map(|_| {
         observe(&control).refusal.filter(|refusal| {
             refusal.reason == refused.reason
-                || (by_parts && is_refused_for_its_predicates(&control, &refused.place))
+                || (by_parts && is_refused_for_its_predicate(&control, &refused.place))
         })
     })?;
     Some(Settled {
@@ -1523,8 +1523,8 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
 }
 
 /// Whether `case`, which Polars refuses, is allowed every time it is run with the predicate that
-/// holds `place` made `true`, and no other: that predicate is why it is refused.
-fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
+/// holds `place` made `false`, and no other: that predicate is why it is refused.
+fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
     let path = place.path();
     // The predicate is the item after the last `predicates` the place goes through, and that is a
     // condition's where a call of an expression holds it, the start or a link, and not the
@@ -1537,8 +1537,10 @@ fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
     else {
         return false;
     };
-    let Some(truth) = call("polars.lit", vec![("value", Value::Flag(Some(true)))])
-        .and_then(|truth| Expression::new(Start::Call(truth), Vec::new()).ok())
+    // Made `false`, the branch it guards is dropped and the others are still evaluated, which they
+    // would not be after a `true`, whose branch Polars takes whatever follows it.
+    let Some(falsity) = call("polars.lit", vec![("value", Value::Flag(Some(false)))])
+        .and_then(|falsity| Expression::new(Start::Call(falsity), Vec::new()).ok())
     else {
         return false;
     };
@@ -1551,7 +1553,7 @@ fn is_refused_for_its_predicates(case: &Case, place: &Place) -> bool {
         .iter()
         .map(|argument| {
             let value = if argument.parameter() == parameter {
-                replaced_deep_in_value(argument.value(), inside, &truth)?
+                replaced_deep_in_value(argument.value(), inside, &falsity)?
             } else {
                 argument.value().clone()
             };
@@ -3178,7 +3180,7 @@ mod tests {
         // `filter(a.dt.replace(day=g).is_null(), when(f).then(f).otherwise(f))`: the refusal asked
         // about is the first predicate of the filter, which is no predicate of a condition and
         // which Polars does not drop. The case where the values of the condition differ is refused
-        // for it, and allowed with it made `true`, which is not that Polars skips it.
+        // for it, and allowed with it made `false`, which is not that Polars skips it.
         let col = |name: &str| {
             format!(
                 r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
