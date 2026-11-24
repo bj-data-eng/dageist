@@ -9666,6 +9666,23 @@ mod tests {
     }
 
     #[test]
+    fn a_null_quantile_is_excused_in_a_join_key_and_before_a_call_the_column_would_not_take() {
+        // The control makes the literal a column, which a join key reads as the column both tables
+        // hold, and which the call after the quantile need not be given the dtype of: a method of
+        // text after the quantile of a column of numbers is refused for it, not for the quantile.
+        for kept in [
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
+            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--before-a-call-of-text.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(kept),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{kept}"
+            );
+        }
+    }
+
+    #[test]
     fn a_null_quantile_is_not_excused_where_the_case_with_a_column_is_refused_for_another_reason() {
         // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
         // no longer refused for the quantile, and is refused for the year of a number. The literal
