@@ -9352,11 +9352,23 @@ mod tests {
     /// a plain chain in a select, `start` being the chain's own start and `share` the share it is
     /// given.
     fn branch_with_a_quantile(start: Call, share: Expression, in_a_branch: bool) -> Case {
+        branch_with_a_quantile_and(start, share, in_a_branch, Vec::new())
+    }
+
+    /// As [`branch_with_a_quantile`], with the calls `after` following the approximate quantile.
+    fn branch_with_a_quantile_and(
+        start: Call,
+        share: Expression,
+        in_a_branch: bool,
+        after: Vec<Call>,
+    ) -> Case {
         let quantile = call(
             "Expr.approx_quantile",
             vec![("quantile", Value::Expression(share))],
         );
-        let quantiled = chain_of(start, vec![quantile]);
+        let mut links = vec![quantile];
+        links.extend(after);
+        let quantiled = chain_of(start, links);
         if !in_a_branch {
             return select(vec![quantiled]);
         }
@@ -9526,6 +9538,30 @@ mod tests {
                 "{place}"
             );
         }
+    }
+
+    #[test]
+    fn a_null_quantile_is_not_excused_where_the_case_with_a_column_is_refused_for_another_reason() {
+        // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is no
+        // longer refused for the quantile, and is refused for the year of a number. The literal is
+        // then no more shown to be the cause than the call after it, so the case is excused of
+        // nothing.
+        let case = branch_with_a_quantile_and(
+            a_literal_true(),
+            a_share_of_one(),
+            true,
+            vec![call("Expr.dt.year", Vec::new())],
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NULL_QUANTILE),
+            vec![]
+        );
+        // Without the call after it the case with a column is allowed, and the literal is the cause.
+        let plain = branch_with_a_quantile(a_literal_true(), a_share_of_one(), true);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Rows, NULL_QUANTILE),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
     }
 
     #[test]
