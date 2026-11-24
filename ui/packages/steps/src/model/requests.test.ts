@@ -46,11 +46,12 @@ describe('a typed literal as the argument of a parameter', () => {
     expect(literalArgument(valueOf('float'), float(2.5))).toEqual({ kind: 'float', value: 2.5 });
   });
 
-  it('is not a number, but NaN, where text is given for a parameter that takes one', () => {
-    const request = literalArgument(valueOf('integer'), text('abc'));
-
-    expect(request.kind).toBe('integer');
-    expect(request.kind === 'integer' && Number.isNaN(request.value)).toBe(true);
+  it('is no request where text is given for a parameter that takes a number', () => {
+    // There is no number in it to send, and a NaN is not one the engine could read.
+    expect(literalArgument(valueOf('integer'), text('abc'))).toBeNull();
+    expect(literalArgument(valueOf('float'), text('abc'))).toBeNull();
+    expect(literalArgument(valueOf('integer'), integer(Number.NaN))).toBeNull();
+    expect(literalArgument(valueOf('any'), float(Number.NaN))).toBeNull();
   });
 
   it('is text where the parameter takes a string, written as the literal shows it if it is a number', () => {
