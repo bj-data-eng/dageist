@@ -150,7 +150,7 @@ fn file(header: &str, mut lines: Vec<String>) -> String {
 }
 
 /// The three files, by name.
-pub(super) fn files(generated: &Generated, release: &Release) -> [(&'static str, String); 3] {
+pub(super) fn files(generated: &Generated, release: &Release) -> [(&'static str, String); 4] {
     let text =
         |lines: &[&str]| -> Vec<String> { lines.iter().map(|line| (*line).to_owned()).collect() };
     let dtypes = header(
@@ -244,7 +244,37 @@ pub(super) fn files(generated: &Generated, release: &Release) -> [(&'static str,
             "`g`, a rename of `a`, a sort by `a`.",
         ]),
     );
+    let counts = header(
+        "Allowed counts by context",
+        release,
+        &Counts::of(generated.counts.iter().map(|line| &line.outcome)),
+        &text(&[
+            "Each line is: context | count | outcome.",
+            "",
+            "The context table measures each entry as it gives its values. How many values a chain",
+            "gives is not an entry's alone, for a method that follows a count keeps it, so this table",
+            "measures the counts: a chain that ends in a context and gives one value, as many values",
+            "as the table has rows, or another number of them, which the data or the arguments",
+            "decide. The columns hold three rows, and the other number is the first two of them.",
+            "Where the place needs a `Boolean`, the values are those of a `Boolean` column; in a",
+            "join key the other table's key has the dtype the key has; and in a pivot's aggregate",
+            "they are the values of a group.",
+            "",
+            "The outcome is `allowed -`, or `refused <stage>: <Polars' reason>`.",
+        ]),
+    );
     [
+        (
+            "counts.txt",
+            file(
+                &counts,
+                generated
+                    .counts
+                    .iter()
+                    .map(table::CountLine::render)
+                    .collect(),
+            ),
+        ),
         (
             "dtypes.txt",
             file(
@@ -311,7 +341,7 @@ const OUT: &str = "DAGEIST_TABLES_OUT";
 /// every time. The pool of threads is fixed when Polars first uses it, which
 /// the tests of other modules may have done in this process already, so the
 /// measuring is done in a new one.
-fn made_by_one_thread() -> [(&'static str, String); 3] {
+fn made_by_one_thread() -> [(&'static str, String); 4] {
     let dir = std::env::temp_dir().join(format!("dageist-tables-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("a directory for the tables");
     let status = Command::new(std::env::current_exe().expect("the test program"))
@@ -332,6 +362,7 @@ fn made_by_one_thread() -> [(&'static str, String); 3] {
             .unwrap_or_else(|error| panic!("measuring wrote no {name}: {error}"))
     };
     let made = [
+        ("counts.txt", read("counts.txt")),
         ("dtypes.txt", read("dtypes.txt")),
         ("contexts.txt", read("contexts.txt")),
         ("options.txt", read("options.txt")),
@@ -358,7 +389,12 @@ fn the_committed_tables_are_what_polars_gives() {
     let started = Instant::now();
     let files = made_by_one_thread();
     eprintln!("the tables took {:.1?} to make", started.elapsed());
-    let committed = [table::DTYPES, table::CONTEXTS, table::OPTIONS];
+    let committed = [
+        table::COUNTS,
+        table::DTYPES,
+        table::CONTEXTS,
+        table::OPTIONS,
+    ];
     if std::env::var_os(REFRESH).is_some() {
         for (name, text) in &files {
             let path = root().join("api/catalogue").join(name);

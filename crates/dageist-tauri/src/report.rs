@@ -275,12 +275,16 @@ fn expression_dtypes_view(expression: &ExpressionDtypes) -> ExpressionDtypesView
 pub(crate) enum ValueShapeView {
     One,
     Many,
+    /// Another number of values than one or the table's rows, which the data or the arguments
+    /// decide.
+    Counted,
 }
 
 const fn shape_view(shape: Shape) -> ValueShapeView {
     match shape {
         Shape::One => ValueShapeView::One,
         Shape::Many => ValueShapeView::Many,
+        Shape::Counted => ValueShapeView::Counted,
     }
 }
 

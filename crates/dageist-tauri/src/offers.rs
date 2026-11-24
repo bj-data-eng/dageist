@@ -135,6 +135,7 @@ impl From<AfterRequest> for After {
                 shape: match shape {
                     ValueShapeView::One => Shape::One,
                     ValueShapeView::Many => Shape::Many,
+                    ValueShapeView::Counted => Shape::Counted,
                 },
             },
             AfterRequest::Condition { state } => Self::Condition(match state {

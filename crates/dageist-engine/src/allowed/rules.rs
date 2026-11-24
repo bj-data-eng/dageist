@@ -53,6 +53,13 @@ pub enum Rule {
     /// a condition, and the new values of a replacement and its default, where they are moments, are in
     /// one time zone: Polars finds no dtype that two zones have in common.
     MomentsShareAZone,
+    /// The values a call meets are one value, which meets each of the others, or as many as one
+    /// another: a count that the data or the arguments decide is not the table's rows, and not
+    /// another such count it is not known to equal.
+    ValuesMeetInCount,
+    /// A window is given a value as long as its group, which a count that the data or the
+    /// arguments decide is not, unless the window joins the values of a group or explodes them.
+    WindowInputIsNotCounted,
     /// A window is given a value as long as its input, which a value of one row that a part widens is
     /// not.
     WindowInputIsNotWidened,
@@ -60,7 +67,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 15] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -73,6 +80,8 @@ impl Rule {
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
         Self::TimeZoneIsValid,
+        Self::ValuesMeetInCount,
+        Self::WindowInputIsNotCounted,
         Self::WindowInputIsNotWidened,
     ];
 
@@ -92,6 +101,8 @@ impl Rule {
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::ValuesMeetInCount => "values-meet-in-count",
+            Self::WindowInputIsNotCounted => "window-input-is-not-counted",
             Self::WindowInputIsNotWidened => "window-input-is-not-widened",
         }
     }
@@ -125,6 +136,12 @@ impl Rule {
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::ValuesMeetInCount => {
+                "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
+            }
+            Self::WindowInputIsNotCounted => {
+                "a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, unless the window joins the values of a group into a list or explodes them"
+            }
             Self::WindowInputIsNotWidened => {
                 "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
             }
@@ -158,6 +175,8 @@ impl Rule {
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::TimeZoneIsValid
+            | Self::ValuesMeetInCount
+            | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
@@ -268,6 +287,8 @@ impl Rule {
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
             | Self::TimeZoneIsValid
+            | Self::ValuesMeetInCount
+            | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened => false,
         }
     }

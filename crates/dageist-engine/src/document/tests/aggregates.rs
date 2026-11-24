@@ -37,6 +37,8 @@ fn a_method_that_gives_one_value_in_the_tables_is_one_the_walk_counts_so() {
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == catalog::Applies::Expression)
+        // The count of what a method gives is its argument's, which is measured with one value.
+        .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
     {
         let id = entry.id().as_str();
         let one_for_every_receiver = [Representative::Int64, Representative::String]

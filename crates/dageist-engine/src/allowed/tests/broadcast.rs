@@ -165,6 +165,10 @@ fn the_catalogue_says_for_each_expression_parameter_whether_polars_meets_a_recei
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
+        // What a method that gives a count of values that the data or the arguments decide gives
+        // is that count, which the walk states from the arguments and these measurements of one
+        // value and many cannot.
+        .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
     {
         for parameter in entry
             .parameters()
@@ -215,6 +219,7 @@ fn a_method_given_a_literal_beside_a_column_receiver_gives_what_the_tables_say()
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
+        .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
     {
         for parameter in entry
             .parameters()

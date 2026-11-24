@@ -986,6 +986,7 @@ fn after_request(after: After) -> AfterRequest {
             shape: match shape {
                 Shape::One => ValueShapeView::One,
                 Shape::Many => ValueShapeView::Many,
+                Shape::Counted => ValueShapeView::Counted,
             },
         },
         After::Condition(state) => AfterRequest::Condition {

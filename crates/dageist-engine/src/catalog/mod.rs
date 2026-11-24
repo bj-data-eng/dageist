@@ -15,6 +15,7 @@
 mod arguments;
 mod comparison;
 mod condition;
+mod counting;
 mod defaults;
 mod duration;
 mod entries;
@@ -29,6 +30,7 @@ mod words;
 pub use arguments::{Argument, Arguments, BuildError, PatternMeans};
 pub use comparison::Comparison;
 pub use condition::Conditional;
+pub use counting::Counting;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use duration::{DurationError, DurationUse, any_moment, check_duration};
 pub use left_out::{LeftOut, Reason, left_out};

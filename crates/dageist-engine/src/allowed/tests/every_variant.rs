@@ -60,7 +60,9 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::PatternIsValid => Some(Rule::PivotAggregateGivesOneValue),
         Rule::PivotAggregateGivesOneValue => Some(Rule::ReplacementValuesMatchInNumber),
         Rule::ReplacementValuesMatchInNumber => Some(Rule::TimeZoneIsValid),
-        Rule::TimeZoneIsValid => Some(Rule::WindowInputIsNotWidened),
+        Rule::TimeZoneIsValid => Some(Rule::ValuesMeetInCount),
+        Rule::ValuesMeetInCount => Some(Rule::WindowInputIsNotCounted),
+        Rule::WindowInputIsNotCounted => Some(Rule::WindowInputIsNotWidened),
         Rule::WindowInputIsNotWidened => None,
     }
 }
@@ -76,7 +78,8 @@ const fn next_stage(stage: Stage) -> Option<Stage> {
 const fn next_shape(shape: Shape) -> Option<Shape> {
     match shape {
         Shape::One => Some(Shape::Many),
-        Shape::Many => None,
+        Shape::Many => Some(Shape::Counted),
+        Shape::Counted => None,
     }
 }
 

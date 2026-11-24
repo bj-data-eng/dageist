@@ -14,11 +14,11 @@ use crate::allowed::dtype::Representative;
 use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
-    Chain, ContextLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces, Reason,
-    Stage, subject_of,
+    Chain, ContextLine, CountLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces,
+    Reason, Shape, Stage, subject_of,
 };
 use crate::catalog::{
-    self, Applies, Argument, BuildError, Entry, Kind, Parameter, ParameterDefault,
+    self, Applies, Argument, BuildError, Counting, Entry, Kind, Parameter, ParameterDefault,
     Shape as ParamShape,
 };
 
@@ -34,6 +34,7 @@ pub(super) struct Generated {
     pub dtypes: Vec<DtypeLine>,
     pub contexts: Vec<ContextLine>,
     pub options: Vec<OptionLine>,
+    pub counts: Vec<CountLine>,
 }
 
 /// Runs `work` on every item, on as many threads as the machine offers up to
@@ -73,11 +74,13 @@ pub(super) fn generate() -> Generated {
     let dtypes = dtype_lines();
     let index = DtypeIndex::new(&dtypes);
     let options = option_lines(&index);
-    let contexts = context_lines(&index, &OptionIndex::new(&options));
+    let counts = count_lines();
+    let contexts = context_lines(&index, &OptionIndex::new(&options), &counts);
     Generated {
         dtypes,
         contexts,
         options,
+        counts,
     }
 }
 
@@ -112,13 +115,25 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 /// A quantile is in the list too, though the approximate one meets a column of shares: the sample's
 /// columns hold the numbers 1 and 3, which are no share, so what Polars does with a column of them
 /// says nothing of the dtype, and the number 1 is the share that is the largest value.
-const SCALAR_ONLY: [(&str, &str); 6] = [
+///
+/// So are the counts that cut a column: the values `head`, `tail`, `limit` and `slice` take, and
+/// the `k` of `top_k` and `bottom_k`, which Polars reads as the first value it is given or refuses
+/// many values of.
+const SCALAR_ONLY: [(&str, &str); 14] = [
     ("Expr.shift", "n"),
     ("Expr.shift", "fill_value"),
     ("Expr.diff", "n"),
     ("Expr.pct_change", "n"),
     ("Expr.quantile", "quantile"),
     ("Expr.approx_quantile", "quantile"),
+    ("Expr.head", "n"),
+    ("Expr.limit", "n"),
+    ("Expr.tail", "n"),
+    ("Expr.slice", "offset"),
+    ("Expr.slice", "length"),
+    ("Expr.top_k", "k"),
+    ("Expr.bottom_k", "k"),
+    ("Expr.gather", "indices"),
 ];
 
 /// The parts of a date that the functions which make one take, whose calendar has no month and no
@@ -249,6 +264,7 @@ fn companions(
         ("Expr.replace_strict", Some("default")) => vec![("old", own())],
         // A slice that is tested for its length starts at a place: the second character.
         ("Expr.str.slice", Some("length")) => vec![("offset", expression(integer(1)))],
+        ("Expr.slice", Some("length")) => vec![("offset", expression(integer(1)))],
         // A time zone every moment is given, or converted to: one that has no gap or repeat.
         ("Expr.dt.replace_time_zone" | "Expr.dt.convert_time_zone", _) => {
             vec![("time_zone", Argument::TimeZone(Some("UTC".to_owned())))]
@@ -257,6 +273,11 @@ fn companions(
         ("Expr.dt.strftime", _) => vec![("format", Argument::String("iso".to_owned()))],
         // The keys that a sort by must be given, beside the further keys that are tested.
         ("Expr.sort_by", Some("more_by")) => vec![("by", expressions(vec![scope.start()]))],
+        // A place past the end is a null, where Polars refuses it as the data decide: a table of no
+        // rows has no place at all, so a call that refuses one runs on none of them.
+        ("Expr.gather", _) => vec![("null_on_oob", Argument::Flag(Some(true)))],
+        // Every second value: the count that the method takes is a number typed in.
+        ("Expr.gather_every", _) => vec![("n", Argument::Integer(2))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
         ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),
@@ -374,6 +395,40 @@ fn dtype_jobs() -> Vec<DtypeJob> {
     jobs
 }
 
+/// Whether the call of `entry` with `options` gives a count of values that its arguments or the
+/// data decide, and not what the three rows of a sample table say: it has the shape
+/// [`Shape::Counted`] whatever it gives there, as `unique` gives three values of three that
+/// differ, and `mode` one or all of them.
+///
+/// A method whose count is an argument's is measured with the argument it is given, and says
+/// what that gives.
+fn declared_counted(entry: &Entry, options: &[(&str, &str)]) -> bool {
+    matches!(Counting::of(entry, options), Some(counting) if !matches!(counting, Counting::TheArgument(_)))
+}
+
+/// `outcome`, with the shape [`Shape::Counted`] where `entry` is declared to give one.
+///
+/// A drop of the nulls or the NaNs is the exception that stays [`Shape::Many`]: the sample's
+/// columns hold a null, which it drops, and the context table measures it on a column that holds
+/// none, as the explanation says.
+fn settled(entry: &Entry, options: &[(&str, &str)], outcome: Outcome) -> Outcome {
+    match outcome {
+        Outcome::Allowed(Some(produces)) if drops_values(entry) => {
+            Outcome::Allowed(Some(Produces {
+                shape: Shape::Many,
+                ..produces
+            }))
+        }
+        Outcome::Allowed(Some(produces)) if declared_counted(entry, options) => {
+            Outcome::Allowed(Some(Produces {
+                shape: Shape::Counted,
+                ..produces
+            }))
+        }
+        other => other,
+    }
+}
+
 fn dtype_line(job: &DtypeJob) -> DtypeLine {
     // A function that starts an expression is measured on columns of the dtype of its argument,
     // beside a column of whole numbers.
@@ -408,7 +463,7 @@ fn dtype_line(job: &DtypeJob) -> DtypeLine {
         parameter: job.parameter,
         receiver: job.receiver,
         argument: job.argument,
-        outcome: outcome(&plan, &frames),
+        outcome: settled(job.entry, &[], outcome(&plan, &frames)),
     }
 }
 
@@ -654,11 +709,23 @@ const KEY: DataType = DataType::Int64;
 /// What follows the expression under test where the chain goes on from it,
 /// so that the context does not refuse it for how it ends: a test for a value
 /// where a `Boolean` is required, which any dtype can be given.
-fn continued_subject(context: Context, subject: Expr) -> Result<Expr, BuildError> {
-    if needs_boolean(context) {
-        method(entry("Expr.is_not_null"), subject, Vec::new())
+fn continued_subject(
+    context: Context,
+    subject: Expr,
+    aggregated: bool,
+) -> Result<Expr, BuildError> {
+    let tested = if needs_boolean(context) {
+        method(entry("Expr.is_not_null"), subject, Vec::new())?
     } else {
-        Ok(subject)
+        subject
+    };
+    // What gives a count of values that the data or the arguments decide goes on to one value, as
+    // a count of its values or whether all of them are: no place takes the count itself, and what
+    // is measured is whether the method may stand in the place at all.
+    match (aggregated, needs_boolean(context)) {
+        (false, _) => Ok(tested),
+        (true, true) => method(entry("Expr.all"), tested, Vec::new()),
+        (true, false) => method(entry("Expr.len"), tested, Vec::new()),
     }
 }
 
@@ -802,13 +869,14 @@ fn context_plan(
     context: Context,
     chain: Chain,
     subject: Subject<'_>,
+    aggregated: bool,
     frames: &Frames,
     empty: bool,
 ) -> Result<LazyFrame, BuildError> {
     let scope = scope_of(context.outer());
     let mut held = subject(scope)?;
     if chain == Chain::Continues {
-        held = continued_subject(context, held)?;
+        held = continued_subject(context, held, aggregated)?;
     }
     if let Some(nested) = context.nested() {
         held = wrap(nested, held, scope)?;
@@ -950,7 +1018,15 @@ fn without_nulls(scope: Scope, class: Representative) -> Option<&'static str> {
     }
 }
 
-fn context_lines(index: &DtypeIndex, options: &OptionIndex) -> Vec<ContextLine> {
+fn context_lines(
+    index: &DtypeIndex,
+    options: &OptionIndex,
+    counts: &[CountLine],
+) -> Vec<ContextLine> {
+    let counts: HashMap<(Context, Shape), Outcome> = counts
+        .iter()
+        .map(|line| ((line.context, line.shape), line.outcome.clone()))
+        .collect();
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
@@ -995,6 +1071,7 @@ fn context_lines(index: &DtypeIndex, options: &OptionIndex) -> Vec<ContextLine> 
             *chain,
             &candidates,
             &form_candidates,
+            &counts,
         )
     })
 }
@@ -1006,8 +1083,14 @@ fn context_line(
     chain: Chain,
     candidates: &HashMap<&'static str, Vec<Candidate>>,
     form_candidates: &HashMap<(&'static str, Form), Vec<Candidate>>,
+    counts: &HashMap<(Context, Shape), Outcome>,
 ) -> ContextLine {
     let id = entry.id().as_str();
+    let form_words: Vec<(&str, &str)> = form.into_iter().collect();
+    // A method that gives a count of values that the data or the arguments decide stands in a
+    // place when what it goes on to, one value, may; the three rows of a sample cannot measure
+    // the count itself, which the table of counts does.
+    let counted = entry.applies() == Applies::Expression && declared_counted(entry, &form_words);
     let rules = Rule::governing(id, context);
     let form_options: Vec<OptionValue> = form
         .into_iter()
@@ -1115,7 +1198,9 @@ fn context_line(
     let in_a_join_key = matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight);
     let held = in_a_join_key.then(|| held_dtype(context, &*subject, &probe));
     let measured = match &held {
-        Some(dtype) if chain == Chain::Continues && cannot_be_cast_to_a_key(dtype) => Chain::Ends,
+        Some(dtype) if chain == Chain::Continues && !counted && cannot_be_cast_to_a_key(dtype) => {
+            Chain::Ends
+        }
         _ => chain,
     };
     let key = match &held {
@@ -1123,16 +1208,28 @@ fn context_line(
         _ => KEY,
     };
     let frames = Frames::new(receiver_dtype, argument_dtype, &key);
-    let plan =
-        |frames: &Frames, empty: bool| context_plan(context, measured, &*subject, frames, empty);
-    let measured = measure(&plan, &frames);
-    let outcome = match measured {
-        Err(reason) => Outcome::Refused(reason),
-        Ok(_) => Outcome::Allowed(match (&candidate, entry.applies()) {
-            (Some(candidate), _) => candidate.produces.clone(),
-            (None, Applies::Function) => standalone(&*subject, &frames),
-            (None, _) => None,
-        }),
+    let plan = |frames: &Frames, empty: bool| {
+        context_plan(context, measured, &*subject, counted, frames, empty)
+    };
+    let outcome = match (
+        counted && chain == Chain::Ends,
+        counts.get(&(context, Shape::Counted)),
+    ) {
+        // Where a chain that ends is a count, the table of counts says what Polars does.
+        (true, Some(Outcome::Refused(reason))) => Outcome::Refused(reason.clone()),
+        (true, _) => Outcome::Allowed(
+            candidate
+                .as_ref()
+                .and_then(|candidate| candidate.produces.clone()),
+        ),
+        (false, _) => match measure(&plan, &frames) {
+            Err(reason) => Outcome::Refused(reason),
+            Ok(_) => Outcome::Allowed(match (&candidate, entry.applies()) {
+                (Some(candidate), _) => candidate.produces.clone(),
+                (None, Applies::Function) => standalone(&*subject, &frames),
+                (None, _) => None,
+            }),
+        },
     };
     ContextLine {
         entry: id,
@@ -1162,6 +1259,74 @@ fn standalone(subject: Subject<'_>, frames: &Frames) -> Option<Produces> {
 }
 
 // ---------------------------------------------------------------------------
+// The table of counts
+
+/// The expression that gives `shape` where `boolean` says the place needs a `Boolean`, read from
+/// the values of a column in the scope: the column, one value of it, or the first two.
+fn counted_subject(shape: Shape, boolean: bool, scope: Scope) -> Result<Expr, BuildError> {
+    let values = match (boolean, scope.group) {
+        (true, false) => column(scope.boolean),
+        // The values of a group are of the column it reads, which a test of each makes `Boolean`.
+        (true, true) => method(entry("Expr.is_not_null"), scope.start(), Vec::new())?,
+        (false, _) => scope.start(),
+    };
+    match shape {
+        Shape::Many => Ok(values),
+        Shape::One => method(
+            entry(if boolean { "Expr.all" } else { "Expr.sum" }),
+            values,
+            Vec::new(),
+        ),
+        Shape::Counted => method(
+            entry("Expr.head"),
+            values,
+            vec![("n", expression(integer(2)))],
+        ),
+    }
+}
+
+fn count_lines() -> Vec<CountLine> {
+    let jobs: Vec<(Context, Shape)> = Context::all()
+        .into_iter()
+        .flat_map(|context| Shape::ALL.into_iter().map(move |shape| (context, shape)))
+        .collect();
+    in_parallel(&jobs, |(context, shape)| count_line(*context, *shape))
+}
+
+/// What Polars does with a chain of `shape` that ends in `context`: of the values of a column of
+/// whole numbers, or of `Boolean`s where the place needs them, as many as the table has rows, one
+/// of them, or the first two.
+fn count_line(context: Context, shape: Shape) -> CountLine {
+    let boolean = needs_boolean(context);
+    let subject: Maker = Box::new(move |scope| counted_subject(shape, boolean, scope));
+    let probe = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    // Where the chain ends in a join key, the other table's key has the dtype the key has.
+    let in_a_join_key = matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight);
+    let key = if in_a_join_key {
+        held_dtype(context, &*subject, &probe)
+    } else {
+        KEY
+    };
+    let frames = Frames::new(Representative::Int64, Representative::Int64, &key);
+    let plan = |frames: &Frames, empty: bool| {
+        context_plan(context, Chain::Ends, &*subject, false, frames, empty)
+    };
+    let outcome = match measure(&plan, &frames) {
+        Ok(_) => Outcome::Allowed(None),
+        Err(reason) => Outcome::Refused(reason),
+    };
+    CountLine {
+        context,
+        shape,
+        outcome,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The option table
 
 /// One option of an entry and the values it is given.
@@ -1182,10 +1347,16 @@ fn dtype_classes() -> Vec<Representative> {
         .collect()
 }
 
+/// The options that no line of the option table is measured for, because what Polars does with
+/// them is for the data to say: `gather` refuses a place past the end of what it follows, which
+/// a table of no rows has for every place, unless it is told to give a null there.
+pub(super) const NOT_MEASURED: [(&str, &str); 1] = [("Expr.gather", "null_on_oob")];
+
 fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
     entry
         .parameters()
         .iter()
+        .filter(|parameter| !NOT_MEASURED.contains(&(entry.id().as_str(), parameter.name())))
         // The dtype a method converts values to is measured by the cast, for what it accepts is
         // what a cast accepts.
         .filter(|parameter| parameter.converts().is_empty())
@@ -1392,8 +1563,16 @@ fn option_line(
             option_step(id, frames, empty, chosen.clone())
         }
     };
+    let words: Vec<(&str, &str)> = set
+        .iter()
+        .map(|(name, text, _)| (*name, text.as_str()))
+        .collect();
     let outcome = match measure(&plan, &frames) {
-        Ok(measured) => Outcome::Allowed(candidate.as_ref().and_then(|_| measured.produces())),
+        Ok(measured) => settled(
+            entry,
+            &words,
+            Outcome::Allowed(candidate.as_ref().and_then(|_| measured.produces())),
+        ),
         Err(reason) => Outcome::Refused(reason),
     };
     let options: Vec<OptionValue> = set

@@ -57,6 +57,8 @@
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #   time-zone-is-valid: a time zone must be one Polars reads.
+#   values-meet-in-count: the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal.
+#   window-input-is-not-counted: a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, unless the window joins the values of a group into a list or explodes them.
 #   window-input-is-not-widened: a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
@@ -67,7 +69,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13020 combinations: 8887 allowed; 2420 refused when Polars resolved the schema, 1713 when it ran the rows, 0 when it ran the empty table.
+# 13800 combinations: 9274 allowed; 2608 refused when Polars resolved the schema, 1918 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -1209,6 +1211,66 @@ Expr.arg_sort | sort > over.partition_by | continues | Int64 | - | - | allowed U
 Expr.arg_sort | sort > over.partition_by | ends | Int64 | - | - | allowed UInt32 many
 Expr.arg_sort | sort | continues | Int64 | - | - | allowed UInt32 many
 Expr.arg_sort | sort | ends | Int64 | - | - | allowed UInt32 many
+Expr.arg_unique | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | filter > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.arg_unique | filter > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | filter | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 counted
+Expr.arg_unique | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 counted
+Expr.arg_unique | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.arg_unique | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.arg_unique | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arg_unique | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arg_unique | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arg_unique | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed UInt32 counted
+Expr.arg_unique | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed UInt32 counted
+Expr.arg_unique | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | select > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | select > condition.value | ends | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | select > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.arg_unique | select > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | select | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | select | ends | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.arg_unique | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | sort > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | sort > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.arg_unique | sort > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.arg_unique | sort | continues | Int64 | - | - | allowed UInt32 counted
+Expr.arg_unique | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.backward_fill | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.backward_fill | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.backward_fill | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 many
@@ -1809,6 +1871,66 @@ Expr.bitwise_xor | sort > over.partition_by | continues | Int64 | - | - | allowe
 Expr.bitwise_xor | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 one
 Expr.bitwise_xor | sort | continues | Int64 | - | - | allowed Int64 one
 Expr.bitwise_xor | sort | ends | Int64 | - | - | allowed Int64 one
+Expr.bottom_k | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.bottom_k | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.bottom_k | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.bottom_k | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.bottom_k | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.bottom_k | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.bottom_k | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.bottom_k | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.bottom_k | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.bottom_k | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.bottom_k | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.bottom_k | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.bottom_k | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.bottom_k | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.bottom_k | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.bottom_k | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.bottom_k | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.bottom_k | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.cast | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.cast | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.cast | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 many
@@ -6309,6 +6431,66 @@ Expr.fill_null[strategy=zero] | sort > over.partition_by | continues | Int64 | -
 Expr.fill_null[strategy=zero] | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.fill_null[strategy=zero] | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.fill_null[strategy=zero] | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.filter | filter > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | filter > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | filter > condition.value | continues | Int64 | Boolean | filter-predicate-is-boolean | allowed Int64 counted
+Expr.filter | filter > condition.value | ends | Boolean | Boolean | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | filter > over.order_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | filter > over.order_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.filter | filter > over.partition_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | filter > over.partition_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | filter | continues | Int64 | Boolean | filter-predicate-is-boolean | allowed Int64 counted
+Expr.filter | filter | ends | Boolean | Boolean | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | join_left > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | join_left > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left > condition.value | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | join_left > condition.value | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left > over.order_by | continues | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left > over.order_by | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left > over.partition_by | continues | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left > over.partition_by | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_left | continues | Int64 | Boolean | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.filter | join_left | ends | Int64 | Boolean | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | join_right > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > condition.value | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | join_right > condition.value | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > over.order_by | continues | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > over.order_by | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > over.partition_by | continues | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right > over.partition_by | ends | Int64 | Boolean | - | refused schema: all join key expressions must be elementwise.
+Expr.filter | join_right | continues | Int64 | Boolean | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.filter | join_right | ends | Int64 | Boolean | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.filter | pivot_aggregate > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | pivot_aggregate > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | allowed Boolean counted
+Expr.filter | pivot_aggregate > condition.value | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | pivot_aggregate > condition.value | ends | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | pivot_aggregate > over.order_by | continues | Int64 | Boolean | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.filter | pivot_aggregate > over.order_by | ends | Int64 | Boolean | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.filter | pivot_aggregate > over.partition_by | continues | Int64 | Boolean | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.filter | pivot_aggregate > over.partition_by | ends | Int64 | Boolean | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.filter | pivot_aggregate | continues | Int64 | Boolean | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.filter | pivot_aggregate | ends | Int64 | Boolean | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.filter | select > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | select > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | allowed Boolean counted
+Expr.filter | select > condition.value | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | select > condition.value | ends | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | select > over.order_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | select > over.order_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.filter | select > over.partition_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | select > over.partition_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | select | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | select | ends | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | sort > condition.predicate | continues | Int64 | Boolean | condition-predicate-is-boolean | allowed Int64 counted
+Expr.filter | sort > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | sort > condition.value | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | sort > condition.value | ends | Int64 | Boolean | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | sort > over.order_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | sort > over.order_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.filter | sort > over.partition_by | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | sort > over.partition_by | ends | Int64 | Boolean | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.filter | sort | continues | Int64 | Boolean | - | allowed Int64 counted
+Expr.filter | sort | ends | Int64 | Boolean | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.first | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.first | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.first | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 one
@@ -6549,6 +6731,126 @@ Expr.forward_fill | sort > over.partition_by | continues | Int64 | - | - | allow
 Expr.forward_fill | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.forward_fill | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.forward_fill | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.gather | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
+Expr.gather | filter > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean one
+Expr.gather | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 one
+Expr.gather | filter > condition.value | ends | Boolean | Int8 | filter-predicate-is-boolean | allowed Boolean one
+Expr.gather | filter > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | filter > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | filter > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | filter > over.partition_by | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | filter | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 one
+Expr.gather | filter | ends | Boolean | Int8 | filter-predicate-is-boolean | allowed Boolean one
+Expr.gather | join_left > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_left | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
+Expr.gather | pivot_aggregate > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean one
+Expr.gather | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 one
+Expr.gather | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 one
+Expr.gather | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
+Expr.gather | select > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean one
+Expr.gather | select > condition.value | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | select > condition.value | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | select > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | select > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | select > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | select > over.partition_by | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | select | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | select | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
+Expr.gather | sort > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean one
+Expr.gather | sort > condition.value | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort > condition.value | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | sort > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 1 that doesn't match the input DataFrame: 3
+Expr.gather | sort > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort > over.partition_by | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.gather | sort | ends | Int64 | Int64 | - | allowed Int64 one
+Expr.gather_every | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.gather_every | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.gather_every | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.gather_every | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.gather_every | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.gather_every | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.gather_every | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather_every | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather_every | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.gather_every | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.gather_every | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.gather_every | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.gather_every | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.gather_every | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.gather_every | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.gather_every | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.gather_every | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.gather_every | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.ge | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
@@ -6729,6 +7031,66 @@ Expr.has_nulls | sort > over.partition_by | continues | Int64 | - | - | allowed 
 Expr.has_nulls | sort > over.partition_by | ends | Int64 | - | - | allowed Boolean one
 Expr.has_nulls | sort | continues | Int64 | - | - | allowed Boolean one
 Expr.has_nulls | sort | ends | Int64 | - | - | allowed Boolean one
+Expr.head | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.head | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.head | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.head | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.head | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.head | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.head | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.head | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.head | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.head | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.head | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.head | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.head | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.head | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.head | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.head | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.head | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.head | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.head | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.head | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.head | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.head | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.head | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.head | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.is_between | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_between | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_between | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
@@ -7689,6 +8051,66 @@ Expr.len | sort > over.partition_by | continues | Int64 | - | - | allowed UInt32
 Expr.len | sort > over.partition_by | ends | Int64 | - | - | allowed UInt32 one
 Expr.len | sort | continues | Int64 | - | - | allowed UInt32 one
 Expr.len | sort | ends | Int64 | - | - | allowed UInt32 one
+Expr.limit | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.limit | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.limit | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.limit | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.limit | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.limit | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.limit | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.limit | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.limit | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.limit | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.limit | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.limit | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.limit | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.limit | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.limit | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.limit | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.limit | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.limit | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.limit | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.limit | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.limit | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.limit | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.limit | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.limit | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.log | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Float64 many
 Expr.log | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `a`
 Expr.log | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Float64 many
@@ -8169,6 +8591,66 @@ Expr.mod | sort > over.partition_by | continues | Int64 | Int64 | - | allowed In
 Expr.mod | sort > over.partition_by | ends | Int64 | Int64 | - | allowed Int64 many
 Expr.mod | sort | continues | Int64 | Int64 | - | allowed Int64 many
 Expr.mod | sort | ends | Int64 | Int64 | - | allowed Int64 many
+Expr.mode | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.mode | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.mode | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.mode | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.mode | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.mode | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.mode | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.mode | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.mode | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.mode | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.mode | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.mode | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.mode | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.mode | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.mode | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.mode | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.mode | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.mode | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.mode | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.mode | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.mode | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.mode | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.mode | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.mode | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.mul | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 many
 Expr.mul | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.mul | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 many
@@ -9849,6 +10331,66 @@ Expr.skew | sort > over.partition_by | continues | Int64 | - | - | allowed Float
 Expr.skew | sort > over.partition_by | ends | Int64 | - | - | allowed Float64 one
 Expr.skew | sort | continues | Int64 | - | - | allowed Float64 one
 Expr.skew | sort | ends | Int64 | - | - | allowed Float64 one
+Expr.slice | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
+Expr.slice | filter > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 counted
+Expr.slice | filter > condition.value | ends | Boolean | Int8 | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | filter > over.order_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | filter > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.slice | filter > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | filter > over.partition_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | filter | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 counted
+Expr.slice | filter | ends | Boolean | Int8 | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | join_left > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
+Expr.slice | join_left > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left > condition.value | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | join_left > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_left | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.slice | join_left | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
+Expr.slice | join_right > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > condition.value | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | join_right > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
+Expr.slice | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.slice | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.slice | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean counted
+Expr.slice | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.slice | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.slice | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.slice | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.slice | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: unable to extract offset from Scalar(ScalarColumn { name: "literal", scalar: Scalar { dtype: Int64, value: Null }, length: 1, materialized: OnceLock(<uninit>) })
+Expr.slice | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.slice | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
+Expr.slice | select > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | allowed Boolean counted
+Expr.slice | select > condition.value | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | select > condition.value | ends | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | select > over.order_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | select > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.slice | select > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | select > over.partition_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | select | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | select | ends | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | sort > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 counted
+Expr.slice | sort > condition.predicate | ends | Boolean | Int8 | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | sort > condition.value | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | sort > condition.value | ends | Int64 | Int64 | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | sort > over.order_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | sort > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.slice | sort > over.partition_by | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | sort > over.partition_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.slice | sort | continues | Int64 | Int64 | - | allowed Int64 counted
+Expr.slice | sort | ends | Int64 | Int64 | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.sort | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.sort | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.sort | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 many
@@ -12009,6 +12551,66 @@ Expr.sum | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 
 Expr.sum | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 one
 Expr.sum | sort | continues | Int64 | - | - | allowed Int64 one
 Expr.sum | sort | ends | Int64 | - | - | allowed Int64 one
+Expr.tail | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.tail | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.tail | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.tail | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.tail | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.tail | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.tail | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.tail | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.tail | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.tail | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.tail | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.tail | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.tail | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.tail | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.tail | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.tail | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.tail | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.tail | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.tail | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.tail | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.tail | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.tail | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.tail | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.tail | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.tan | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Float64 many
 Expr.tan | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `a`
 Expr.tan | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Float64 many
@@ -12129,6 +12731,66 @@ Expr.tanh | sort > over.partition_by | continues | Int64 | - | - | allowed Float
 Expr.tanh | sort > over.partition_by | ends | Int64 | - | - | allowed Float64 many
 Expr.tanh | sort | continues | Int64 | - | - | allowed Float64 many
 Expr.tanh | sort | ends | Int64 | - | - | allowed Float64 many
+Expr.top_k | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.top_k | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.top_k | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.top_k | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.top_k | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.top_k | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.top_k | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.top_k | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.top_k | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.top_k | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.top_k | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.top_k | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.top_k | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.top_k | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.top_k | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.top_k | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.top_k | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.top_k | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.top_k | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.top_k | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.top_k | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.top_k | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.truediv | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Float64 many
 Expr.truediv | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `a`
 Expr.truediv | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Float64 many
@@ -12249,6 +12911,126 @@ Expr.truncate | sort > over.partition_by | continues | Int64 | - | - | allowed I
 Expr.truncate | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.truncate | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.truncate | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.unique | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | filter > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.unique | filter > condition.value | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | filter > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique | filter > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 counted
+Expr.unique | filter | ends | Boolean | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | join_left > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.unique | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 counted
+Expr.unique | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.unique | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.unique | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.unique | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.unique | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.unique | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Int64 counted
+Expr.unique | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | select > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean counted
+Expr.unique | select > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | select > condition.value | ends | Int64 | - | - | allowed Int64 counted
+Expr.unique | select > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique | select > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | select | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | select | ends | Int64 | - | - | allowed Int64 counted
+Expr.unique | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 counted
+Expr.unique | sort > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | sort > condition.value | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | sort > over.order_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique | sort > over.partition_by | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique | sort | continues | Int64 | - | - | allowed Int64 counted
+Expr.unique | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | filter > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique_counts | filter > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | filter | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 counted
+Expr.unique_counts | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 counted
+Expr.unique_counts | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.unique_counts | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.unique_counts | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique_counts | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique_counts | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.unique_counts | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed UInt32 counted
+Expr.unique_counts | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed UInt32 counted
+Expr.unique_counts | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | select > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | select > condition.value | ends | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | select > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique_counts | select > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | select | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | select | ends | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 counted
+Expr.unique_counts | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | sort > condition.value | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | sort > over.order_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.unique_counts | sort > over.partition_by | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.unique_counts | sort | continues | Int64 | - | - | allowed UInt32 counted
+Expr.unique_counts | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.var | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Float64 one
 Expr.var | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `_POLARS_TMP_PHYS_`
 Expr.var | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Float64 one

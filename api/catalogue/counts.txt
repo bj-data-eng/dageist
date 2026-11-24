@@ -1,0 +1,124 @@
+# Allowed counts by context
+#
+# Polars: the release py-2.1.0 at the commit 7f902bd3ffd27ff82d14278a09a295ff2f7aed92 of vendor/polars.
+# Generated from the catalogue and Polars by the engine test
+# `allowed::tests::artifacts::the_committed_tables_are_what_polars_gives`, with Polars on
+# one thread, so that a reason that depends on which of two failures comes first is the
+# same every time. Do not edit.
+# To refresh after a change of the catalogue or of Polars:
+#   DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts
+# See docs/how-to.md, "Refresh The Tables Of Allowed Combinations".
+#
+# Each line is: context | count | outcome.
+#
+# The context table measures each entry as it gives its values. How many values a chain
+# gives is not an entry's alone, for a method that follows a count keeps it, so this table
+# measures the counts: a chain that ends in a context and gives one value, as many values
+# as the table has rows, or another number of them, which the data or the arguments
+# decide. The columns hold three rows, and the other number is the first two of them.
+# Where the place needs a `Boolean`, the values are those of a `Boolean` column; in a
+# join key the other table's key has the dtype the key has; and in a pivot's aggregate
+# they are the values of a group.
+#
+# The outcome is `allowed -`, or `refused <stage>: <Polars' reason>`.
+#
+# An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
+# `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved
+# its schema, ran it on three rows that include a null, and ran it on a table with no rows.
+# The stage is where Polars refused it: `schema`; `rows`, when the schema resolved and
+# the rows were refused; or `empty`, when only the table with no rows was. `one` is a
+# value for the three rows together, `many` any other number. A reason is Polars' message
+# up to its first blank line, on one line.
+#
+# 90 combinations: 54 allowed; 18 refused when Polars resolved the schema, 18 when it ran the rows, 0 when it ran the empty table.
+#
+filter > condition.predicate | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+filter > condition.predicate | many | allowed -
+filter > condition.predicate | one | allowed -
+filter > condition.value | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+filter > condition.value | many | allowed -
+filter > condition.value | one | allowed -
+filter > over.order_by | counted | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+filter > over.order_by | many | allowed -
+filter > over.order_by | one | allowed -
+filter > over.partition_by | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+filter > over.partition_by | many | allowed -
+filter > over.partition_by | one | allowed -
+filter | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+filter | many | allowed -
+filter | one | allowed -
+join_left > condition.predicate | counted | refused schema: all join key expressions must be elementwise.
+join_left > condition.predicate | many | allowed -
+join_left > condition.predicate | one | allowed -
+join_left > condition.value | counted | refused schema: all join key expressions must be elementwise.
+join_left > condition.value | many | allowed -
+join_left > condition.value | one | allowed -
+join_left > over.order_by | counted | refused schema: all join key expressions must be elementwise.
+join_left > over.order_by | many | refused schema: all join key expressions must be elementwise.
+join_left > over.order_by | one | refused schema: all join key expressions must be elementwise.
+join_left > over.partition_by | counted | refused schema: all join key expressions must be elementwise.
+join_left > over.partition_by | many | refused schema: all join key expressions must be elementwise.
+join_left > over.partition_by | one | refused schema: all join key expressions must be elementwise.
+join_left | counted | refused schema: all join key expressions must be elementwise.
+join_left | many | allowed -
+join_left | one | allowed -
+join_right > condition.predicate | counted | refused schema: all join key expressions must be elementwise.
+join_right > condition.predicate | many | allowed -
+join_right > condition.predicate | one | allowed -
+join_right > condition.value | counted | refused schema: all join key expressions must be elementwise.
+join_right > condition.value | many | allowed -
+join_right > condition.value | one | allowed -
+join_right > over.order_by | counted | refused schema: all join key expressions must be elementwise.
+join_right > over.order_by | many | refused schema: all join key expressions must be elementwise.
+join_right > over.order_by | one | refused schema: all join key expressions must be elementwise.
+join_right > over.partition_by | counted | refused schema: all join key expressions must be elementwise.
+join_right > over.partition_by | many | refused schema: all join key expressions must be elementwise.
+join_right > over.partition_by | one | refused schema: all join key expressions must be elementwise.
+join_right | counted | refused schema: all join key expressions must be elementwise.
+join_right | many | allowed -
+join_right | one | allowed -
+pivot_aggregate > condition.predicate | counted | allowed -
+pivot_aggregate > condition.predicate | many | allowed -
+pivot_aggregate > condition.predicate | one | allowed -
+pivot_aggregate > condition.value | counted | allowed -
+pivot_aggregate > condition.value | many | allowed -
+pivot_aggregate > condition.value | one | allowed -
+pivot_aggregate > over.order_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+pivot_aggregate > over.order_by | many | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+pivot_aggregate > over.order_by | one | refused rows: lengths don't match: the length of the window expression did not match that of the group
+pivot_aggregate > over.partition_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+pivot_aggregate > over.partition_by | many | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+pivot_aggregate > over.partition_by | one | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+pivot_aggregate | counted | allowed -
+pivot_aggregate | many | allowed -
+pivot_aggregate | one | allowed -
+select > condition.predicate | counted | allowed -
+select > condition.predicate | many | allowed -
+select > condition.predicate | one | allowed -
+select > condition.value | counted | allowed -
+select > condition.value | many | allowed -
+select > condition.value | one | allowed -
+select > over.order_by | counted | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+select > over.order_by | many | allowed -
+select > over.order_by | one | allowed -
+select > over.partition_by | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+select > over.partition_by | many | allowed -
+select > over.partition_by | one | allowed -
+select | counted | allowed -
+select | many | allowed -
+select | one | allowed -
+sort > condition.predicate | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+sort > condition.predicate | many | allowed -
+sort > condition.predicate | one | allowed -
+sort > condition.value | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+sort > condition.value | many | allowed -
+sort > condition.value | one | allowed -
+sort > over.order_by | counted | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+sort > over.order_by | many | allowed -
+sort > over.order_by | one | allowed -
+sort > over.partition_by | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+sort > over.partition_by | many | allowed -
+sort > over.partition_by | one | allowed -
+sort | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+sort | many | allowed -
+sort | one | allowed -
