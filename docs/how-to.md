@@ -73,8 +73,9 @@ cargo run --offline --locked -p dageist-tauri -- bridge
 npm --prefix ui run dev
 ```
 
-Open `http://localhost:5173`. The status badge reads `dageist 0.1.0` once the
-page has reached the bridge, and the steps, the node's inputs and the table
+Open `http://localhost:5173`. The status at the foot of the side panel reads
+`dageist 0.1.0` once the page has reached the bridge, and the steps, the
+canvas, the node's inputs and the table
 show what the application shows. The page updates as files under `ui/` change,
 with no build of the application. The bridge prints
 `dageist bridge listening on http://127.0.0.1:7878` when it is ready. The
@@ -101,6 +102,28 @@ only and serves only a page that reaches it through that address or
 `localhost`; see [the bridge](explanation.md#the-bridge) for why. It is run from
 `cargo run`, a debug build. A release build of the binary has no console on
 Windows, because the host sets `windows_subsystem = "windows"` for releases.
+
+## Work On The View In The Application Window
+
+What only the application window has, such as its title bar, the place of its
+window controls and the browser keys it turns off, is seen in the window
+itself. A debug build can load the view from the development server rather
+than from `ui/dist`, so the window updates as files under `ui/` change, as the
+browser does. Start the development server, then build and open the window
+with a development address set for this build only. `tauri.conf.json` is left
+unchanged:
+
+```sh
+npm --prefix ui run dev
+TAURI_CONFIG='{"build":{"devUrl":"http://localhost:5173"}}' cargo run --offline --locked -p dageist-tauri
+```
+
+The window needs no bridge: it reaches the host through Tauri. A change to
+the window's own settings in `tauri.conf.json`, or to the permissions in
+`capabilities/`, takes effect only once the window is built and opened again.
+If the page fails its first load, for example while a file it imports is
+missing, the window stays blank, and a later change does not bring it back:
+quit the window and open it again.
 
 ## Format The View
 
