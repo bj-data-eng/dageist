@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-use dageist_fuzz::engine::{PropertyConfig, run_property};
+use dageist_fuzz::engine::{PropertyConfig, PropertyReport, run_property};
 use dageist_fuzz::generation::property;
 use dageist_fuzz::reduction::{
     ReductionEvaluation, ReductionLimits, ReductionReport, ReductionStatus, reduce_with,
@@ -446,8 +446,9 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
         tally: RefCell::new(Tally::new()),
         findings: RefCell::new(Vec::new()),
     };
-    let report = run_property(&observing, &strategy, config, &mut capture)
-        .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
+    let result = run_property(&observing, &strategy, config, &mut capture);
+    let findings = observing.findings.into_inner();
+    let evaluated = evaluated_by(result, findings.len());
     // The tally is of the run, not of the reduction of what it found. What the thread tallied
     // since its last evaluation is of the cases made after it.
     let mut tally = observing.tally.into_inner();
@@ -455,9 +456,18 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
         *tally.entry(what).or_default() += count;
     }
     Report {
-        evaluated: report.counts.evaluated(),
-        findings: observing.findings.into_inner(),
+        evaluated,
+        findings,
         tally: tally_lines(&tally),
+    }
+}
+
+/// How many cases the run of the property checked something in, or the panic that says why it
+/// could not be run.
+fn evaluated_by(result: Result<PropertyReport>, _findings: usize) -> u64 {
+    match result {
+        Ok(report) => report.counts.evaluated(),
+        Err(error) => panic!("the property could not be run: {error:?}"),
     }
 }
 
@@ -556,6 +566,56 @@ mod tests {
         // The cases are the ones the seed makes, whatever failed before them.
         assert_eq!(failing.evaluated, clean.evaluated);
         assert_eq!(failing.tally, clean.tally);
+    }
+
+    fn insufficient() -> FuzzError {
+        FuzzError::new(
+            dageist_fuzz::FuzzErrorKind::InsufficientCoverage,
+            "run fuzz engine",
+            "owner-declared coverage was not met",
+        )
+    }
+
+    #[test]
+    fn a_campaign_that_found_something_and_drew_too_many_cases_again_still_says_what_it_found() {
+        // The findings are what a campaign is run for, and they are told after every case has
+        // been run, so coverage that is not met must not take them from the run that made them.
+        assert_eq!(evaluated_by(Err(insufficient()), 1), 0);
+        assert_eq!(evaluated_by(Err(insufficient()), 3), 0);
+        // Where it found nothing, a run that could not be made is no run: it is said so.
+        let nothing = std::panic::catch_unwind(|| evaluated_by(Err(insufficient()), 0));
+        assert!(nothing.is_err(), "no finding excuses insufficient coverage");
+        // A failure that is not of coverage is no run, whatever was found before it.
+        let broken = FuzzError::new(
+            dageist_fuzz::FuzzErrorKind::Harness,
+            "run fuzz engine",
+            "owner adapter error",
+        );
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| evaluated_by(
+                Err(broken),
+                2
+            )))
+            .is_err()
+        );
+        let report = PropertyReport {
+            counts: dageist_fuzz::ExecutionCounts::new(7, 0),
+            assessment: dageist_fuzz::CoverageAssessment::Sufficient,
+            failure: None,
+        };
+        assert_eq!(evaluated_by(Ok(report), 0), 7);
+    }
+
+    #[test]
+    fn a_focused_campaign_may_draw_as_many_cases_again_as_it_is_allowed_to_reject() {
+        // A campaign that is focused on few methods draws most of its cases again, as the run
+        // is told to put up with up to a million; the coverage the target declares is the same.
+        let target = AllowedTarget::new();
+        assert_eq!(
+            target.descriptor().max_generation_rejections(),
+            1_000_000,
+            "the run rejects up to a million cases"
+        );
     }
 
     #[test]
