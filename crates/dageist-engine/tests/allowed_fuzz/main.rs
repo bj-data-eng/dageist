@@ -28,6 +28,7 @@ mod predict;
 mod probe;
 mod reduce;
 mod target;
+mod timeout;
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
