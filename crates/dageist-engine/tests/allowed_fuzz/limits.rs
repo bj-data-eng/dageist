@@ -5500,6 +5500,39 @@ mod tests {
         }
         // The text is the cast's only where it follows the values: another call between them, or
         // before the cast, or another cast, is the sample's.
+        // Calls that keep the text of the numbers, and take none away, may stand between the cast
+        // and the conversion: a fill forward, a reverse, one of them picked.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-group-aggregate--text-made-of-the-numbers-of-a-group--kept-by-a-fill.case"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        for keeping in [
+            "Expr.forward_fill",
+            "Expr.backward_fill",
+            "Expr.reverse",
+            "Expr.sort",
+            "Expr.drop_nulls",
+            "Expr.first",
+            "Expr.last",
+            "Expr.min",
+            "Expr.max",
+        ] {
+            let case = chain_after(
+                Representative::Int8,
+                vec![
+                    to_text(),
+                    call(keeping, Vec::new()),
+                    call("Expr.skew", Vec::new()),
+                ],
+            );
+            assert_eq!(
+                refused_by_the_tables_at(&case, at_the_call(2), text),
+                vec![Limit::AGroupAggregate],
+                "{keeping}"
+            );
+        }
         // A fill with a null of text gives the numbers the dtype text as a cast does.
         assert_eq!(
             excused_by_kept(
