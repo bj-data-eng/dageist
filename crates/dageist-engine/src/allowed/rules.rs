@@ -48,6 +48,10 @@ pub enum Rule {
     /// A pattern is a regular expression Polars can compile, unless the text is plain text by a
     /// flag such as `literal`.
     PatternIsValid,
+    /// A range or a repeat typed in is one Polars can make: a step above nothing, an interval of
+    /// the length of time its bounds are read in, bounds the dtype holds and a count that is not
+    /// below nothing.
+    RangeIsValid,
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
@@ -72,7 +76,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -84,6 +88,7 @@ impl Rule {
         Self::ParameterTakesOneValue,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
+        Self::RangeIsValid,
         Self::ReplacementValuesMatchInNumber,
         Self::TimeZoneIsValid,
         Self::ValuesMeetInCount,
@@ -106,6 +111,7 @@ impl Rule {
             Self::MomentsShareAZone => "moments-share-a-zone",
             Self::ParameterTakesOneValue => "parameter-takes-one-value",
             Self::PatternIsValid => "pattern-is-valid",
+            Self::RangeIsValid => "range-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
             Self::ValuesMeetInCount => "values-meet-in-count",
@@ -159,6 +165,9 @@ impl Rule {
                 "a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run"
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
+            Self::RangeIsValid => {
+                "a range or a repeat typed in must be one Polars can make: a step above nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, and a number of values that is not below nothing"
+            }
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
             }
@@ -184,6 +193,7 @@ impl Rule {
             | Self::MomentsShareAZone
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
+            | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
@@ -295,6 +305,7 @@ impl Rule {
             | Self::KeyIsElementwise
             | Self::DurationIsValid
             | Self::PatternIsValid
+            | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
             | Self::ParameterTakesOneValue

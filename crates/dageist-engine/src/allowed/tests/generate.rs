@@ -14,8 +14,8 @@ use crate::allowed::dtype::Representative;
 use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
-    Chain, ContextLine, CountLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces,
-    Reason, Shape, Stage, subject_of,
+    Chain, ContextLine, CountLine, DtypeKey, DtypeLine, LIST_FORM, OptionLine, OptionValue,
+    Outcome, Produces, Reason, Shape, Stage, subject_of,
 };
 use crate::catalog::{
     self, Applies, Argument, BuildError, Counting, Entry, Kind, Parameter, ParameterDefault,
@@ -119,7 +119,11 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 /// So are the counts that cut a column: the values `head`, `tail`, `limit` and `slice` take, and
 /// the `k` of `top_k` and `bottom_k`, which Polars reads as the first value it is given or refuses
 /// many values of.
-const SCALAR_ONLY: [(&str, &str); 14] = [
+///
+/// So are the bounds, the number of samples, the value and the number of times of the functions that
+/// make a range or a repeat, which Polars reads as one value and refuses a column of: "non-scalar start
+/// passed".
+const SCALAR_ONLY: [(&str, &str); 27] = [
     ("Expr.shift", "n"),
     ("Expr.shift", "fill_value"),
     ("Expr.diff", "n"),
@@ -134,6 +138,19 @@ const SCALAR_ONLY: [(&str, &str); 14] = [
     ("Expr.top_k", "k"),
     ("Expr.bottom_k", "k"),
     ("Expr.gather", "indices"),
+    ("polars.date_range", "start"),
+    ("polars.date_range", "end"),
+    ("polars.datetime_range", "start"),
+    ("polars.datetime_range", "end"),
+    ("polars.int_range", "start"),
+    ("polars.int_range", "end"),
+    ("polars.linear_space", "start"),
+    ("polars.linear_space", "end"),
+    ("polars.linear_space", "num_samples"),
+    ("polars.repeat", "value"),
+    ("polars.repeat", "n"),
+    ("polars.time_range", "start"),
+    ("polars.time_range", "end"),
 ];
 
 /// The parts of a date that the functions which make one take, whose calendar has no month and no
@@ -199,6 +216,9 @@ fn argument_expression(
             column(scope.argument),
             vec![("others", expressions(vec![flag(true)]))],
         )
+    } else if (entry, parameter) == ("polars.repeat", "value") && dtype == Representative::Null {
+        // A null is the one value of the dtype Null, which no number casts to.
+        null_of(&dtype.dtype())
     } else if SCALAR_ONLY.contains(&(entry, parameter))
         || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
     {
@@ -260,6 +280,31 @@ fn companions(
                 )
             })
             .collect(),
+        // The other bound of a range is one value of the dtype that is tested, as the bound is.
+        (
+            "polars.int_range"
+            | "polars.date_range"
+            | "polars.datetime_range"
+            | "polars.time_range"
+            | "polars.linear_space",
+            Some(tested @ ("start" | "end")),
+        ) => {
+            let other = if tested == "start" { "end" } else { "start" };
+            let mut others: Vec<(&'static str, Argument)> = stands_in(other)
+                .ok()
+                .map(|bound| vec![(other, expression(bound))])
+                .unwrap_or_default();
+            if entry == "polars.linear_space" {
+                others.push(("num_samples", expression(integer(3))));
+            }
+            others
+        }
+        ("polars.linear_space", Some("num_samples")) => vec![
+            ("start", expression(integer(0))),
+            ("end", expression(integer(10))),
+        ],
+        ("polars.repeat", Some("value")) => vec![("n", expression(integer(3)))],
+        ("polars.repeat", Some("n")) => vec![("value", expression(integer(1)))],
         ("Expr.over", Some("partition_by" | "order_by")) => Vec::new(),
         ("Expr.over", _) => vec![("partition_by", expressions(vec![scope.partition()]))],
         ("Expr.round_sig_figs", _) => vec![("digits", Argument::Integer(2))],
@@ -506,6 +551,41 @@ impl DtypeIndex {
         }
     }
 
+    /// The receivers a method that is given a list or an array runs on, the one that fits best
+    /// first, each with the first of them that runs: the form of `is_in` that Polars meets row by
+    /// row.
+    fn list_candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
+        let id = entry.id().as_str();
+        let order = std::iter::once(Representative::Int64).chain(
+            Representative::ALL
+                .into_iter()
+                .filter(|dtype| *dtype != Representative::Int64),
+        );
+        order
+            .filter_map(|receiver| {
+                [
+                    Representative::ListOfInteger,
+                    Representative::ListOfString,
+                    Representative::Array,
+                ]
+                .into_iter()
+                .find_map(|argument| {
+                    match self
+                        .lines
+                        .get(&(id, Some("other"), Some(receiver), Some(argument)))
+                    {
+                        Some(Outcome::Allowed(produces)) => Some(Candidate {
+                            receiver,
+                            arguments: vec![("other", argument)],
+                            produces: produces.clone(),
+                        }),
+                        _ => None,
+                    }
+                })
+            })
+            .collect()
+    }
+
     /// The receivers a method runs on, the one that fits best first: `Int64`,
     /// then the others in the table's order. Each is given, for each parameter
     /// that must be given, an argument of its own dtype if that runs, and
@@ -696,7 +776,14 @@ fn function_on(
     let mut given = companions(id, Some(subject), scope, receiver, receiver);
     given.retain(|(name, _)| !extra.iter().any(|(given, _)| given == name));
     given.extend(extra);
-    given.push((subject, expression(scope.start())));
+    // The subject of a function that reads it as one value is one value of the dtype, which a
+    // column is not.
+    let held = if SCALAR_ONLY.contains(&(id, subject)) {
+        argument_expression(id, subject, receiver, scope)?
+    } else {
+        scope.start()
+    };
+    given.push((subject, expression(held)));
     function(id, given)
 }
 
@@ -975,12 +1062,25 @@ fn forms(entry: &'static Entry) -> Vec<Form> {
         };
         forms.extend(words.iter().map(|word| (parameter.name(), *word)));
     }
+    // `is_in` is measured given a list, which Polars meets row by row, as well as given a column of
+    // the dtype it follows.
+    if entry.id().as_str() == "Expr.is_in" {
+        forms.push(LIST_FORM);
+    }
     forms
 }
 
 /// The receivers a form of `entry` is measured on in a context: those the option table allows
 /// the form on, `Int64` before the others, with what it gives on each.
-fn form_candidates_of(entry: &'static Entry, form: Form, options: &OptionIndex) -> Vec<Candidate> {
+fn form_candidates_of(
+    entry: &'static Entry,
+    form: Form,
+    options: &OptionIndex,
+    index: &DtypeIndex,
+) -> Vec<Candidate> {
+    if form == LIST_FORM {
+        return index.list_candidates(entry);
+    }
     let order = std::iter::once(Representative::Int64).chain(
         Representative::ALL
             .into_iter()
@@ -1065,7 +1165,7 @@ fn context_lines(
             forms(entry).into_iter().map(|form| {
                 (
                     (entry.id().as_str(), form),
-                    form_candidates_of(entry, form, options),
+                    form_candidates_of(entry, form, options, index),
                 )
             })
         })
@@ -1097,7 +1197,8 @@ fn context_line(
     // A method that gives a count of values that the data or the arguments decide stands in a
     // place when what it goes on to, one value, may; the three rows of a sample cannot measure
     // the count itself, which the table of counts does.
-    let counted = entry.applies() == Applies::Expression && declared_counted(entry, &form_words);
+    let counted = matches!(entry.applies(), Applies::Expression | Applies::Function)
+        && declared_counted(entry, &form_words);
     let rules = Rule::governing(id, context);
     let form_options: Vec<OptionValue> = form
         .into_iter()
@@ -1139,8 +1240,10 @@ fn context_line(
                 };
             };
             let for_subject = chosen.clone();
+            // The form of a list given to `is_in` is no option: the candidate gives it.
             let given: Vec<(&'static str, Argument)> = form
                 .into_iter()
+                .filter(|form| *form != LIST_FORM)
                 .map(|(name, word)| (name, Argument::Choice(word.to_owned())))
                 .collect();
             (
@@ -1183,6 +1286,58 @@ fn context_line(
                 "polars.time" => function(id, vec![("hour", expression(scope.start()))]),
                 "polars.duration" => function(id, vec![("days", expression(scope.start()))]),
                 "polars.from_epoch" => function(id, vec![("column", expression(scope.start()))]),
+                // A range or a repeat gives a count, which a place takes where what it goes on
+                // to, one value, may: it is measured with arguments typed in, and one value of the
+                // dtype of a bound where the dtype is one of the bounds.
+                "polars.int_range" => function(
+                    id,
+                    vec![
+                        ("start", expression(integer(0))),
+                        ("end", expression(integer(2))),
+                    ],
+                ),
+                "polars.date_range" => function(
+                    id,
+                    vec![
+                        ("start", expression(one_of(&DataType::Date)?)),
+                        ("end", expression(one_of(&DataType::Date)?)),
+                    ],
+                ),
+                "polars.datetime_range" => function(
+                    id,
+                    vec![
+                        (
+                            "start",
+                            expression(one_of(&Representative::Datetime.dtype())?),
+                        ),
+                        (
+                            "end",
+                            expression(one_of(&Representative::Datetime.dtype())?),
+                        ),
+                    ],
+                ),
+                "polars.time_range" => function(
+                    id,
+                    vec![
+                        ("start", expression(one_of(&DataType::Time)?)),
+                        ("end", expression(one_of(&DataType::Time)?)),
+                    ],
+                ),
+                "polars.linear_space" => function(
+                    id,
+                    vec![
+                        ("start", expression(integer(0))),
+                        ("end", expression(integer(1))),
+                        ("num_samples", expression(integer(3))),
+                    ],
+                ),
+                "polars.repeat" => function(
+                    id,
+                    vec![
+                        ("value", expression(integer(1))),
+                        ("n", expression(integer(3))),
+                    ],
+                ),
                 other => panic!("the generator does not know the function {other}"),
             }),
         ),
@@ -1233,6 +1388,13 @@ fn context_line(
             Err(reason) => Outcome::Refused(reason),
             Ok(_) => Outcome::Allowed(match (&candidate, entry.applies()) {
                 (Some(candidate), _) => candidate.produces.clone(),
+                // What a count gives is a count, whatever three rows say of it.
+                (None, Applies::Function) if counted => {
+                    standalone(&*subject, &frames).map(|produces| Produces {
+                        shape: Shape::Counted,
+                        ..produces
+                    })
+                }
                 (None, Applies::Function) => standalone(&*subject, &frames),
                 (None, _) => None,
             }),

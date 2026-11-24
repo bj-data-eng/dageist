@@ -5963,9 +5963,30 @@ mod tests {
     fn the_functions_that_make_one_value_of_literals_are_the_ones_the_catalogue_holds_and_named() {
         // A function that gives many values of literals, as a range of dates would, must not be
         // excused as one value: a new function of the catalogue fails here until it is decided.
+        // The functions that count their values from their arguments make many values, so none of
+        // them is a function of literals.
+        let mut counted: Vec<&str> = catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == catalog::Applies::Function)
+            .filter(|entry| catalog::Counting::of(entry, &[]).is_some())
+            .map(|entry| entry.id().as_str())
+            .collect();
+        counted.sort_unstable();
+        assert_eq!(
+            counted,
+            [
+                "polars.date_range",
+                "polars.datetime_range",
+                "polars.int_range",
+                "polars.linear_space",
+                "polars.repeat",
+                "polars.time_range",
+            ]
+        );
         let mut functions: Vec<&str> = catalog::entries()
             .iter()
             .filter(|entry| entry.applies() == catalog::Applies::Function)
+            .filter(|entry| catalog::Counting::of(entry, &[]).is_none())
             .map(|entry| entry.id().as_str())
             .filter(|id| !matches!(*id, "polars.col" | "polars.element"))
             .collect();

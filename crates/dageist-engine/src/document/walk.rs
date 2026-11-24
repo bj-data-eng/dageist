@@ -34,6 +34,7 @@ use crate::catalog::{self, Applies, AsManyAs, Comparison, Counting, Entry, Kind,
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
 use super::model::{Call, Expression, Start, Step, Value};
+use super::ranges::{Made, made_by};
 
 /// A call of an expression: what it follows, and whether it may stand there.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -505,6 +506,30 @@ fn made_dtype(start: &Call) -> Option<DataType> {
                 None => TimeUnit::Microseconds,
             },
         )),
+        "polars.int_range" => Some(match start.argument("dtype") {
+            Some(Value::Dtype(dtype)) => dtype.as_polars().clone(),
+            _ => DataType::Int64,
+        }),
+        "polars.date_range" => Some(DataType::Date),
+        "polars.time_range" => Some(DataType::Time),
+        // The unit and the zone of moments that a range makes are those of its bounds unless it
+        // is told: they are known here where the call tells them, and by the bounds otherwise.
+        "polars.datetime_range" => {
+            let interval = match start.argument("interval") {
+                Some(Value::Duration(text)) => text.as_str(),
+                _ => "1d",
+            };
+            let unit = match time_unit_word(start, "time_unit") {
+                Some(word) => unit(&word),
+                None if interval.contains("ns") => TimeUnit::Nanoseconds,
+                None => return None,
+            };
+            let zone = match start.argument("time_zone") {
+                Some(Value::TimeZone(Some(text))) => crate::catalog::check_time_zone(text).ok()?,
+                _ => return None,
+            };
+            Some(DataType::Datetime(unit, zone))
+        }
         "polars.from_epoch" => Some(match time_unit_word(start, "time_unit").as_deref() {
             Some("d") => DataType::Date,
             Some("ns") => DataType::Datetime(TimeUnit::Nanoseconds, None),
@@ -594,6 +619,133 @@ fn is_folded_into_a_literal(start: &Call) -> bool {
         Some(_) => false,
     };
     !zoned && parts.iter().all(|part| a_number(start.argument(part)))
+}
+
+/// Why the two bounds of a linear space are of dtypes that have none in common, where both are known:
+/// numbers meet in a float, and moments, times of day and lengths of time only in their own dtype.
+fn incompatible_bounds(start: &Call, arguments: &[(String, Operand)]) -> Option<String> {
+    use Representative as R;
+    if start.entry().id().as_str() != "polars.linear_space" {
+        return None;
+    }
+    let class_of = |name: &str| {
+        arguments
+            .iter()
+            .find(|(given, _)| given == name)
+            .and_then(|(_, operand)| operand.dtype)
+    };
+    // A number typed without a dtype takes the dtype of the number beside it, and is no other.
+    let loose = |name: &str| {
+        arguments
+            .iter()
+            .any(|(given, operand)| given == name && operand.loose.is_some())
+    };
+    let (first, last) = match (class_of("start"), class_of("end")) {
+        (Some(first), Some(last)) => (first, last),
+        (Some(known), None) if loose("end") => (known, R::Int64),
+        (None, Some(known)) if loose("start") => (R::Int64, known),
+        _ => return None,
+    };
+    let number = |class: R| {
+        matches!(
+            class,
+            R::Int8
+                | R::Int16
+                | R::Int32
+                | R::Int64
+                | R::Int128
+                | R::UInt8
+                | R::UInt16
+                | R::UInt32
+                | R::UInt64
+                | R::UInt128
+                | R::Float16
+                | R::Float32
+                | R::Float64
+        )
+    };
+    let compatible = (number(first) && number(last))
+        || (first == last
+            && matches!(
+                first,
+                R::Date | R::Datetime | R::DatetimeZoned | R::Time | R::Duration
+            ));
+    (!compatible)
+        .then(|| format!("'start' and 'end' have incompatible dtypes, got {first} and {last}"))
+}
+
+/// The class of what a range or a repeat gives where it is the arguments that decide it: the dtype
+/// a repeat is given or the dtype of its value, the number or the moment a linear space is made of,
+/// and the moments of a range of moments, in the zone they are given or that their bounds have.
+fn range_class(start: &Call, arguments: &[(String, Operand)]) -> Option<Representative> {
+    use Representative as R;
+    let class_of = |name: &str| {
+        arguments
+            .iter()
+            .find(|(given, _)| given == name)
+            .and_then(|(_, operand)| operand.dtype)
+    };
+    // A number typed without a dtype takes the one it is met with.
+    let is_a_number = |name: &str| {
+        arguments.iter().any(|(given, operand)| {
+            given == name
+                && (operand.loose.is_some()
+                    || operand.dtype.is_some_and(|class| {
+                        matches!(
+                            class,
+                            R::Int8
+                                | R::Int16
+                                | R::Int32
+                                | R::Int64
+                                | R::Int128
+                                | R::UInt8
+                                | R::UInt16
+                                | R::UInt32
+                                | R::UInt64
+                                | R::UInt128
+                                | R::Float16
+                                | R::Float32
+                                | R::Float64
+                        )
+                    }))
+        })
+    };
+    match start.entry().id().as_str() {
+        "polars.repeat" => match start.argument("dtype") {
+            Some(Value::Dtype(dtype)) => Representative::of(dtype.as_polars()),
+            _ => class_of("value"),
+        },
+        "polars.linear_space" => match (class_of("start"), class_of("end")) {
+            (Some(R::Float32), Some(R::Float32)) => Some(R::Float32),
+            (Some(R::Float16), Some(R::Float16)) => Some(R::Float16),
+            (Some(R::Date), Some(R::Date)) => Some(R::Datetime),
+            (Some(first), Some(last))
+                if first == last
+                    && matches!(
+                        first,
+                        R::Datetime | R::DatetimeZoned | R::Time | R::Duration
+                    ) =>
+            {
+                Some(first)
+            }
+            _ if is_a_number("start") && is_a_number("end") => Some(R::Float64),
+            _ => None,
+        },
+        "polars.datetime_range" => {
+            let zone_given = matches!(
+                start.argument("time_zone"),
+                Some(Value::TimeZone(Some(text)))
+                    if matches!(crate::catalog::check_time_zone(text), Ok(Some(_)))
+            );
+            match (class_of("start"), class_of("end")) {
+                _ if zone_given => Some(R::DatetimeZoned),
+                (Some(R::DatetimeZoned), _) | (_, Some(R::DatetimeZoned)) => Some(R::DatetimeZoned),
+                (Some(R::Date | R::Datetime), Some(R::Date | R::Datetime)) => Some(R::Datetime),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 /// The word of a flag or a choice, as the option table writes it.
@@ -1153,6 +1305,27 @@ impl Walker<'_> {
         }
     }
 
+    /// The names of the two zones of the bounds `start` and `end` of a range, where both are moments,
+    /// their zones are known and they differ.
+    fn bounds_clash(&self, arguments: &[(String, Operand)]) -> Option<(String, String)> {
+        const NONE: &str = "no time zone";
+        let zone_of = |name: &str| {
+            arguments
+                .iter()
+                .find(|(given, _)| given == name)
+                .and_then(|(_, operand)| operand.zone)
+        };
+        let named = |at: usize| self.zones[at].clone();
+        match (zone_of("start")?, zone_of("end")?) {
+            (Zone::Named(first), Zone::Named(second)) if first != second => {
+                Some((named(first), named(second)))
+            }
+            (Zone::Named(first), Zone::Naive) => Some((named(first), NONE.to_owned())),
+            (Zone::Naive, Zone::Named(second)) => Some((NONE.to_owned(), named(second))),
+            _ => None,
+        }
+    }
+
     /// The zone of the moment a start gives, where its arguments decide it.
     fn start_zone(&mut self, start: &Call) -> Option<Zone> {
         match self.start_dtype(start)? {
@@ -1345,15 +1518,31 @@ impl Walker<'_> {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
                 let takes_expressions = takes_expressions(start);
+                let counted_by_arguments =
+                    Counting::of(start.entry(), &[]) == Some(Counting::TheArguments);
+                // The two ends of a range of moments are in one time zone, as the two ends of a
+                // linear space are: Polars finds no dtype that two zones have in common.
+                let clash = if matches!(
+                    start.entry().id().as_str(),
+                    "polars.datetime_range" | "polars.linear_space"
+                ) {
+                    self.bounds_clash(&start_arguments)
+                } else {
+                    None
+                };
                 // What a function that takes expressions gives is said only where each argument's
                 // dtype is known, as for a method: the tables are not asked of one that is not, and
                 // Polars may refuse it for its dtype.
-                let class = self.start_class(start).filter(|_| {
-                    !takes_expressions
-                        || start_arguments
-                            .iter()
-                            .all(|(_, operand)| operand.dtype.is_some())
-                });
+                let class = self
+                    .start_class(start)
+                    .or_else(|| range_class(start, &start_arguments))
+                    .filter(|_| {
+                        !takes_expressions
+                            || counted_by_arguments
+                            || start_arguments
+                                .iter()
+                                .all(|(_, operand)| operand.dtype.is_some())
+                    });
                 self.blind_to_a_missing_column(start);
                 // A function that takes expressions is judged for what it is given, and gives as
                 // many values as its widest argument.
@@ -1383,8 +1572,17 @@ impl Walker<'_> {
                         .with_unclassed(&unclassed)
                         .with_options(&words)
                         .with_time_zones(&time_zones)
+                        .with_zone_clash(
+                            clash
+                                .as_ref()
+                                .map(|(first, second)| (first.as_str(), second.as_str())),
+                        )
                         .following(self.start_unit(start));
-                    if start_arguments
+                    if counted_by_arguments {
+                        // A range or a repeat gives as many values as its arguments fix, which is
+                        // neither one value nor as many as the table has rows.
+                        chosen.giving_shape(Shape::Counted)
+                    } else if start_arguments
                         .iter()
                         .all(|(_, operand)| operand.shape == Shape::One)
                     {
@@ -1395,14 +1593,39 @@ impl Walker<'_> {
                 } else {
                     chosen
                 };
-                let verdict = match allowed::rule_forbids_a_folded_function_in_a_join_key(context) {
-                    Err(refusal) if is_folded_into_a_literal(start) => Verdict::Refused(refusal),
-                    _ => allowed::offer(
-                        start.entry(),
-                        &OfferPlace::new(context, After::Start),
-                        &chosen,
-                    ),
-                };
+                let mut verdict =
+                    match allowed::rule_forbids_a_folded_function_in_a_join_key(context) {
+                        Err(refusal) if is_folded_into_a_literal(start) => {
+                            Verdict::Refused(refusal)
+                        }
+                        _ => allowed::offer(
+                            start.entry(),
+                            &OfferPlace::new(context, After::Start),
+                            &chosen,
+                        ),
+                    };
+                // A range or a repeat reads each argument it takes as one value, and refuses what
+                // no arguments typed in make a range of.
+                let made = counted_by_arguments.then(|| made_by(start)).flatten();
+                if verdict.is_allowed() && counted_by_arguments {
+                    let refusal = given_other_than_one_value(start.entry(), &start_arguments)
+                        .and_then(|(parameter, given)| {
+                            allowed::rule_forbids_a_parameter_given_more_than_one_value(
+                                parameter, given,
+                            )
+                            .err()
+                        })
+                        .or_else(|| {
+                            let said = match &made {
+                                Some(Made::Refused(said)) => Some(said.clone()),
+                                _ => incompatible_bounds(start, &start_arguments),
+                            }?;
+                            allowed::rule_forbids_a_range_that_cannot_be_made(&said).err()
+                        });
+                    if let Some(refusal) = refusal {
+                        verdict = Verdict::Refused(refusal);
+                    }
+                }
                 match &verdict {
                     Verdict::Refused(refusal) => self.refuse(refusal, false),
                     Verdict::Allowed(allowance) => {
@@ -1447,7 +1670,10 @@ impl Walker<'_> {
                             Cur::Value {
                                 dtype: class,
                                 shape: allowance.shape(),
-                                count: Count::NotKnown,
+                                count: match made {
+                                    Some(Made::Counts(count)) => count,
+                                    _ => Count::NotKnown,
+                                },
                                 // A function that makes a value of what it is given gives one that
                                 // was taken where one of them is.
                                 taken: start_arguments
@@ -2675,7 +2901,7 @@ fn counted_by(link: &Call, counting: Counting, held: Option<Count>) -> Count {
                 _ => at_most(None),
             }
         }
-        Counting::TheArgument(_) => Count::NotKnown,
+        Counting::TheArgument(_) | Counting::TheArguments => Count::NotKnown,
     }
 }
 

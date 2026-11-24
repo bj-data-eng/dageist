@@ -193,7 +193,9 @@ fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_cont
             Kind::Choice(words) => words.len(),
             other => panic!("{other:?} is given in place of a parameter and is no choice"),
         })
-        .sum();
+        .sum::<usize>()
+        // And the form of `is_in` that is given a list, which Polars meets row by row.
+        + 1;
     assert_eq!(
         tables.contexts.len(),
         (entries.len() + forms) * Context::all().len()

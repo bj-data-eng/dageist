@@ -12,8 +12,8 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{
-    OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject, is_method,
-    subject_of,
+    LIST_FORM, OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject,
+    is_a_list, is_method, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -649,22 +649,32 @@ fn stood_in_for(entry: &Entry, options: &[(&str, &str)]) -> Vec<&'static str> {
         .collect()
 }
 
-/// The options chosen that are given in place of another parameter, which a method with them
-/// stands in a context in the form of.
-fn form_of(entry: &Entry, options: &[(&str, &str)]) -> Vec<(&'static str, String)> {
-    entry
+/// The options chosen that are given in place of another parameter, and the list that `is_in` is
+/// given, which a method with them stands in a context in the form of.
+fn form_of(entry: &Entry, chosen: &Chosen<'_>) -> Vec<(&'static str, String)> {
+    let mut form: Vec<(&'static str, String)> = entry
         .parameters()
         .iter()
         .filter(|parameter| parameter.in_place_of().is_some())
         .filter_map(|parameter| {
-            let word = options
+            let word = chosen
+                .options
                 .iter()
                 .find(|(name, _)| *name == parameter.name())?
                 .1;
             (default_word(parameter).as_deref() != Some(word))
                 .then(|| (parameter.name(), word.to_owned()))
         })
-        .collect()
+        .collect();
+    if entry.id().as_str() == "Expr.is_in"
+        && chosen
+            .arguments
+            .iter()
+            .any(|(name, class)| *name == LIST_FORM.0 && is_a_list(*class))
+    {
+        form.push((LIST_FORM.0, LIST_FORM.1.to_owned()));
+    }
+    form
 }
 
 /// What the option table says the options chosen give.
@@ -1139,7 +1149,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     let mut ends = Outcome::Allowed(None);
     // An option given in place of a parameter makes the method another form, which the table
     // measured apart where it differs: a fill by a strategy is not a fill by a value.
-    let form = form_of(entry, chosen.options);
+    let form = form_of(entry, chosen);
     let cell = tables
         .contexts
         .get(&(id, form, place.context))
@@ -1316,6 +1326,16 @@ pub fn rule_forbids_a_parameter_given_more_than_one_value(
         Rule::ParameterTakesOneValue,
         &format!("{parameter} was given {given}"),
     ))
+}
+
+/// The refusal of a range or a repeat that no arguments typed in make, which the caller has found:
+/// `said` is why, in Polars' words where Polars says it.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words and what the range is refused for.
+pub fn rule_forbids_a_range_that_cannot_be_made(said: &str) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(Rule::RangeIsValid, &said))
 }
 
 /// The refusal of a window given a count of values that the data or the arguments decide, which the

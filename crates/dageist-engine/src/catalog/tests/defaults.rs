@@ -142,6 +142,15 @@ fn every_default_the_catalogue_writes_is_read_as_the_value_its_kind_holds() {
             let context = format!("{} {}", entry.id().as_str(), parameter.name());
             let value = parameter.default().value();
             match (parameter.kind(), &value) {
+                // The dtype that `int_range` gives is the name Python writes, `Int64`, which is no
+                // value the engine reads: the build gives it where the parameter is not.
+                (Kind::Dtype, DefaultValue::Other) => {
+                    assert_eq!(
+                        (entry.id().as_str(), parameter.name()),
+                        ("polars.int_range", "dtype"),
+                        "{context}"
+                    );
+                }
                 (_, DefaultValue::Other) => panic!("{context}: a default that is not read"),
                 (_, DefaultValue::Required) => {
                     assert_eq!(parameter.default(), ParameterDefault::Required, "{context}");
@@ -266,7 +275,8 @@ fn only_the_rows_a_method_counts_and_the_base_of_log_are_expressions_with_a_defa
     // rows and has a whole number for its default (`Role::Count`), which is `shift(n=1)`. The
     // base of `log` defaults to Euler's number, and an expression of that number is not judged
     // to be at it: the editor draws the base inline, where "same as the default" is not said.
-    // Another expression parameter that gets a default has to be looked at there first.
+    // Another expression parameter that gets a default has to be looked at there first: the first
+    // bound of `int_range`, which is 0 and is the end where only one bound is given, is drawn inline too.
     let mut found: Vec<(&str, &str, Role, DefaultValue)> = entries()
         .iter()
         .flat_map(|entry| {
@@ -312,7 +322,13 @@ fn only_the_rows_a_method_counts_and_the_base_of_log_are_expressions_with_a_defa
             ),
             ("Expr.shift", "n", Role::Count, DefaultValue::Integer(1)),
             ("Expr.tail", "n", Role::Count, DefaultValue::Integer(10)),
-            ("Expr.top_k", "k", Role::Count, DefaultValue::Integer(5))
+            ("Expr.top_k", "k", Role::Count, DefaultValue::Integer(5)),
+            (
+                "polars.int_range",
+                "start",
+                Role::Plain,
+                DefaultValue::Integer(0)
+            )
         ]
     );
 }

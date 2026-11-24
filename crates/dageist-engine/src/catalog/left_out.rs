@@ -103,15 +103,11 @@ pub fn left_out() -> &'static [LeftOut] {
 // - `Expr.dt.add_business_days` and `is_business_day` take `week_mask` and `holidays`, a week of seven
 //   flags and a list of dates, which are lists of literals, and a list of literals typed in, of
 //   flags or of dates, is a kind of its own that does not exist yet.
-// - `polars.date_range`, `datetime_range`, `time_range`, `int_range`, `linear_space` and `repeat` give as
-//   many values as their bounds, their step or interval and their count fit, from arguments that are one
-//   value each, and Polars refuses a count beside a column in the places the table of counts measures.
-//   The shape of a count exists now, in the walk and the tables, and the methods that take some of the
-//   values of a column use it. These are functions that start an expression, whose count is the
-//   arguments' own: it is worked out from bounds that are numbers, dates or times typed in, and from a
-//   duration string for the interval, which a function of the catalogue does not yet say from its
-//   arguments, and the tables measure a function that takes expressions by the dtype of its first.
-//   The `*_ranges` functions give a list of each and wait for a list kind too.
+// - The `*_ranges` functions, `polars.date_ranges`, `datetime_ranges`, `time_ranges`, `int_ranges` and
+//   `linear_spaces`, give a list of values for each row, which waits for a list kind: a step has no
+//   way yet to hold or draw a list that is made of its rows. The functions that give one range, with a
+//   count of values their arguments decide, are catalogued, and `polars.arange` is Python's `int_range`
+//   under another name.
 // - `Expr.interpolate` gives as many values as it follows, but whether Polars takes a column depends
 //   on its rows: it interpolates a column of `Boolean` that holds no null to a `Float64` and panics
 //   on one that holds a null, and the method `nearest` does the same for text and arrays, where the
@@ -119,12 +115,13 @@ pub fn left_out() -> &'static [LeftOut] {
 //   null is accepted by Polars and refused by the tables, so it waits for a way to say that a
 //   column holds no null.
 // - `Expr.item` gives the single value of an expression and refuses one that has none or more than
-//   one, with "aggregation 'item' expected a single value, got 4 values": whether a column or a
-//   chain of many values is accepted depends on how many rows the table holds, which no shape of
-//   the walk says: the table's rows are not a count. Polars takes it after an aggregate, which is
-//   one value, and refuses it after a column of the sample's three rows, so the tables would refuse
-//   it where a table of one row takes it. `allow_empty` only admits a table of no rows. It waits for
-//   a way to say how many rows a table has.
+//   one, with "aggregation 'item' expected a single value, got 4 values". The shapes of the walk say
+//   when it is accepted without the rows: after one value, which it gives again, and after a count of
+//   exactly one; and when it is refused: after a count of more than one, and after none unless
+//   `allow_empty` says so. What it is for is to find out that a table holds one row, and the rows are
+//   no shape of the walk: the editor, which is strict where the data decide, would refuse it there,
+//   so what it would accept is a call that gives back the value it is given. It waits for a way to
+//   say how many rows a table has; `allow_empty` only admits a table of no rows.
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.
@@ -547,9 +544,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.cum_reduce", Reason::TakesPythonFunction),
     LeftOut::new("polars.cum_sum", Reason::NotYetCatalogued),
     LeftOut::new("polars.cum_sum_horizontal", Reason::NotYetCatalogued),
-    LeftOut::new("polars.date_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.date_ranges", Reason::NotYetCatalogued),
-    LeftOut::new("polars.datetime_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.datetime_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.dtype_of", Reason::NotYetCatalogued),
     LeftOut::new("polars.escape_regex", Reason::NeverOffered),
@@ -561,11 +556,9 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.format", Reason::NotYetCatalogued),
     LeftOut::new("polars.head", Reason::NotYetCatalogued),
     LeftOut::new("polars.implode", Reason::NotYetCatalogued),
-    LeftOut::new("polars.int_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.int_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.last", Reason::NotYetCatalogued),
     LeftOut::new("polars.len", Reason::NotYetCatalogued),
-    LeftOut::new("polars.linear_space", Reason::NotYetCatalogued),
     LeftOut::new("polars.linear_spaces", Reason::NotYetCatalogued),
     LeftOut::new("polars.list", Reason::NotYetCatalogued),
     LeftOut::new("polars.map_batches", Reason::TakesPythonFunction),
@@ -584,7 +577,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.pipe_with_dtype", Reason::TakesPythonFunction),
     LeftOut::new("polars.quantile", Reason::NotYetCatalogued),
     LeftOut::new("polars.reduce", Reason::TakesPythonFunction),
-    LeftOut::new("polars.repeat", Reason::NotYetCatalogued),
     LeftOut::new("polars.rolling_corr", Reason::NotYetCatalogued),
     LeftOut::new("polars.rolling_cov", Reason::NotYetCatalogued),
     LeftOut::new("polars.row_index", Reason::NotYetCatalogued),
@@ -609,7 +601,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.sum", Reason::NotYetCatalogued),
     LeftOut::new("polars.sum_horizontal", Reason::NotYetCatalogued),
     LeftOut::new("polars.tail", Reason::NotYetCatalogued),
-    LeftOut::new("polars.time_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.time_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.union", Reason::NotYetCatalogued),
     LeftOut::new("polars.var", Reason::NotYetCatalogued),

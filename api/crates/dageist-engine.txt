@@ -130,13 +130,14 @@ pub dageist_engine::allowed::Rule::MomentsShareAZone
 pub dageist_engine::allowed::Rule::ParameterTakesOneValue
 pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
+pub dageist_engine::allowed::Rule::RangeIsValid
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
 pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 16]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 17]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -294,6 +295,7 @@ pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::En
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_range_that_cannot_be_made(said: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_count() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_widened_value() -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -398,6 +400,7 @@ pub dageist_engine::catalog::Counting::AtMost(&'static str)
 pub dageist_engine::catalog::Counting::EveryNth
 pub dageist_engine::catalog::Counting::FromAPlace
 pub dageist_engine::catalog::Counting::TheArgument(&'static str)
+pub dageist_engine::catalog::Counting::TheArguments
 pub dageist_engine::catalog::Counting::TheCondition
 pub dageist_engine::catalog::Counting::TheData
 pub dageist_engine::catalog::Counting::TheRowsLess(&'static str)

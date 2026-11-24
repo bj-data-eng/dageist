@@ -7,14 +7,17 @@
 //! sweep collects every disagreement before it asserts, and a case that is not asked, or that
 //! the editor refuses more strictly than Polars on purpose, is listed with its reason.
 //!
-//! The table has seven rows, whose groups by `k` are of four, two and one, so that no count
-//! typed here is the rows and no group has the length of another.
+//! The table has seven rows, whose groups by `k` are of four, two and one, and whose first value
+//! of `a` is 4, so that no count that a column gives is the rows or one, and no group has the
+//! length of another.
 
 use std::collections::BTreeMap;
 
 use dageist_engine::allowed::{Count, RefusalSource};
 use dageist_engine::catalog::{self, Applies};
-use dageist_engine::document::{Document, Inputs, Outcome, Report, StepRows};
+use dageist_engine::document::{
+    Document, Inputs, Outcome, Report, Segment, StepRows, WalkedExpression,
+};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
@@ -22,7 +25,7 @@ use crate::support::{call, chain, document, field, field_then, many, step, whole
 
 /// The table: a column of each dtype a range is given, of seven rows.
 fn frame() -> DataFrame {
-    let ints = |name: &str| Series::new(name.into(), [1_i64, 2, 3, 4, 5, 6, 7]);
+    let ints = |name: &str| Series::new(name.into(), [4_i64, 5, 6, 7, 1, 2, 3]);
     let cast = |name: &str, dtype: DataType| {
         ints(name)
             .cast(&dtype)
@@ -71,8 +74,29 @@ fn run(entry: &str, arguments: Value) -> Report {
         .expect("the table has a schema")
 }
 
+/// The report of the step with the plan built and no rows run, which a range of more values than
+/// Polars holds is asked of.
+fn planned(entry: &str, arguments: Value) -> Report {
+    let document =
+        Document::read(&document(vec![step("s", entry, arguments)])).expect("a document");
+    document
+        .run(&inputs(), frame().lazy())
+        .expect("the table has a schema")
+}
+
 fn select_of(items: Vec<Value>) -> Report {
     run("LazyFrame.select", json!({ "exprs": many(items) }))
+}
+
+/// The expression of the `at`th item of the select, with what the walk says of it.
+fn item(report: &Report, at: usize) -> &WalkedExpression {
+    let path = [Segment::Parameter("exprs".to_owned()), Segment::Item(at)];
+    report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|expression| expression.place().path() == path)
+        .unwrap_or_else(|| panic!("the walk holds no item {at}"))
 }
 
 /// What Polars and the walk say of a report.
@@ -125,21 +149,74 @@ fn lit(arguments: Value) -> Value {
     chain(call("polars.lit", arguments), vec![])
 }
 
-/// A date typed in: Polars reads the text as the dtype it is given.
-fn typed(text: &str, dtype: &str) -> Value {
-    lit(json!({ "value": { "string": text }, "dtype": { "dtype": dtype } }))
+/// The parts of a date and a time of day that a text such as `2024-01-31 05:30:15.000250` has.
+fn parts_of(text: &str) -> Vec<(&'static str, i64)> {
+    let (day, clock) = text.split_once(' ').unwrap_or((text, ""));
+    let mut parts = Vec::new();
+    let mut numbers = day
+        .split('-')
+        .map(|number| number.parse::<i64>().expect("a number"));
+    if !day.is_empty() && day.contains('-') {
+        for name in ["year", "month", "day"] {
+            parts.push((name, numbers.next().expect("a part of a date")));
+        }
+    }
+    let clock = if day.contains('-') { clock } else { text };
+    if !clock.is_empty() {
+        let (whole_seconds, fraction) = clock.split_once('.').unwrap_or((clock, ""));
+        let mut numbers = whole_seconds
+            .split(':')
+            .map(|number| number.parse::<i64>().expect("a number"));
+        for name in ["hour", "minute", "second"] {
+            parts.push((name, numbers.next().expect("a part of a time")));
+        }
+        if !fraction.is_empty() {
+            let micro = format!("{fraction:0<6}");
+            parts.push(("microsecond", micro.parse().expect("microseconds")));
+        }
+    }
+    parts
 }
 
+/// A call that makes a moment or a time of the parts of `text`, each part a number typed in.
+fn made_of(id: &str, text: &str, only: &[&str]) -> Value {
+    let arguments: Vec<(&str, Value)> = parts_of(text)
+        .into_iter()
+        .filter(|(name, _)| only.contains(name))
+        .map(|(name, number)| (name, whole(number)))
+        .collect();
+    start_of(id, arguments)
+}
+
+/// A date typed in: the call that makes one of a year, a month and a day.
 fn date(text: &str) -> Value {
-    typed(text, "Date")
+    made_of("polars.date", text, &["year", "month", "day"])
 }
 
+/// A moment typed in, in microseconds and in no time zone.
 fn moment(text: &str) -> Value {
-    typed(text, "Datetime(time_unit='us', time_zone=None)")
+    made_of(
+        "polars.datetime",
+        text,
+        &[
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second",
+            "microsecond",
+        ],
+    )
 }
 
+/// A time of day typed in.
 fn time_of_day(text: &str) -> Value {
-    typed(text, "Time")
+    made_of(
+        "polars.time",
+        text,
+        &["hour", "minute", "second", "microsecond"],
+    )
 }
 
 fn choice(word: &str) -> Value {
@@ -310,8 +387,18 @@ fn counts_typed_in() -> Vec<Typed> {
         ),
         counted_by_hand(
             "int_range too long to run",
-            int_range(vec![("start", whole(0)), ("end", whole(10_000_000_000))]),
-            10_000_000_000,
+            int_range(vec![("start", whole(0)), ("end", whole(4_000_000_000))]),
+            4_000_000_000,
+        ),
+        counted_by_hand(
+            "int_range of the most values Polars holds",
+            int_range(vec![("start", whole(0)), ("end", whole(4_294_967_295))]),
+            4_294_967_295,
+        ),
+        counted_by_hand(
+            "repeat of the most values Polars holds",
+            repeat(vec![("value", whole(1)), ("n", whole(4_294_967_295))]),
+            4_294_967_295,
         ),
         counted_by_hand(
             "int_range over the whole of an i64",
@@ -800,11 +887,25 @@ fn counts_typed_in() -> Vec<Typed> {
 fn a_range_typed_in_gives_the_count_polars_gives_it() {
     let mut disagreements = Vec::new();
     let mut by_hand = 0;
+    let mut panicked = Vec::new();
     for case in counts_typed_in() {
-        let report = select_of(vec![case.call.clone()]);
-        let walk = report.steps()[0].walk();
+        // A build of Polars with debug assertions panics where the release does not.
+        let Ok(report) = std::panic::catch_unwind(|| {
+            // What is too long to run is planned and not run.
+            if case.by_hand.is_some() {
+                planned(
+                    "LazyFrame.select",
+                    json!({ "exprs": many(vec![case.call.clone()]) }),
+                )
+            } else {
+                select_of(vec![case.call.clone()])
+            }
+        }) else {
+            panicked.push(case.name);
+            continue;
+        };
         let said = walk_says(&report);
-        let counted = walk.expressions().first().and_then(|found| found.count());
+        let counted = item(&report, 0).count();
         match case.by_hand {
             // Too many values to run: the number is worked out by hand, which the walk's must be.
             Some(count) => {
@@ -844,7 +945,54 @@ fn a_range_typed_in_gives_the_count_polars_gives_it() {
         disagreements.len(),
         disagreements.join("\n")
     );
-    assert_eq!(by_hand, 2, "the cases too large to run are named");
+    assert_eq!(by_hand, 4, "the cases too large to run are named");
+    // Polars asserts, in a build that has debug assertions, that the values of a range of days in a
+    // zone are no more than its length over the length of a day, which a day of 23 hours, where the
+    // clocks go forward, breaks: Python Polars 2.1.0 gives 5 values of this case.
+    assert_eq!(
+        panicked,
+        ["datetime_range by the day across a change of clock"],
+        "the cases Polars panics on"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// A count of one
+
+#[test]
+fn a_count_of_exactly_one_beside_the_rows_is_refused_though_the_engine_that_runs_steps_takes_it() {
+    // Exception, stricter by design: the streaming engine, which the steps run on, broadcasts a
+    // range or a repeat of one value to the rows, where Python Polars 2.1.0's in-memory engine
+    // refuses it with "Series literal, length 1 doesn't match the DataFrame height of 7". A count
+    // is not one value, and the editor refuses it as the in-memory engine does.
+    let ones = [
+        (
+            "int_range",
+            int_range(vec![("start", whole(0)), ("end", whole(1))]),
+        ),
+        ("repeat", repeat(vec![("value", whole(1)), ("n", whole(1))])),
+        (
+            "linear_space",
+            linear_space(vec![
+                ("start", whole(0)),
+                ("end", whole(1)),
+                ("num_samples", whole(1)),
+            ]),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, start) in ones {
+        let report = select_of(vec![field("k"), start]);
+        if !polars_says(&report).accepts() {
+            found.push(format!(
+                "{name}: the engine of steps refuses it too, which would end this exception"
+            ));
+        }
+        if walk_says(&report) != Said::Refuses("values-meet-in-count".to_owned()) {
+            found.push(format!("{name}: the walk says {:?}", walk_says(&report)));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -896,10 +1044,6 @@ fn a_range_whose_arguments_are_not_typed_in_has_a_count_that_is_not_known() {
             ]),
         ),
         (
-            "repeat a column's first value",
-            repeat(vec![("value", first("a")), ("n", whole(3))]),
-        ),
-        (
             "repeat a column's first value as many times as it says",
             repeat(vec![("value", whole(1)), ("n", first("n"))]),
         ),
@@ -932,12 +1076,11 @@ fn a_range_whose_arguments_are_not_typed_in_has_a_count_that_is_not_known() {
     let mut disagreements = Vec::new();
     for (name, start) in cases {
         let report = select_of(vec![start]);
-        let walk = report.steps()[0].walk();
-        if let Some(refusal) = walk.refusal() {
+        if let Some(refusal) = report.steps()[0].walk().refusal() {
             disagreements.push(format!("{name}: refused, {:?}", refusal.refusal().reason()));
             continue;
         }
-        let counted = walk.expressions().first().and_then(|found| found.count());
+        let counted = item(&report, 0).count();
         if counted != Some(Count::NotKnown) {
             disagreements.push(format!(
                 "{name}: the walk says {counted:?}, not that it is not known"
@@ -1263,6 +1406,50 @@ fn what_polars_never_makes_a_range_of_is_refused_where_the_step_is_walked() {
 }
 
 #[test]
+fn a_range_of_more_values_than_polars_holds_is_refused_where_the_step_is_walked() {
+    // Polars is built with an index of 32 bits, so a column of more than 4294967295 values panics
+    // with "Polars' maximum length reached": the plan is built, which no rows are run on.
+    let too_many = [
+        (
+            "int_range of one past the most",
+            int_range(vec![("start", whole(0)), ("end", whole(4_294_967_296))]),
+        ),
+        (
+            "int_range down to the most",
+            int_range(vec![
+                ("start", whole(4_294_967_296)),
+                ("end", whole(0)),
+                ("step", json!({ "integer": -1 })),
+            ]),
+        ),
+        (
+            "int_range from the smallest to the largest",
+            int_range(vec![("start", whole(i64::MIN)), ("end", whole(i64::MAX))]),
+        ),
+        (
+            "repeat one past the most",
+            repeat(vec![("value", whole(1)), ("n", whole(4_294_967_296))]),
+        ),
+        (
+            "linear_space of one past the most",
+            linear_space(vec![
+                ("start", whole(0)),
+                ("end", whole(1)),
+                ("num_samples", whole(4_294_967_296)),
+            ]),
+        ),
+    ];
+    let mut found = Vec::new();
+    for (name, start) in too_many {
+        let report = planned("LazyFrame.select", json!({ "exprs": many(vec![start]) }));
+        if walk_says(&report) != Said::Refuses("range-is-valid".to_owned()) {
+            found.push(format!("{name}: the walk says {:?}", walk_says(&report)));
+        }
+    }
+    assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+#[test]
 fn a_range_is_always_lazy_and_never_offers_eager() {
     // Polars' `eager` makes a series where the engine's steps make plans: the flag is in the
     // signature, which the catalogue holds as Python writes it, and a step that sets it is
@@ -1384,13 +1571,11 @@ fn forms(column: &str) -> Vec<(&'static str, Value)> {
 /// The places that hold a start, each a step of a document that is built from the start, with
 /// what it holds named: where the values it gives are one count, beside the rows, a fill, a key.
 fn places(start: &Value) -> Vec<(&'static str, Report)> {
-    let first_of = |name: &str| field_then(name, vec![call("Expr.first", json!({}))]);
-    let sum_of_a = || field_then("a", vec![call("Expr.sum", json!({}))]);
     vec![
         ("a select", select_of(vec![start.clone()])),
         (
             "a select beside the rows",
-            select_of(vec![field("a"), start.clone()]),
+            select_of(vec![field("k"), start.clone()]),
         ),
         (
             "a step that adds a column",
@@ -1471,20 +1656,23 @@ fn places(start: &Value) -> Vec<(&'static str, Report)> {
         (
             "an aggregate of the values beside a column",
             select_of(vec![
-                field("a"),
+                field("k"),
                 on_start(start, vec![call("Expr.sum", json!({}))]),
             ]),
         ),
         (
             "the first value beside the rows",
             select_of(vec![
-                field("a"),
+                field("k"),
                 on_start(start, vec![call("Expr.first", json!({}))]),
             ]),
         ),
         (
-            "a sum of the rows beside the first value",
-            select_of(vec![first_of("a"), sum_of_a(), start.clone()]),
+            "a sum of the rows beside the values",
+            select_of(vec![
+                field_then("k", vec![call("Expr.sum", json!({}))]),
+                start.clone(),
+            ]),
         ),
     ]
 }
