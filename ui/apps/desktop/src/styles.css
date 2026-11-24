@@ -45,6 +45,50 @@
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   /* Code is set as it is typed: two signs side by side are never drawn as one. */
   --font-mono--font-feature-settings: 'calt' 0, 'liga' 0;
+
+  /*
+   * The colour names shadcn/ui's components are written in, each set to one
+   * of the tokens above. shadcn's own `accent` and `muted`, a hover fill and
+   * a quiet fill, are left out: here `accent` is the orange and `muted` the
+   * quiet text, and the copied components use `hover` and `line` instead.
+   */
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-canvas);
+  --color-secondary: var(--color-raised);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted-foreground: var(--color-muted);
+  --color-destructive: var(--color-danger);
+  --color-border: var(--color-line);
+  --color-input: var(--color-line-strong);
+  --color-ring: var(--color-line-strong);
+  --color-sidebar: var(--color-panel);
+  --color-sidebar-foreground: var(--color-ink);
+  --color-sidebar-primary: var(--color-accent);
+  --color-sidebar-primary-foreground: var(--color-canvas);
+  --color-sidebar-accent: var(--color-hover);
+  --color-sidebar-accent-foreground: var(--color-ink);
+  --color-sidebar-border: var(--color-line);
+  --color-sidebar-ring: var(--color-line-strong);
+}
+
+/*
+ * The application is always dark, so shadcn/ui's `dark:` styles always apply,
+ * whatever the system's appearance.
+ */
+@custom-variant dark (&:where(*));
+
+/*
+ * A border with no colour of its own is drawn in the line colour, not in the
+ * colour of the text: shadcn/ui's components draw some of their edges so.
+ */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
 }
 
 /*

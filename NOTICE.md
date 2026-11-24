@@ -10,10 +10,11 @@ fuzz framework's optional dependencies, and the crates patched in the root
 [Cargo.toml](Cargo.toml), at the versions resolved by [Cargo.lock](Cargo.lock),
 for the direct dependencies of the public API audit generator declared in
 [api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved by
-[its lock file](api/generator/Cargo.lock), and for the libraries and the
-typefaces copied into the view. It does not enumerate the Rust dependencies'
-transitive, optional, platform, or compiled dependencies, and it is not a
-complete inventory for a distributed application bundle.
+[its lock file](api/generator/Cargo.lock), and for the libraries, the
+source code adapted from shadcn/ui and the typefaces copied into the view. It
+does not enumerate the Rust dependencies' transitive, optional, platform, or
+compiled dependencies, and it is not a complete inventory for a distributed
+application bundle.
 
 Vite and its React plugin, the Tailwind CSS Vite plugin, TypeScript, oxlint,
 oxlint-tsgolint, oxfmt, Vitest and the React and Node type declarations,
@@ -177,6 +178,16 @@ Feather for the icons derived from it:
 
 * License: [ISC License, with the MIT License terms of Feather](licenses/lucide/LICENSE)
 * Homepage: [Lucide](https://lucide.dev)
+
+This product's view includes components adapted from shadcn/ui, copied as
+source code, not as a package, from commit
+`055aa6b7837b1808456a24beb4c97a677864aa82` of
+[shadcn-ui/ui](https://github.com/shadcn-ui/ui) and modified. They are in
+[ui/packages/design/src/shadcn](ui/packages/design/src/shadcn). They are
+distributed by shadcn:
+
+* License: [MIT License](licenses/shadcn-ui/LICENSE.md)
+* Homepage: [shadcn/ui](https://ui.shadcn.com)
 
 This product's view includes the upright variable font of the Inter typeface
 4.1, unmodified, distributed by The Inter Project Authors:
