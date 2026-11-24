@@ -27,6 +27,8 @@ them. The changes made here:
   value from its toggle, and checks for a missing tooltip explicitly.
 - **No `Math.random` while drawing.** `SidebarMenuSkeleton` derives its
   varying width from `useId` instead.
+- **No cookie.** `sidebar.tsx` does not write a cookie to keep whether the
+  sidebar is open: the application holds that, and nothing read the cookie.
 - **`use-mobile.ts`** reads the window's width with `useSyncExternalStore`
   instead of setting state from an effect.
 - **`skeleton.tsx`** is hidden from screen readers.
