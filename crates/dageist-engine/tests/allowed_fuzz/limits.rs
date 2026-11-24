@@ -97,9 +97,10 @@ pub enum Limit {
     ///   a kurtosis in the same places, which convert what they follow to a float as a cast
     ///   does, and of the text of a count or a position, made by a fill with a text literal after
     ///   the call that counts, or of the numbers of a group cast or filled to text by the first
-    ///   call, which a fill, a reverse, a sort, a drop of the nulls or one value picked may
-    ///   follow, and which read as the numbers, or of the values of a group written by a first
-    ///   call with a format of digits alone, as the year, which read as numbers, or of what
+    ///   call, which a fill, a reverse, a sort, a drop of the nulls, a running maximum or
+    ///   minimum or one value picked may follow, and which read as the numbers, or of the
+    ///   values of a group written by a first call with a format of digits alone, as the year,
+    ///   which read as numbers, or of what
     ///   a column of the dtype Null is compared or calculated with, which stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
@@ -868,6 +869,8 @@ fn keeps_each_value(links: &[Call]) -> bool {
                 | "Expr.last"
                 | "Expr.min"
                 | "Expr.max"
+                | "Expr.cum_max"
+                | "Expr.cum_min"
         )
     })
 }
