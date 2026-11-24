@@ -716,7 +716,8 @@ fn the_values_of_a_condition_and_a_fill_value_are_moments_in_one_zone() {
 #[test]
 fn the_values_of_a_chained_condition_are_moments_in_one_zone_whether_or_not_it_has_an_otherwise() {
     // Polars meets the values of a condition where it works out the schema, so a `then` of a chain
-    // that has another zone than the values before it is refused, with an `otherwise` after it or not.
+    // that has another zone than the values before it is refused, with an `otherwise` after it or
+    // not.
     let berlin = || {
         let mut links = in_utc();
         links.push(in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")));

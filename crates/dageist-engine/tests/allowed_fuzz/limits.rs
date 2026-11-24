@@ -95,8 +95,9 @@ pub enum Limit {
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
     ///   what they follow to a float as a cast does, and of the text of a count or a position,
-    ///   which reads as the number, or of what a column of the dtype Null is compared or
-    ///   calculated with, which stays null;
+    ///   made by a fill with a text literal after the call that counts, which reads as the
+    ///   number, or of what a column of the dtype Null is compared or calculated with, which
+    ///   stays null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -449,24 +450,24 @@ pub enum Limit {
     AMomentBeyondTheRangeOfAUnit,
     /// Polars' streaming engine refuses the approximate quantile of a literal, or of a value that
     /// literals alone make, which is one value, where it stands in a value of a branch of a
-    /// condition, or in the predicate of a `when` after the first, with the reason that the quantile
-    /// holds a null. It meets it in a select, a filter, a sort key, a join key, a window, the
-    /// predicate of the first `when`, and on a column in the condition. The tables measured the call
-    /// in a condition on columns. Polars refusing the rows or the empty table with that refusal,
-    /// which has no place, in a case with a condition that holds in a value or in a later predicate
-    /// a chain that starts from a literal, or from a function that makes a date, a time, a moment or
-    /// a length of time and reads no column, and takes an approximate quantile: the case run again
-    /// with each such start a column is allowed.
+    /// condition, or in the predicate of a `when` after the first, with the reason that the
+    /// quantile holds a null. It meets it in a select, a filter, a sort key, a join key, a window,
+    /// the predicate of the first `when`, and on a column in the condition. The tables measured the
+    /// call in a condition on columns. Polars refusing the rows or the empty table with that
+    /// refusal, which has no place, in a case with a condition that holds in a value or in a later
+    /// predicate a chain that starts from a literal, or from a function that makes a date, a time,
+    /// a moment or a length of time and reads no column, and takes an approximate quantile: the
+    /// case run again with each such start a column is allowed.
     AnApproximateQuantileOfALiteralInACondition,
     /// Polars shifts a moment that is one value, which a function of literals alone or an
     /// aggregate of a column makes, with the number it is filled with, whatever the time zone of
     /// the fill: it takes the number as it is. Its schema names the zone of the receiver and so do
     /// the rows in memory; the streaming engine gives rows in the zone of the fill for an aggregate
     /// and for a moment of literals in `with_columns`, and the zone of the receiver for a moment of
-    /// literals in a `select`. It panics when the same shift follows a column of moments, which the tables record
-    /// and the named rule that moments share a zone refuses for every receiver. The rule is the
-    /// tables' own, so the disagreement is of a rule that refuses what Polars allows, at a shift
-    /// that is filled, whose receiver gives one value.
+    /// literals in a `select`. The streaming engine panics when the same shift follows a column of
+    /// moments, which the tables record and the named rule that moments share a zone refuses for
+    /// every receiver. The rule is the tables' own, so the disagreement is of a rule that refuses
+    /// what Polars allows, at a shift that is filled, whose receiver gives one value.
     AMomentOfOneValueFilledInAnotherZone,
 }
 
@@ -656,7 +657,7 @@ impl Limit {
                 "Polars reads the quantile of an approximate quantile of a literal, or of a value that literals alone make, as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
-                "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where it panics for a column of moments, which the tables measured"
+                "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -824,8 +825,8 @@ fn is_a_fill_with_text(call: &Call) -> bool {
 
 /// Whether the first `upto` links of the aggregate `chain` of the pivot `step` follow the values of
 /// columns that are all of the dtype Null and only compare them, do arithmetic with them, pick one
-/// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables measured the
-/// values of a column that holds some.
+/// of them or order them, which leaves nulls: the call at `upto` meets nulls, where the tables
+/// measured the values of a column that holds some.
 fn leaves_nulls_of_a_column_of_nulls(
     frames: &Frames,
     step: &Call,
@@ -5285,7 +5286,8 @@ mod tests {
                 "{what}"
             );
         }
-        // A count, a fill with text and then another call that keeps the text, is still the count's.
+        // A count, a fill with text and then another call that keeps the text, is still the
+        // count's.
         let (kept_on, place) = skewed(vec![
             call("Expr.count", Vec::new()),
             fill_with(text_of("1d")),
@@ -9537,9 +9539,9 @@ mod tests {
 
     #[test]
     fn a_null_quantile_is_not_excused_where_the_case_with_a_column_is_refused_for_another_reason() {
-        // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is no
-        // longer refused for the quantile, and is refused for the year of a number. The literal is
-        // then no more shown to be the cause than the call after it, so the case is excused of
+        // `lit(true).approx_quantile(1).dt.year()` in a branch: a column in the literal's place is
+        // no longer refused for the quantile, and is refused for the year of a number. The literal
+        // is then no more shown to be the cause than the call after it, so the case is excused of
         // nothing.
         let case = branch_with_a_quantile_and(
             a_literal_true(),
@@ -9551,7 +9553,8 @@ mod tests {
             refused_for_a_bound(&case, None, Stage::Rows, NULL_QUANTILE),
             vec![]
         );
-        // Without the call after it the case with a column is allowed, and the literal is the cause.
+        // Without the call after it the case with a column is allowed, and the literal is the
+        // cause.
         let plain = branch_with_a_quantile(a_literal_true(), a_share_of_one(), true);
         assert_eq!(
             refused_for_a_bound(&plain, None, Stage::Rows, NULL_QUANTILE),
