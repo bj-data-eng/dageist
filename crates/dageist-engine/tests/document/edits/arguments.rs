@@ -393,6 +393,87 @@ fn keys_set_as_a_whole_list_leave_each_per_key_option_a_value_for_each() {
     );
 }
 
+/// The values of `descending` of a sort by `by`, then `more_by` the field `b`, after `edit`.
+fn descending_after(
+    by: &[&str],
+    descending: &[bool],
+    edit: impl Fn(&dageist_engine::document::Document) -> dageist_engine::document::Document,
+) -> Json {
+    let fields = |names: &[&str]| many(names.iter().map(|name| field(name)).collect());
+    let document = read(vec![step(
+        "order",
+        "LazyFrame.sort",
+        json!({
+            "by": fields(by),
+            "more_by": fields(&["b"]),
+            "descending": many(descending.iter().map(|value| flag(*value)).collect()),
+        }),
+    )]);
+    let edited = edit(&document);
+    super::json_of(&edited)["steps"][0]["call"]["arguments"]["descending"].clone()
+}
+
+fn keys_of(names: &[&str]) -> Value {
+    Value::Many(
+        names
+            .iter()
+            .map(|name| Value::Expression(Expression::field(*name).expect("a field")))
+            .collect(),
+    )
+}
+
+#[test]
+fn keys_of_by_set_as_a_longer_list_leave_the_values_of_the_more_keys_where_they_are() {
+    // Keys `a` then `b`, which `more_by` holds, with values false and true.
+    let by = inside(0, "order", vec![parameter("by")]);
+    let after = descending_after(&["a"], &[false, true], |document| {
+        document
+            .set_argument(&by, keys_of(&["a", "c"]))
+            .expect("set")
+    });
+    // `c` is new and holds the default, and `b` keeps its true.
+    assert_eq!(after, many(vec![flag(false), flag(false), flag(true)]));
+}
+
+#[test]
+fn keys_of_by_set_as_a_shorter_list_take_only_their_own_values_with_them() {
+    let by = inside(0, "order", vec![parameter("by")]);
+    let after = descending_after(&["a", "c"], &[false, false, true], |document| {
+        document.set_argument(&by, keys_of(&["a"])).expect("set")
+    });
+    assert_eq!(after, many(vec![flag(false), flag(true)]));
+    // Taking a key whose value was true leaves the more keys' values alone.
+    let after = descending_after(&["a", "c"], &[false, true, false], |document| {
+        document.set_argument(&by, keys_of(&["a"])).expect("set")
+    });
+    assert_eq!(after, many(vec![flag(false), flag(false)]));
+}
+
+#[test]
+fn keys_of_by_that_are_cleared_take_only_their_own_values_with_them() {
+    let by = inside(0, "order", vec![parameter("by")]);
+    let after = descending_after(&["a"], &[false, true], |document| {
+        document.clear_argument(&by).expect("cleared")
+    });
+    assert_eq!(after, many(vec![flag(true)]));
+}
+
+#[test]
+fn keys_of_more_by_set_as_a_longer_or_shorter_list_keep_the_values_of_by() {
+    let more = inside(0, "order", vec![parameter("more_by")]);
+    // `a` is the first key, `b` the second; `more_by` becomes `b` and `c`.
+    let longer = descending_after(&["a"], &[true, false], |document| {
+        document
+            .set_argument(&more, keys_of(&["b", "c"]))
+            .expect("set")
+    });
+    assert_eq!(longer, many(vec![flag(true), flag(false), flag(false)]));
+    let shorter = descending_after(&["a"], &[true, false], |document| {
+        document.set_argument(&more, keys_of(&[])).expect("set")
+    });
+    assert_eq!(shorter, many(vec![flag(true)]));
+}
+
 #[test]
 fn keys_set_as_a_whole_list_leave_one_value_for_every_key_as_it_is() {
     let document = read(vec![sort(json!({ "descending": flag(true) }))]);
