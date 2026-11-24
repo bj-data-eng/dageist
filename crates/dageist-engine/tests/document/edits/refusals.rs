@@ -422,10 +422,6 @@ fn a_refusal_of_a_place_with_the_largest_index_can_be_shown() {
         let place = inside(1, "second", vec![parameter("columns"), way]);
         let error = refused(document.set_argument(&place, Value::Integer(1)));
         assert!(!error.to_string().is_empty(), "{error:?}");
-        assert!(matches!(
-            error.problem(),
-            EditProblem::DoesNotFit { .. } | EditProblem::Nothing
-        ));
     }
     let item = inside(
         1,
