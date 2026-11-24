@@ -1409,3 +1409,151 @@ fn no_receiver_of_two_levels_is_run_into_a_panic_of_polars() {
             .join("\n")
     );
 }
+
+// ---------------------------------------------------------------------------
+// Arrays of two widths that meet
+
+/// What Polars and the walk say of `links` after `column`, in a `select`: Polars' words where it
+/// refuses or panics, and the dtype it gives where it accepts.
+fn polars_and_walk_say(column: &str, links: Vec<Value>) -> Option<(Said, Said, Option<DataType>)> {
+    let (value, path) = step_of(Place::Select, column, links);
+    let document = Document::read(&document(vec![value])).ok()?;
+    let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        document.run_on(&inputs(), &frame())
+    }));
+    let Ok(Ok(report)) = ran else {
+        return Some((
+            Said::Refuses("Polars panicked".to_owned()),
+            Said::NotKnown,
+            None,
+        ));
+    };
+    let given = report.steps()[0]
+        .expressions()
+        .iter()
+        .find(|traced| traced.place().path() == path)
+        .and_then(|traced| match traced.links().last()? {
+            Resolution::Dtype(dtype) => Some(dtype.clone()),
+            _ => None,
+        });
+    Some((polars_says(&report), walk_says(&report), given))
+}
+
+/// Every call that takes an expression and is given an array of two values and an array of three
+/// is what Polars says of it: where Polars refuses it though it takes two arrays of two, the walk
+/// refuses it too, and where Polars takes it, the walk refuses it only for what it would claim of
+/// the result, an array, where Polars gives a list. Polars refuses to add arrays of two widths, to
+/// look one up in the other and to replace by them, and compares them.
+#[test]
+fn every_call_that_meets_arrays_of_two_widths_is_what_polars_says() {
+    let two = column_of(Representative::Array(Inner::Int64));
+    let three = WIDE;
+    let mut agree_on_the_width = Vec::new();
+    let mut asked = 0;
+    for entry in catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == catalog::Applies::Expression)
+    {
+        let id = entry.id().as_str();
+        let expressions: Vec<_> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| matches!(parameter.kind(), catalog::Kind::Expression(_)))
+            .collect();
+        let needs_more = entry.parameters().iter().any(|parameter| {
+            parameter.is_needed()
+                && !matches!(
+                    parameter.kind(),
+                    catalog::Kind::Expression(_) | catalog::Kind::Dtype
+                )
+        });
+        if expressions.is_empty() || needs_more {
+            continue;
+        }
+        let needed: Vec<_> = expressions
+            .iter()
+            .filter(|parameter| parameter.is_needed())
+            .collect();
+        // The parameters that are given the other array: the ones the call needs, or each of the
+        // others by itself where it needs none.
+        let sets: Vec<Vec<&catalog::Parameter>> = if needed.is_empty() {
+            expressions
+                .iter()
+                .map(|parameter| vec![*parameter])
+                .collect()
+        } else {
+            vec![needed.iter().map(|parameter| **parameter).collect()]
+        };
+        for set in sets {
+            for (receiver, other_for_two, other_for_three) in [
+                (two.as_str(), two.as_str(), three),
+                (three, two.as_str(), three),
+            ] {
+                let call_with = |other: &str| {
+                    let mut arguments = serde_json::Map::new();
+                    for parameter in entry.parameters().iter().filter(|parameter| {
+                        parameter.is_needed() && matches!(parameter.kind(), catalog::Kind::Dtype)
+                    }) {
+                        arguments.insert(parameter.name().to_owned(), json!({ "dtype": "Int64" }));
+                    }
+                    for parameter in &set {
+                        let value = if parameter.shape() == catalog::Shape::Many {
+                            many(vec![field(other)])
+                        } else {
+                            field(other)
+                        };
+                        arguments.insert(parameter.name().to_owned(), value);
+                    }
+                    vec![call(id, Value::Object(arguments))]
+                };
+                // The other array is of the width of the receiver, then of the other width.
+                let same = if receiver == two {
+                    other_for_two
+                } else {
+                    other_for_three
+                };
+                let other = if receiver == two {
+                    other_for_three
+                } else {
+                    other_for_two
+                };
+                asked += 1;
+                let (Some((alike, _, _)), Some((met, walked, given))) = (
+                    polars_and_walk_say(receiver, call_with(same)),
+                    polars_and_walk_say(receiver, call_with(other)),
+                ) else {
+                    continue;
+                };
+                let label = format!(
+                    "{id} {} on {receiver} beside {other}",
+                    set.iter()
+                        .map(|parameter| parameter.name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                match (&alike, &met, &walked) {
+                    // Polars refuses the widths, and the walk says it does not.
+                    (Said::Accepts, Said::Refuses(_), Said::Accepts | Said::NotKnown) => {
+                        agree_on_the_width.push(format!("{label}: the walk accepts, {met:?}"));
+                    }
+                    // Polars takes the widths, and the walk refuses them where Polars gives no
+                    // array, which it would have claimed.
+                    (_, Said::Accepts, Said::Refuses(_))
+                        if matches!(given, Some(DataType::Array(..))) =>
+                    {
+                        agree_on_the_width.push(format!(
+                            "{label}: the walk refuses {walked:?}, Polars gives {given:?}"
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    assert!(
+        agree_on_the_width.is_empty(),
+        "{} of {asked} calls differ from Polars:\n{}",
+        agree_on_the_width.len(),
+        agree_on_the_width.join("\n")
+    );
+}
