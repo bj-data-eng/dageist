@@ -11003,6 +11003,30 @@ mod tests {
             )),
             Vec::<&str>::new()
         );
+        // A panic is never the fold's: the exponent is folded to a null, which Polars allows, and
+        // is the number 100 without the fold, which it panics for, as the tables recorded, and
+        // the limit for a panic is the one that excuses it.
+        let overflow = "Polars panicked: attempt to exponentiate with overflow";
+        let powered = select(vec![chain_of(
+            column("k"),
+            vec![call(
+                "Expr.pow",
+                vec![(
+                    "exponent",
+                    Value::Expression(chain_of(
+                        call("polars.lit", vec![("value", Value::Integer(100))]),
+                        vec![sum_with_null(), call("Expr.abs", Vec::new())],
+                    )),
+                )],
+            )],
+        )]);
+        let found = slugs(refused_by_the_tables_at(
+            &powered,
+            at(&[parameter("exprs"), Segment::Item(0), Segment::Link(0)]),
+            overflow,
+        ));
+        assert!(!found.contains(&SLUG), "{found:?}");
+        assert!(found.contains(&"a-panic"), "{found:?}");
         // A fold in another expression of the step is no reason Polars allows this one.
         assert_eq!(
             asked(
