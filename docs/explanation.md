@@ -716,8 +716,15 @@ column, an aggregate or any other chain is not, and the count is then not known.
   its step is none, and a step past the end is one. A step of nothing is refused, and so is a bound that the dtype does not
   hold: 300 is no `UInt8`, and Polars refuses it of a range that is empty too.
 - `linear_space` and `repeat` give as many values as the number of samples and the number of times: none for 0, and a
-  number below nothing is refused. A range or a repeat that is cut by `head`, `tail`, `limit` or a slice's length of a number below
-  nothing is refused too, for Polars cannot extract the length from it: "unable to extract length".
+  number below nothing is refused.
+- A chain that starts at a range or a repeat, whatever methods follow, is not cut by `head`, `tail`, `limit` or the length of a
+  slice given a number below nothing: Polars casts the length to an unsigned number where the cut runs and refuses it with
+  "unable to extract length". Python's engines and the engine of steps fold `head`, `limit` and a slice's length into the
+  chain after the first values or after a method that gives a value for each value it follows, as `abs`, `neg` and `+ 1`
+  do, and run it, and refuse it with their optimizations off, so the editor, which is strict where the optimizer decides,
+  refuses it there too; a test pins those. A range met as an operand of a chain is not judged: `(a + int_range(0, 3)).head(-2)`
+  is refused by Python's in-memory engine and taken by the streaming one, as `a.tail(-2)` of a column is, so it is the
+  engine's answer and not the range's.
 - The dates, moments and times of day of `date_range`, `datetime_range` and `time_range` are counted by Polars, which the
   engine asks with the arguments typed in, as it asks of a duration: how many months fit between two dates, the last day
   of a month, a clock put back or forward in a time zone and a range counted in nanoseconds are Polars' to say. A range of
@@ -735,6 +742,8 @@ time zones are refused by `moments-share-a-zone`.
 
 Some of what the editor refuses Polars takes, on purpose:
 
+- A repeat of a struct that is cast to another dtype is refused, though Polars casts a struct of one field to the dtype of
+  its field: the tables measure a struct of two, and the editor does not know how many fields a column's struct has.
 - An interval of nothing or below nothing is refused whatever the bounds are, though Polars gives no values where the end is
   before the start and refuses it only where it is not: the editor is strict where the data decide.
 - A count of exactly one beside the rows, an operand, a fill, an exponent or a share is refused, as `values-meet-in-count`

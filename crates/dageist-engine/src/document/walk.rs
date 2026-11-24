@@ -336,8 +336,9 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
-    /// Whether the link follows a range or a repeat and nothing else: Polars cannot extract the
-    /// length that cuts it from a number below nothing.
+    /// Whether the chain starts at a range or a repeat: Polars cannot extract the length that cuts
+    /// it from a number below nothing, after any link that the optimizer does not fold the cut
+    /// into, which the engines do not agree on, so the editor refuses it after every one.
     after_a_range: bool,
 }
 
@@ -1794,9 +1795,8 @@ impl Walker<'_> {
                     unit,
                     widened,
                     zone,
-                    after_a_range: at == 0
-                        && matches!(expression.start(), Start::Call(start)
-                            if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments)),
+                    after_a_range: matches!(expression.start(), Start::Call(start)
+                        if Counting::of(start.entry(), &[]) == Some(Counting::TheArguments)),
                 },
             );
             unit = unit_after(link, unit, &standing);
