@@ -3116,10 +3116,12 @@ mod tests {
 
     #[test]
     fn a_predicate_is_not_settled_by_the_refusal_of_another_predicate_of_the_condition() {
-        // `when(a.dt.replace(day=1).is_null()).then(a).when(f.dt.replace(day=g).is_null()).then(a)
+        // `when(a.dt.replace(day=1).is_null()).then(a).when(a.dt.replace(day=g).is_null()).then(a)
         // .otherwise(a)`: Polars drops the predicates. Where the last value differs it refuses the
         // second predicate, whose day is text, and the first it allows. The refusal the tables
         // are asked about is the first predicate's replacement, which that refusal does not show.
+        // With the first made `true` Polars folds the condition to its first value and never
+        // evaluates the second, which is no showing that the first is why it was refused.
         let col = |name: &str| {
             format!(
                 r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
@@ -3143,7 +3145,7 @@ mod tests {
 {{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[{},{{"entry":"Then.when","arguments":{{"predicates":{{"many":[{}]}}}}}},{},{}]}}}}]}}}}}}}}]}}"#,
             predicate("a", one),
             value("When.then"),
-            predicate("f", col("g")),
+            predicate("a", col("g")),
             value("ChainedWhen.then"),
             value("ChainedThen.otherwise"),
         );
