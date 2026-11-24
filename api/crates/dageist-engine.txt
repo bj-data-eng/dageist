@@ -127,6 +127,7 @@ pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::MomentsShareAZone
+pub dageist_engine::allowed::Rule::ParameterTakesOneValue
 pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
@@ -135,7 +136,7 @@ pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 15]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 16]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -292,6 +293,7 @@ pub fn dageist_engine::allowed::refuse_a_count_that_may_not_end(context: dageist
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_count() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_widened_value() -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -471,6 +473,9 @@ pub dageist_engine::catalog::Kind::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::catalog::Laziness
 pub dageist_engine::catalog::Laziness::Lazy
 pub dageist_engine::catalog::Laziness::NeedsCollect
+pub enum dageist_engine::catalog::OneValue
+pub dageist_engine::catalog::OneValue::Scalar
+pub dageist_engine::catalog::OneValue::SingleRow
 pub enum dageist_engine::catalog::ParameterDefault
 pub dageist_engine::catalog::ParameterDefault::Python(&'static str)
 pub dageist_engine::catalog::ParameterDefault::Required
@@ -663,6 +668,7 @@ pub const fn dageist_engine::catalog::Parameter::lenient_beside(&self) -> core::
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::names_the_fields_of_the_result(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::offered(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::one_value(&self) -> core::option::Option<dageist_engine::catalog::OneValue>
 pub const fn dageist_engine::catalog::Parameter::plain_text_flag(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape

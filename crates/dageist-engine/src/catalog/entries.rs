@@ -24,8 +24,8 @@ use polars::series::ops::NullBehavior;
 
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
-    EntryId, Family, Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape,
-    ValueType, Variadic, Writes,
+    EntryId, Family, Kind, Laziness, OneValue, Parameter, ParameterDefault, PatternMeans, Role,
+    Shape, ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -2552,7 +2552,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: ANY,
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
-            .not_broadcasting()],
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
         laziness: Laziness::Lazy,
         build: Build::Expression(bottom_k),
     },
@@ -2679,7 +2680,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             optional("n", Kind::Expression(INTEGER), Shape::One, "1")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "null_behavior",
                 Kind::Choice(NULL_BEHAVIOR),
@@ -3449,7 +3451,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: ANY,
         parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
             .with_role(Role::Count)
-            .not_broadcasting()],
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pct_change),
     },
@@ -3476,7 +3479,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("quantile", Kind::Expression(NUMERIC), Shape::One)
                 .with_role(Role::Share)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::SingleRow),
             optional(
                 "interpolation",
                 Kind::Choice(QUANTILE_METHOD),
@@ -3612,11 +3616,13 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             optional("n", Kind::Expression(INTEGER), Shape::One, "1")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional("fill_value", EXPRESSION, Shape::One, "None")
                 .keyword_only()
                 .with_role(Role::Filler)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),
@@ -4029,7 +4035,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: ANY,
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
-            .not_broadcasting()],
+            .not_broadcasting()
+            .reading_one_value(OneValue::SingleRow)],
         laziness: Laziness::Lazy,
         build: Build::Expression(top_k),
     },

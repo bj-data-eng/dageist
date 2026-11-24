@@ -53,6 +53,7 @@
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column.
 #   moments-share-a-zone: moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone.
+#   parameter-takes-one-value: a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.

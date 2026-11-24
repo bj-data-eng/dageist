@@ -2145,6 +2145,22 @@ impl Walker<'_> {
                 },
             );
         }
+        // A parameter that Polars reads as one value is given one: not the rows, not a count, and, where it
+        // must be one that Polars can tell is one, not one that a method took of one value.
+        if matches!(cur, Cur::Value { .. })
+            && let Some((parameter, given)) = given_other_than_one_value(entry, arguments)
+            && let Err(refusal) =
+                allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter, given)
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         let receiver_taken = matches!(&cur, Cur::Value { taken: true, .. });
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
@@ -2668,6 +2684,32 @@ fn gives_other_numbers_of_values(
             }
             None => false,
         }
+    })
+}
+
+/// The first parameter of `entry` that Polars reads as one value and is given another, with what it
+/// was given: the rows, a count of values, or, for a parameter that must be a scalar, one value that a
+/// method took of one value. An expression that was not walked to its end is not judged.
+fn given_other_than_one_value<'a>(
+    entry: &'a Entry,
+    arguments: &[(String, Operand)],
+) -> Option<(&'a str, &'static str)> {
+    entry.parameters().iter().find_map(|parameter| {
+        let how = parameter.one_value()?;
+        let operand = arguments
+            .iter()
+            .find(|(name, _)| name == parameter.name())
+            .map(|(_, operand)| operand)
+            .filter(|operand| operand.known && operand.reliable)?;
+        let given = match operand.shape {
+            Shape::Many => "the rows",
+            Shape::Counted => "a count of values",
+            Shape::One if operand.taken && how == catalog::OneValue::Scalar => {
+                "one value that a method took of one value"
+            }
+            Shape::One => return None,
+        };
+        Some((parameter.name(), given))
     })
 }
 

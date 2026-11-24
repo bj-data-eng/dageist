@@ -161,3 +161,35 @@ fn the_share_of_a_quantile_takes_numbers_only() {
         );
     }
 }
+
+#[test]
+fn only_the_parameters_polars_reads_as_one_value_say_how_they_must_be_given_it() {
+    // Python Polars 2.1.0, in a select: `shift`'s count and fill and `diff`'s count refuse the rows, a
+    // count of values and the one value that `head` took of one value, with "must be a scalar value";
+    // a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count and take
+    // that value. A count of values that `head` or `slice` take, and an approximate quantile's
+    // share, take any of them.
+    let mut found: Vec<(&str, &str, catalog::OneValue)> = catalog::entries()
+        .iter()
+        .flat_map(|entry| {
+            entry.parameters().iter().filter_map(move |parameter| {
+                parameter
+                    .one_value()
+                    .map(|how| (entry.id().as_str(), parameter.name(), how))
+            })
+        })
+        .collect();
+    found.sort_by_key(|(entry, parameter, _)| (*entry, *parameter));
+    assert_eq!(
+        found,
+        [
+            ("Expr.bottom_k", "k", catalog::OneValue::SingleRow),
+            ("Expr.diff", "n", catalog::OneValue::Scalar),
+            ("Expr.pct_change", "n", catalog::OneValue::SingleRow),
+            ("Expr.quantile", "quantile", catalog::OneValue::SingleRow),
+            ("Expr.shift", "fill_value", catalog::OneValue::Scalar),
+            ("Expr.shift", "n", catalog::OneValue::Scalar),
+            ("Expr.top_k", "k", catalog::OneValue::SingleRow),
+        ]
+    );
+}

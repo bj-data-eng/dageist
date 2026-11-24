@@ -1301,6 +1301,23 @@ pub fn rule_forbids_a_window_over_a_widened_value() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::WindowInputIsNotWidened))
 }
 
+/// The refusal of a parameter that Polars reads as one value and is given another, which the caller
+/// has found: `given` says what it was given, as `the rows`, `a count of values` or `one value that
+/// a method took of one value`.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words and what the parameter was given.
+pub fn rule_forbids_a_parameter_given_more_than_one_value(
+    parameter: &str,
+    given: &str,
+) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::ParameterTakesOneValue,
+        &format!("{parameter} was given {given}"),
+    ))
+}
+
 /// The refusal of a window given a count of values that the data or the arguments decide, which the
 /// caller has found: the window gives each row of its group the value it gives the group, so it
 /// takes a value as long as the group, unless it joins the values of a group or explodes them.

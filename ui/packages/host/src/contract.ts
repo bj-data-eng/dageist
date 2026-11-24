@@ -475,6 +475,7 @@ export const RULE_NAMES = [
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
   'moments-share-a-zone',
+  'parameter-takes-one-value',
   'pattern-is-valid',
   'replacement-values-match-in-number',
   'time-zone-is-valid',

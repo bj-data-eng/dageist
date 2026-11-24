@@ -41,6 +41,10 @@ pub enum Rule {
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
+    /// A parameter that Polars reads as one value is given one: not the rows, not a count of values
+    /// that the data or the arguments decide, and, for the places a shift and a difference look back
+    /// by and the value a shift fills with, not one value that a method took of one value.
+    ParameterTakesOneValue,
     /// A pattern is a regular expression Polars can compile, unless the text is plain text by a
     /// flag such as `literal`.
     PatternIsValid,
@@ -68,7 +72,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -77,6 +81,7 @@ impl Rule {
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
+        Self::ParameterTakesOneValue,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
@@ -99,6 +104,7 @@ impl Rule {
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
+            Self::ParameterTakesOneValue => "parameter-takes-one-value",
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
@@ -149,6 +155,9 @@ impl Rule {
             Self::MomentsShareAZone => {
                 "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
             }
+            Self::ParameterTakesOneValue => {
+                "a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run"
+            }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -173,6 +182,7 @@ impl Rule {
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
             | Self::MomentsShareAZone
+            | Self::ParameterTakesOneValue
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::TimeZoneIsValid
@@ -287,6 +297,7 @@ impl Rule {
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
+            | Self::ParameterTakesOneValue
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
