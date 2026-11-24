@@ -193,6 +193,8 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
 
 #[cfg(test)]
 mod tests {
+    use dageist_engine::document::{Place, Segment, StepId};
+
     use super::super::predict::{Verdict, predict};
     use super::*;
 
@@ -343,5 +345,96 @@ mod tests {
                 .iter()
                 .all(|alone| observe(alone).refusal.is_some())
         );
+    }
+
+    /// `with_columns(a.arg_sort().mode(), b.head(n=3))`: the first item is a count that is the rows
+    /// whatever they are, which stays a finding; the second is a count by chance on its own.
+    const A_STRUCTURAL_COUNT_BESIDE_A_COUNT_BY_CHANCE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.arg_sort","arguments":{}},{"entry":"Expr.mode","arguments":{}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[{"entry":"Expr.head","arguments":{"n":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":3}}},"then":[]}}}}]}}]}}}}]}"#;
+
+    /// `with_columns(k.mode() + k.head(n=3))`: both counts are in one expression.
+    const TWO_COUNTS_IN_ONE_EXPRESSION: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.mode","arguments":{}},{"entry":"Expr.add","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.head","arguments":{"n":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":3}}},"then":[]}}}}]}}}}]}}]}}}}]}"#;
+
+    /// `with_columns(k.mode(), u.cum_sum())`: a count by chance beside an item that holds none.
+    const A_COUNT_BESIDE_AN_ITEM_WITH_NONE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.mode","arguments":{}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["u"]}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}]}}}}]}"#;
+
+    /// `with_columns(k.cum_sum())`: no call counts.
+    const NO_COUNT: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}]}}}}]}"#;
+
+    fn decoded(text: &str) -> Case {
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    #[test]
+    fn a_second_count_in_another_item_settles_no_refusal_of_the_first() {
+        // The twelve rows refuse `b.head(3)` for lengths, which says nothing of the places that
+        // sort a column: the item that holds the refused place is asked alone, and it is allowed
+        // on every rows, so the refusal stays a finding.
+        let case = decoded(A_STRUCTURAL_COUNT_BESIDE_A_COUNT_BY_CHANCE);
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("values-meet-in-count")
+        ));
+        assert_eq!(settle(&case, &refused), None);
+    }
+
+    #[test]
+    fn two_counts_in_one_expression_settle_no_refusal_of_either() {
+        // Which of the two the control makes another is not the refused one's to say.
+        let case = decoded(TWO_COUNTS_IN_ONE_EXPRESSION);
+        let refused = refusal(&case);
+        assert!(is_a_count_refusal(&refused), "{refused:?}");
+        assert_eq!(settle(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_count_by_chance_is_settled_though_another_item_holds_no_count() {
+        let case = decoded(A_COUNT_BESIDE_AN_ITEM_WITH_NONE);
+        let settled = settle(&case, &refusal(&case)).expect("a count by chance");
+        assert!(is_a_refusal_of_lengths(&settled.reason), "{settled:?}");
+    }
+
+    #[test]
+    fn a_case_that_holds_no_count_settles_nothing_whatever_the_refusal_says() {
+        let case = decoded(NO_COUNT);
+        for source in [Source::Rule("values-meet-in-count"), Source::Polars] {
+            let refused = Refused {
+                source,
+                at: String::new(),
+                place: Place::of_step(0, StepId::new("s").ok())
+                    .then(Segment::Parameter("exprs".to_owned()))
+                    .then(Segment::Item(0)),
+                stage: None,
+                reason: "it cannot end here: a count of values that the data or the arguments decide, which may not end an expression in select: lengths don't match".to_owned(),
+                argument_unknown: false,
+            };
+            assert_eq!(settle(&case, &refused), None);
+        }
+    }
+
+    #[test]
+    fn only_a_refusal_for_lengths_that_do_not_meet_settles_a_count() {
+        for reason in [
+            "lengths don't match: zip node received non-equal length inputs",
+            "cannot evaluate two Series of different lengths (0 and 3)",
+            "sort expressions must have same length as DataFrame, got DataFrame height: 3",
+            "shapes of `self`, `mask` and `other` are not suitable for `zip_with` operation",
+        ] {
+            assert!(is_a_refusal_of_lengths(reason), "{reason}");
+        }
+        for reason in [
+            "gather indices are out of bounds",
+            "attempt to multiply with overflow",
+            "conversion from `str` to `i64` failed in column 'a' for 1 out of 1 values",
+            "Polars panicked: index out of bounds",
+            "`exp` operation not supported for dtype `date` as argument 0",
+            "dtype `null` has no time unit",
+        ] {
+            assert!(!is_a_refusal_of_lengths(reason), "{reason}");
+        }
     }
 }
