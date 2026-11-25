@@ -800,6 +800,40 @@ fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of
 }
 
 #[test]
+fn a_predicate_that_is_no_boolean_in_a_joins_key_is_refused_where_the_other_table_holds_keys() {
+    // `when(k).then(1).otherwise(0)` as the key: Python Polars 2.2.0 refuses a predicate of whole
+    // numbers when it evaluates the key, which its streaming engine does only where the other
+    // table holds a key with a value, as `rk` does here; the rule that a condition's predicate is
+    // a `Boolean` says it whatever the other table holds, so the evidence of the rule is this case.
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("k")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": whole(1) })),
+            call("Then.otherwise", json!({ "statement": whole(0) })),
+            call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+        ],
+    );
+    let report = join_on(key);
+    assert!(
+        polars_says(&report).is_some_and(|reason| reason.contains("Boolean")),
+        "{:?} {:?}",
+        polars_says(&report),
+        outcome(&report)
+    );
+    assert!(
+        walk(&report).refusal().is_some_and(|refusal| matches!(
+            refusal.refusal().source(),
+            RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
+        )),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}
+
+#[test]
 fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_as_polars_takes_it()
 {
     // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers at once, for none is 1.5,
