@@ -908,6 +908,16 @@ fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_a
             &format!("{method} beside k, a float given"),
             &join_on(swapped(method, number(1.5, Some("Float32")))),
         );
+        // Polars rewrites the number only where it is a 32 or 64 bit float, so a 16 bit float is
+        // compared as it is and the key is taken.
+        taken(
+            &format!("{method} of k, a half float given"),
+            &join_on(beside(method, number(1.5, Some("Float16")))),
+        );
+        taken(
+            &format!("{method} beside k, a half float given"),
+            &join_on(swapped(method, number(1.5, Some("Float16")))),
+        );
         taken(
             &format!("{method} of k, no fraction"),
             &join_on(beside(method, number(2.0, None))),
