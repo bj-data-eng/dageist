@@ -82,6 +82,25 @@ const IS_STEPS_WINDOW = new URLSearchParams(window.location.search).get('window'
  */
 const IN_APPLICATION_WINDOW = tauriHost() !== null;
 
+/** The transform whose steps are edited: its id and the name it shows. */
+interface Editing {
+  readonly node: string;
+  readonly name: string;
+}
+
+/** The topic on which the main window says which transform's steps are edited. */
+const EDITING_TOPIC = 'editing';
+/** The topic on which the steps window asks the main window which that is. */
+const EDITING_ASKED_TOPIC = 'editing-asked';
+
+/** Reads what the main window said on `EDITING_TOPIC`, or `null` when it is not that. */
+function readEditing(message: unknown): Editing | null {
+  if (typeof message !== 'object' || message === null) return null;
+  if (!('node' in message) || !('name' in message)) return null;
+  const { node, name } = message;
+  return typeof node === 'string' && typeof name === 'string' ? { node, name } : null;
+}
+
 /** Draws the application window. */
 export function App(): React.JSX.Element {
   const [host, setHost] = useState<Host | null>(null);
@@ -93,6 +112,7 @@ export function App(): React.JSX.Element {
   // A workspace is mounted when it is first shown and then stays mounted, so
   // switching away and back keeps what was being done in it.
   const [visited, setVisited] = useState<readonly Workspace[]>(() => [startingWorkspace()]);
+  const [editing, setEditing] = useState<Editing | null>(null);
 
   useEffect(() => {
     if (IS_STEPS_WINDOW) document.title = 'dageist · steps';
@@ -125,6 +145,40 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
+  // The main window edits the steps of the graph's first transform until another is chosen, and
+  // tells the steps window which transform that is.
+  useEffect(() => {
+    if (host === null || IS_STEPS_WINDOW || editing !== null) return undefined;
+    let live = true;
+    host.graph().then(
+      (graph) => {
+        const first = graph.nodes.find((node) => node.kind === 'transform');
+        if (live && first !== undefined) setEditing({ node: first.id, name: first.name });
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [host, editing]);
+  useEffect(() => {
+    if (host === null || IS_STEPS_WINDOW || editing === null) return undefined;
+    host.broadcast(EDITING_TOPIC, editing);
+    return host.listen(EDITING_ASKED_TOPIC, () => {
+      host.broadcast(EDITING_TOPIC, editing);
+    });
+  }, [host, editing]);
+  // The steps window edits what the main window says, and asks it once it can hear the answer.
+  useEffect(() => {
+    if (host === null || !IS_STEPS_WINDOW) return undefined;
+    const stop = host.listen(EDITING_TOPIC, (message) => {
+      const said = readEditing(message);
+      if (said !== null) setEditing(said);
+    });
+    host.broadcast(EDITING_ASKED_TOPIC, {});
+    return stop;
+  }, [host]);
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const show = (next: Workspace): void => {
@@ -143,12 +197,21 @@ export function App(): React.JSX.Element {
   if (IS_STEPS_WINDOW) {
     return (
       <main className="flex h-full flex-col bg-canvas bg-dots p-4">
-        {host === null ? (
-          <Panel mark="ƒx" title="Steps" details={[status.text]}>
+        {host === null || editing === null ? (
+          <Panel
+            mark="ƒx"
+            title="Steps"
+            details={[host === null ? status.text : 'Waiting for the main window…']}
+          >
             {null}
           </Panel>
         ) : (
-          <StepsWindow host={host} styleNonce={STYLE_NONCE} />
+          <StepsWindow
+            host={host}
+            node={editing.node}
+            name={editing.name}
+            styleNonce={STYLE_NONCE}
+          />
         )}
       </main>
     );
@@ -202,7 +265,15 @@ export function App(): React.JSX.Element {
       <div className="relative min-w-0 flex-1 bg-dots">
         {/* Under another workspace the canvas takes no keys, clicks or focus. */}
         <div className="absolute inset-0" inert={workspace !== 'flow'}>
-          {host !== null && <FlowCanvas host={host} />}
+          {host !== null && (
+            <FlowCanvas
+              host={host}
+              onEditSteps={(node, name) => {
+                setEditing({ node, name });
+                show('steps');
+              }}
+            />
+          )}
         </div>
         <main
           className={cx(
@@ -212,12 +283,21 @@ export function App(): React.JSX.Element {
         >
           {visited.includes('steps') && (
             <div className={frame('steps')} inert={workspace !== 'steps'}>
-              {host === null ? (
-                <Panel mark="ƒx" title="Transform · Claim timing" details={[status.text]}>
+              {host === null || editing === null ? (
+                <Panel
+                  mark="ƒx"
+                  title="Transform"
+                  details={[host === null ? status.text : 'The graph has no transform yet.']}
+                >
                   {null}
                 </Panel>
               ) : (
-                <StepsWorkspace host={host} styleNonce={STYLE_NONCE} />
+                <StepsWorkspace
+                  host={host}
+                  node={editing.node}
+                  name={editing.name}
+                  styleNonce={STYLE_NONCE}
+                />
               )}
             </div>
           )}

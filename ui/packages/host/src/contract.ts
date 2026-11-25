@@ -323,6 +323,153 @@ export type InputView =
       readonly values: ValuesView;
     };
 
+/** What a node of the graph is. Mirrors `KindView` in crates/dageist-tauri/src/graph.rs. */
+export type NodeKind = 'source' | 'transform' | 'output' | 'parameters';
+
+/** What an input takes. Mirrors `TakesView` in crates/dageist-tauri/src/graph.rs. */
+export type Takes = 'table' | 'value' | 'list';
+
+/** A place on a node a reference fills. Mirrors `SlotView` in crates/dageist-tauri/src/graph.rs. */
+export type SlotView =
+  /** The table a transform's steps start from. */
+  | { readonly kind: 'start' }
+  /** A named input of a transform. */
+  | { readonly kind: 'input'; readonly name: string }
+  /** The table an output writes. */
+  | { readonly kind: 'written' };
+
+/** What a node reads. Mirrors `ReferenceView` in crates/dageist-tauri/src/graph.rs. */
+export type ReferenceView =
+  /** The table a node gives. */
+  | { readonly kind: 'table'; readonly node: string }
+  /** The values of one column of the table a node gives. */
+  | { readonly kind: 'column'; readonly node: string; readonly column: string }
+  /** One value of a Parameters node. */
+  | { readonly kind: 'parameter'; readonly node: string; readonly name: string };
+
+/**
+ * An output a slot can be filled from: a node's table, whole or by one of its columns, or one
+ * value. Mirrors `FitView` in crates/dageist-tauri/src/graph.rs.
+ */
+export type GraphFitView =
+  | { readonly kind: 'table'; readonly node: string }
+  | { readonly kind: 'parameter'; readonly node: string; readonly name: string };
+
+/** One slot of a node. Mirrors `SlotStateView` in crates/dageist-tauri/src/graph.rs. */
+export interface SlotStateView {
+  readonly slot: SlotView;
+  readonly takes: Takes;
+  /** What fills it, or `null` while it is not connected. */
+  readonly from: ReferenceView | null;
+  /** Every output that could fill it without closing a cycle. */
+  readonly fits: readonly GraphFitView[];
+}
+
+/** A file a source reads or an output writes. Mirrors `FileView` in crates/dageist-tauri/src/graph.rs. */
+export interface FileView {
+  readonly path: string;
+  readonly format: 'parquet' | 'csv';
+}
+
+/** One value of a Parameters node. Mirrors `ParameterView` in crates/dageist-tauri/src/graph.rs. */
+export interface GraphParameterView {
+  readonly name: string;
+  readonly dtype: string;
+  readonly text: string;
+}
+
+/**
+ * Where a node's box stands and, once resized, its size, in canvas units. Mirrors `FrameView` in
+ * crates/dageist-tauri/src/graph.rs.
+ */
+export interface FrameView {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number | null;
+  readonly height: number | null;
+}
+
+/** One node as the canvas draws it. Mirrors `NodeBoxView` in crates/dageist-tauri/src/graph.rs. */
+export interface NodeBoxView {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: NodeKind;
+  /** What the node is set to, in a few words. */
+  readonly summary: string;
+  readonly slots: readonly SlotStateView[];
+  /** For a transform, what may feed a new input; `null` for other kinds. */
+  readonly newInput: readonly GraphFitView[] | null;
+  /** The columns of the table the node gives or would write, or `null` while they are not known. */
+  readonly columns: readonly FieldView[] | null;
+  /** A Parameters node's values; empty for other kinds. */
+  readonly parameters: readonly GraphParameterView[];
+  readonly file: FileView | null;
+  /** What keeps the node from being worked out, in words. */
+  readonly problems: readonly string[];
+  /** Where its box stands, or `null` while it has not been placed. */
+  readonly frame: FrameView | null;
+}
+
+/** The graph as the canvas draws it. Mirrors `GraphView` in crates/dageist-tauri/src/graph.rs. */
+export interface GraphView {
+  readonly revision: number;
+  readonly layoutRevision: number;
+  /** Every node, each after the nodes it reads. */
+  readonly nodes: readonly NodeBoxView[];
+  /** The dtypes a parameter may have. */
+  readonly parameterDtypes: readonly string[];
+}
+
+/** One edit of the graph. Mirrors `GraphEditRequest` in crates/dageist-tauri/src/graph.rs. */
+export type GraphEdit =
+  | {
+      readonly edit: 'add';
+      readonly kind: NodeKind;
+      readonly follows: string | null;
+      readonly name: string | null;
+    }
+  | { readonly edit: 'remove'; readonly node: string }
+  | { readonly edit: 'rename'; readonly node: string; readonly name: string }
+  | { readonly edit: 'setFile'; readonly node: string; readonly file: FileView | null }
+  | {
+      readonly edit: 'connect';
+      readonly node: string;
+      readonly slot: SlotView;
+      readonly from: ReferenceView;
+    }
+  | { readonly edit: 'connectNew'; readonly node: string; readonly from: ReferenceView }
+  | { readonly edit: 'disconnect'; readonly node: string; readonly slot: SlotView }
+  | {
+      readonly edit: 'addInput';
+      readonly node: string;
+      readonly name: string;
+      readonly takes: Takes;
+    }
+  | { readonly edit: 'removeInput'; readonly node: string; readonly name: string }
+  | {
+      readonly edit: 'setParameter';
+      readonly node: string;
+      readonly name: string;
+      readonly dtype: string;
+      readonly text: string;
+    }
+  | { readonly edit: 'removeParameter'; readonly node: string; readonly name: string };
+
+/** What an edit of the graph came to. Mirrors `GraphEditAnswerView` in crates/dageist-tauri/src/graph.rs. */
+export type GraphEditAnswerView =
+  /** The edit was made: the graph at its new revision, and the node it added, if any. */
+  | { readonly kind: 'edited'; readonly graph: GraphView; readonly added: string | null }
+  /** The graph refused the edit and is still at `revision`. */
+  | { readonly kind: 'refused'; readonly revision: number; readonly message: string };
+
+/** The revision the layout is at after a box was placed. Mirrors `PlacedView` in crates/dageist-tauri/src/graph.rs. */
+export interface PlacedView {
+  readonly layoutRevision: number;
+}
+
+/** What a file is chosen for. Mirrors `Purpose` in crates/dageist-tauri/src/dialog.rs. */
+export type FilePurpose = 'open' | 'save';
+
 /** What a node is connected to. Mirrors `NodeView` in crates/dageist-tauri/src/node.rs. */
 export interface NodeView {
   readonly source: SourceView;
@@ -1207,25 +1354,52 @@ export interface Host {
   readonly coreIdentity: () => Promise<IdentityView>;
   /** Fetches the catalogue of operations the step editor offers, with its English words. */
   readonly operationCatalogue: () => Promise<CatalogueView>;
-  /** Reports what the node is connected to: the table its steps start from and every other input. */
-  readonly nodeInputs: () => Promise<NodeView>;
+  /** Reports the graph, worked out: every node with its slots, columns and problems. */
+  readonly graph: () => Promise<GraphView>;
   /**
-   * Reports the document the host holds for the node, the revision it is at, and what running it
+   * Makes `edit` on the graph, which must be at `revision`, and reports the edited graph, or why
+   * the graph refused the edit. It rejects with `stale` when the graph is at another revision.
+   */
+  readonly editGraph: (revision: number, edit: GraphEdit) => Promise<GraphEditAnswerView>;
+  /**
+   * Places the box of `node` on the layout, which must be at `revision`. It rejects with `stale`
+   * when the layout is at another revision.
+   */
+  readonly placeNode: (revision: number, node: string, frame: FrameView) => Promise<PlacedView>;
+  /** Opens the system's file dialog and reports the file chosen, or `null`. */
+  readonly chooseFile: (purpose: FilePurpose) => Promise<FileView | null>;
+  /**
+   * Reports what the transform `node` is connected to: the table its steps start from and every
+   * other input.
+   */
+  readonly nodeInputs: (node: string) => Promise<NodeView>;
+  /**
+   * Reports the document of the transform `node`, the revision it is at, and what running it
    * reported.
    */
-  readonly nodeDocument: () => Promise<DocumentStateView>;
+  readonly nodeDocument: (node: string) => Promise<DocumentStateView>;
   /**
-   * Makes `edit` on the node's document, which must be at `revision`, and reports the edited
-   * document at its new revision, or why the engine refused the edit. It rejects with `stale`
-   * when the document is at another revision.
+   * Makes `edit` on the document of the transform `node`, which must be at `revision`, and
+   * reports the edited document at its new revision, or why the engine refused the edit. It
+   * rejects with `stale` when the document is at another revision.
    */
-  readonly editDocument: (revision: number, edit: EditRequest) => Promise<EditAnswerView>;
+  readonly editDocument: (
+    node: string,
+    revision: number,
+    edit: EditRequest,
+  ) => Promise<EditAnswerView>;
   /**
-   * Gives the rows after the step `step` of the document at `revision`, at most `limit` of them,
-   * as text. It rejects with `stale` when the document is at another revision, when the step is
-   * not in it or was refused, or when `limit` is over what a preview may hold.
+   * Gives the rows after the step `step` of the document of the transform `node` at `revision`,
+   * at most `limit` of them, as text. It rejects with `stale` when the document is at another
+   * revision, when the step is not in it or was refused, or when `limit` is over what a preview
+   * may hold.
    */
-  readonly rowsAfterStep: (revision: number, step: string, limit: number) => Promise<RowsView>;
+  readonly rowsAfterStep: (
+    node: string,
+    revision: number,
+    step: string,
+    limit: number,
+  ) => Promise<RowsView>;
   /**
    * Asks which calls may stand at `place`: every entry that stands in an
    * expression, offered or refused, with whether the chain may end there.

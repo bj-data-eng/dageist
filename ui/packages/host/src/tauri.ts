@@ -15,6 +15,7 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeDocumentState, decodeEditAnswer } from './decode-document';
+import { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
@@ -53,12 +54,18 @@ export function tauriHost(): Host | null {
   return {
     coreIdentity: async () => invokeDecoded('core_identity', decodeIdentity),
     operationCatalogue: async () => invokeDecoded('operation_catalogue', decodeCatalogue),
-    nodeInputs: async () => invokeDecoded('node_inputs', decodeNode),
-    nodeDocument: async () => invokeDecoded('node_document', decodeDocumentState),
-    editDocument: async (revision, edit) =>
-      invokeDecoded('edit_document', decodeEditAnswer, { revision, edit }),
-    rowsAfterStep: async (revision, step, limit) =>
-      invokeDecoded('rows_after_step', decodeRows, { revision, step, limit }),
+    graph: async () => invokeDecoded('graph', decodeGraph),
+    editGraph: async (revision, edit) =>
+      invokeDecoded('edit_graph', decodeGraphEditAnswer, { revision, edit }),
+    placeNode: async (revision, node, frame) =>
+      invokeDecoded('place_node', decodePlaced, { revision, node, frame }),
+    chooseFile: async (purpose) => invokeDecoded('choose_file', decodeChosenFile, { purpose }),
+    nodeInputs: async (node) => invokeDecoded('node_inputs', decodeNode, { node }),
+    nodeDocument: async (node) => invokeDecoded('node_document', decodeDocumentState, { node }),
+    editDocument: async (node, revision, edit) =>
+      invokeDecoded('edit_document', decodeEditAnswer, { node, revision, edit }),
+    rowsAfterStep: async (node, revision, step, limit) =>
+      invokeDecoded('rows_after_step', decodeRows, { node, revision, step, limit }),
     offersAt: async (place) =>
       invokeDecoded('offers_at', decodeOffers, { positions: place.positions, after: place.after }),
     candidateFits: async (request) =>

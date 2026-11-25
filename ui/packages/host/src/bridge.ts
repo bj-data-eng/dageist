@@ -19,6 +19,7 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeDocumentState, decodeEditAnswer } from './decode-document';
+import { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
@@ -101,12 +102,18 @@ export function bridgeHost(): Host {
   return {
     coreIdentity: async () => call('core_identity', decodeIdentity),
     operationCatalogue: async () => call('operation_catalogue', decodeCatalogue),
-    nodeInputs: async () => call('node_inputs', decodeNode),
-    nodeDocument: async () => call('node_document', decodeDocumentState),
-    editDocument: async (revision, edit) =>
-      call('edit_document', decodeEditAnswer, { revision, edit }),
-    rowsAfterStep: async (revision, step, limit) =>
-      call('rows_after_step', decodeRows, { revision, step, limit }),
+    graph: async () => call('graph', decodeGraph),
+    editGraph: async (revision, edit) =>
+      call('edit_graph', decodeGraphEditAnswer, { revision, edit }),
+    placeNode: async (revision, node, frame) =>
+      call('place_node', decodePlaced, { revision, node, frame }),
+    chooseFile: async (purpose) => call('choose_file', decodeChosenFile, { purpose }),
+    nodeInputs: async (node) => call('node_inputs', decodeNode, { node }),
+    nodeDocument: async (node) => call('node_document', decodeDocumentState, { node }),
+    editDocument: async (node, revision, edit) =>
+      call('edit_document', decodeEditAnswer, { node, revision, edit }),
+    rowsAfterStep: async (node, revision, step, limit) =>
+      call('rows_after_step', decodeRows, { node, revision, step, limit }),
     offersAt: async (place) =>
       call('offers_at', decodeOffers, { positions: place.positions, after: place.after }),
     candidateFits: async (request) =>

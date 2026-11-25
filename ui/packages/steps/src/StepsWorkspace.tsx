@@ -20,6 +20,10 @@ import { useEditorWindow } from './window';
 export interface StepsWorkspaceProps {
   /** Opens the steps window and carries the chosen step between the windows. */
   readonly host: Host;
+  /** The id of the transform whose steps are edited. */
+  readonly node: string;
+  /** The transform's name, which the panel's title shows. */
+  readonly name: string;
   /**
    * The nonce the page's content security policy accepts for injected styles,
    * or `null` when there is no policy. Dragging injects a few style rules.
@@ -27,23 +31,33 @@ export interface StepsWorkspaceProps {
   readonly styleNonce: string | null;
 }
 
-/** Draws the table of the sample claims with its steps listed beside it, once the catalogue is there. */
-export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
+/**
+ * Draws the rows the transform's steps start from with its steps listed beside them, once the
+ * catalogue is there. Another transform is drawn afresh, with nothing carried over.
+ */
+export function StepsWorkspace({
+  host,
+  node,
+  name,
+  styleNonce,
+}: StepsWorkspaceProps): React.JSX.Element {
   return (
-    <EngineProvider host={host} title="Transform · Claim timing">
-      <Transform host={host} styleNonce={styleNonce} />
+    <EngineProvider key={node} host={host} node={node} title={`Transform · ${name}`}>
+      <Transform host={host} node={node} name={name} styleNonce={styleNonce} />
     </EngineProvider>
   );
 }
 
-function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const window = useEditorWindow(host, 'main');
+function Transform({ host, node, name, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
+  const window = useEditorWindow(host, node, 'main');
   const { editor, drafts, selection, steps, run, selectedIndex, rows } = window;
   return (
     <EditorProvider value={editor}>
       <DraftsProvider value={drafts}>
         <Body
           host={host}
+          node={node}
+          name={name}
           styleNonce={styleNonce}
           window={window}
           steps={steps}
@@ -68,6 +82,7 @@ interface BodyProps extends StepsWorkspaceProps {
 
 function Body({
   host,
+  name,
   styleNonce,
   window,
   steps,
@@ -88,7 +103,7 @@ function Body({
   return (
     <Panel
       mark="ƒx"
-      title="Transform · Claim timing"
+      title={`Transform · ${name}`}
       details={[
         'The rows after the chosen step. Choose a step on the right to see how the table changes, and drag a step to another place. Open the editor to change the steps.',
       ]}

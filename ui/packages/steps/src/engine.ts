@@ -69,6 +69,7 @@ function keyOfRows(request: RowsRequest): string {
  */
 export function useRows(
   host: Host,
+  node: string,
   revision: number | null,
   selectedId: string | null,
   step: PreparedStep | null,
@@ -89,7 +90,8 @@ export function useRows(
       delay: EDIT_DELAY,
       keyOf: keyOfRows,
       retryable: mayPass,
-      send: async (request) => host.rowsAfterStep(request.revision, request.step, PREVIEW_ROWS),
+      send: async (request) =>
+        host.rowsAfterStep(node, request.revision, request.step, PREVIEW_ROWS),
       deliver: (request, outcome) => {
         setAnswered((held) =>
           held !== null &&
@@ -107,7 +109,7 @@ export function useRows(
       made.stop();
       scheduler.current = null;
     };
-  }, [host]);
+  }, [host, node]);
 
   if (selectedId === null || step === null) return { display: null, settled: true };
   if (!askable) {

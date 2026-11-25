@@ -22,8 +22,13 @@
   --xy-minimap-node-background-color: var(--color-line-strong);
 }
 
-/* A box's pin: a small ring on its edge, level with the line it belongs to. */
+/*
+ * A box's pin: a small ring on its edge, level with the line it belongs to. It
+ * lies above the zones that resize the box, so pressing a pin draws a wire
+ * while pressing the edge beside it resizes.
+ */
 .dageist-flow .react-flow__handle {
+  z-index: 3;
   width: 9px;
   height: 9px;
   border-width: 1.5px;

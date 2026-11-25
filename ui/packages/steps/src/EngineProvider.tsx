@@ -55,18 +55,28 @@ export function useHost(): Host {
 /** What the provider needs. */
 export interface EngineProviderProps {
   readonly host: Host;
+  /** The id of the transform whose inputs are fetched. */
+  readonly node: string;
   /** What the window is called while the parts are not there. */
   readonly title: string;
   readonly children: React.ReactNode;
 }
 
-/** Fetches the catalogue and the node from `host` and draws `children` once they are there. */
-export function EngineProvider({ host, title, children }: EngineProviderProps): React.JSX.Element {
+/**
+ * Fetches the catalogue and the inputs of the transform `node` from `host` and draws `children`
+ * once they are there.
+ */
+export function EngineProvider({
+  host,
+  node: id,
+  title,
+  children,
+}: EngineProviderProps): React.JSX.Element {
   const [fetched, setFetched] = useState<Fetched | null>(null);
 
   useEffect(() => {
     let live = true;
-    Promise.all([host.operationCatalogue(), host.nodeInputs()])
+    Promise.all([host.operationCatalogue(), host.nodeInputs(id)])
       .then(([view, node]) => {
         if (!live) return;
         setFetched({
@@ -87,7 +97,7 @@ export function EngineProvider({ host, title, children }: EngineProviderProps): 
     return () => {
       live = false;
     };
-  }, [host]);
+  }, [host, id]);
 
   // What was fetched from another host is not what this one serves.
   const outcome = fetched?.host === host ? fetched.outcome : null;

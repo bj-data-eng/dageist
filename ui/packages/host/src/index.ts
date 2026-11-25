@@ -53,7 +53,15 @@ export type {
   ExpressionDtypesView,
   FiguresView,
   FieldView,
+  FileView,
+  FilePurpose,
   FitView,
+  FrameView,
+  GraphEdit,
+  GraphEditAnswerView,
+  GraphFitView,
+  GraphParameterView,
+  GraphView,
   FitsRequest,
   FitsView,
   Host,
@@ -62,6 +70,8 @@ export type {
   KindView,
   LiteralView,
   NestedPosition,
+  NodeBoxView,
+  NodeKind,
   NodeView,
   OfferPlaceView,
   OffersView,
@@ -75,9 +85,11 @@ export type {
   ParameterView,
   PlaceRequest,
   PlaceView,
+  PlacedView,
   PositionView,
   ReadingView,
   ReadingsView,
+  ReferenceView,
   RefusalSourceView,
   RefusalView,
   ResolutionView,
@@ -86,6 +98,8 @@ export type {
   RunView,
   SegmentView,
   SettingView,
+  SlotStateView,
+  SlotView,
   ShapeView,
   SourceView,
   StageView,
@@ -95,6 +109,7 @@ export type {
   StepStartsRequest,
   StepStartsView,
   TableView,
+  Takes,
   TypedKind,
   TypedRequest,
   ValueShapeView,
@@ -120,6 +135,7 @@ export {
   decodeStepStarts,
 } from './decode-offers';
 export { decodeDocumentState, decodeEditAnswer } from './decode-document';
+export { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
 export { decodeRun } from './decode-run';
 export { decodeBlock } from './decode-block';
 export { decodeIdentity, decodeTable } from './decode-sample';
