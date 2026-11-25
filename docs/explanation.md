@@ -1356,29 +1356,45 @@ searched, so that the row under the pointer does not move when a row is ticked.
 
 ### What The Editor Cannot Express
 
-The step editor splits what it can do from how it draws it. Every decision about
-what the editor can do with a piece of an expression is a pure function in
+The step editor splits what it can do from how it draws it. These decisions
+about a piece of an expression are pure functions in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/words.ts), and the
 components in `ui/packages/steps/src/`, `Chain.tsx`, `Values.tsx`,
-`Parameters.tsx`, `StepRow.tsx` and `StepList.tsx`, call those functions and
-draw the result. A component decides nothing of its own about these:
+`Parameters.tsx`, `StepRow.tsx` and `StepList.tsx`, call them and draw the
+result:
 
-| Decision | Function |
+| Decision | Function the components call |
 | --- | --- |
-| Which groups of offers a word's list holds, and which words stand at a place | `listsOf`, `wordsAt` in [model/words.ts](../ui/packages/steps/src/model/words.ts) |
-| Which group an entry is picked from, and whether it can be picked at a place | `routeOf`, `canPick` in `model/words.ts` |
-| Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `actionsOfValue` in `model/words.ts` |
+| Which groups of offers a word's list holds, and the connected inputs it offers | `listsOf`, `listsChainRow`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile |
+| Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `noAddition` in `model/words.ts`; a component that draws no adding for a piece stops compiling when the model gives that piece one |
 | How a value is drawn: as one word, as a chain, or as the lines of a condition | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
-| Which control a parameter gets, and how an entry sets it | `controlOf`, `settingOf` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
+| Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
+| Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts) |
+| Which functions a chain starts from besides a field and a typed value | `START_FUNCTIONS` in `model/catalogue.ts`, which the start list reads through `startOffers` |
 | What a step's report and its rows say, beside its row and at its end | `sayingOf`, `rowEndOf`, `rowsFailure` in [model/report.ts](../ui/packages/steps/src/model/report.ts) |
 
 What stays in the components is the arrangement: placement, folding to the room
-on a line and the look of a word. The head of each step, which parameters it
-lays out and where, is one such arrangement, so the model lists those
-parameters in `HEAD_PARAMETERS` and the components are not checked against the
-list. Which words stand at which place, `wordsAt`, is the same: the components
-compose their words by their structure, and the model states which words that
-structure puts at a place of each kind.
+on a line and the look of a word.
+
+Some of what the grid test asks is a statement that no component calls, and the
+documentation says so rather than pretend otherwise. It is kept with the test, in
+`ui/packages/steps/test-support/places.ts`, built from the functions above:
+
+- Which words stand at a place. The components compose their words by their
+  structure, so the test states what that structure puts at each place: a value
+  slot where a step's head or an option draws a parameter that holds an
+  expression, the word a chain starts from with it, the argument of a method where
+  some method takes an expression first, and after a value a list that adds a
+  method and the name of a method. A component that moves a word is not caught.
+- Which group of a list an entry is picked from. A method comes from the methods,
+  `when` and `element` from the functions, a field from the fields and a typed
+  value from the typed values, and `then` and `otherwise` come with `when`. The
+  field, the typed value, `then` and `otherwise` are named by the constants the
+  reading of a document uses, and the functions by `START_FUNCTIONS`; that
+  `col` is picked as a field and `lit` as a typed value is not checked.
+- Which parameters of the field, the typed value and `when` the editor sets,
+  `SET_BY_THE_ENTRY` in `model/controls.ts`: the drawings of those three entries
+  are not checked against it.
 
 What the editor has no way to draw is written once, in
 [model/limits.ts](../ui/packages/steps/src/model/limits.ts), as declared
@@ -1392,22 +1408,29 @@ Two view tests hold the list against what the engine allows. The host writes
 the grid of every call the engine allows at every place of every kind,
 `ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
 classes of dtype in 3 shapes and 4 states of a condition. The grid test,
-`model/grid.test.ts`, takes every cell of it, every start that leads to the cell
-and every entry the engine allows there. A start is a field, a connected value,
-a connected list, a typed whole number, number or text, or a function that
-starts a chain; a field and a connected list lead to the places of many values,
-a connected value and a typed value to those of one, and a function to every
-place of a value, because what a function gives is the engine's to say. For each
-it runs the model's functions and asks two things: whether the entry can be
-picked or added at that place, and whether each of its parameters and options
-gets a control. The same test asks of each position of a context whether some
-word draws it. What it finds is compared with the declared gaps, and the
-comparison fails both ways: on a gap that is found and not declared, and on a
-gap that is declared and no longer one, so a gap that is drawn is taken off the
-list with the change that draws it. A second test, `model/states.test.ts`, does
-the same for every outcome of a step, every cause of a refusal and every state of
-its rows that the host can report, built from the reports the host writes, and
-asks that each says something.
+`model/grid.test.ts`, runs the functions above over every cell of it and checks
+three things. For each cell, that each start that leads to it can have a method
+added after it. A start is a field, a connected value, a connected list, a typed
+whole number, number or text, or a function that starts a chain; a field and a
+connected list lead to the places of many values, a connected value and a typed
+value to those of one, a typed value to the classes of dtype the host's readings
+give it, and a function to every place of a value, because what a function gives
+is the engine's to say. For each cell, that each entry the engine allows there
+can be picked or made, and has a row in the list the editor builds from the
+engine's answer. And for each entry, that each of its parameters and options gets
+a control. The same test asks of each position of a context whether some word
+draws it. It does not check a start and an entry together: a start that cannot
+have a method added is one gap, however many entries the engine allows after it.
+What the test finds is compared with the declared gaps, and the comparison
+fails both ways: on a gap that is found and not declared, and on a gap that is
+declared and no longer one, so a gap that is drawn is taken off the list with
+the change that draws it. A second test, `model/states.test.ts`, does the same
+for every outcome of a step, every cause of a refusal and every state of its rows
+that the host can report, built from the reports the host writes, and asks that
+each says something. One of its states, a step after one that failed on the rows,
+is built by hand: the host's reports hold no step after a failure, so it is the
+failed step followed by an accepted step with its count changed to not counted,
+as the engine's counts tests show it.
 
 Today the declared gaps are these:
 
@@ -1426,9 +1449,7 @@ Today the declared gaps are these:
 - A step Polars accepts that was not counted because a step before it failed on
   the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 
-A step that is accepted and not counted in a run that read no rows says nothing
-either, and it is not a gap: nothing happened to it that a person is owed words
-for. The tests do not cover which classes of dtype the editor can type as an
+The tests do not cover which classes of dtype the editor can type as an
 argument: the document holds a number, text or a flag as a literal, so a typed
 date, duration or Boolean literal, which the engine may allow, is not on the
 list.
