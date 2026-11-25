@@ -1288,13 +1288,21 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     } else {
         id
     };
+    // The columns an unnest writes are the keys of a join as many as the other side's keys are, which
+    // the tables measured as one, and are named by the fields, which the keys' names are asked of
+    // by what the document says: where it is a join's key, they do not say.
+    let unnested_key = id == "Expr.struct.unnest"
+        && matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
+        && place.context.nested().is_none();
     let cell = tables
         .contexts
         .get(&(measured_as, form, place.context))
+        .filter(|_| !unnested_key)
         .or_else(|| {
             tables
                 .contexts
                 .get(&(measured_as, Vec::new(), place.context))
+                .filter(|_| !unnested_key)
         });
     if let Some(cell) = cell {
         match &cell.continues {
@@ -1398,6 +1406,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // not by what the fields are, which Polars says and the walk cannot: where the struct is the
     // values of a pivot's group, or comes of a call that did not say its fields.
     if struct_gives.is_undecided() {
+        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+    }
+    if unnested_key {
         ending = Ending::NotKnown(Unknown::TheResultsDtype);
     }
     // Several columns of a field read with several names are no dtype of one value, and the tables

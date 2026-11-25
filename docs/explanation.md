@@ -2380,7 +2380,9 @@ The calls that read and change fields are the methods of the `struct` namespace:
   walk carries the columns, not the fields, and the call is judged where several columns may stand. A struct of one
   field is one column, which the call gives as the field it holds, and is judged as the field read is; a struct of none writes
   no column. The tables measured an unnest on a struct of two: they allow it as an item of a select and as a key of a sort,
-  and refuse it as a join's key, which Polars refuses where the other side's key is one column, in a filter, and in a pivot's aggregate.
+  and refuse it in a filter and in a pivot's aggregate. A join's key that is an unnest is not judged: the walk says it cannot
+  tell whether it may end there, for Polars accepts it where the other side's keys expand to as many columns, which the tables
+  measured as one, and a key that repeats a name is refused by what the fields are named, which the keys' names do not read.
 
 Four named rules hold what Polars does of fields and the tables cannot say:
 
@@ -2761,11 +2763,11 @@ that count made another, which it cannot do where the case holds two counts whos
 `value_counts` beside another count of the rows (a `when` of two `value_counts`, one inside the `by` of a `sort_by`
 of another) is refused by a rule, or at the end of a predicate, and Polars allows it. A join key that is an
 unnest, which writes a column for each field and so has no one output name for the rule against a repeated pair of
-key names to read, may repeat a name that Polars refuses (`on` a struct of a literal and an unnested struct of
-one), or expands to as many columns on both sides where the tables measured it against the other table's one. And
-an unnest of a struct of no fields writes no column, which a call that takes columns as operands then meets as
-none, where the tables measured it given one. The walk's naming of an unnest's columns is the cause of the
-second and third, and is in `output_name` of `crates/dageist-engine/src/document/walk.rs`.
+key names to read, is not judged: the walk says it cannot tell, so the repeated name that Polars refuses (`on` a struct
+of a literal and an unnested struct of one) and the columns that expand as many on both sides, where the tables measured
+the other table's one, are no disagreement. And an unnest of a struct of no fields writes no column, which a call that
+takes columns as operands then meets as none, where the tables measured it given one. The walk's naming of an unnest's
+columns is the cause, and is in `output_name` of `crates/dageist-engine/src/document/walk.rs`.
 The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
 drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
 two kinds that a focused campaign found are now settled: a count that is the table's rows, or one value, by chance
