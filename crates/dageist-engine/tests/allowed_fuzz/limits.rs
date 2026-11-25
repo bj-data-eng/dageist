@@ -11503,4 +11503,30 @@ mod tests {
             vec![]
         );
     }
+
+    #[test]
+    fn two_counts_that_no_rows_change_are_one_limit_where_every_control_leaves_the_case_allowed() {
+        let place = at(&[
+            Segment::Parameter("predicates".to_owned()),
+            Segment::Item(0),
+        ]);
+        let reason = "it cannot end here: a count of values that the data or the arguments decide, which is neither one value nor the table's rows, may not end an expression in filter: lengths don't match: zip node received non-equal length inputs";
+        let two = filtered(chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("g"), &[])]))],
+            ),
+            &[
+                "Expr.is_null",
+                "Expr.value_counts",
+                "Expr.is_null",
+                "Expr.value_counts",
+                "Expr.is_null",
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(&two, place, Some(TableStage::Rows), reason),
+            vec![Limit::ACountNoRowsChange]
+        );
+    }
 }

@@ -288,8 +288,8 @@ fn is_asked_of_one_count(case: &Case) -> bool {
 /// one value, or the rows, by what it is made of, as a test of a struct, which is never null, a
 /// comparison with a null and a column of nulls are. The tables cannot know it, and no rows show it
 /// by chance, so it is no count that is by design the rows by chance: it is what the rows cannot
-/// change. `false` where the tables' refusal is not of a count, the case holds a count in more than
-/// one place, or Polars refuses the case on the sample's rows or on any control.
+/// change. `false` where the tables' refusal is not of a count, the case holds no count, or Polars
+/// refuses the case on the sample's rows or on any control.
 pub fn is_a_count_no_rows_change(
     case: &Case,
     refused: &Refused,
@@ -307,7 +307,14 @@ pub fn is_a_count_no_rows_change(
     {
         return false;
     }
-    let Some(item) = only_the_item(case, refused).filter(is_asked_of_one_count) else {
+    // The controls change every count the case holds, which is no matter where none of them makes a
+    // count another: Polars allowing the case with all of them changed shows that no count is the
+    // rows by chance, whatever their number.
+    let Some(item) = only_the_item(case, refused).filter(|item| {
+        counting_places(item) >= 1
+            && observe(item).refusal.is_none()
+            && matches!(&predict(item).verdict, Verdict::Refuses(refused) if is_a_count_refusal(refused))
+    }) else {
         return false;
     };
     let unchanged = |case: &Case, rows: Rows| {
