@@ -44,6 +44,8 @@ import { anyField, counted, fieldOffers, matches, offer, titled } from './offers
 import { useFieldHint } from './origins';
 import { useListState, usePositions } from './positions';
 import { usePreparedStep } from './engine';
+import type { LiteralType } from './model/controls';
+import { controlOf, oneControlOf, startsWithEngineWord } from './model/controls';
 import type { Path } from './model/doc';
 import { expressionOf, itemSegment, keySegment, pathKey, under, valueSegment } from './model/doc';
 import { parameterSegment } from './model/doc';
@@ -403,21 +405,6 @@ export function DtypeDrawing({
   );
 }
 
-/**
- * What is typed into a literal: a number of a stated type, text, a duration, a pattern, a path or
- * a date.
- */
-export type LiteralType =
-  | 'integer'
-  | 'float'
-  | 'string'
-  | 'date'
-  | 'any'
-  | 'duration'
-  | 'pattern'
-  | 'timeZone'
-  | 'path';
-
 /** Returns what the engine is asked a text is typed into, for a literal of `type`. */
 function typedInto(type: LiteralType): TypedKind {
   switch (type) {
@@ -606,7 +593,7 @@ interface OneProps {
   readonly onSet: (request: ValueRequest) => void;
 }
 
-/** Draws one argument of one kind. Every kind has one drawing; `pairs` and the shapes are drawn around these. */
+/** Draws one argument of one kind, as the model says the kind is drawn. `pairs` and the shapes are drawn around these. */
 function OneDrawing({
   kind,
   parameter,
@@ -632,7 +619,8 @@ function OneDrawing({
           parameter: parameter.name,
           place: placeRequest(around.method.place),
         };
-  switch (kind.kind) {
+  const drawn = oneControlOf(kind);
+  switch (drawn.control) {
     case 'expression':
       return (
         <ValueSlot
@@ -658,11 +646,11 @@ function OneDrawing({
           }}
         />
       );
-    case 'value':
+    case 'literal':
       return (
         <LiteralDrawing
           {...common}
-          type={kind.type}
+          type={drawn.type}
           value={shownOf(argument)}
           onChange={(literal) => {
             const request = literalArgument(kind, literal);
@@ -684,7 +672,7 @@ function OneDrawing({
       return (
         <ChoiceDrawing
           {...common}
-          words={kind.words}
+          words={drawn.words}
           value={wordOf(argument)}
           onChange={(word) => {
             onSet(wordArgument(kind, word));
@@ -701,22 +689,8 @@ function OneDrawing({
           }}
         />
       );
-    case 'duration':
-    case 'pattern':
-    case 'path':
-      return (
-        <LiteralDrawing
-          {...common}
-          type={kind.kind}
-          value={shownOf(argument)}
-          onChange={(literal) => {
-            const request = literalArgument(kind, literal);
-            if (request !== null) onSet(request);
-          }}
-        />
-      );
     case 'timeZone':
-      return <TimeZoneDrawing {...common} argument={argument} none={kind.none} onPick={onSet} />;
+      return <TimeZoneDrawing {...common} argument={argument} none={drawn.none} onPick={onSet} />;
     case 'table':
       return (
         <TableDrawing
@@ -727,11 +701,10 @@ function OneDrawing({
           }}
         />
       );
-    case 'pairs':
-      // Entries are one kind each, so a pair does not hold pairs.
-      return <span className="font-sans text-xs text-wrong">pairs inside pairs are not drawn</span>;
+    case 'none':
+      return <span className="font-sans text-xs text-wrong">{drawn.why}</span>;
     default:
-      return kind satisfies never;
+      return drawn satisfies never;
   }
 }
 
@@ -755,7 +728,7 @@ function ManyDrawing({ parameter, argument, path, around }: ListProps): React.JS
   const items = argument?.kind === 'many' ? argument.items : [];
   const draftAt = draftKey('item', step.id, pathKey(path));
   const drafting = drafts.get(draftAt) !== undefined;
-  if (kind.kind === 'column') {
+  if (controlOf(parameter).shape === 'columns' && kind.kind === 'column') {
     // Fields stand on the line and fold to the room there is.
     const names = items.flatMap((item) => {
       const name = wordOf(item);
@@ -994,7 +967,9 @@ function EachControl({
 }): React.JSX.Element {
   const { kind } = parameter;
   const label = `${parameter.shown} for ${item}`;
-  if (kind.kind === 'flag' || kind.kind === 'choice') {
+  const control = controlOf(parameter);
+  const chosen = control.shape === 'perItem' && control.each === 'choose';
+  if (chosen && (kind.kind === 'flag' || kind.kind === 'choice')) {
     // A setting with a few fixed answers is chosen from a list inside the list.
     const options =
       kind.kind === 'flag'
@@ -1009,10 +984,8 @@ function EachControl({
         className="dg-given"
         value={value}
         onChange={(event) => {
-          const chosen = event.currentTarget.value;
-          onChange(
-            kind.kind === 'flag' ? flagArgument(chosen === 'true') : wordArgument(kind, chosen),
-          );
+          const word = event.currentTarget.value;
+          onChange(kind.kind === 'flag' ? flagArgument(word === 'true') : wordArgument(kind, word));
         }}
       >
         {value === '' && <option value="">{'—'}</option>}
@@ -1024,10 +997,12 @@ function EachControl({
       </select>
     );
   }
-  // What a value takes when it is typed is read by the engine in a list of its own, which a row
-  // of a list has no room for, so a parameter of another kind is not drawn here.
   return (
-    <span className="font-sans text-xs text-wrong">{`${parameter.shown} is not drawn here`}</span>
+    <span className="font-sans text-xs text-wrong">
+      {control.shape === 'perItem' && control.each === 'none'
+        ? control.why
+        : `${parameter.shown} is not drawn here`}
+    </span>
   );
 }
 
@@ -1182,32 +1157,45 @@ export function ParameterDrawing({
 }: ParameterDrawingProps): React.JSX.Element {
   const edits = useStepEdits();
   const step = useStepAt();
-  const { kind, shape } = parameter;
+  const { kind } = parameter;
   const notes = [`${parameter.shown} · ${parameter.label}`];
+  const control = controlOf(parameter);
   let drawing: React.JSX.Element;
-  if (shape.shape === 'perItem') {
-    drawing = <EachDrawing parameter={parameter} argument={argument} path={path} around={around} />;
-  } else if (kind.kind === 'pairs') {
-    drawing = (
-      <PairsDrawing parameter={parameter} argument={argument} path={path} around={around} />
-    );
-  } else if (shape.shape === 'many') {
-    drawing = <ManyDrawing parameter={parameter} argument={argument} path={path} around={around} />;
-  } else {
-    drawing = (
-      <OneDrawing
-        kind={kind}
-        parameter={parameter}
-        argument={argument}
-        path={path}
-        describedAs={describe(parameter)}
-        around={around}
-        openId={freshKey(step.id, path)}
-        onSet={(request) => {
-          void edits.setArgument(path, request);
-        }}
-      />
-    );
+  switch (control.shape) {
+    case 'perItem':
+      drawing = (
+        <EachDrawing parameter={parameter} argument={argument} path={path} around={around} />
+      );
+      break;
+    case 'pairs':
+      drawing = (
+        <PairsDrawing parameter={parameter} argument={argument} path={path} around={around} />
+      );
+      break;
+    case 'columns':
+    case 'many':
+      drawing = (
+        <ManyDrawing parameter={parameter} argument={argument} path={path} around={around} />
+      );
+      break;
+    case 'one':
+      drawing = (
+        <OneDrawing
+          kind={kind}
+          parameter={parameter}
+          argument={argument}
+          path={path}
+          describedAs={describe(parameter)}
+          around={around}
+          openId={freshKey(step.id, path)}
+          onSet={(request) => {
+            void edits.setArgument(path, request);
+          }}
+        />
+      );
+      break;
+    default:
+      return control satisfies never;
   }
   return (
     <Hint lines={notes} code={false}>
@@ -1226,8 +1214,7 @@ function reasonToWait(
   parameter: ParameterView,
   engine: Asked<ReadonlyMap<string, PreparedOption>>,
 ): string | null {
-  const { kind } = parameter;
-  if (kind.kind !== 'flag' && kind.kind !== 'choice') return null;
+  if (!startsWithEngineWord(parameter.kind)) return null;
   if (engine.state === 'failed') return engine.reason;
   if (engine.state !== 'ready') return 'waiting for the engine';
   const option = engine.answer.get(parameter.name);

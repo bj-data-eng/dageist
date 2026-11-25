@@ -170,16 +170,6 @@ export function optionParameters(
   );
 }
 
-/**
- * Returns the parameters of the method `entry` that can be added to it: all but the argument that is
- * drawn where the method is.
- */
-export function methodOptionParameters(entry: EntryView | null): readonly ParameterView[] {
-  if (entry === null) return [];
-  const argument = argumentOf(entry);
-  return optionParameters(entry, argument === null ? [] : [argument.parameter.name]);
-}
-
 /** The step verbs, by their Polars names. */
 export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
 

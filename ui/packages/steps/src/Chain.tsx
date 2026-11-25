@@ -47,9 +47,9 @@ import {
   elementEntry,
   methodId,
   methodNameOf,
-  methodOptionParameters,
   positionOfParameter,
 } from './model/catalogue';
+import { methodOptionParameters } from './model/controls';
 import type { ExpressionView } from './model/doc';
 import {
   START_SEGMENT,
