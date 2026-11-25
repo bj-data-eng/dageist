@@ -1888,7 +1888,16 @@ a duration typed in and of where `element` stands, and runs its schema and its r
 under `catch_unwind`. That is how a table that is stricter than Polars is found, as a refusal of
 the step document would otherwise be the tables' own words. It does not ask Polars about a method
 that depends on the element dtype of an element the tables do not measure or Polars has no
-implementation of, which Polars panics on, and which the walk refuses by a rule for that reason. The case is the
+implementation of, which Polars panics on, and which the walk refuses by a rule for that reason.
+
+That asking is a copy of what the step document builds, whose builder is private, so the copy is
+checked against it: a case whose step the walk allows, and which the step document does not refuse
+by what it holds of its own, is asked of both, and the property `asker-agrees-with-engine` holds
+that they say the same. It compares whether Polars refuses the step, at which stage and place and in
+what words, and the dtype of every expression at its start and after each link. The words of a
+refusal of the schema are compared exactly; those of a refusal of the rows are compared with the
+values they name left out and every digit alike, for which row fails first is not the same from run
+to run. A difference is the finding `asker-differs-from-the-engine`. The case is the
 document's own text, so a kept case replays exactly. A campaign draws its methods
 evenly, or focused on chosen methods so that every case holds one of them, which keeps
 a batch of new methods checked against the rest as deeply however many the catalogue

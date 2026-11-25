@@ -803,6 +803,19 @@ Polars by hand, and decide which it is:
 - **A mistake of the generator** (a case that Polars refuses for what no table
   is about, such as a value that depends on the rows): correct
   `allowed_fuzz/generate.rs` and say why in a comment there.
+- **The asker differing from the engine** (the finding `asker-differs-from-the-engine`
+  of the property `asker-agrees-with-engine`, which is no disagreement between the
+  tables and Polars): the target asks Polars about a step the walk refuses through
+  `tests/ask_polars/mod.rs`, a copy of what the step engine builds, and for a case whose
+  step the walk allows it asks the engine and the asker both and compares whether and where
+  Polars refuses it, in what words and the dtype of every expression. The words of a refusal
+  of the rows are compared with the values they name left out, and of the schema exactly.
+  Read the two answers in the finding, replay the case, and find which of the two builds the
+  step another way: the copy, if the engine's builder changed (`document/run.rs`, and the
+  patterns and durations of `document/model.rs`), which then follows it; or a refusal of the
+  engine that the asker lacks, which belongs in the asker if Polars panics without it. Add
+  the case as a test in `allowed_fuzz/observe.rs` with the fix. Do not excuse it with a
+  limit: a limit is about the tables, and the finding is about the target.
 
 `DAGEIST_FUZZ_STRICT=1` makes the limits and the probe excuse nothing, which shows
 what each one would otherwise report. The tally printed with `--nocapture` counts the
