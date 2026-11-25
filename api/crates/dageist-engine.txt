@@ -1293,6 +1293,7 @@ pub fn dageist_engine::document::WalkedExpression::calls(&self) -> &[dageist_eng
 pub const fn dageist_engine::document::WalkedExpression::context(&self) -> core::option::Option<dageist_engine::allowed::Context>
 pub const fn dageist_engine::document::WalkedExpression::count(&self) -> core::option::Option<dageist_engine::allowed::Count>
 pub const fn dageist_engine::document::WalkedExpression::ending(&self) -> core::option::Option<&dageist_engine::allowed::Ending>
+pub fn dageist_engine::document::WalkedExpression::fields(&self) -> &[core::option::Option<dageist_engine::allowed::Fields>]
 pub const fn dageist_engine::document::WalkedExpression::place(&self) -> &dageist_engine::document::Place
 pub fn dageist_engine::document::WalkedExpression::places(&self) -> alloc::vec::Vec<core::option::Option<dageist_engine::allowed::Place>>
 pub const dageist_engine::document::FIRST_VALUES: usize
