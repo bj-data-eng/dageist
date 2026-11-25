@@ -18,9 +18,9 @@ use polars::prelude::{
     DurationArgs, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation,
     LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError,
     QuantileMethod, RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
-    SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal,
-    binary_expr, by_name, col, cols, datetime, datetime_range, duration, element, int_range,
-    linear_space, lit, repeat, when,
+    Slice, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
+    all_horizontal, binary_expr, by_name, col, cols, datetime, datetime_range, duration, element,
+    int_range, linear_space, lit, repeat, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -1877,7 +1877,7 @@ fn row_count(arguments: &Arguments) -> Result<u32, BuildError> {
 }
 
 fn frame_head(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.slice(0, row_count(arguments)?))
+    Ok(frame.slice(Slice::head(row_count(arguments)? as usize)))
 }
 
 fn frame_tail(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
@@ -1895,12 +1895,13 @@ fn frame_slice(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, Bui
         Some(other) => return Err(Arguments::wrong("offset", "a whole number", other)),
     };
     // Python leaves the length out as the most rows an index holds, and refuses a negative one.
-    let length = optional_unsigned(arguments, "length")?.unwrap_or(u32::MAX);
-    Ok(frame.slice(offset, length))
+    let length =
+        optional_unsigned(arguments, "length")?.map_or(u32::MAX as usize, |length| length as usize);
+    Ok(frame.slice((offset, length)))
 }
 
 fn frame_first(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.slice(0, 1))
+    Ok(frame.slice(Slice::head(1)))
 }
 
 fn frame_last(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {

@@ -92,7 +92,7 @@ impl Table {
                 .select(columns.iter().map(String::as_str))
                 .map_err(|source| EngineError::polars("selecting block columns", source))?
         };
-        let (offset, _) = slice_bounds(offset, length)?;
-        write_block(&selected.slice(offset, length))
+        let (offset, length) = slice_bounds(offset, length)?;
+        write_block(&selected.slice((offset, length)))
     }
 }
