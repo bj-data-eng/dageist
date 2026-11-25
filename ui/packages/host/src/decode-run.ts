@@ -31,6 +31,7 @@ import type {
   VerdictView,
   WalkRefusalView,
   WalkView,
+  StructView,
   WalkedExpressionView,
 } from './contract';
 import {
@@ -240,6 +241,11 @@ const readStanding: Decode<StandingView> = readRecord(['follows', 'verdict'], (f
   verdict: readField(fields, path, 'verdict', readNullable(readVerdict)),
 }));
 
+const readStruct: Decode<StructView> = readRecord(['dtype', 'fields'], (fields, path) => ({
+  dtype: readField(fields, path, 'dtype', readString),
+  fields: readField(fields, path, 'fields', readNullable(readList(readFieldView))),
+}));
+
 const readWalkedExpression: Decode<WalkedExpressionView> = readRecord(
   ['place', 'context', 'calls', 'places', 'fields', 'ending'],
   (fields, path) => ({
@@ -247,7 +253,7 @@ const readWalkedExpression: Decode<WalkedExpressionView> = readRecord(
     context: readField(fields, path, 'context', readNullable(readContext)),
     calls: readField(fields, path, 'calls', readList(readStanding)),
     places: readField(fields, path, 'places', readList(readNullable(readOfferPlace))),
-    fields: readField(fields, path, 'fields', readList(readNullable(readList(readFieldView)))),
+    fields: readField(fields, path, 'fields', readList(readNullable(readStruct))),
     ending: readField(fields, path, 'ending', readNullable(readEnding)),
   }),
 );

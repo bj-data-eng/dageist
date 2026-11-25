@@ -195,7 +195,7 @@ export function FieldDrawing({
       label={value ?? 'field'}
       tone="column"
       look={value === null ? 'none' : 'plain'}
-      wrong={value === null || !known.some((field) => field.name === value)}
+      wrong={value === null || (fields !== null && !known.some((field) => field.name === value))}
       names={names ?? false}
       openNow={useIsFresh(openId)}
       describedAs={describedAs}

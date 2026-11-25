@@ -694,11 +694,21 @@ export interface WalkedExpressionView {
    */
   readonly places: ReadonlyArray<OfferPlaceView | null>;
   /**
-   * The fields of the struct each of the places follows, in the same order; `null` where the value
-   * there is no struct or the walk does not know what it holds.
+   * The struct each of the places follows, in the same order, as the engine writes it; `null`
+   * where the value there is no struct.
    */
-  readonly fields: ReadonlyArray<readonly FieldView[] | null>;
+  readonly fields: ReadonlyArray<StructView | null>;
   readonly ending: EndingView | null;
+}
+
+/**
+ * A struct a place follows. `dtype` is the dtype as the engine writes it, `Struct` alone where the
+ * walk does not know what it holds, and `fields` its fields, `null` where the walk does not know
+ * them. Mirrors `StructView` in crates/dageist-tauri/src/report.rs.
+ */
+export interface StructView {
+  readonly dtype: string;
+  readonly fields: readonly FieldView[] | null;
 }
 
 /** A refusal the tables found, and where. */

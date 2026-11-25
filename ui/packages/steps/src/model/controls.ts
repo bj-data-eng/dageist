@@ -118,6 +118,18 @@ export function controlOf(parameter: ParameterView): ParameterControl {
   return { shape: 'one', one: oneControlOf(kind) };
 }
 
+/** Returns whether `control` is drawn as a pick among the fields of a struct, one or several. */
+export function offersFields(control: ParameterControl): boolean {
+  switch (control.shape) {
+    case 'one':
+      return control.one.control === 'field';
+    case 'many':
+      return control.each.control === 'field';
+    default:
+      return false;
+  }
+}
+
 /**
  * Returns why a parameter of `kind` that is added as an option has to wait for the engine to say
  * what it starts with: a flag and a choice start with the word the engine's table of options gives,

@@ -417,7 +417,7 @@ function MethodLink({
             method:
               entry === null
                 ? undefined
-                : { entry: entry.id, place, fields: dtypes?.fields[index] ?? null },
+                : { entry: entry.id, place, fields: dtypes?.fields[index]?.fields ?? null },
           }}
           layout="inline"
         />

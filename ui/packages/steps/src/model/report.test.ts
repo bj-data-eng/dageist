@@ -295,16 +295,21 @@ describe('a refusal', () => {
       links: [],
       places: [selectAfter('Struct(x: Int64, y: String)', 'many')],
       fields: [
-        [
-          { name: 'dcn', dtype: 'String' },
-          { name: 'count', dtype: 'UInt32' },
-        ],
+        {
+          dtype: 'Struct(dcn: String, count: UInt32)',
+          fields: [
+            { name: 'dcn', dtype: 'String' },
+            { name: 'count', dtype: 'UInt32' },
+          ],
+        },
       ],
     };
     expect(linkHint(chain, 0)).toBe(
       'after a value of the class Struct(dcn: String, count: UInt32)',
     );
-    expect(linkHint({ ...chain, fields: [null] }, 0)).toBe('after a value of the class Struct');
+    expect(linkHint({ ...chain, fields: [{ dtype: 'Struct', fields: null }] }, 0)).toBe(
+      'after a value of the class Struct',
+    );
   });
 
   it('shows the dtype in and the dtype out of a link of a step that was planned, not a class', () => {

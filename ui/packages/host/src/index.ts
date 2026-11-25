@@ -118,6 +118,7 @@ export type {
   VerdictView,
   WalkRefusalView,
   WalkView,
+  StructView,
   WalkedExpressionView,
   WindowName,
   WordsView,

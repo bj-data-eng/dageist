@@ -29,7 +29,7 @@ import { allowedAt, decodeGrid } from '../../host/test-support/grid';
 import type { Grid } from '../../host/test-support/grid';
 import { indexCatalogue } from '../src/model/catalogue';
 import type { Catalogue } from '../src/model/catalogue';
-import { settingOf } from '../src/model/controls';
+import { offersFields, settingOf } from '../src/model/controls';
 import type { ExpressionView } from '../src/model/doc';
 import type { Cover, Gap, StartKind } from '../src/model/limits';
 import { FOUND_BY, coverKey } from '../src/model/limits';
@@ -320,6 +320,13 @@ export function findGaps(
         !isDrawn(setting.control)
       ) {
         note({ kind: 'parameterKind', of: undrawnKind(parameter) });
+      } else if (
+        (setting.by === 'argument' || setting.by === 'option') &&
+        offersFields(setting.control)
+      ) {
+        // The names are those of the struct the walk reports at the method's place, which no cell of
+        // the grid holds: a place has a class, and the fields are what the chain before it carries.
+        note({ kind: 'parameter', entry: entry.id, parameter: parameter.name });
       }
     }
   }

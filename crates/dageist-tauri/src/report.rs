@@ -12,8 +12,8 @@
 //! engine's short names, such as `Datetime(us)`.
 
 use dageist_engine::allowed::{
-    After, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace, Refusal,
-    RefusalSource, Shape, Stage, Verdict, dtype_name,
+    After, ConditionState, Context, Ending, Fields, Nested, Outer, Place as OfferPlace, Refusal,
+    RefusalSource, Representative, Shape, Stage, Verdict, dtype_name,
 };
 use dageist_engine::catalog::Laziness;
 use dageist_engine::document::{
@@ -495,10 +495,33 @@ struct WalkedExpressionView {
     /// end would have; absent where the context or what comes before is not
     /// known.
     places: Vec<Option<OfferPlaceView>>,
-    /// The fields of the struct each of the places follows, in the same order, and none where the
-    /// value there is no struct or the walk does not know what it holds.
-    fields: Vec<Option<Vec<FieldView>>>,
+    /// The struct each of the places follows, in the same order, written as the engine writes it
+    /// with its fields where the walk knows them; none where the value there is no struct.
+    fields: Vec<Option<StructView>>,
     ending: Option<EndingView>,
+}
+
+/// A struct a place follows: the dtype as the engine writes it, which is `Struct` alone where the
+/// walk does not know what it holds, and its fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct StructView {
+    dtype: String,
+    fields: Option<Vec<FieldView>>,
+}
+
+fn struct_view(held: Option<&Fields>) -> StructView {
+    StructView {
+        dtype: held.map_or_else(|| "Struct".to_owned(), Fields::written),
+        fields: held.map(|fields| {
+            fields
+                .iter()
+                .map(|field| FieldView {
+                    name: field.name().to_owned(),
+                    dtype: field.written().to_owned(),
+                })
+                .collect()
+        }),
+    }
 }
 
 fn walked_expression_view(expression: &WalkedExpression) -> WalkedExpressionView {
@@ -519,18 +542,18 @@ fn walked_expression_view(expression: &WalkedExpression) -> WalkedExpressionView
             .map(|place| place.as_ref().map(offer_place_view))
             .collect(),
         fields: expression
-            .fields()
+            .places()
             .iter()
-            .map(|held| {
-                held.as_ref().map(|fields| {
-                    fields
-                        .iter()
-                        .map(|field| FieldView {
-                            name: field.name().to_owned(),
-                            dtype: field.written().to_owned(),
-                        })
-                        .collect()
-                })
+            .zip(expression.fields())
+            .map(|(place, held)| {
+                let follows_a_struct = matches!(
+                    place.as_ref().map(OfferPlace::after),
+                    Some(After::Value {
+                        dtype: Representative::Struct,
+                        ..
+                    })
+                );
+                follows_a_struct.then(|| struct_view(held.as_ref()))
             })
             .collect(),
         ending: expression.ending().map(ending_view),

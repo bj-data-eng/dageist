@@ -135,13 +135,19 @@
               null
             ],
             "fields": [
-              [
-                {
-                  "name": "x",
-                  "dtype": "Int64"
-                }
-              ],
-              null
+              {
+                "dtype": "Struct(x: Int64)",
+                "fields": [
+                  {
+                    "name": "x",
+                    "dtype": "Int64"
+                  }
+                ]
+              },
+              {
+                "dtype": "Struct",
+                "fields": null
+              }
             ],
             "ending": {
               "kind": "notKnown",

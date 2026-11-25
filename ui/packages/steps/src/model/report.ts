@@ -14,13 +14,13 @@ import type {
   CountView,
   DocumentStepView,
   ErrorKind,
-  FieldView,
   OfferPlaceView,
   PlaceView,
   ResolutionView,
   RowsView,
   RunView,
   StepReportView,
+  StructView,
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
@@ -47,8 +47,8 @@ export interface ChainDtypes {
    * may stand at a place is asked of the engine at it.
    */
   readonly places: ReadonlyArray<OfferPlaceView | null>;
-  /** The fields of the struct each of the places follows; `null` where it follows none the walk knows. */
-  readonly fields: ReadonlyArray<readonly FieldView[] | null>;
+  /** The struct each of the places follows, as the engine writes it; `null` where it follows none. */
+  readonly fields: ReadonlyArray<StructView | null>;
 }
 
 /** What a step is, as far as anyone knows. */
@@ -167,15 +167,9 @@ export function linkHint(dtypes: ChainDtypes | undefined, index: number): string
   if (input !== null) return `${input} → ${dtypes.links[index] ?? 'does not fit'}`;
   const after = dtypes.places[index]?.after;
   if (after?.kind !== 'value') return null;
-  // The tables measure one struct of two fields, so its class is written with the fields the walk
-  // carries, or as a struct alone where it does not know them.
-  const held = dtypes.fields[index] ?? null;
-  const written = after.dtype.startsWith('Struct(')
-    ? held === null
-      ? 'Struct'
-      : `Struct(${held.map((field) => `${field.name}: ${field.dtype}`).join(', ')})`
-    : after.dtype;
-  return `after a value of the class ${written}`;
+  // The tables measure one struct of two fields, so the dtype of a struct is the one the engine
+  // writes for what the walk carries, and not its class.
+  return `after a value of the class ${dtypes.fields[index]?.dtype ?? after.dtype}`;
 }
 
 /** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
