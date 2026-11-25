@@ -484,11 +484,17 @@ pub enum Limit {
     /// which Polars allows on the sample's rows and on twelve rows, on four rows that tie and on
     /// rows where every column holds a null.
     ACountNoRowsChange,
+    /// `struct.json_encode` writes a value of any dtype as text, a number as its digits, which a
+    /// pivot's aggregate then reads as a number of a group where the sample's text, a duration, is
+    /// no number. The tables measured the call on the sample's text. The tables refusing, in a
+    /// pivot that holds a `struct.json_encode`, with the refusal that text cannot be converted to a
+    /// number, which Polars allows.
+    AJsonOfANumberInAPivot,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 40] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -528,6 +534,7 @@ impl Limit {
         Self::ArithmeticOnAStructOfNumbers,
         Self::AStructMetByAStructOfOtherFields,
         Self::ACountNoRowsChange,
+        Self::AJsonOfANumberInAPivot,
     ];
 
     /// The name a kept case is filed under.
@@ -584,6 +591,7 @@ impl Limit {
             Self::ArithmeticOnAStructOfNumbers => "arithmetic-on-a-struct-of-numbers",
             Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
             Self::ACountNoRowsChange => "a-count-no-rows-change",
+            Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
         }
     }
 
@@ -667,6 +675,9 @@ impl Limit {
             }
             Self::AStructOfAnUntypedNumberInAJoinKey => {
                 "a number typed without a dtype stays open in a struct that is a join's key, which Polars does not match with the key of the other table, where the tables measured a struct of columns"
+            }
+            Self::AJsonOfANumberInAPivot => {
+                "a number written as json text is read as the number again, where the tables measured the call on the sample's text, which is no number"
             }
             Self::ACountNoRowsChange => {
                 "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
@@ -3887,6 +3898,25 @@ fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
 }
 
 /// Whether the limit is why the tables and Polars disagree.
+/// Whether a call of arithmetic follows a value that the tables class as a struct, in any expression
+/// the tables followed.
+fn arithmetic_follows_a_struct(case: &Case, prediction: &Prediction) -> bool {
+    prediction.expressions.iter().any(|traced| {
+        let Some(chain) = locate(case, &traced.place).inside.last().copied() else {
+            return false;
+        };
+        chain.links().iter().enumerate().any(|(at, link)| {
+            let before = if at == 0 {
+                traced.start
+            } else {
+                traced.links.get(at - 1).copied().flatten()
+            };
+            link.entry().family() == catalog::Family::Arithmetic
+                && before == Some(Representative::Struct)
+        })
+    })
+}
+
 fn applies(
     limit: Limit,
     case: &Case,
@@ -4381,6 +4411,22 @@ fn applies(
             Limit::ACountNoRowsChange,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_no_rows_change(case, refused, prediction, observed),
+        (Limit::AJsonOfANumberInAPivot, Disagreement::PolarsAllows(refused)) => {
+            pivot
+                && matches!(refused.source, Source::Polars)
+                && refused.reason.starts_with("conversion from `str` to")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.struct.json_encode")))
+        }
+        (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsRefuses(refusal)) => {
+            // Polars adds, subtracts and so on field by field, each by the dtypes of the two fields.
+            unplaced(refusal)
+                && refusal
+                    .reason
+                    .contains("operation not supported for dtypes")
+                && arithmetic_follows_a_struct(case, prediction)
+        }
         (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsAllows(refused)) => {
             matches!(refused.source, Source::Polars)
                 && refused
@@ -11527,6 +11573,88 @@ mod tests {
         assert_eq!(
             tables_refuse(&two, place, Some(TableStage::Rows), reason),
             vec![Limit::ACountNoRowsChange]
+        );
+    }
+
+    #[test]
+    fn the_fields_of_a_struct_that_do_not_meet_are_the_cause_of_a_refusal_of_arithmetic_on_it() {
+        let reason = "add operation not supported for dtypes `i8` and `duration[μs]`";
+        let structs = chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("k"), &[])]))],
+            ),
+            &["Expr.add"],
+        );
+        let case = select(vec![structs]);
+        let traced = |class: Representative| {
+            vec![Traced {
+                place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
+                start: Some(Representative::Struct),
+                links: vec![Some(class)],
+            }]
+        };
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                reason,
+                traced(Representative::Struct)
+            ),
+            vec![Limit::ArithmeticOnAStructOfNumbers]
+        );
+        // A sum of what is no struct is no struct's, and nor is a refusal of another kind.
+        let plain = select(vec![chain(column("k"), &["Expr.add"])]);
+        let traced_plain = vec![Traced {
+            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
+            start: Some(Representative::Int64),
+            links: vec![Some(Representative::Int64)],
+        }];
+        assert_eq!(
+            polars_refuses(&plain, None, Stage::Rows, reason, traced_plain),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "conversion of 1 failed",
+                traced(Representative::Struct)
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_number_written_as_json_is_the_cause_of_a_refusal_to_read_text_as_one_in_a_pivot() {
+        let reason = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let json = chain(
+            call("polars.element", Vec::new()),
+            &["Expr.count", "Expr.struct.json_encode", "Expr.kurtosis"],
+        );
+        let place = at(&[
+            Segment::Parameter("aggregate_function".to_owned()),
+            Segment::Link(2),
+        ]);
+        assert_eq!(
+            tables_refuse(
+                &pivot(json),
+                place.clone(),
+                Some(TableStage::Schema),
+                reason
+            ),
+            vec![Limit::AJsonOfANumberInAPivot]
+        );
+        // Without the call, or in a select, the text is not the json of a number.
+        let without = chain(
+            call("polars.element", Vec::new()),
+            &["Expr.count", "Expr.kurtosis"],
+        );
+        assert_eq!(
+            tables_refuse(&pivot(without), place, Some(TableStage::Schema), reason),
+            vec![]
         );
     }
 }
