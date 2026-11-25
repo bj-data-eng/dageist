@@ -459,6 +459,7 @@ pub struct Allowance {
     ending: Ending,
     fields: Option<Fields>,
     columns: Option<Fields>,
+    width: Option<usize>,
 }
 
 impl Allowance {
@@ -498,6 +499,13 @@ impl Allowance {
     #[must_use]
     pub const fn fields(&self) -> Option<&Fields> {
         self.fields.as_ref()
+    }
+
+    /// The width of the array the chain has after the entry where the entry decides it: the array a
+    /// field read holds.
+    #[must_use]
+    pub const fn width(&self) -> Option<usize> {
+        self.width
     }
 
     /// The columns the entry writes where it writes several, one for each field of a struct it
@@ -1427,12 +1435,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         result = Some(found.of_width(width));
     }
+    let width = struct_gives.width();
     Ok(Allowance {
         result,
         shape,
         ending,
         fields,
         columns,
+        width,
     })
 }
 

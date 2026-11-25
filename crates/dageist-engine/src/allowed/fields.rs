@@ -33,6 +33,8 @@ pub struct Field {
     /// reads the field and meets another number gives the dtype of that number, not the one the
     /// struct is written with.
     loose: bool,
+    /// The width of the array the field is, where it is one whose width is known.
+    width: Option<usize>,
 }
 
 impl Field {
@@ -45,6 +47,10 @@ impl Field {
             class: Representative::of(dtype),
             fields: Fields::of_dtype(dtype),
             loose: false,
+            width: match dtype {
+                DataType::Array(_, width) => Some(*width),
+                _ => None,
+            },
         }
     }
 
@@ -58,7 +64,14 @@ impl Field {
             class,
             fields: None,
             loose: false,
+            width: None,
         }
+    }
+
+    /// The width of the array the field is, where it is known.
+    #[must_use]
+    pub const fn width(&self) -> Option<usize> {
+        self.width
     }
 
     /// The field's name.
@@ -214,6 +227,7 @@ pub struct Input<'a> {
     class: Option<Representative>,
     fields: Option<&'a Fields>,
     loose: bool,
+    width: Option<usize>,
 }
 
 impl<'a> Input<'a> {
@@ -230,7 +244,15 @@ impl<'a> Input<'a> {
             class,
             fields,
             loose: false,
+            width: None,
         }
+    }
+
+    /// The same input, which is an array of the width `width` where that is known.
+    #[must_use]
+    pub const fn with_width(mut self, width: Option<usize>) -> Self {
+        self.width = width;
+        self
     }
 
     /// The same input, which is a number typed without a dtype where `loose`.
@@ -417,6 +439,14 @@ pub(super) fn gives(
                     input.name.map(|name| {
                         let mut field = Field::of_class(name, input.class);
                         field.loose = input.loose;
+                        if let (Some(width), Some(Representative::Array(_))) =
+                            (input.width, input.class)
+                        {
+                            field.width = Some(width);
+                            field.written = ResultDtype::new(field.written.clone(), input.class)
+                                .of_width(width)
+                                .to_string();
+                        }
                         if let (Some(fields), Some(Representative::Struct)) =
                             (input.fields, input.class)
                         {
@@ -478,9 +508,12 @@ pub(super) fn gives(
                     .collect();
                 return Ok(Gives::Struct(Fields::new(fields).ok()));
             }
-            if let Some(width) = chosen.width
-                && width != names.len()
-            {
+            // Names are counted against the width of the array, which Polars knows and the walk may
+            // not: they are no more judged than the fields they would name are known.
+            let Some(width) = chosen.width else {
+                return Ok(Gives::Undecided);
+            };
+            if width != names.len() {
                 return Err((
                     Rule::FieldNamesFitTheStruct,
                     format!(
@@ -558,6 +591,14 @@ impl Gives {
             Self::Field(Some(field)) => (Some(ResultDtype::of_field(field)), field.fields.clone()),
             Self::Field(None) | Self::Columns(_) | Self::Unknown | Self::Undecided => (None, None),
         })
+    }
+
+    /// The width of the array a field read holds, where it is known.
+    pub(super) fn width(&self) -> Option<usize> {
+        match self {
+            Self::Field(Some(field)) => field.width,
+            _ => None,
+        }
     }
 
     /// Whether the call reads or renames fields that the chain does not know, so that what Polars

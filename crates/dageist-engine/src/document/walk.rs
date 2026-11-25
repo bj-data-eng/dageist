@@ -558,8 +558,15 @@ fn start_name(start: &Start, links: &[Call]) -> Option<String> {
 }
 
 /// One value a call of `polars.struct` makes a struct of: the name it writes, its class, the fields
-/// it holds where it is a struct, and whether it is a number typed without a dtype.
-type StructInput = (Option<String>, Option<Representative>, Option<Fields>, bool);
+/// it holds where it is a struct, whether it is a number typed without a dtype, and the width it has
+/// where it is an array whose width is known.
+struct StructInput {
+    name: Option<String>,
+    class: Option<Representative>,
+    fields: Option<Fields>,
+    loose: bool,
+    width: Option<usize>,
+}
 
 /// The values a call of `polars.struct` makes a struct of, in order, each with the name it is given
 /// where it is one of the named values: those that are listed first, then the named ones.
@@ -1743,13 +1750,12 @@ impl Walker<'_> {
         struct_inputs(start)
             .into_iter()
             .zip(listed.chain(named))
-            .map(|((name, _), (_, operand))| {
-                (
-                    name.or_else(|| operand.name.map(|at| self.names[at.0].clone())),
-                    operand.dtype,
-                    operand.fields.map(|at| self.fieldsets[at.0].clone()),
-                    operand.loose.is_some(),
-                )
+            .map(|((name, _), (_, operand))| StructInput {
+                name: name.or_else(|| operand.name.map(|at| self.names[at.0].clone())),
+                class: operand.dtype,
+                fields: operand.fields.map(|at| self.fieldsets[at.0].clone()),
+                loose: operand.loose.is_some(),
+                width: operand.width,
             })
             .collect()
     }
@@ -1935,11 +1941,13 @@ impl Walker<'_> {
                     self.struct_inputs_made(start, &start_arguments);
                 let input_names: Vec<Input<'_>> = inputs_made
                     .iter()
-                    .map(|(name, class, fields, loose)| {
-                        Input::new(name.as_deref(), *class, fields.as_ref()).loose_if(*loose)
+                    .map(|input| {
+                        Input::new(input.name.as_deref(), input.class, input.fields.as_ref())
+                            .loose_if(input.loose)
+                            .with_width(input.width)
                     })
                     .collect();
-                start_given = inputs_made.first().and_then(|(name, _, _, _)| name.clone());
+                start_given = inputs_made.first().and_then(|input| input.name.clone());
                 let names = start.names();
                 let numbers = start.numbers();
                 let chosen = Chosen::default()
@@ -2221,7 +2229,12 @@ impl Walker<'_> {
                 },
             );
             unit = unit_after(link, unit, &standing);
-            width = width_after(width, &standing);
+            // A field read of an array has the width the field holds.
+            width = standing
+                .verdict()
+                .and_then(Verdict::allowance)
+                .and_then(allowed::Allowance::width)
+                .or_else(|| width_after(width, &standing));
             zone = self.zone_after(link, zone, &standing);
             name = name_after(link, name, fields_followed.as_ref());
             fields = self.fields_after(&standing);

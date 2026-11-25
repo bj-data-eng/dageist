@@ -513,17 +513,11 @@ pub enum Limit {
     /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
     /// reason the tables gave of a key of the join, where it allows the inner join.
     AJoinKeyPolarsDoesNotRun,
-    /// Polars counts the names given to an array against the array's width, which a struct that
-    /// holds the array has in its dtype, and the walk carries no width for a field of a struct. The
-    /// tables measured an array that a column is. Polars refusing the plan with the refusal that
-    /// the number of names does not match the width of the input, at an array made a struct whose
-    /// chain read a field of a struct before it.
-    AnArrayWidthAStructFieldHolds,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 44] = [
+    pub const ALL: [Self; 43] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -567,7 +561,6 @@ impl Limit {
         Self::AToStructGivenNamesAlike,
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
-        Self::AnArrayWidthAStructFieldHolds,
     ];
 
     /// The name a kept case is filed under.
@@ -628,7 +621,6 @@ impl Limit {
             Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
-            Self::AnArrayWidthAStructFieldHolds => "an-array-width-a-struct-field-holds",
         }
     }
 
@@ -721,9 +713,6 @@ impl Limit {
             }
             Self::SeveralCountsInOneItem => {
                 "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
-            }
-            Self::AnArrayWidthAStructFieldHolds => {
-                "Polars counts the names given to an array against its width, which a struct that holds the array has in its dtype, where the walk carries no width for the field of a struct that it read"
             }
             Self::AJoinKeyPolarsDoesNotRun => {
                 "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
@@ -4553,20 +4542,6 @@ fn applies(
             Limit::SeveralCountsInOneItem,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_among_counts(case, refused),
-        (Limit::AnArrayWidthAStructFieldHolds, Disagreement::PolarsRefuses(refusal)) => {
-            refusal.reason.contains("number of field names provided")
-                && refusal.place.as_ref().is_some_and(|place| {
-                    let locus = locate(case, place);
-                    locus
-                        .call
-                        .is_some_and(|call| is(call, "Expr.arr.to_struct"))
-                        && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                            chain.links()[..at]
-                                .iter()
-                                .any(|link| is(link, "Expr.struct.field"))
-                        })
-                })
-        }
         (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
             is(step, "LazyFrame.join")
                 && matches!(refused.source, Source::Polars)
@@ -11884,31 +11859,6 @@ mod tests {
         assert_eq!(
             excused_by_kept("uncovered-a-null-struct-to-fill--a-struct-made-of-a-list.case"),
             vec![Limit::ANullStructToFill]
-        );
-    }
-
-    #[test]
-    fn the_names_given_to_an_array_a_struct_holds_are_counted_by_polars_against_its_width() {
-        assert_eq!(
-            excused_by_kept("uncovered-an-array-width-a-struct-field-holds.case"),
-            vec![Limit::AnArrayWidthAStructFieldHolds]
-        );
-        // An array of a column has its width in the walk, which refuses names of another number
-        // by a rule, so no limit has a part in it.
-        let names = Value::Many(vec![Value::String("y".to_owned())]);
-        let case = select(vec![chain_of(
-            column("a"),
-            vec![call("Expr.arr.to_struct", vec![("fields", names)])],
-        )]);
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(link_of("exprs", 0, 0)),
-                Stage::Schema,
-                "arr.to_struct() number of field names provided (1) does not match width of input (2).",
-                Vec::new()
-            ),
-            vec![]
         );
     }
 

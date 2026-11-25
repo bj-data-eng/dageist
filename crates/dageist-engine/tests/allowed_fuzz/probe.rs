@@ -517,6 +517,7 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         Source::Rule(rule) if *rule == FIELD_NAMES_RULE => {
             probe.contains("multiple fields with name")
                 || probe.contains("different number of fields")
+                || probe.contains("number of field names provided")
         }
         // A count that values meet, or a window is given, is refused as lengths that do not match.
         Source::Rule(rule) if COUNT_MEETING_RULES.contains(rule) => is_a_refusal_of_lengths(probe),
