@@ -377,6 +377,20 @@
     }
   ],
   "optionKinds": ["flag", "choice"],
+  "defaultKinds": ["required", "none", "flag", "integer", "float", "text", "empty", "other"],
+  "settingKinds": [
+    "unset",
+    "flag",
+    "integer",
+    "float",
+    "text",
+    "word",
+    "field",
+    "element",
+    "comparison",
+    "list",
+    "pairs"
+  ],
   "dtypeClasses": [
     "Int8",
     "Int16",
@@ -449,6 +463,7 @@
   "valueShapes": ["one", "many", "counted"],
   "afterKinds": ["start", "value", "condition"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
+  "resolutions": ["dtype", "several", "unfinished", "noContext", "refused"],
   "causes": ["unknownTable", "unknownInput", "build", "notAllowed", "polars"],
   "refusalSources": ["polars", "rule", "structure"],
   "stages": ["schema", "rows", "empty"],
@@ -536,6 +551,7 @@
   ],
   "outcomes": ["valid", "refused", "incomplete", "notRun"],
   "rowsStates": ["notCounted", "counted", "failed"],
+  "changes": ["added", "replaced"],
   "states": [
     {
       "outcome": "valid",
@@ -651,6 +667,63 @@
       "rows": "notCounted",
       "after": "notRun"
     }
+  ],
+  "editAnswers": ["edited", "refused"],
+  "problemKinds": [
+    "noStep",
+    "stepChanged",
+    "nothing",
+    "doesNotFit",
+    "wrongPlace",
+    "notPerItem",
+    "noDefault",
+    "outOfRange",
+    "unknownEntry",
+    "noStart",
+    "cannotAdd",
+    "needsValue",
+    "refused"
+  ],
+  "thingKinds": [
+    "step",
+    "call",
+    "parameter",
+    "item",
+    "key",
+    "entryValue",
+    "start",
+    "link",
+    "expressionWithoutCall",
+    "value"
+  ],
+  "valueKinds": [
+    "expression",
+    "columns",
+    "integer",
+    "float",
+    "string",
+    "flag",
+    "choice",
+    "dtype",
+    "duration",
+    "pattern",
+    "timeZone",
+    "table",
+    "path",
+    "pairs",
+    "list"
+  ],
+  "wanted": [
+    "call",
+    "argument",
+    "parameter",
+    "item",
+    "entryPart",
+    "link",
+    "expression",
+    "list",
+    "pairs",
+    "partOfStep"
   ],
   "inputKinds": ["table", "value", "list"],
   "origins": ["node", "column", "parameter"],

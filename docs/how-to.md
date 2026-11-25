@@ -314,10 +314,11 @@ After a change to a variant the step editor has to handle, such as a kind of sta
 parameter, a class of dtype, a cause or rule of a refusal, a state of a step or of its rows or a
 kind of input, `report::census::tests::the_snapshot_is_what_the_host_reports` fails and names
 `ui/packages/host/fixtures/census.json`. The census lists every such variant from the Rust types:
-a type with a list of all its variants is read through it, and any other is walked by a function
-that names each variant with no wildcard arm, so adding a variant fails to compile until that
-function places it, in `crates/dageist-tauri/src/report/census.rs`. Write the file from there,
-format it, then run the view's tests, which decode it:
+a type with a list of all its variants is read through it, and any other is listed by
+`every_variant!` in `crates/dageist-tauri/src/report/census.rs`, which takes one arm for each
+variant by name and expands a `match` with no wildcard arm, so adding a variant fails to compile
+until it has an arm. Write the file from there, format it, then run the view's tests, which decode
+it:
 
 ```sh
 DAGEIST_REFRESH_CENSUS=1 cargo test --offline --locked -p dageist-tauri report::census::tests::the_snapshot_is_what_the_host_reports

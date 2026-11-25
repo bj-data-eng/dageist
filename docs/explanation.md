@@ -1438,11 +1438,14 @@ The third test, `model/census.test.ts`, holds the variants the grid cannot list.
 The host writes the census, `ui/packages/host/fixtures/census.json`, from the Rust
 types, so that a variant added to a type reaches it without a hand edit. A type
 that has a list of its own variants, such as the rules of the tables or the
-classes of dtype, is read through that list. Any other is walked by a function in
-`crates/dageist-tauri/src/report/census.rs` that names every variant with no
-wildcard arm, so a variant added to the type does not compile until it has a
-place there. A word in the census is the word the host serializes for the
-variant. The census holds:
+classes of dtype, is read through that list. Any other is listed by `every_variant!`
+in `crates/dageist-tauri/src/report/census.rs`, which takes one arm for each
+variant by name and expands a `match` with no wildcard arm and the list the arms
+give, so a variant added to the type does not compile until it has an arm, and no
+arm can stand for two variants. Where the host serializes a view type, a word in
+the census is the word it serializes for the variant; the few words that are
+written by a `match` are held against the host's snapshots by the host's tests.
+The census holds:
 
 - 21 starts: a field, a connected value, a connected list, nothing picked yet, a
   number, text or flag typed in, and each function that starts a chain, `when`

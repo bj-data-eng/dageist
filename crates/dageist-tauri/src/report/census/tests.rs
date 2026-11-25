@@ -1,7 +1,9 @@
-//! The census holds every variant the host has, which these tests find in what the host and the
-//! engine write elsewhere: the committed snapshots of what the commands return, and what the engine
-//! answers where it is asked. None is derived from the census writer's own output, so a variant the
-//! walk of a type missed is one the other source still holds.
+//! The census holds every variant the host has. Its lists of the types the host serializes are
+//! made by `every_variant!`, which does not compile while a variant lacks an arm, and these tests
+//! hold what the lists say against what the host and the engine write elsewhere: the committed
+//! snapshots of what the commands return, the hand-written lists of the vocabulary, and what the
+//! engine answers where it is asked. None is derived from the census writer's own output, so a
+//! variant a list lacks is one the other source still holds.
 
 use std::collections::BTreeSet;
 
@@ -474,4 +476,203 @@ fn every_reading_the_host_wrote_of_typed_text_is_among_the_census_readings() {
     assert!(pairs.contains(&("text".to_owned(), "none".to_owned())));
     // A reading that fails to read is listed with no literal, for each slot that can refuse a text.
     assert!(readings.iter().any(|reading| reading["literal"].is_null()));
+}
+
+#[test]
+fn a_list_made_by_every_variant_holds_the_samples_of_each_arm_in_order() {
+    #[derive(Debug, PartialEq)]
+    enum Sample {
+        Plain,
+        Held(u8),
+        Named { number: u8 },
+    }
+    let all = every_variant!(Sample;
+        Plain => [Sample::Plain],
+        Held => [Sample::Held(1), Sample::Held(2)],
+        Named => [Sample::Named { number: 3 }],
+    );
+
+    assert_eq!(
+        all,
+        [
+            Sample::Plain,
+            Sample::Held(1),
+            Sample::Held(2),
+            Sample::Named { number: 3 }
+        ]
+    );
+}
+
+#[test]
+fn no_list_of_words_names_a_variant_twice() {
+    let held = census();
+    let mut checked = 0;
+    for (name, list) in held.as_object().expect("an object") {
+        let Some(items) = list.as_array() else {
+            continue;
+        };
+        let words: Vec<&str> = items.iter().filter_map(Value::as_str).collect();
+        if words.len() != items.len() {
+            continue;
+        }
+        let distinct: BTreeSet<&str> = words.iter().copied().collect();
+        assert_eq!(distinct.len(), words.len(), "{name} names a word twice");
+        checked += 1;
+    }
+    assert!(checked > 15, "{checked} lists of words");
+}
+
+#[test]
+fn the_families_of_words_the_view_decodes_are_those_the_vocabulary_lists_by_hand() {
+    let held = census();
+    let vocabulary = committed("vocabulary.json");
+    for (name, in_vocabulary) in [
+        ("changes", "changes"),
+        ("settingKinds", "settings"),
+        ("problemKinds", "problemKinds"),
+        ("thingKinds", "thingKinds"),
+        ("wanted", "wanted"),
+        ("valueKinds", "valueKinds"),
+    ] {
+        assert_eq!(
+            listed(&held, name),
+            words_of(&vocabulary, in_vocabulary),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn every_resolution_default_and_answer_the_host_reported_is_in_the_census() {
+    let held = census();
+    let mut resolutions = BTreeSet::new();
+    for run in runs().into_iter().chain([variants()]) {
+        for step in run["steps"].as_array().expect("steps") {
+            for expression in step["expressions"].as_array().expect("expressions") {
+                resolutions.insert(
+                    expression["start"]["kind"]
+                        .as_str()
+                        .expect("a kind")
+                        .to_owned(),
+                );
+                for link in expression["links"].as_array().expect("links") {
+                    resolutions.insert(link["kind"].as_str().expect("a kind").to_owned());
+                }
+            }
+        }
+    }
+    assert!(
+        resolutions.is_subset(&listed(&held, "resolutions")),
+        "{resolutions:?}"
+    );
+    assert_eq!(listed(&held, "resolutions").len(), 5);
+
+    let mut defaults = BTreeSet::new();
+    for entry in committed("catalogue.json")["entries"]
+        .as_array()
+        .expect("entries")
+    {
+        for parameter in entry["parameters"].as_array().expect("parameters") {
+            defaults.insert(
+                parameter["default"]["kind"]
+                    .as_str()
+                    .expect("a kind")
+                    .to_owned(),
+            );
+        }
+    }
+    assert!(
+        defaults.is_subset(&listed(&held, "defaultKinds")),
+        "{defaults:?}"
+    );
+
+    let answers: BTreeSet<String> = ["edit-edited.json", "edit-refused.json"]
+        .iter()
+        .map(|file| {
+            committed(file)["status"]
+                .as_str()
+                .expect("a status")
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(answers, listed(&held, "editAnswers"));
+    let problem = committed("edit-refused.json")["problem"]["kind"]
+        .as_str()
+        .expect("a kind")
+        .to_owned();
+    assert!(listed(&held, "problemKinds").contains(&problem));
+}
+
+#[test]
+fn the_words_written_by_hand_are_those_the_host_wrote_in_its_snapshots() {
+    // `kind_word`, `value_type_word`, `shape_word`, `typed_word`, `literal_word`, `before_word`
+    // and `slot_json` are exhaustive matches that write a word; the snapshots of the catalogue,
+    // the readings of typed text and the reports hold the words the host serializes.
+    let held = census();
+    let catalogue = committed("catalogue.json");
+    let mut kinds = BTreeSet::new();
+    let mut shapes = BTreeSet::new();
+    let mut types = BTreeSet::new();
+    for entry in catalogue["entries"].as_array().expect("entries") {
+        for parameter in entry["parameters"].as_array().expect("parameters") {
+            kinds.insert(
+                parameter["kind"]["kind"]
+                    .as_str()
+                    .expect("a kind")
+                    .to_owned(),
+            );
+            shapes.insert(
+                parameter["shape"]["shape"]
+                    .as_str()
+                    .expect("a shape")
+                    .to_owned(),
+            );
+            if parameter["kind"]["kind"] == "value" {
+                types.insert(
+                    parameter["kind"]["type"]
+                        .as_str()
+                        .expect("a type")
+                        .to_owned(),
+                );
+            }
+        }
+    }
+    assert!(
+        kinds.is_subset(&listed(&held, "parameterKinds")),
+        "{kinds:?}"
+    );
+    assert!(
+        shapes.is_subset(&listed(&held, "parameterShapes")),
+        "{shapes:?}"
+    );
+    assert!(types.is_subset(&listed(&held, "valueTypes")), "{types:?}");
+    assert_eq!(listed(&held, "parameterShapes").len(), 3);
+    // The words of a literal and a slot are those of the readings the host wrote.
+    let literals: BTreeSet<String> = [
+        "typed-whole.json",
+        "typed-expression.json",
+        "typed-date.json",
+    ]
+    .iter()
+    .flat_map(|file| {
+        committed(file)["readings"]
+            .as_array()
+            .expect("readings")
+            .iter()
+            .filter(|reading| reading["kind"] == "read")
+            .map(|reading| {
+                reading["literal"]["kind"]
+                    .as_str()
+                    .expect("a kind")
+                    .to_owned()
+            })
+            .collect::<Vec<_>>()
+    })
+    .collect();
+    let census_literals: BTreeSet<String> = typed_values()
+        .iter()
+        .filter(|value| value["readable"] == true)
+        .map(|value| value["literal"].as_str().expect("a word").to_owned())
+        .collect();
+    assert!(literals.is_subset(&census_literals), "{literals:?}");
 }

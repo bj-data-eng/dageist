@@ -10,43 +10,52 @@
 //! without a hand edit:
 //!
 //! - A type that has a list of every variant of its own, such as `Rule::ALL`, is read through it.
-//! - Any other is walked from its first variant by a function that names each variant, with no
-//!   wildcard arm, `chain`: a variant added to the type does not compile until that function gives
-//!   it a place, and the test of each chain checks that the walk reached every variant its
-//!   function names.
+//! - Any other is listed by `every_variant!`, which takes one arm for each variant, by name, and
+//!   expands both a `match` with no wildcard arm and the list the arms give. A variant added to the
+//!   type does not compile until it has an arm, so it is in the list, and no arm can stand for two
+//!   variants, because it names one. An arm gives the samples of its variant, which a test of the
+//!   words checks are distinct.
 //!
-//! A word in a list is the word the host serializes for that variant, read from the serialized
-//! sample and not written again here, so that the view is given the words it receives.
+//! A word in a list is, where the view type is serialized, the word the host serializes for the
+//! variant, read from the serialized sample. The words of a few engine types are written here by
+//! an exhaustive `match`, which a test holds against the committed fixtures of the host:
+//! `kind_word`, `value_type_word`, `shape_word`, `typed_word`, `literal_word`, `before_word` and
+//! `slot_json`.
 
 use std::collections::BTreeSet;
 
 use dageist_engine::allowed::{After, ConditionState, Literal, Representative, Rule, Shape, Stage};
-use dageist_engine::catalog::{self, Build, Kind, ValueType};
-use dageist_engine::document::{Call, Expression, Place, Start, Value as Held};
+use dageist_engine::catalog::{self, Build, Kind, Setting, Shape as ShapeOf, ValueType};
+use dageist_engine::document::{Call, Change, Expression, Place, Start, Value as Held, ValueKind};
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{
-    CauseView, CountView, OutcomeView, PlaceView, RefusalSourceView, RefusalView, StageView,
-    ValuesView, condition_state_view, place_view, shape_view, stage_view,
+    CauseView, CountView, OutcomeView, PlaceView, RefusalSourceView, RefusalView, ResolutionView,
+    StageView, ValuesView, change_view, condition_state_view, place_view, shape_view, stage_view,
+};
+use crate::catalogue::{DefaultView, setting_view};
+use crate::document::{
+    EditAnswerView, ProblemView, ThingView, ValueKindView, WantedView, value_kind_view,
 };
 use crate::node::{InputView, OriginView};
 use crate::offers::{TypedRequest, ValueTypeRequest, read_view};
 
-/// The variants of a type reached from `first` by `next`, which ends the walk with `None`.
+/// Lists the samples of every variant of a type, from the one place that names them.
 ///
-/// `next` names every variant of the type with no wildcard arm, so a variant added to the type does
-/// not compile until `next` places it. A variant placed in no walk from `first` is not reached, and
-/// the test of the chain, which compares it with the words of a second list, fails.
-fn chain<T>(first: T, next: impl Fn(&T) -> Option<T>) -> Vec<T> {
-    /// More than any list here has, so that a walk that loops fails and does not hang.
-    const MOST: usize = 128;
-    let mut walked = vec![first];
-    while let Some(following) = walked.last().and_then(&next) {
-        assert!(walked.len() < MOST, "the chain does not end");
-        walked.push(following);
-    }
-    walked
+/// Each arm is `Variant => samples`, where `samples` is anything that iterates the values that
+/// stand for the variant. The macro expands a `match` over the type with one arm for each name and
+/// no wildcard, so a variant the invocation lacks does not compile, and an arm names one variant,
+/// so none is left standing for another. It returns the samples of every arm, in order.
+macro_rules! every_variant {
+    ($ty:ident; $($variant:ident => $samples:expr),+ $(,)?) => {{
+        let _every_variant_is_named = |placed: &$ty| match placed {
+            $( $ty::$variant { .. } => () ),+
+        };
+        let mut all = Vec::new();
+        $( all.extend($samples); )+
+        all
+    }};
 }
 
 /// What a view's serialization says under `key`: the word the view receives for the variant.
@@ -85,72 +94,34 @@ fn refusal(source: RefusalSourceView) -> RefusalView {
 
 // What a refusal came from.
 
-const fn next_source(source: &RefusalSourceView) -> Option<RefusalSourceView> {
-    match source {
-        RefusalSourceView::Polars { .. } => Some(RefusalSourceView::Rule {
-            rule: Rule::ALL[0].name(),
-        }),
-        RefusalSourceView::Rule { .. } => Some(RefusalSourceView::Structure),
-        RefusalSourceView::Structure => None,
-    }
-}
-
 fn sources() -> Vec<RefusalSourceView> {
-    chain(
-        RefusalSourceView::Polars {
-            stage: StageView::Schema,
-        },
-        next_source,
+    every_variant!(RefusalSourceView;
+        Polars => [RefusalSourceView::Polars { stage: StageView::Schema }],
+        Rule => [RefusalSourceView::Rule { rule: Rule::ALL[0].name() }],
+        Structure => [RefusalSourceView::Structure],
     )
 }
 
 // Why a step was refused.
 
-fn next_cause(cause: &CauseView) -> Option<CauseView> {
-    Some(match cause {
-        CauseView::UnknownTable { .. } => CauseView::UnknownInput {
-            name: String::new(),
-        },
-        CauseView::UnknownInput { .. } => CauseView::Build {
-            reason: String::new(),
-        },
-        CauseView::Build { .. } => CauseView::NotAllowed {
-            refusal: refusal(RefusalSourceView::Structure),
-        },
-        CauseView::NotAllowed { .. } => CauseView::Polars {
-            reason: String::new(),
-        },
-        CauseView::Polars { .. } => return None,
-    })
-}
-
 fn causes() -> Vec<CauseView> {
-    chain(
-        CauseView::UnknownTable {
-            name: String::new(),
-        },
-        next_cause,
+    every_variant!(CauseView;
+        UnknownTable => [CauseView::UnknownTable { name: String::new() }],
+        UnknownInput => [CauseView::UnknownInput { name: String::new() }],
+        Build => [CauseView::Build { reason: String::new() }],
+        NotAllowed => [CauseView::NotAllowed { refusal: refusal(RefusalSourceView::Structure) }],
+        Polars => [CauseView::Polars { reason: String::new() }],
     )
 }
 
 // What running a step on the rows came to.
 
-fn next_count(count: &CountView) -> Option<CountView> {
-    Some(match count {
-        CountView::NotCounted => CountView::Counted {
-            received: 0,
-            kept: 0,
-            first: Vec::new(),
-        },
-        CountView::Counted { .. } => CountView::Failed {
-            reason: String::new(),
-        },
-        CountView::Failed { .. } => return None,
-    })
-}
-
 fn counts() -> Vec<CountView> {
-    chain(CountView::NotCounted, next_count)
+    every_variant!(CountView;
+        NotCounted => [CountView::NotCounted],
+        Counted => [CountView::Counted { received: 0, kept: 0, first: Vec::new() }],
+        Failed => [CountView::Failed { reason: String::new() }],
+    )
 }
 
 // What running a step came to.
@@ -159,29 +130,15 @@ fn here() -> PlaceView {
     place_view(&Place::of_step(0, None))
 }
 
-fn next_outcome(outcome: &OutcomeView) -> Option<OutcomeView> {
-    Some(match outcome {
-        OutcomeView::Valid { .. } => OutcomeView::Refused {
-            place: here(),
-            cause: CauseView::Polars {
-                reason: String::new(),
-            },
-        },
-        OutcomeView::Refused { .. } => OutcomeView::Incomplete { place: here() },
-        OutcomeView::Incomplete { .. } => OutcomeView::NotRun {
-            blocked_by: String::new(),
-        },
-        OutcomeView::NotRun { .. } => return None,
-    })
-}
-
 fn outcomes() -> Vec<OutcomeView> {
-    chain(
-        OutcomeView::Valid {
-            columns: Vec::new(),
-            changes: Vec::new(),
-        },
-        next_outcome,
+    every_variant!(OutcomeView;
+        Valid => [OutcomeView::Valid { columns: Vec::new(), changes: Vec::new() }],
+        Refused => [OutcomeView::Refused {
+            place: here(),
+            cause: CauseView::Polars { reason: String::new() },
+        }],
+        Incomplete => [OutcomeView::Incomplete { place: here() }],
+        NotRun => [OutcomeView::NotRun { blocked_by: String::new() }],
     )
 }
 
@@ -201,14 +158,15 @@ enum Before {
     NotRun,
 }
 
-const fn next_before(before: &Before) -> Option<Before> {
-    match before {
-        Before::Nothing => Some(Before::Refused),
-        Before::Refused => Some(Before::Incomplete),
-        Before::Incomplete => Some(Before::Failed),
-        Before::Failed => Some(Before::NotRun),
-        Before::NotRun => None,
-    }
+/// Every state of what came before, from the one place that names them.
+fn befores() -> Vec<Before> {
+    every_variant!(Before;
+        Nothing => [Before::Nothing],
+        Refused => [Before::Refused],
+        Incomplete => [Before::Incomplete],
+        Failed => [Before::Failed],
+        NotRun => [Before::NotRun],
+    )
 }
 
 const fn before_word(before: Before) -> &'static str {
@@ -276,7 +234,7 @@ fn states() -> Vec<Value> {
             | OutcomeView::NotRun { .. }) => vec![(None, other)],
         };
         for (cause, outcome) in held {
-            for before in chain(Before::Nothing, next_before) {
+            for before in befores() {
                 if !follows(&outcome, before) {
                     continue;
                 }
@@ -298,36 +256,25 @@ fn states() -> Vec<Value> {
 
 // Where an expression starts.
 
-fn next_input(input: &InputView) -> Option<InputView> {
-    let from = || OriginView::Parameter;
-    Some(match input {
-        InputView::Table { .. } => InputView::Value {
-            name: String::new(),
-            from: from(),
-            dtype: String::new(),
-            value: None,
-        },
-        InputView::Value { .. } => InputView::List {
-            name: String::new(),
-            from: from(),
-            dtype: String::new(),
-            values: ValuesView {
-                shown: Vec::new(),
-                more: 0,
-            },
-        },
-        InputView::List { .. } => return None,
-    })
-}
-
 fn inputs() -> Vec<InputView> {
-    chain(
-        InputView::Table {
+    every_variant!(InputView;
+        Table => [InputView::Table {
             name: String::new(),
             from: OriginView::Parameter,
             columns: Vec::new(),
-        },
-        next_input,
+        }],
+        Value => [InputView::Value {
+            name: String::new(),
+            from: OriginView::Parameter,
+            dtype: String::new(),
+            value: None,
+        }],
+        List => [InputView::List {
+            name: String::new(),
+            from: OriginView::Parameter,
+            dtype: String::new(),
+            values: ValuesView { shown: Vec::new(), more: 0 },
+        }],
     )
 }
 
@@ -341,46 +288,12 @@ const fn input_start(input: &InputView) -> Option<&'static str> {
     }
 }
 
-fn next_origin(origin: &OriginView) -> Option<OriginView> {
-    Some(match origin {
-        OriginView::Node { .. } => OriginView::Column {
-            node: String::new(),
-            column: String::new(),
-        },
-        OriginView::Column { .. } => OriginView::Parameter,
-        OriginView::Parameter => return None,
-    })
-}
-
 fn origins() -> Vec<OriginView> {
-    chain(
-        OriginView::Node {
-            name: String::new(),
-        },
-        next_origin,
+    every_variant!(OriginView;
+        Node => [OriginView::Node { name: String::new() }],
+        Column => [OriginView::Column { node: String::new(), column: String::new() }],
+        Parameter => [OriginView::Parameter],
     )
-}
-
-/// Where a chain in a document starts, as a word of the host's own.
-const fn start_word(start: &Start) -> &'static str {
-    match start {
-        Start::Call(_) => "call",
-        Start::Input(_) => "input",
-        Start::Hole => "hole",
-    }
-}
-
-fn next_start(start: &Start) -> Option<Start> {
-    Some(match start {
-        Start::Call(_) => Start::Input(String::new()),
-        Start::Input(_) => Start::Hole,
-        Start::Hole => return None,
-    })
-}
-
-fn starts_of_document() -> Vec<Start> {
-    let field = Expression::field("a").expect("a field");
-    chain(field.start().clone(), next_start)
 }
 
 /// Whether an entry built as `build` is where a chain starts: a function that makes an expression,
@@ -419,29 +332,25 @@ const fn typed_word(value: &Held) -> Option<&'static str> {
     }
 }
 
-fn next_held(value: &Held) -> Option<Held> {
-    Some(match value {
-        Held::Expression(_) => Held::Columns(Vec::new()),
-        Held::Columns(_) => Held::Integer(0),
-        Held::Integer(_) => Held::Float(0.0),
-        Held::Float(_) => Held::String(String::new()),
-        Held::String(_) => Held::Flag(Some(true)),
-        Held::Flag(_) => Held::Choice(String::new()),
-        Held::Choice(_) => Held::Dtype("Int64".parse().expect("a dtype")),
-        Held::Dtype(_) => Held::Duration(String::new()),
-        Held::Duration(_) => Held::Pattern(String::new()),
-        Held::Pattern(_) => Held::TimeZone(None),
-        Held::TimeZone(_) => Held::Table(String::new()),
-        Held::Table(_) => Held::Path(String::new()),
-        Held::Path(_) => Held::Pairs(Vec::new()),
-        Held::Pairs(_) => Held::Many(Vec::new()),
-        Held::Many(_) => return None,
-    })
-}
-
 fn held_values() -> Vec<Held> {
     let field = Expression::field("a").expect("a field");
-    chain(Held::Expression(field), next_held)
+    every_variant!(Held;
+        Expression => [Held::Expression(field)],
+        Columns => [Held::Columns(Vec::new())],
+        Integer => [Held::Integer(0)],
+        Float => [Held::Float(0.0)],
+        String => [Held::String(String::new())],
+        Flag => [Held::Flag(Some(true))],
+        Choice => [Held::Choice(String::new())],
+        Dtype => [Held::Dtype("Int64".parse().expect("a dtype"))],
+        Duration => [Held::Duration(String::new())],
+        Pattern => [Held::Pattern(String::new())],
+        TimeZone => [Held::TimeZone(None)],
+        Table => [Held::Table(String::new())],
+        Path => [Held::Path(String::new())],
+        Pairs => [Held::Pairs(Vec::new())],
+        Many => [Held::Many(Vec::new())],
+    )
 }
 
 const fn literal_word(literal: &Literal) -> &'static str {
@@ -452,16 +361,12 @@ const fn literal_word(literal: &Literal) -> &'static str {
     }
 }
 
-fn next_literal(literal: &Literal) -> Option<Literal> {
-    Some(match literal {
-        Literal::Integer(_) => Literal::Float(0.0),
-        Literal::Float(_) => Literal::String(String::new()),
-        Literal::String(_) => return None,
-    })
-}
-
 fn literals() -> Vec<Literal> {
-    chain(Literal::Integer(0), next_literal)
+    every_variant!(Literal;
+        Integer => [Literal::Integer(0)],
+        Float => [Literal::Float(0.0)],
+        String => [Literal::String(String::new())],
+    )
 }
 
 /// The class of dtype Polars gives a number, text or flag typed in, as a document holds it. A
@@ -508,36 +413,26 @@ fn typed_values() -> Vec<Value> {
 
 // What typed text is read as.
 
-const fn next_typed(typed: &TypedRequest) -> Option<TypedRequest> {
-    use ValueTypeRequest as Of;
-    Some(match typed {
-        TypedRequest::Expression => TypedRequest::Value {
-            value_type: Of::Integer,
-        },
-        TypedRequest::Value { value_type } => match value_type {
-            Of::Integer => TypedRequest::Value {
-                value_type: Of::Float,
-            },
-            Of::Float => TypedRequest::Value {
-                value_type: Of::String,
-            },
-            Of::String => TypedRequest::Value {
-                value_type: Of::Date,
-            },
-            Of::Date => TypedRequest::Value {
-                value_type: Of::Any,
-            },
-            Of::Any => TypedRequest::Duration,
-        },
-        TypedRequest::Duration => TypedRequest::Pattern,
-        TypedRequest::Pattern => TypedRequest::TimeZone,
-        TypedRequest::TimeZone => TypedRequest::Path,
-        TypedRequest::Path => return None,
-    })
+/// The types of literal a slot may take, from the one place that names them.
+fn value_types() -> Vec<ValueTypeRequest> {
+    every_variant!(ValueTypeRequest;
+        Integer => [ValueTypeRequest::Integer],
+        Float => [ValueTypeRequest::Float],
+        String => [ValueTypeRequest::String],
+        Date => [ValueTypeRequest::Date],
+        Any => [ValueTypeRequest::Any],
+    )
 }
 
 fn typed_slots() -> Vec<TypedRequest> {
-    chain(TypedRequest::Expression, next_typed)
+    every_variant!(TypedRequest;
+        Expression => [TypedRequest::Expression],
+        Value => value_types().into_iter().map(|value_type| TypedRequest::Value { value_type }),
+        Duration => [TypedRequest::Duration],
+        Pattern => [TypedRequest::Pattern],
+        TimeZone => [TypedRequest::TimeZone],
+        Path => [TypedRequest::Path],
+    )
 }
 
 /// The slot a text is typed into, as the contract names it.
@@ -666,25 +561,21 @@ fn kind_json(kind: Kind) -> Value {
     written
 }
 
-const fn next_kind(kind: &Kind) -> Option<Kind> {
-    Some(match kind {
-        Kind::Expression(_) => Kind::Column,
-        Kind::Column => Kind::Value(ValueType::Integer),
-        Kind::Value(_) => Kind::Flag,
-        Kind::Flag => Kind::Choice(&[]),
-        Kind::Choice(_) => Kind::Dtype,
-        Kind::Dtype => Kind::Duration,
-        Kind::Duration => Kind::Pattern,
-        Kind::Pattern => Kind::TimeZone,
-        Kind::TimeZone => Kind::Table,
-        Kind::Table => Kind::Path,
-        Kind::Path => Kind::Pairs(&Kind::Column, &Kind::Column),
-        Kind::Pairs(..) => return None,
-    })
-}
-
 fn kinds() -> Vec<Kind> {
-    chain(Kind::Expression(&[]), next_kind)
+    every_variant!(Kind;
+        Expression => [Kind::Expression(&[])],
+        Column => [Kind::Column],
+        Value => [Kind::Value(ValueType::Integer)],
+        Flag => [Kind::Flag],
+        Choice => [Kind::Choice(&[])],
+        Dtype => [Kind::Dtype],
+        Duration => [Kind::Duration],
+        Pattern => [Kind::Pattern],
+        TimeZone => [Kind::TimeZone],
+        Table => [Kind::Table],
+        Path => [Kind::Path],
+        Pairs => [Kind::Pairs(&Kind::Column, &Kind::Column)],
+    )
 }
 
 /// How a parameter of this kind is set as an option, in the words of the engine's table of
@@ -714,12 +605,12 @@ const fn shape_word(shape: catalog::Shape) -> &'static str {
     }
 }
 
-const fn next_shape(shape: &catalog::Shape) -> Option<catalog::Shape> {
-    Some(match shape {
-        catalog::Shape::One => catalog::Shape::Many,
-        catalog::Shape::Many => catalog::Shape::PerItem(""),
-        catalog::Shape::PerItem(_) => return None,
-    })
+fn shapes() -> Vec<catalog::Shape> {
+    every_variant!(ShapeOf;
+        One => [catalog::Shape::One],
+        Many => [catalog::Shape::Many],
+        PerItem => [catalog::Shape::PerItem("")],
+    )
 }
 
 /// How a parameter is held, as the catalogue gives it: its shape and its kind, with the type of a
@@ -748,19 +639,12 @@ fn parameter_forms() -> Vec<Value> {
 
 // How a value is placed.
 
-fn next_after(after: &After) -> Option<After> {
-    Some(match after {
-        After::Start => After::Value {
-            dtype: Representative::ALL[0],
-            shape: Shape::One,
-        },
-        After::Value { .. } => After::Condition(ConditionState::When),
-        After::Condition(_) => return None,
-    })
-}
-
 fn afters() -> Vec<After> {
-    chain(After::Start, next_after)
+    every_variant!(After;
+        Start => [After::Start],
+        Value => [After::Value { dtype: Representative::ALL[0], shape: Shape::One }],
+        Condition => [After::Condition(ConditionState::When)],
+    )
 }
 
 fn after_word(after: After) -> String {
@@ -780,61 +664,178 @@ fn cells() -> Vec<&'static str> {
     [Some(String::new()), None].iter().map(cell_word).collect()
 }
 
+// What the host sends besides the start of a chain.
+
+fn resolutions() -> Vec<ResolutionView> {
+    every_variant!(ResolutionView;
+        Dtype => [ResolutionView::Dtype { dtype: String::new() }],
+        Several => [ResolutionView::Several { dtypes: Vec::new() }],
+        Unfinished => [ResolutionView::Unfinished],
+        NoContext => [ResolutionView::NoContext],
+        Refused => [ResolutionView::Refused { reason: String::new() }],
+    )
+}
+
+fn defaults() -> Vec<DefaultView> {
+    every_variant!(DefaultView;
+        Required => [DefaultView::Required],
+        Unset => [DefaultView::Unset],
+        Flag => [DefaultView::Flag { value: false }],
+        Integer => [DefaultView::Integer { value: 0 }],
+        Float => [DefaultView::Float { value: 0.0 }],
+        Text => [DefaultView::Text { value: String::new() }],
+        Empty => [DefaultView::Empty],
+        Other => [DefaultView::Other],
+    )
+}
+
+/// One setting of every kind the engine reports.
+fn settings() -> Vec<Setting> {
+    every_variant!(Setting;
+        ToGive => [Setting::ToGive],
+        Flag => [Setting::Flag(true)],
+        Integer => [Setting::Integer(1)],
+        Float => [Setting::Float(1.5)],
+        Text => [Setting::Text(String::new())],
+        Word => [Setting::Word(String::new())],
+        Field => [Setting::Field(String::new())],
+        Element => [Setting::Element("first")],
+        Comparison => [Setting::Comparison {
+            entry: "Expr.eq",
+            field: Box::new(Setting::ToGive),
+            other: Box::new(Setting::ToGive),
+        }],
+        List => [Setting::List(Vec::new())],
+        Pairs => [Setting::Pairs(Vec::new())],
+    )
+}
+
+fn problems() -> Vec<ProblemView> {
+    every_variant!(ProblemView;
+        NoStep => [ProblemView::NoStep { steps: 0 }],
+        StepChanged => [ProblemView::StepChanged { found: String::new() }],
+        Nothing => [ProblemView::Nothing],
+        DoesNotFit => [ProblemView::DoesNotFit { found: ThingView::Step }],
+        WrongPlace => [ProblemView::WrongPlace { needs: WantedView::Call, found: ThingView::Step }],
+        NotPerItem => [ProblemView::NotPerItem],
+        NoDefault => [ProblemView::NoDefault],
+        OutOfRange => [ProblemView::OutOfRange { index: 0, len: 0 }],
+        UnknownEntry => [ProblemView::UnknownEntry { entry: String::new() }],
+        NoStart => [ProblemView::NoStart { entry: "" }],
+        CannotAdd => [ProblemView::CannotAdd { reason: String::new() }],
+        NeedsValue => [ProblemView::NeedsValue { parameter: "" }],
+        Refused => [ProblemView::Refused { reason: String::new() }],
+    )
+}
+
+/// What a place can name, one for each thing and one for each kind of value.
+fn things() -> Vec<ThingView> {
+    every_variant!(ThingView;
+        Step => [ThingView::Step],
+        Call => [ThingView::Call],
+        Parameter => [ThingView::Parameter],
+        Item => [ThingView::Item],
+        Key => [ThingView::Key],
+        EntryValue => [ThingView::EntryValue],
+        Start => [ThingView::Start],
+        Link => [ThingView::Link],
+        ExpressionWithoutCall => [ThingView::ExpressionWithoutCall],
+        Value => [ThingView::Value { of: ValueKindView::Expression }],
+    )
+}
+
+/// What a value an argument holds is, one for each variant of the document's value.
+fn value_kinds() -> Vec<ValueKindView> {
+    held_values()
+        .iter()
+        .map(|value| value_kind_view(ValueKind::of(value)))
+        .collect()
+}
+
+fn wanted() -> Vec<WantedView> {
+    every_variant!(WantedView;
+        Call => [WantedView::Call],
+        Argument => [WantedView::Argument],
+        Parameter => [WantedView::Parameter],
+        Item => [WantedView::Item],
+        EntryPart => [WantedView::EntryPart],
+        Link => [WantedView::Link],
+        Expression => [WantedView::Expression],
+        List => [WantedView::List],
+        Pairs => [WantedView::Pairs],
+        PartOfStep => [WantedView::PartOfStep],
+    )
+}
+
+/// What an edit came to, by the word of its status.
+fn edit_answers() -> Vec<&'static str> {
+    every_variant!(EditAnswerView;
+        Edited => ["edited"],
+        Refused => ["refused"],
+    )
+}
+
+/// What a chain in a document starts from, as the editor names the kinds of start.
+fn starts() -> Vec<Value> {
+    every_variant!(Start;
+        Call => {
+            // A field, a number, text or flag typed in, or another function that starts a chain.
+            let mut called = vec![json!({ "kind": "field" })];
+            called.extend(
+                typed_values()
+                    .iter()
+                    .map(|value| json!({ "kind": "typed", "literal": value["literal"] })),
+            );
+            called.extend(
+                catalog::entries()
+                    .iter()
+                    .filter(|entry| {
+                        starts_a_chain(entry.build())
+                            && !["polars.col", "polars.lit"].contains(&entry.id().as_str())
+                    })
+                    .map(|entry| json!({ "kind": "function", "entry": entry.id().as_str() })),
+            );
+            called
+        },
+        Input => inputs()
+            .iter()
+            .filter_map(input_start)
+            .map(|kind| json!({ "kind": kind })),
+        Hole => [json!({ "kind": "hole" })],
+    )
+}
+
 /// Every variant the step editor has to handle, as the view's census test reads it.
 pub(crate) fn census() -> Value {
-    let starts: Vec<Value> = {
-        let mut starts: Vec<Value> = Vec::new();
-        for start in starts_of_document() {
-            match start_word(&start) {
-                "call" => {
-                    // A chain starts from a field, a typed value or another function.
-                    starts.push(json!({ "kind": "field" }));
-                    for value in typed_values() {
-                        starts.push(json!({ "kind": "typed", "literal": value["literal"] }));
-                    }
-                    for entry in catalog::entries() {
-                        if starts_a_chain(entry.build())
-                            && !["polars.col", "polars.lit"].contains(&entry.id().as_str())
-                        {
-                            starts
-                                .push(json!({ "kind": "function", "entry": entry.id().as_str() }));
-                        }
-                    }
-                }
-                "input" => {
-                    for input in inputs() {
-                        if let Some(kind) = input_start(&input) {
-                            starts.push(json!({ "kind": kind }));
-                        }
-                    }
-                }
-                "hole" => starts.push(json!({ "kind": "hole" })),
-                other => panic!("a start the census does not place: {other}"),
-            }
-        }
-        starts
-    };
-    let after_places = afters();
     json!({
-        "starts": starts,
+        "starts": starts(),
         "typedValues": typed_values(),
         "typedReadings": typed_readings(),
         "parameterKinds": kinds().into_iter().map(kind_word).collect::<Vec<_>>(),
         "valueTypes": ValueType::ALL.map(value_type_word),
-        "parameterShapes": chain(catalog::Shape::One, next_shape).into_iter().map(shape_word).collect::<Vec<_>>(),
+        "parameterShapes": shapes().into_iter().map(shape_word).collect::<Vec<_>>(),
         "parameterForms": parameter_forms(),
         "optionKinds": kinds().into_iter().filter_map(option_word).collect::<Vec<_>>(),
+        "defaultKinds": words(&defaults(), "kind"),
+        "settingKinds": settings().iter().map(|setting| word(&setting_view(setting), "kind")).collect::<Vec<_>>(),
         "dtypeClasses": Representative::ALL.map(Representative::name).to_vec(),
         "valueShapes": plains(&Shape::ALL.map(shape_view)),
-        "afterKinds": after_places.into_iter().map(after_word).collect::<Vec<_>>(),
+        "afterKinds": afters().into_iter().map(after_word).collect::<Vec<_>>(),
         "conditionStates": plains(&ConditionState::ALL.map(condition_state_view)),
+        "resolutions": words(&resolutions(), "kind"),
         "causes": words(&causes(), "kind"),
         "refusalSources": words(&sources(), "by"),
         "stages": plains(&Stage::ALL.map(stage_view)),
         "rules": Rule::ALL.map(|rule| json!({ "name": rule.name(), "statement": rule.statement() })),
         "outcomes": words(&outcomes(), "status"),
         "rowsStates": words(&counts(), "kind"),
+        "changes": plains(&Change::ALL.map(change_view)),
         "states": states(),
+        "editAnswers": edit_answers(),
+        "problemKinds": words(&problems(), "kind"),
+        "thingKinds": words(&things(), "kind"),
+        "valueKinds": plains(&value_kinds()),
+        "wanted": plains(&wanted()),
         "inputKinds": words(&inputs(), "kind"),
         "origins": words(&origins(), "kind"),
         "cells": cells(),

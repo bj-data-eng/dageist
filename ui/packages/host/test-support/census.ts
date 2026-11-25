@@ -86,17 +86,26 @@ export interface Census {
   readonly parameterShapes: readonly string[];
   readonly parameterForms: readonly CensusForm[];
   readonly optionKinds: readonly string[];
+  readonly defaultKinds: readonly string[];
+  readonly settingKinds: readonly string[];
   readonly dtypeClasses: readonly string[];
   readonly valueShapes: readonly string[];
   readonly afterKinds: readonly string[];
   readonly conditionStates: readonly string[];
+  readonly resolutions: readonly string[];
   readonly causes: readonly string[];
   readonly refusalSources: readonly string[];
   readonly stages: readonly string[];
   readonly rules: readonly CensusRule[];
   readonly outcomes: readonly string[];
   readonly rowsStates: readonly string[];
+  readonly changes: readonly string[];
   readonly states: readonly CensusState[];
+  readonly editAnswers: readonly string[];
+  readonly problemKinds: readonly string[];
+  readonly thingKinds: readonly string[];
+  readonly valueKinds: readonly string[];
+  readonly wanted: readonly string[];
   readonly inputKinds: readonly string[];
   readonly origins: readonly string[];
   readonly cells: readonly string[];
@@ -235,17 +244,26 @@ const readCensus: Decode<Census> = readRecord(
     'parameterShapes',
     'parameterForms',
     'optionKinds',
+    'defaultKinds',
+    'settingKinds',
     'dtypeClasses',
     'valueShapes',
     'afterKinds',
     'conditionStates',
+    'resolutions',
     'causes',
     'refusalSources',
     'stages',
     'rules',
     'outcomes',
     'rowsStates',
+    'changes',
     'states',
+    'editAnswers',
+    'problemKinds',
+    'thingKinds',
+    'valueKinds',
+    'wanted',
     'inputKinds',
     'origins',
     'cells',
@@ -259,17 +277,26 @@ const readCensus: Decode<Census> = readRecord(
     parameterShapes: readField(fields, path, 'parameterShapes', readWords),
     parameterForms: readField(fields, path, 'parameterForms', readList(readForm)),
     optionKinds: readField(fields, path, 'optionKinds', readWords),
+    defaultKinds: readField(fields, path, 'defaultKinds', readWords),
+    settingKinds: readField(fields, path, 'settingKinds', readWords),
     dtypeClasses: readField(fields, path, 'dtypeClasses', readWords),
     valueShapes: readField(fields, path, 'valueShapes', readWords),
     afterKinds: readField(fields, path, 'afterKinds', readWords),
     conditionStates: readField(fields, path, 'conditionStates', readWords),
+    resolutions: readField(fields, path, 'resolutions', readWords),
     causes: readField(fields, path, 'causes', readWords),
     refusalSources: readField(fields, path, 'refusalSources', readWords),
     stages: readField(fields, path, 'stages', readWords),
     rules: readField(fields, path, 'rules', readList(readRule)),
     outcomes: readField(fields, path, 'outcomes', readWords),
     rowsStates: readField(fields, path, 'rowsStates', readWords),
+    changes: readField(fields, path, 'changes', readWords),
     states: readField(fields, path, 'states', readList(readState)),
+    editAnswers: readField(fields, path, 'editAnswers', readWords),
+    problemKinds: readField(fields, path, 'problemKinds', readWords),
+    thingKinds: readField(fields, path, 'thingKinds', readWords),
+    valueKinds: readField(fields, path, 'valueKinds', readWords),
+    wanted: readField(fields, path, 'wanted', readWords),
     inputKinds: readField(fields, path, 'inputKinds', readWords),
     origins: readField(fields, path, 'origins', readWords),
     cells: readField(fields, path, 'cells', readWords),

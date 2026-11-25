@@ -549,7 +549,7 @@ pub(crate) enum ValueKindView {
     List,
 }
 
-const fn value_kind_view(kind: ValueKind) -> ValueKindView {
+pub(crate) const fn value_kind_view(kind: ValueKind) -> ValueKindView {
     match kind {
         ValueKind::Expression => ValueKindView::Expression,
         ValueKind::Columns => ValueKindView::Columns,
