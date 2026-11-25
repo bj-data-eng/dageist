@@ -1,7 +1,7 @@
 //! The methods of the `list` and the `arr` namespaces that take no expression argument, on a
 //! column of lists or arrays of every scalar element dtype.
 //!
-//! Every expectation is what Python Polars 2.1.0 does, which each sweep asks by running the same
+//! Every expectation is what Python Polars 2.2.0 does, which each sweep asks by running the same
 //! document on the rows of a table, and on a table with no rows, as the tables of allowed
 //! combinations count a combination. The walk must say the same of the same document, and give
 //! the dtype Polars gives after the last call and how many values it is. A sweep collects every

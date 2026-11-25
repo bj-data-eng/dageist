@@ -4,7 +4,7 @@
 //!
 //! The table is the walk tests' own, whose columns are `a` (`Int64`), `b` (`String`), `f`
 //! (`Boolean`) and `k` (`Int64`). Every expected value is worked out by hand from what Python
-//! Polars 2.1.0 does with three rows of them and from the explanation of the catalogue, not read
+//! Polars 2.2.0 does with three rows of them and from the explanation of the catalogue, not read
 //! from a run.
 
 use dageist_engine::allowed::{
@@ -275,7 +275,7 @@ fn a_chain_that_goes_on_to_an_aggregate_is_one_value_whatever_count_its_first_me
 
 #[test]
 fn what_a_method_takes_of_one_value_is_one_value_only_where_it_keeps_the_value() {
-    // Python Polars 2.1.0, of the sum of `a`, one value: the first `n` of it, or from a place, or
+    // Python Polars 2.2.0, of the sum of `a`, one value: the first `n` of it, or from a place, or
     // every nth from a place, or the top `k`, leave the value where the count and the place leave
     // one, and none where they leave none, which a select refuses beside a column. What is
     // different or most common in one value is that value, and a difference that drops the first
@@ -458,7 +458,7 @@ fn a_select_is_refused_one_value_that_is_none_beside_the_rows() {
 
 #[test]
 fn a_window_takes_no_one_value_that_a_method_took_of_one_value_but_the_aggregate_of_it() {
-    // Polars 2.1.0 refuses these windows with "expressions must have matching group lengths": the
+    // Polars 2.2.0 refuses these windows with "expressions must have matching group lengths": the
     // value is one of each group, and no value is given to the rows, where `sum().over` and
     // `sum().first().over` are accepted, for an aggregate is one value that every row of its group
     // takes.
@@ -906,7 +906,7 @@ fn is_in_gives_the_values_it_follows_unless_it_is_given_a_list_of_each() {
 
 #[test]
 fn is_in_meets_an_array_column_row_by_row_as_it_does_a_list() {
-    // Python Polars 2.1.0: the sum of `a` asked of a column of arrays of two is one answer for each
+    // Python Polars 2.2.0: the sum of `a` asked of a column of arrays of two is one answer for each
     // row, three of them, and so many as the rows are, where a count is not.
     let is_in = |receiver: Vec<Value>| {
         on(
@@ -934,7 +934,7 @@ fn is_in_meets_an_array_column_row_by_row_as_it_does_a_list() {
 
 #[test]
 fn a_window_takes_no_value_that_a_method_took_of_one_value_by_whatever_it_meets_it_in() {
-    // Python Polars 2.1.0 refuses each of these windows with "expressions must have matching group
+    // Python Polars 2.2.0 refuses each of these windows with "expressions must have matching group
     // lengths": the one value that `head(1)` took of the sum of `k` is met by a method, a condition
     // or a fill, and what they give is no more the value of each row of its group than it was.
     let taken = || on("k", vec![call("Expr.sum", json!({})), head(1)]);
@@ -1072,7 +1072,7 @@ fn a_method_that_is_not_told_how_many_takes_what_python_takes_of_the_rows() {
 
 #[test]
 fn is_in_given_a_taken_array_is_refused_by_a_window_and_given_an_array_is_not() {
-    // Python Polars 2.1.0: the sum of `a` asked of the first array of a column of arrays is the value
+    // Python Polars 2.2.0: the sum of `a` asked of the first array of a column of arrays is the value
     // of every row of its group, and asked of the first one that `head` took of it is not. A list is
     // the same, and a column of the values' own dtype is their set, which carries nothing.
     let asked_of = |other: Value| {

@@ -533,7 +533,7 @@ fn is_in(receiver: &str, other: Value) -> Value {
 
 #[test]
 fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
-    // Python Polars 2.1.0: `a.is_in(l)` of a column of lists or of arrays is met row by row, so
+    // Python Polars 2.2.0: `a.is_in(l)` of a column of lists or of arrays is met row by row, so
     // a join may key on it and on what follows it, where a plain column, which is a set, and one
     // list that an aggregate gives, are no key. Each case is asked of Polars by running the join.
     let keyed = |left_on: Value| keys(vec![left_on], vec![field("rf")]);

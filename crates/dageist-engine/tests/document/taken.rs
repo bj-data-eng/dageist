@@ -2,7 +2,7 @@
 //! catalogue that takes an expression, as Polars does.
 //!
 //! The value `k.sum().head(1)` is one value that `head` took of one: no row of a group takes it as
-//! the value of the group, so Python Polars 2.1.0 refuses a window over a call that is given it,
+//! the value of the group, so Python Polars 2.2.0 refuses a window over a call that is given it,
 //! wherever the call meets it, with "expressions must have matching group lengths", and accepts the
 //! same call given `k.sum()` or the first value of what `head` took. This builds, for each
 //! expression parameter of each method and each function that starts an expression, the call of one

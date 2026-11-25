@@ -929,7 +929,7 @@ only another platform's build has is not covered.
 ## Move Polars To A New Release
 
 `vendor/polars` holds the Polars source at the commit of one Python Polars
-release tag, such as `py-2.1.0`. Python Polars and Polars' Rust crates are
+release tag, such as `py-2.2.0`. Python Polars and Polars' Rust crates are
 released separately and from different commits, so a `py-*` tag is the only
 source that matches a Python release. To move to another release, fetch its
 tag into the submodule and check it out; `--depth 1` keeps the submodule

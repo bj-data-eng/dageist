@@ -1,7 +1,7 @@
 //! The functions that start an expression with a number of values their arguments decide:
 //! `int_range`, `date_range`, `datetime_range`, `time_range`, `linear_space` and `repeat`.
 //!
-//! Every expectation is what Python Polars 2.1.0 does, which each test asks by running the same
+//! Every expectation is what Python Polars 2.2.0 does, which each test asks by running the same
 //! document on the rows of a table. The walk must say the same of the same document: how many
 //! values each call gives where its arguments are typed in, and which places refuse it. Each
 //! sweep collects every disagreement before it asserts, and a case that is not asked, or that
@@ -1024,7 +1024,7 @@ fn a_range_typed_in_gives_the_count_polars_gives_it() {
     assert_eq!(by_hand, 4, "the cases too large to run are named");
     // Polars asserts, in a build that has debug assertions, that the values of a range of days in a
     // zone are no more than its length over the length of a day, which a day of 23 hours, where the
-    // clocks go forward, breaks: Python Polars 2.1.0 gives 5 values of this case.
+    // clocks go forward, breaks: Python Polars 2.2.0 gives 5 values of this case.
     assert_eq!(
         panicked,
         ["datetime_range by the day across a change of clock"],
@@ -1038,7 +1038,7 @@ fn a_range_typed_in_gives_the_count_polars_gives_it() {
 #[test]
 fn a_count_of_exactly_one_beside_the_rows_is_refused_though_the_engine_that_runs_steps_takes_it() {
     // Exception, stricter by design: the streaming engine, which the steps run on, broadcasts a
-    // range or a repeat of one value to the rows, where Python Polars 2.1.0's in-memory engine
+    // range or a repeat of one value to the rows, where Python Polars 2.2.0's in-memory engine
     // refuses it with "Series literal, length 1 doesn't match the DataFrame height of 7". A count
     // is not one value, and the editor refuses it as the in-memory engine does.
     let ones = [
@@ -1527,7 +1527,7 @@ fn a_range_of_more_values_than_polars_holds_is_refused_where_the_step_is_walked(
 
 #[test]
 fn a_join_pairs_the_output_names_of_two_ranges_as_polars_names_them() {
-    // Python Polars 2.1.0 names what a range gives by the first expression it is given, `literal`
+    // Python Polars 2.2.0 names what a range gives by the first expression it is given, `literal`
     // where that is a number typed in or none is given, and what `repeat` gives by its value. A join
     // refuses a pair of names made twice: "joining with repeated key names". A key of a count is
     // not elementwise, so each key goes on to an aggregate of the values, which is one value.
@@ -2019,7 +2019,7 @@ fn a_count_of_exactly_one_is_refused_beside_every_kind_of_place_that_polars_broa
 
 #[test]
 fn a_condition_of_identical_branches_drops_its_predicate_only_where_they_are_one_value() {
-    // Python Polars 2.1.0, in both engines: where both values of a condition are the same one
+    // Python Polars 2.2.0, in both engines: where both values of a condition are the same one
     // value, the predicate is met by it, and the condition is as long as the predicate; where they
     // are the same many values or the same count, a predicate that is not as many refuses it with
     // "shapes of `self`, `mask` and `other` are not suitable for `zip_with`" or "zip node received
@@ -2224,7 +2224,7 @@ fn a_range_is_not_cut_by_a_length_below_nothing_as_polars_refuses_it() {
 
 #[test]
 fn a_repeat_of_a_list_or_an_array_is_taken_as_polars_takes_it() {
-    // Python Polars 2.1.0: `repeat(l.first(), 3)` of a column of lists gives three lists, and so do
+    // Python Polars 2.2.0: `repeat(l.first(), 3)` of a column of lists gives three lists, and so do
     // arrays. The tables made one value of a dtype by casting a number to it, which no list, array
     // or struct takes, and refused them with a reason that is not true of the value. A struct is
     // measured with the first value of a column of two fields, and a column of one field is taken too.
@@ -2279,10 +2279,10 @@ fn chains_from_a_range() -> Vec<(&'static str, Value)> {
     ]
 }
 
-/// The chains that Python Polars 2.1.0 and the engine of steps fold a cut into where it is by `head`,
-/// `limit` or a slice's length: the first values, and the methods that give a value for each value
-/// they follow, whose cut the optimizer moves into what they follow. With its optimizations off
-/// Polars refuses them as it does every other chain.
+/// The chains that Python Polars 2.1.0 folded a cut into where it is by `head`, `limit` or a slice's
+/// length: the first values, and the methods that give a value for each value they follow, whose cut
+/// the optimizer moved into what they follow. Polars 2.2.0 refuses a cut below nothing after each, as
+/// it does after every other chain.
 fn chains_a_cut_is_folded_into() -> Vec<(&'static str, Vec<Value>)> {
     let one = |id: &str, arguments: Value| vec![call(id, arguments)];
     vec![
@@ -2350,8 +2350,8 @@ fn ranges_to_cut() -> Vec<(&'static str, Value)> {
 
 #[test]
 fn a_range_is_not_cut_by_a_length_below_nothing_after_any_chain_the_engine_of_steps_refuses() {
-    // Python Polars 2.1.0 and the engine of steps: the length is cast to an unsigned number where the
-    // cut runs, so a number below nothing is refused wherever it is not folded away. Every chain
+    // Python Polars 2.2.0 and the engine of steps: the length is cast to an unsigned number where the
+    // cut runs, so a number below nothing is refused after every chain. Every chain
     // here refuses it in both engines: an aggregate, an ordering, a shift, a difference, a filter
     // and the values that differ.
     let filter = call(
