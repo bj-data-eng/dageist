@@ -512,11 +512,18 @@ pub enum Limit {
     /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
     /// reason the tables gave of a key of the join, where it allows the inner join.
     AJoinKeyPolarsDoesNotRun,
+    /// An unnest of a struct that has no field, as the one whose fields were all dropped is, gives
+    /// no expression, which Polars leaves out of the key, the operands or the struct that hold it.
+    /// The tables judge what it follows as written, a count of values a struct held that is no
+    /// part of the case Polars runs. The tables refusing, or Polars refusing, a call that holds an
+    /// unnest of a struct the walk knows to have no field, at a place that holds the unnest or is
+    /// the step.
+    AnUnnestOfNoFields,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 43] = [
+    pub const ALL: [Self; 44] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -560,6 +567,7 @@ impl Limit {
         Self::AToStructGivenNamesAlike,
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
+        Self::AnUnnestOfNoFields,
     ];
 
     /// The name a kept case is filed under.
@@ -620,6 +628,7 @@ impl Limit {
             Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
+            Self::AnUnnestOfNoFields => "an-unnest-of-no-fields",
         }
     }
 
@@ -713,6 +722,9 @@ impl Limit {
             Self::SeveralCountsInOneItem => {
                 "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
             }
+            Self::AnUnnestOfNoFields => {
+                "an unnest of a struct that has no field gives no expression, which Polars leaves out of what holds it, where the tables judged what it follows as written"
+            }
             Self::AJoinKeyPolarsDoesNotRun => {
                 "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
             }
@@ -741,7 +753,7 @@ impl Limit {
                 "Polars' streaming engine does not meet a text of one value with each value of a replacement in the order key of a window, which it does in a select, where the tables measured it"
             }
             Self::ALiteralTextBesideManyReplacementValues => {
-                "a literal text is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
+                "a literal text, or a struct of literals written as text, is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
@@ -2843,8 +2855,7 @@ const A_VALUE_OF_ANOTHER_LENGTH: &str = "does not match string column length";
 /// in it or in an expression it holds.
 fn holds_a_replacement_of_a_literal(expression: &Expression) -> bool {
     let replaces = |link: &Call| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all");
-    let starts_from_a_text =
-        matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"));
+    let starts_from_a_text = starts_from_a_text_of_literals(expression);
     (starts_from_a_text && expression.links().iter().any(replaces))
         || std::iter::once(expression.start())
             .filter_map(|start| match start {
@@ -2871,24 +2882,35 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| None, &|_| false)
+    call_with_columns_cut_for(
+        call,
+        is_it,
+        &|_| column.to_owned(),
+        &|_| None,
+        &|_| false,
+        &text_made_of_literals,
+    )
 }
 
 /// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, cast
 /// to the dtype `cast_to` says of it, if it does, and each chain made so is cut after its first
-/// call that `cut_after` accepts: what follows is no part of what the column stands in for.
+/// call that `cut_after` accepts: what follows is no part of what the column stands in for. The
+/// first links of each chain made so, as many as `skipped` says of it, are left out, for the column
+/// stands in for what they made.
 fn call_with_columns_cut_for(
     call: &Call,
     is_it: &dyn Fn(&Expression) -> bool,
     column_of: &dyn Fn(&Expression) -> String,
     cast_to: &dyn Fn(&Expression) -> Option<Value>,
     cut_after: &dyn Fn(&Call) -> bool,
+    skipped: &dyn Fn(&Expression) -> usize,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
         column_of: &'a dyn Fn(&Expression) -> String,
         cast_to: &'a dyn Fn(&Expression) -> Option<Value>,
         cut_after: &'a dyn Fn(&Call) -> bool,
+        skipped: &'a dyn Fn(&Expression) -> usize,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
         Some(match held {
@@ -2933,7 +2955,13 @@ fn call_with_columns_cut_for(
         if replaced && let Some(dtype) = (replacing.cast_to)(expression) {
             links.push(Call::new(catalog::entry("Expr.cast")?, vec![("dtype", dtype)]).ok()?);
         }
-        for link in expression.links() {
+        // What the column stands in for is what the first links made of the start, which are left out.
+        let left_out = if replaced {
+            (replacing.skipped)(expression)
+        } else {
+            0
+        };
+        for link in expression.links().iter().skip(left_out) {
             links.push(call_replaced(link, replacing)?);
             if replaced && (replacing.cut_after)(link) {
                 break;
@@ -2956,13 +2984,35 @@ fn call_with_columns_cut_for(
             column_of,
             cast_to,
             cut_after,
+            skipped,
         },
     )
 }
 
+/// How many links make the text of a struct of literals: the ones up to its `json_encode`, which
+/// give one value and write it as text, so a column of text stands in for the chain from there.
+/// None for any other chain.
+fn text_made_of_literals(expression: &Expression) -> usize {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.struct") => expression
+            .links()
+            .iter()
+            .position(|link| is(link, "Expr.struct.json_encode"))
+            .filter(|at| gives_one_value_of_literals(expression, *at))
+            .map_or(0, |at| at + 1),
+        _ => 0,
+    }
+}
+
+/// Whether the chain starts from a literal text, or from a struct of literals that it writes as text.
+fn starts_from_a_text_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+        || text_made_of_literals(expression) > 0
+}
+
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
 fn holds_a_replacement_of_a_literal_alone(expression: &Expression) -> bool {
-    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+    starts_from_a_text_of_literals(expression)
         && expression
             .links()
             .iter()
@@ -4471,8 +4521,11 @@ fn applies(
             // The number is open in a struct, or in the field that a call read from one.
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
-                && refusal.reason.contains("datatypes of join keys")
-                && refusal.reason.contains("dyn ")
+                && ((refusal.reason.contains("datatypes of join keys")
+                    && refusal.reason.contains("dyn "))
+                    // A semi or anti join meets the key made on each side as it is, the number
+                    // open on both, where Polars finds the two keys of different types.
+                    || refusal.reason.contains("join received different key types"))
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "polars.struct")))
@@ -4492,6 +4545,16 @@ fn applies(
             Limit::SeveralCountsInOneItem,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_among_counts(case, refused),
+        (
+            Limit::AnUnnestOfNoFields,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => holds_an_unnest_of_no_field(case, refused.place.path()),
+        (Limit::AnUnnestOfNoFields, Disagreement::PolarsRefuses(refusal)) => {
+            holds_an_unnest_of_no_field(
+                case,
+                refusal.place.as_ref().map_or(&[][..], |place| place.path()),
+            )
+        }
         (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
             is(step, "LazyFrame.join")
                 && matches!(refused.source, Source::Polars)
@@ -4550,6 +4613,10 @@ fn applies(
                         .starts_with("could not evaluate comparison between series")
                     && refusal.reason.matches("Struct(").count() >= 2)
                 || (unplaced(refusal) && refusal.reason == "Cannot cast from struct to other types")
+                // A cast of one struct to another whose fields have other names.
+                || (unplaced(refusal)
+                    && refusal.reason.starts_with("cast from `struct[")
+                    && refusal.reason.contains("structs field name mismatch"))
                 // The values of a condition are structs that Polars finds no dtype of both for.
                 || (refusal.reason.starts_with("failed to determine supertype of struct[")
                     && refusal.reason.contains(" and struct["))
@@ -4694,6 +4761,19 @@ fn applies(
         }
         _ => false,
     }
+}
+
+/// Whether the case holds an unnest of a struct the walk knows to have no field, at `path` or inside
+/// what is there: the whole step where the path is empty.
+fn holds_an_unnest_of_no_field(case: &Case, path: &[Segment]) -> bool {
+    super::predict::places_after_no_field(case)
+        .iter()
+        .any(|at| {
+            at.path().starts_with(path)
+                && locate(case, at)
+                    .call
+                    .is_some_and(|call| is(call, "Expr.struct.unnest"))
+        })
 }
 
 /// The case with its join made a left join, which runs the keys of the left table where an inner
@@ -5035,12 +5115,15 @@ mod tests {
 
     /// The limits that excuse the case a kept file holds, as the target finds them: with the tables'
     /// verdict and what Polars does, which no limit's own tests make up.
-    fn excused_by_kept(name: &str) -> Vec<Limit> {
+    fn kept_case(name: &str) -> Case {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/allowed_fuzz/regressions")
             .join(name);
-        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
-        excused_by(&case)
+        Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
+    }
+
+    fn excused_by_kept(name: &str) -> Vec<Limit> {
+        excused_by(&kept_case(name))
     }
 
     fn excused_by(case: &Case) -> Vec<Limit> {
@@ -11781,6 +11864,39 @@ mod tests {
             rule_refuses(&renamed, place, "field-names-fit-the-struct", reason),
             vec![]
         );
+    }
+
+    #[test]
+    fn an_unnest_of_a_struct_with_no_field_excuses_what_it_is_in_and_nothing_beside_it() {
+        assert_eq!(
+            excused_by_kept("uncovered-an-unnest-of-no-fields.case"),
+            vec![Limit::AnUnnestOfNoFields]
+        );
+        // An unnest of a struct with fields gives them, so a key refused for what it holds is not
+        // the limit's: the same case with a struct that drops fewer fields has no unnest of none.
+        let case = kept_case("uncovered-an-unnest-of-no-fields.case");
+        let text = String::from_utf8(case.encode()).expect("text");
+        let kept_one = text.replace(
+            r#"{"field":"literal"},{"field":"n"}"#,
+            r#"{"field":"literal"}"#,
+        );
+        assert_ne!(kept_one, text);
+        let other = Case::decode(kept_one.as_bytes()).expect("a case");
+        assert!(!excused_by(&other).contains(&Limit::AnUnnestOfNoFields));
+    }
+
+    #[test]
+    fn a_struct_of_literals_written_as_text_is_one_value_that_a_replacement_does_not_broadcast() {
+        for name in [
+            "uncovered-a-literal-text-beside-many-replacement-values--a-struct-of-literals-written-as-text.case",
+            "uncovered-a-literal-text-beside-many-replacement-values--a-struct-of-literals-written-as-the-prefix.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::ALiteralTextBesideManyReplacementValues],
+                "{name}"
+            );
+        }
     }
 
     #[test]
