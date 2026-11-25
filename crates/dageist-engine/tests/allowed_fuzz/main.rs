@@ -254,18 +254,6 @@ fn replay_a_case() {
     );
 }
 
-/// Every kept case replays, and no longer disagrees. A file named
-/// `fixed-*.case` was a disagreement the tables or a named rule now settle,
-/// and replays as checked; a file named `stricter-<what it shows>.case` is a
-/// case where the tables refuse a part Polars does not evaluate, and a probe of
-/// that part shows the tables right; a file named `by-design-<what it shows>.case` is a case
-/// where the tables refuse a count that Polars allows because the count is the table's rows, or
-/// one value, by chance, which the case on more rows shows; a file named `by-engine-<what it shows>.case` is a case where a named rule refuses what Polars'
-/// streaming engine runs and its in-memory engine refuses, for what the rule names; a file named
-/// `uncovered-<limit>.case` is a case the
-/// tables state they do not cover, and replays as excused by that limit, and
-/// every limit has one. A limit may have others, named
-/// `uncovered-<limit>--<what it shows>.case`.
 /// How many threads Polars runs on: the size of its own pool, which `POLARS_MAX_THREADS` sets and
 /// which is the number of cores where it is not set.
 fn polars_threads() -> usize {
@@ -282,9 +270,144 @@ fn the_threads_polars_runs_on_are_the_ones_it_is_told_to() {
     assert!(polars_threads() >= 1);
 }
 
+/// Every kept case replays, and no longer disagrees. A file named `fixed-*.case` was a
+/// disagreement the tables or a named rule now settle, and replays as checked; a file named
+/// `stricter-<what it shows>.case` is a case where the tables refuse a part Polars does not
+/// evaluate, and a probe of that part shows the tables right; a file named
+/// `by-design-<what it shows>.case` is a case where the tables refuse a count that Polars allows
+/// because the count is the table's rows, or one value, by chance, which the case on more rows
+/// shows; a file named `by-engine-<what it shows>.case` is a case where a named rule refuses what
+/// Polars' streaming engine runs and its in-memory engine refuses, for what the rule names; a
+/// file named `uncovered-<limit>.case` is a case the tables state they do not cover, and replays
+/// as excused by that limit, and every limit has one. A limit may have others, named
+/// `uncovered-<limit>--<what it shows>.case`. Every case is replayed before the ones that are
+/// not settled are reported, so one run names all of them.
 #[test]
 fn every_kept_case_replays_as_settled() {
     on_a_large_stack(kept_cases_replay_as_settled);
+}
+
+/// What a kept case is settled as, by the name it is kept under.
+enum Settled {
+    Fixed,
+    Stricter,
+    ByDesign,
+    ByEngine,
+    /// Excused by the limits it names, the first of which is the one it shows.
+    Excused(Vec<Limit>),
+}
+
+impl Settled {
+    fn named(name: &str) -> Result<Self, String> {
+        if name.starts_with("fixed-") {
+            Ok(Self::Fixed)
+        } else if name.starts_with("by-engine-") {
+            Ok(Self::ByEngine)
+        } else if name.starts_with("by-design-") {
+            Ok(Self::ByDesign)
+        } else if name.starts_with("stricter-") {
+            Ok(Self::Stricter)
+        } else if let Some(slugs) = name
+            .strip_prefix("uncovered-")
+            .and_then(|rest| rest.strip_suffix(".case"))
+            // `uncovered-<limit>--<what it shows>.case` is another case of a limit, and
+            // `--also-<limit>` after it names another limit that explains the case too.
+            .map(|rest| {
+                let mut parts = rest.split("--");
+                let first = parts.next().unwrap_or(rest);
+                let also = parts.filter_map(|part| part.strip_prefix("also-"));
+                std::iter::once(first).chain(also).collect::<Vec<_>>()
+            })
+        {
+            slugs
+                .iter()
+                .map(|slug| {
+                    Limit::ALL
+                        .into_iter()
+                        .find(|limit| limit.slug() == *slug)
+                        .ok_or_else(|| format!("{name} names no limit {slug}"))
+                })
+                .collect::<Result<_, _>>()
+                .map(Self::Excused)
+        } else {
+            Err(format!(
+                "{name} is neither fixed-*, stricter-*, by-design-*, by-engine-* nor uncovered-*"
+            ))
+        }
+    }
+
+    /// Whether `outcome` is what the case is settled as, and what is wrong where it is not.
+    fn holds_for(&self, name: &str, outcome: &dageist_fuzz::CaseOutcome) -> Result<(), String> {
+        let detail = detail_of(outcome);
+        let rejected_as = |what: &str, prefix: &str| {
+            if outcome.kind() == OutcomeKind::ExpectedRejection
+                && outcome
+                    .detail()
+                    .is_some_and(|said| said.starts_with(prefix))
+            {
+                Ok(())
+            } else {
+                Err(format!("{name} is {what}: {detail}"))
+            }
+        };
+        match self {
+            Self::Fixed => {
+                if outcome.kind() == OutcomeKind::Evaluated {
+                    Ok(())
+                } else {
+                    Err(format!("{name} is settled and checked: {detail}"))
+                }
+            }
+            Self::ByEngine => rejected_as(
+                "stricter than one of Polars' engines",
+                target::STRICTER_THAN_ONE_ENGINE,
+            ),
+            Self::ByDesign => rejected_as(
+                "stricter by design where a count is the rows by chance",
+                counts::STRICTER_BY_DESIGN,
+            ),
+            Self::Stricter => rejected_as(
+                "stricter where Polars does not evaluate the part",
+                target::STRICTER_WHERE_UNEVALUATED,
+            ),
+            Self::Excused(named) => {
+                // The detail is the statement of every limit that excuses the case, in order.
+                let expected: Vec<&str> = Limit::ALL
+                    .into_iter()
+                    .filter(|limit| named.contains(limit))
+                    .map(Limit::statement)
+                    .collect();
+                if outcome.kind() == OutcomeKind::ExpectedRejection
+                    && outcome.detail() == Some(expected.join("; ").as_str())
+                {
+                    Ok(())
+                } else {
+                    Err(format!("{name} is excused by its limits: {detail}"))
+                }
+            }
+        }
+    }
+}
+
+/// The most threads at which Polars still gives the cases of [`settled_on_few_threads`] the
+/// outcome that one gets there; on more it gives the one they are kept under.
+const FEW_THREADS: usize = 2;
+
+/// What a kept case is settled as where Polars runs on few threads, if that is not what its name
+/// says. The cases are kept for what Polars does on its usual pool; on [`FEW_THREADS`] or fewer
+/// a debug build panics on the overflow of a running sum that it evaluates on more, and its
+/// streaming engine refuses a replacement of one value that it runs on more.
+fn settled_on_few_threads(name: &str) -> Option<Settled> {
+    if polars_threads() > FEW_THREADS {
+        return None;
+    }
+    match name {
+        "fixed-polars-evaluates-an-overflow.case" => {
+            Some(Settled::Excused(vec![Limit::AnOverflow]))
+        }
+        "by-engine-a-replacement-in-a-sort-key-of-one-value.case" => Some(Settled::Stricter),
+        _ => None,
+    }
 }
 
 fn kept_cases_replay_as_settled() {
@@ -298,11 +421,9 @@ fn kept_cases_replay_as_settled() {
         })
         .collect();
     files.sort();
-    let mut fixed = 0;
-    let mut stricter = 0;
-    let mut by_design = 0;
-    let mut by_engine = 0;
+    let (mut fixed, mut stricter, mut by_design, mut by_engine) = (0, 0, 0, 0);
     let mut excused = std::collections::BTreeSet::new();
+    let mut unsettled = Vec::new();
     for path in files {
         let bytes = std::fs::read(&path).expect("a kept case is read");
         let name = path
@@ -311,86 +432,29 @@ fn kept_cases_replay_as_settled() {
             .expect("a file name");
         let evaluation = replay(&target, &bytes, &mut |_| Ok(()))
             .unwrap_or_else(|error| panic!("{name} could not be replayed: {error:?}"));
-        let outcome = &evaluation.outcome;
-        if name.starts_with("fixed-") {
-            assert_eq!(
-                outcome.kind(),
-                OutcomeKind::Evaluated,
-                "{name} is settled and checked: {}",
-                detail_of(outcome)
-            );
-            fixed += 1;
-        } else if name.starts_with("by-engine-") {
-            assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
-            assert!(
-                outcome
-                    .detail()
-                    .is_some_and(|detail| detail.starts_with(target::STRICTER_THAN_ONE_ENGINE)),
-                "{name} is stricter than one of Polars' engines: {}",
-                detail_of(outcome)
-            );
-            by_engine += 1;
-        } else if name.starts_with("by-design-") {
-            assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
-            assert!(
-                outcome
-                    .detail()
-                    .is_some_and(|detail| detail.starts_with(counts::STRICTER_BY_DESIGN)),
-                "{name} is stricter by design where a count is the rows by chance: {}",
-                detail_of(outcome)
-            );
-            by_design += 1;
-        } else if name.starts_with("stricter-") {
-            assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
-            assert!(
-                outcome
-                    .detail()
-                    .is_some_and(|detail| detail.starts_with(target::STRICTER_WHERE_UNEVALUATED)),
-                "{name} is stricter where Polars does not evaluate the part: {}",
-                detail_of(outcome)
-            );
-            stricter += 1;
-        } else if let Some(slugs) = name
-            .strip_prefix("uncovered-")
-            .and_then(|rest| rest.strip_suffix(".case"))
-            // `uncovered-<limit>--<what it shows>.case` is another case of a limit, and
-            // `--also-<limit>` after it names another limit that explains the case too.
-            .map(|rest| {
-                let mut parts = rest.split("--");
-                let first = parts.next().unwrap_or(rest);
-                let also = parts.filter_map(|part| part.strip_prefix("also-"));
-                std::iter::once(first).chain(also).collect::<Vec<_>>()
-            })
-        {
-            let named: Vec<Limit> = slugs
-                .iter()
-                .map(|slug| {
-                    Limit::ALL
-                        .into_iter()
-                        .find(|limit| limit.slug() == *slug)
-                        .unwrap_or_else(|| panic!("{name} names no limit {slug}"))
-                })
-                .collect();
-            // The detail is the statement of every limit that excuses the case, in order.
-            let expected: Vec<&str> = Limit::ALL
-                .into_iter()
-                .filter(|limit| named.contains(limit))
-                .map(Limit::statement)
-                .collect();
-            assert_eq!(
-                (outcome.kind(), outcome.detail()),
-                (
-                    OutcomeKind::ExpectedRejection,
-                    Some(expected.join("; ").as_str())
-                ),
-                "{name} is excused by {}",
-                slugs.join(" and ")
-            );
-            excused.insert(slugs[0].to_owned());
-        } else {
-            panic!("{name} is neither fixed-*, stricter-*, by-design-* nor uncovered-*");
+        let settled = Settled::named(name).unwrap_or_else(|refusal| panic!("{refusal}"));
+        match &settled {
+            Settled::Fixed => fixed += 1,
+            Settled::Stricter => stricter += 1,
+            Settled::ByDesign => by_design += 1,
+            Settled::ByEngine => by_engine += 1,
+            Settled::Excused(named) => {
+                excused.insert(named[0].slug().to_owned());
+            }
+        }
+        let settled = settled_on_few_threads(name).unwrap_or(settled);
+        if let Err(wrong) = settled.holds_for(name, &evaluation.outcome) {
+            unsettled.push(wrong);
         }
     }
+    // Every case is replayed before the first that is wrong is reported, so one run says all.
+    assert!(
+        unsettled.is_empty(),
+        "{} kept cases do not replay as settled on {} threads:\n{}",
+        unsettled.len(),
+        polars_threads(),
+        unsettled.join("\n")
+    );
     assert!(fixed > 0, "a disagreement that was settled is kept");
     assert!(stricter > 0, "a part Polars does not evaluate is kept");
     assert!(by_design > 0, "a count that is the rows by chance is kept");
