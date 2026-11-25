@@ -43,6 +43,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
     ),
 ];
 
+/// What the outcome of a case says where a named rule refuses what Polars' streaming engine
+/// runs and its in-memory engine refuses, for what the rule names.
+pub const STRICTER_THAN_ONE_ENGINE: &str = "stricter than one of Polars' engines";
+
 /// What the outcome of a case says where the tables refuse a part that Polars
 /// does not evaluate, and a probe of the part shows the tables right.
 pub const STRICTER_WHERE_UNEVALUATED: &str = "stricter where Polars does not evaluate the part";
