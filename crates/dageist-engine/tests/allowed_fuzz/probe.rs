@@ -2614,6 +2614,11 @@ mod tests {
             "3 names are given to a struct of 2 fields",
             "struct.rename_fields() argument has a different number of fields than the struct it operates on (3 vs 2)."
         ));
+        assert!(same_reason(
+            &rule,
+            "1 names are given to an array of 2 places",
+            "arr.to_struct() number of field names provided (1) does not match width of input (2)."
+        ));
         assert!(!same_reason(&rule, said, "field not found: zz"));
         assert!(!same_reason(&rule, said, "lengths don't match"));
     }
