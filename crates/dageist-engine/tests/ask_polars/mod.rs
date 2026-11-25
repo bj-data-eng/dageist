@@ -94,6 +94,29 @@ pub struct Planned {
     pub traces: Vec<Traced>,
 }
 
+/// Runs `ask`, a question put to Polars about `step`, and fails the test with what Polars said, and
+/// the step it was asked of, where it panics: a test that asks Polars of a step the tables refuse
+/// meets what Polars panics on, which is then a failure of the test and no unwinding through it.
+///
+/// # Panics
+///
+/// When Polars panics in `ask`.
+pub fn guarded<T>(step: &Step, ask: impl FnOnce() -> T) -> T {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(ask)).unwrap_or_else(|payload| {
+        let said = payload
+            .downcast_ref::<&str>()
+            .map(|text| (*text).to_owned())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "something that is no text".to_owned());
+        panic!(
+            "Polars panicked when it was asked of the step {:?} of {}: {}",
+            step.id().as_str(),
+            step.call().entry().id().as_str(),
+            first_line(&said)
+        )
+    })
+}
+
 /// The first line of `text`, as the step engine's reports are read.
 pub fn first_line(text: &str) -> String {
     text.split("\n\n")

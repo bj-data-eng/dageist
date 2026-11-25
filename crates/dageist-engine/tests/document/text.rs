@@ -128,14 +128,15 @@ fn a_method_of_text_after_whole_numbers_is_refused_at_its_link_as_polars_refuses
     assert!(matches!(step.rows(), StepRows::NotCounted));
     let document = Document::read(&selecting(upper)).expect("a document");
     let nothing = |_: &str| None;
+    let step = &document.steps()[0];
     assert!(
-        ask_polars::collect(
-            &document.steps()[0],
+        ask_polars::guarded(step, || ask_polars::collect(
+            step,
             0,
             &claims(),
             Connected::tables(&nothing),
             100
-        )
+        ))
         .is_err()
     );
 }

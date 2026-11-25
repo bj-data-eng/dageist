@@ -118,19 +118,21 @@ fn polars_asked(document: &Document, rows: bool) -> (Said, Option<usize>) {
     );
     let connected = Connected::new(&tables, &literals);
     let step = &document.steps()[0];
-    let Some(planned) = ask_polars::plan(step, 0, &frame(), connected) else {
-        return (Said::Refuses("the step cannot be asked".to_owned()), None);
-    };
-    if let Err(refused) = planned.schema {
-        return (Said::Refuses(refused.reason), None);
-    }
-    if !rows {
-        return (Said::Accepts, None);
-    }
-    match ask_polars::collect(step, 0, &frame(), connected, 100) {
-        Ok(collected) => (Said::Accepts, Some(collected.height())),
-        Err(reason) => (Said::Refuses(reason), None),
-    }
+    ask_polars::guarded(step, || {
+        let Some(planned) = ask_polars::plan(step, 0, &frame(), connected) else {
+            return (Said::Refuses("the step cannot be asked".to_owned()), None);
+        };
+        if let Err(refused) = planned.schema {
+            return (Said::Refuses(refused.reason), None);
+        }
+        if !rows {
+            return (Said::Accepts, None);
+        }
+        match ask_polars::collect(step, 0, &frame(), connected, 100) {
+            Ok(collected) => (Said::Accepts, Some(collected.height())),
+            Err(reason) => (Said::Refuses(reason), None),
+        }
+    })
 }
 
 /// The document of the one step `entry` given `arguments`, run on the table.

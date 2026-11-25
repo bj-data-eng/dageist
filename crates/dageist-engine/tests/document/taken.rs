@@ -181,17 +181,19 @@ fn polars_says(document: &Document, frame: &DataFrame) -> Said {
     let nothing = |_: &str| None;
     let connected = Connected::tables(&nothing);
     let step = &document.steps()[0];
-    let Some(planned) = ask_polars::plan(step, 0, frame, connected) else {
-        return Said::Other("not run".to_owned());
-    };
-    if let Err(refused) = planned.schema {
-        return Said::Other(refused.reason);
-    }
-    match ask_polars::collect(step, 0, frame, connected, 100) {
-        Ok(_) => Said::Accepts,
-        Err(text) if text.contains("matching group lengths") => Said::RefusesTheWindow,
-        Err(text) => Said::Other(text),
-    }
+    ask_polars::guarded(step, || {
+        let Some(planned) = ask_polars::plan(step, 0, frame, connected) else {
+            return Said::Other("not run".to_owned());
+        };
+        if let Err(refused) = planned.schema {
+            return Said::Other(refused.reason);
+        }
+        match ask_polars::collect(step, 0, frame, connected, 100) {
+            Ok(_) => Said::Accepts,
+            Err(text) if text.contains("matching group lengths") => Said::RefusesTheWindow,
+            Err(text) => Said::Other(text),
+        }
+    })
 }
 
 fn walk_says(document: &Document, frame: &DataFrame) -> Said {

@@ -67,8 +67,11 @@ fn join_of(left: DataFrame, other: DataFrame, arguments: Value) -> Joined {
     let document =
         Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document");
     let tables = |name: &str| (name == "other").then(|| other.clone().lazy());
-    let polars = match ask_polars::plan(&document.steps()[0], 0, &left, Connected::tables(&tables))
-    {
+    let step = &document.steps()[0];
+    let planned = ask_polars::guarded(step, || {
+        ask_polars::plan(step, 0, &left, Connected::tables(&tables))
+    });
+    let polars = match planned {
         Some(planned) => match planned.schema {
             Ok(_) => Polars::Allows,
             Err(refused) => Polars::Refuses(refused.reason),

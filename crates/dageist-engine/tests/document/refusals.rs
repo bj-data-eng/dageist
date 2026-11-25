@@ -476,12 +476,15 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
     let document = Document::read(&document(steps)).expect("a document");
     let nothing = |_: &str| None;
     let connected = Connected::tables(&nothing);
-    let planned = ask_polars::plan(&document.steps()[0], 0, &claims(), connected)
+    let step = &document.steps()[0];
+    let planned = ask_polars::guarded(step, || ask_polars::plan(step, 0, &claims(), connected))
         .expect("a step that can be asked");
     let schema = planned.schema.expect("Polars plans it");
     assert_eq!(schema.get("day"), Some(&DataType::Date));
-    let error = ask_polars::collect(&document.steps()[0], 0, &claims(), connected, 10)
-        .expect_err("Polars cannot take the date of text");
+    let error = ask_polars::guarded(step, || {
+        ask_polars::collect(step, 0, &claims(), connected, 10)
+    })
+    .expect_err("Polars cannot take the date of text");
     assert!(!error.is_empty());
 
     // The tables record the failure, so the step engine does not run the step, and neither plans
@@ -763,4 +766,18 @@ fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step_as_t
     );
     let error = pivoted.collect_schema().expect_err("Polars refuses it");
     assert!(error.to_string().contains("column references"), "{error}");
+}
+
+#[test]
+#[should_panic(
+    expected = "Polars panicked when it was asked of the step \"bad\" of LazyFrame.select: a thread broke"
+)]
+fn a_panic_of_polars_when_it_is_asked_of_a_step_fails_the_test_and_names_the_step() {
+    let document = Document::read(&document(vec![step(
+        "bad",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![field("dcn")]) }),
+    )]))
+    .expect("a document");
+    ask_polars::guarded(&document.steps()[0], || panic!("a thread broke"));
 }

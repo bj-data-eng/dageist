@@ -58,8 +58,10 @@ fn report_of(entry: &str, arguments: Value) -> Ran {
 /// What the step engine reports of `document` run on `working`, and what Polars says of it.
 fn ran_on(document: &Document, working: &DataFrame) -> Ran {
     let tables = |name: &str| (name == "other").then(|| other().lazy());
-    let polars =
-        ask_polars::refusal_of(&document.steps()[0], 0, working, Connected::tables(&tables));
+    let step = &document.steps()[0];
+    let polars = ask_polars::guarded(step, || {
+        ask_polars::refusal_of(step, 0, working, Connected::tables(&tables))
+    });
     let report = document
         .run_on(&inputs(), working)
         .expect("the table has a schema");
