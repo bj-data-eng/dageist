@@ -341,9 +341,6 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
-    /// Whether the link is the first of a chain that starts from a number typed in that has a
-    /// fraction, which Polars compares as it compares one on the other side.
-    starts_from_a_fraction: bool,
 }
 
 /// What a chain has so far.
@@ -1818,6 +1815,7 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
+        let mut compares_with_a_fraction = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -1842,6 +1840,22 @@ impl Walker<'_> {
                 Cur::Value { shape, .. } => Some(*shape),
                 _ => None,
             };
+            // Polars decides a comparison of missing values of whole numbers with a number that has
+            // a fraction at once, for no whole number is it, and refuses the join whose key that
+            // leaves with no value for each row, as not elementwise. Whether the key is one is
+            // for what ends the chain to say: a key that is one value, as the count or the sum of
+            // the comparison is, is taken whole.
+            compares_with_a_fraction |= is_a_comparison_of_missing_values(link)
+                && (matches!(&cur, Cur::Value { dtype: Some(dtype), shape: Shape::Many, .. } if is_a_whole_number(*dtype))
+                    && operands(link).into_iter().any(is_a_number_with_a_fraction)
+                    || at == 0
+                        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start))
+                        && arguments.iter().any(|(name, operand)| {
+                            name == "other"
+                                && operand.known
+                                && operand.shape == Shape::Many
+                                && operand.dtype.is_some_and(is_a_whole_number)
+                        }));
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -1855,8 +1869,6 @@ impl Walker<'_> {
                     width,
                     widened,
                     zone,
-                    starts_from_a_fraction: at == 0
-                        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start)),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -1914,7 +1926,17 @@ impl Walker<'_> {
             let as_read = self
                 .read_against()
                 .and_then(|schema| with_null_columns_as_literals(expression, schema));
-            if is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
+            let is_many = matches!(
+                &cur,
+                Cur::Value {
+                    shape: Shape::Many,
+                    ..
+                }
+            );
+            if (is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
+                || compares_with_a_fraction
+                    && is_many
+                    && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight))
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -2079,7 +2101,6 @@ impl Walker<'_> {
             width,
             widened,
             zone,
-            starts_from_a_fraction,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2101,32 +2122,6 @@ impl Walker<'_> {
         // the value and its dtype are, so it is said first.
         if let Some(said) = cut_below_nothing(link)
             && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
-        {
-            self.refuse(&refusal, false);
-            return (
-                Cur::Dead,
-                Standing {
-                    follows: None,
-                    verdict: Some(Verdict::Refused(refusal)),
-                },
-            );
-        }
-        // Polars decides a comparison of missing values of whole numbers with a number that has a
-        // fraction at once, for no whole number is it, and refuses the join whose key that leaves
-        // with no value for each row, as not elementwise. A key that is one value, as the count of
-        // a column is, is taken whole.
-        if matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
-            && is_a_comparison_of_missing_values(link)
-            && (matches!(&cur, Cur::Value { dtype: Some(dtype), shape: Shape::Many, .. } if is_a_whole_number(*dtype))
-                && operands(link).into_iter().any(is_a_number_with_a_fraction)
-                || starts_from_a_fraction
-                    && arguments.iter().any(|(name, operand)| {
-                        name == "other"
-                            && operand.known
-                            && operand.shape == Shape::Many
-                            && operand.dtype.is_some_and(is_a_whole_number)
-                    }))
-            && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
         {
             self.refuse(&refusal, false);
             return (
