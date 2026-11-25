@@ -1445,6 +1445,17 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if unnested_key {
         ending = Ending::NotKnown(Unknown::TheResultsDtype);
     }
+    // Polars keeps a number typed without a dtype open in a struct that is a join's key, so the key
+    // does not match the one the number is given its dtype in, though both resolve to one (Polars
+    // issue draft 23): a key made of such a struct, or of a field read from one, is not told.
+    let in_a_key = matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
+        && place.context.nested().is_none();
+    if in_a_key
+        && ((id == "polars.struct" && chosen.inputs.iter().any(Input::is_loose))
+            || struct_gives.reads_a_loose_field())
+    {
+        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+    }
     // Several columns of a field read with several names are no dtype of one value, and the tables
     // measured one name: where the place is no item of a select or a sort key, they do not say.
     let columns = struct_gives.columns().cloned();

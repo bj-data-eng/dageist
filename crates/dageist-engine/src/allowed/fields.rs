@@ -68,6 +68,11 @@ impl Field {
         }
     }
 
+    /// Whether the field was made of a number typed without a dtype, which stays open.
+    pub(super) const fn is_loose(&self) -> bool {
+        self.loose
+    }
+
     /// The width of the array the field is, where it is known.
     #[must_use]
     pub const fn width(&self) -> Option<usize> {
@@ -253,6 +258,11 @@ impl<'a> Input<'a> {
     pub const fn with_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
         self
+    }
+
+    /// Whether the input is a number typed without a dtype.
+    pub(super) const fn is_loose(&self) -> bool {
+        self.loose
     }
 
     /// The same input, which is a number typed without a dtype where `loose`.
@@ -591,6 +601,11 @@ impl Gives {
             Self::Field(Some(field)) => (Some(ResultDtype::of_field(field)), field.fields.clone()),
             Self::Field(None) | Self::Columns(_) | Self::Unknown | Self::Undecided => (None, None),
         })
+    }
+
+    /// Whether the call reads a field made of a number typed without a dtype.
+    pub(super) fn reads_a_loose_field(&self) -> bool {
+        matches!(self, Self::Field(Some(field)) if field.is_loose())
     }
 
     /// The width of the array a field read holds, where it is known.
