@@ -325,7 +325,10 @@ npm --prefix ui run format
 npm --prefix ui run test
 ```
 
-Review the diff, and never edit the file by hand.
+Review the diff. A variant the census gains that the editor does not draw fails the view's census
+test, in `ui/packages/steps/src/model/census.test.ts`, until the editor draws it or
+`ui/packages/steps/src/model/limits.ts` declares it as a gap with its reason. Never edit the file by
+hand.
 
 ## Open The Sample Table
 

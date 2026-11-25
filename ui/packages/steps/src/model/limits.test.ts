@@ -12,7 +12,7 @@ import { GAPS, coverKey, editorLimit } from './limits';
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 
 describe('the declared gaps', () => {
-  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, and a report that says nothing', () => {
+  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, a report that says nothing, and a flag that cannot be typed', () => {
     expect(sorted(GAPS.map((gap) => coverKey(gap.cover)))).toEqual(
       sorted([
         'entry ChainedThen.otherwise',
@@ -40,6 +40,7 @@ describe('the declared gaps', () => {
         'start typedFloat',
         'start typedInteger',
         'start typedText',
+        'typed flag',
       ]),
     );
   });
