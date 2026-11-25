@@ -3095,6 +3095,62 @@ mod tests {
         );
     }
 
+    #[test]
+    fn what_the_target_says_of_a_schema_is_no_refusal_of_polars() {
+        // `sort_by(g.cbrt())` of a text column: Polars evaluates the cube root and allows the
+        // step. The tables' reason, that the schema says `String` and the rows give `Float64`, is
+        // the target's own comparison of a column's plan with its rows, which only shows where the
+        // cube root is the output, so no probe of the call alone is the refusal of Polars.
+        let case = kept("uncovered-a-hidden-schema.case");
+        let refused = refusal(&case);
+        let said = "the schema says String and the rows give Float64";
+        assert_eq!(refused.reason, said);
+        assert_eq!(settle(&case, &refused), None);
+        assert_eq!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+        assert!(!same_reason(&Source::Polars, said, said));
+    }
+
+    #[test]
+    fn a_key_whose_call_polars_refuses_on_a_column_is_asked_where_it_is_the_key() {
+        // `sort(by=a.cbrt())` of a text column: the tables refuse the cube root because its plan
+        // says `String` and its rows give `Float64`, which is no refusal of Polars where it is
+        // the output of a step, and a sort key is none. Asked as the key on a column, Polars
+        // panics where it meets the mismatch, while a column whose plan and rows agree, and the
+        // column alone, are allowed as the key.
+        let case = in_a_position("LazyFrame.sort", "by", "String", &["Expr.cbrt"]);
+        let refused = refusal(&case);
+        assert_eq!(
+            refused.reason,
+            "the schema says String and the rows give Float64"
+        );
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a key that Polars refuses");
+        assert_eq!(found.showing, Showing::TheSchemaMismatch);
+        assert!(found.probe.contains("LazyFrame.sort"), "{}", found.probe);
+        assert!(found.probe.contains("Expr.cbrt"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p\"]"),
+            "{}",
+            found.probe
+        );
+        assert!(found.reason.contains("panicked"), "{}", found.reason);
+        // The same call is the output of a step in `select`, and no probe settles it there.
+        let selected = in_a_position("LazyFrame.select", "exprs", "String", &["Expr.cbrt"]);
+        let refused = refusal(&selected);
+        assert_eq!(
+            settle_apart(
+                &selected,
+                &refused,
+                &predict(&selected),
+                &observe(&selected)
+            ),
+            None
+        );
+    }
+
     /// A case that selects the chain `a` then `links` (no arguments) in the
     /// position `entry` and `parameter` name, on columns of `receiver`.
     fn in_a_position(entry: &str, parameter: &str, receiver: &str, links: &[&str]) -> Case {
