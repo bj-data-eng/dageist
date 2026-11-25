@@ -1403,7 +1403,7 @@ gaps. Each gap names what it covers, an entry the editor cannot pick or make, a
 place no word of the editor stands at, a kind of start after which it cannot add
 a method, a parameter it does not set, a kind of parameter that has no drawing,
 a step no list adds, a parameter of a step that is neither drawn in its head nor
-offered as an option, a state of a step's report that says nothing, or a kind of
+offered as an option, an expression the walk gives no context, a state of a step's report that says nothing, or a kind of
 value a document holds typed in that the host cannot read, and it says why. A list
 shows an entry that is declared as disabled with the reason, where it lists the
 entry.
@@ -1512,10 +1512,15 @@ Today the declared gaps are these:
   for, `with_columns`, `filter`, `sort`, `select`, `rename`, `join` and `pivot`,
   and `drop`, `drop_nans`, `drop_nulls`, `fill_nan`, `first`, `gather_every`,
   `head`, `last`, `limit`, `reverse`, `slice`, `tail` and `with_row_index` are
-  drawn by their parameters alone, so a document may hold one and nothing adds it.
+  drawn by their parameters alone, so a document may hold one and nothing adds it
+  ([#137](https://github.com/bj-data-eng/dageist/issues/137)).
 - The parameters of a step that its head does not draw and its options do not
   offer: a sort's `more_by`, because the fields to order by are one list, and a
-  join's `on`, because the keys of the two tables are one list each.
+  join's `on`, because the keys of the two tables are one list each
+  ([#137](https://github.com/bj-data-eng/dageist/issues/137)).
+- The value of a keyword constraint of a filter, which the engine walks and names no position
+  for, so the editor cannot ask what may stand there
+  ([#172](https://github.com/bj-data-eng/dageist/issues/172)).
 - A flag typed in. A document may hold one as the value of `lit`, but the host
   reads typed text as a number or as text and never as a flag, so the editor has
   no way to type one ([#177](https://github.com/bj-data-eng/dageist/issues/177)).
@@ -1544,18 +1549,21 @@ report it gives of it, and the view rebuilds every piece of every one.
 
 **What it holds.** The corpus is five files of
 `ui/packages/host/fixtures/`, `corpus-methods.json`, `corpus-starts.json`,
-`corpus-parameters.json`, `corpus-steps.json` and `corpus-refused.json`, 530
-documents in all and about 1.6 MB, written one document to a line and left alone by
+`corpus-parameters.json`, `corpus-steps.json` and `corpus-refused.json`, 560
+documents in all and about 1.8 MB, written one document to a line and left alone by
 the formatter. Each document has a name that says what it is for, the document as
 the host sends it and the report of running it, which the view decodes with the
-decoders it reads the host with. The files also name what the node is connected to.
+decoders it reads the host with. The files also name what the node is connected to, with every column of the table a join
+brings in, while a document runs on the columns it reads.
 
 - *Methods.* Each method of an expression after each shape of value the engine allows
   it after, one value, many values and a count of values, in the first context where
   the walk of the document allows it and, where it can, where an expression may end at
   it. A chain goes on for up to eight methods after the one it is made for, each one that
   needs nothing given and that no chain held yet, so 365 chains hold all 247 methods at
-  every shape they stand after, but one.
+  every shape they stand after, but one, and one more chain holds a method in each of the
+  other 23 contexts where the engine allows one: all but the keys of a window in a join's key
+  and in a pivot's aggregate, which allow none.
 - *Starts.* Each function that starts a chain, `when` and `element` among them, a field,
   a connected value, a connected list, a number, text and a flag typed in, and nothing
   picked yet, each alone and where the engine allows one with a method after it; a
@@ -1569,8 +1577,12 @@ decoders it reads the host with. The files also name what the node is connected 
 - *Refusals.* Each cause the engine gives for a step: a table that is not connected, an
   input that is a table, a step with something still to be picked, one that Polars
   accepts and cannot run on the rows, the step after one that was refused and after one
-  that failed on the rows; and one document for each source of a refusal that the
-  tables give a call at a place: each rule they apply there and each stage of Polars.
+  that failed on the rows; one document for each source of a refusal that the
+  tables give a call at a place: each rule they apply there and each stage of Polars; and
+  one for each rule of the walk that a document holds by being edited from an allowed one: a
+  pattern, a duration and a time zone that are not valid, a range with a step of nothing, a
+  join's key that holds an aggregate beside a column, two pairs of keys named alike, and a
+  window given a count of values.
 
 **How it is made.** Every document is made by the engine's own edits, as the editor
 makes them: a step is added with `add_step`, a chain starts with `start_with` or
@@ -1607,12 +1619,15 @@ does not read:
   count of values, whose one argument that meets a count is the form Polars deprecates;
 - every function that starts a chain and every link of a condition is held where the
   engine allows it;
-- every context the tables cover holds a chain, every step of the catalogue is held, and
-  every parameter the engine offers is given in a document that calls its entry;
+- every context the tables cover holds a chain, and every context in which the engine allows a
+  method holds one, which is 24 of the 30; every step of the catalogue is held, and every
+  parameter the engine offers is given in a document that calls its entry;
 - every kind of start, outcome, state of the rows and cause that the census lists is held;
 - every source of a refusal the tables give a call at a place is held, and every rule is
-  held or declared as not held with its reason, which for 12 rules is that they judge what
-  a call is given or what two keys are together, which the documents do not reach;
+  held or declared as not held with its reason: five are not held, because the corpus's
+  arrays are of one width, because Polars refuses first, as the tables record it, a date in a
+  join's key and moments of two zones, because the node is connected to one list, and because
+  no chain it plans gives a window a value that a part widens;
 - what the walk says of each call is what the tables say at the place it reports.
 
 The view's test reads the committed files alone and repeats the check of what they hold, so
@@ -1644,11 +1659,13 @@ A piece the editor cannot build is a declared gap, or the test fails naming the 
 step, the way down to the piece and what is wrong. A gap is accepted if it is declared, of
 whatever kind: the corpus finds the entries the grid declares, the starts after which no
 method is added and the parameters the entries do not set again where a document holds them,
-and it finds two gaps of its own, a step no list adds and a parameter of a step that is not
-offered. The declared gaps of a kind the corpus finds are held both ways, so one that the editor
-has come to draw fails as stale. The test finds nothing else today, and it names the one expression
-it cannot place: the value of a keyword constraint of a filter, which the walk does not walk. It
-counts about 5,000 pieces and takes under half a second.
+and it finds three gaps of its own, a step no list adds, a parameter of a step that is not
+offered and an expression the walk gives no context. The declared gaps of a kind the corpus finds are held both ways, so one that the editor
+has come to draw fails as stale. The test finds nothing else today. The one expression of a step that was run that has no context is the
+value of a keyword constraint of a filter, which the walk walks and names no position for, so no
+list can be asked what may stand there; it is a declared gap
+([#172](https://github.com/bj-data-eng/dageist/issues/172)). The test counts about 5,000 pieces and
+takes under half a second.
 
 The test has its own checks that it can fail: a corpus without the documents of a function, a
 step, a parameter or a kind of start is missing it by name; an entry whose family the catalogue
