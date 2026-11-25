@@ -61,7 +61,7 @@ pub enum Rule {
     PatternIsValid,
     /// A range or a repeat typed in is one Polars can make and cut: a step other than nothing, an
     /// interval of the length of time its bounds are read in, bounds the dtype holds, a count that is
-    /// not below nothing and, of it and of any value made of literals alone, no length below nothing to cut it by.
+    /// not below nothing and, of it, no length below nothing to cut any value by.
     RangeIsValid,
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
@@ -192,7 +192,7 @@ impl Rule {
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::RangeIsValid => {
-                "a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it and of any value made of literals alone, no length below nothing to cut it by"
+                "a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it, no length below nothing to cut any value by"
             }
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"

@@ -341,12 +341,6 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
-    /// Whether what the link follows is made of literals, ranges and connected inputs alone, with no
-    /// column anywhere in it: Polars' slice of a series of literals cannot
-    /// extract the length that cuts it from a number below nothing, where the optimizer does not
-    /// fold the cut into it, which the engines do not agree on, so the editor refuses it after
-    /// every link.
-    made_of_literals: bool,
 }
 
 /// What a chain has so far.
@@ -1821,12 +1815,6 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
-        // Whether the chain so far has no column in it anywhere: a start and arguments of literals.
-        let mut literal_prefix = match expression.start() {
-            Start::Call(start) => call_is_made_of_literals(start),
-            Start::Input(_) => true,
-            Start::Hole => false,
-        };
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -1864,13 +1852,11 @@ impl Walker<'_> {
                     width,
                     widened,
                     zone,
-                    made_of_literals: literal_prefix,
                 },
             );
             unit = unit_after(link, unit, &standing);
             width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
-            literal_prefix = literal_prefix && call_is_made_of_literals(link);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
@@ -2088,7 +2074,6 @@ impl Walker<'_> {
             width,
             widened,
             zone,
-            made_of_literals,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2106,10 +2091,9 @@ impl Walker<'_> {
                 },
             );
         }
-        // Polars cannot extract the length that cuts a range, a repeat or a value of literals alone
-        // from a number below nothing, whatever the dtype of what it cuts is, so it is said first.
-        if made_of_literals
-            && let Some(said) = cut_below_nothing(link)
+        // Polars cannot extract the length that cuts a value from a number below nothing, whatever
+        // the value and its dtype are, so it is said first.
+        if let Some(said) = cut_below_nothing(link)
             && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
         {
             self.refuse(&refusal, false);
@@ -2916,13 +2900,11 @@ fn taken_after(
 /// not Polars meets it with each of the values the call follows. It does not where the call only
 /// looks up in it or by it: the keys of a sort order the values and are no part of them, what a
 /// replacement lists is a table of values it looks up, and a column of the dtype of the values that
-/// `is_in` is given is their set, whole, which is not read value by value as a list is. The share
-/// of a quantile is read once, before the groups, where an approximate quantile reads it in each.
+/// `is_in` is given is their set, whole, which is not read value by value as a list is.
 fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
     match (entry.id().as_str(), name) {
         ("Expr.sort_by", "by" | "more_by")
-        | ("Expr.replace" | "Expr.replace_strict", "old" | "new")
-        | ("Expr.quantile", "quantile") => false,
+        | ("Expr.replace" | "Expr.replace_strict", "old" | "new") => false,
         ("Expr.is_in", "other") => is_met_by_its_dtype(entry, name, operand),
         _ => true,
     }
@@ -2930,11 +2912,13 @@ fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
 
 /// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
 /// what the call gives one that Polars cannot tell is one before the rows run. It does for every
-/// parameter, the keys of a sort, what a replacement lists and the set `is_in` is given included, for
-/// Polars asks only whether what a call is made of is a scalar. The share of the exact quantile is
-/// the one it reads once, before the rest, and does not count.
+/// parameter, the keys of a sort included, but not for what a replacement lists and the set `is_in`
+/// is given, which Polars looks up in and does not ask whether they are a scalar.
 fn carries_to_a_scalar(entry: &Entry, name: &str) -> bool {
-    !(entry.id().as_str() == "Expr.quantile" && name == "quantile")
+    !matches!(
+        (entry.id().as_str(), name),
+        ("Expr.replace" | "Expr.replace_strict", "old" | "new") | ("Expr.is_in", "other")
+    )
 }
 
 /// What two values that a call meets give together: one value is met by each of the other, and
@@ -2981,36 +2965,9 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     broadcasts(entry, name)
 }
 
-/// Whether `expression` has no column anywhere in it: a start of literals, ranges and the functions
-/// that make a value of them, and arguments that are made so too.
-fn is_made_of_literals(expression: &Expression) -> bool {
-    // A connected value or list is a literal of its dtype to Polars.
-    let start_is = match expression.start() {
-        Start::Call(start) => call_is_made_of_literals(start),
-        Start::Input(_) => true,
-        Start::Hole => false,
-    };
-    start_is && expression.links().iter().all(call_is_made_of_literals)
-}
-
-/// Whether the arguments of `call` hold no column, and the call is none that reads one.
-fn call_is_made_of_literals(call: &Call) -> bool {
-    fn value(given: &Value) -> bool {
-        match given {
-            Value::Expression(expression) => is_made_of_literals(expression),
-            Value::Many(items) => items.iter().all(value),
-            Value::Pairs(pairs) => pairs.iter().all(|(key, held)| value(key) && value(held)),
-            Value::Columns(_) | Value::Table(_) | Value::Path(_) => false,
-            _ => true,
-        }
-    }
-    !matches!(call.entry().id().as_str(), "polars.col" | "polars.element")
-        && call.arguments().iter().all(|given| value(given.value()))
-}
-
-/// Why a method that cuts the values it follows may not cut a range, a repeat or a value of
-/// literals alone by what it is given, where it is a number typed in below nothing: how many values the first, the last and
-/// `limit` keep, and the length of a slice.
+/// Why a method that cuts the values it follows may not cut them by what it is given, where it is a
+/// number typed in below nothing: how many values the first, the last and `limit` keep, and the length
+/// of a slice.
 fn cut_below_nothing(link: &Call) -> Option<String> {
     let parameter = match link.entry().id().as_str() {
         "Expr.head" | "Expr.limit" | "Expr.tail" => "n",
@@ -3019,7 +2976,7 @@ fn cut_below_nothing(link: &Call) -> Option<String> {
     };
     let number = whole_number(link, parameter).filter(|number| *number < 0)?;
     Some(format!(
-        "a range, a repeat or a value of literals alone cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from it"
+        "values cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from them"
     ))
 }
 

@@ -415,9 +415,6 @@ pub enum OneValue {
     /// and neither the rows, nor a count of values, nor the one value that a method took of one value,
     /// as the first of them is.
     Scalar,
-    /// One value of one row: the one value that a method took of one value is, and the rows and a
-    /// count of values are not.
-    SingleRow,
 }
 
 /// What a parameter that gives a number of values is given as many of as.

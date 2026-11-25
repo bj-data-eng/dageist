@@ -520,7 +520,6 @@ pub dageist_engine::catalog::Laziness::Lazy
 pub dageist_engine::catalog::Laziness::NeedsCollect
 pub enum dageist_engine::catalog::OneValue
 pub dageist_engine::catalog::OneValue::Scalar
-pub dageist_engine::catalog::OneValue::SingleRow
 pub enum dageist_engine::catalog::ParameterDefault
 pub dageist_engine::catalog::ParameterDefault::Python(&'static str)
 pub dageist_engine::catalog::ParameterDefault::Required

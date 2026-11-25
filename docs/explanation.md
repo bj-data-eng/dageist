@@ -749,18 +749,10 @@ column, an aggregate or any other chain is not, and the count is then not known.
   hold: 300 is no `UInt8`, and Polars refuses it of a range that is empty too.
 - `linear_space` and `repeat` give as many values as the number of samples and the number of times: none for 0, and a
   number below nothing is refused.
-- A value made of literals, ranges and connected values and lists alone, which Polars meets as literals of their dtype, with no
-  column anywhere in it, is not cut by `head`, `tail`, `limit` or the
-  length of a slice given a number below nothing, whatever methods come between: a chain that starts at a range or a repeat of
-  literals, one that meets a range as an operand, a branch, a predicate, a fill or an exponent, and a literal alone, as `lit(5).head(-2)`
-  is. Polars' slice of a series of literals casts the length to an unsigned number and refuses it with "unable to extract
-  length", and the engine of steps and Python's engines fold the cut away only after a chain of methods that give a value for
-  each value, or the first values, which they refuse with their optimizations off, so the editor, which is strict where the
-  optimizer decides, refuses those too; a test pins them. Where a column is what is cut, and a range is an operand of it,
-  `(a.head(4) + int_range(0, 4)).cum_sum().head(-2)` runs in the engine of steps, and Python's in-memory engine refuses what the
-  streaming one takes, as it does `a.tail(-2)` of a column, so the cut is judged by what has no column and not by the range.
-  A range that a column is added to, `int_range(0, 4).add(a.head(4))`, is no value of literals alone, and its cut runs. The rule
-  `range-is-valid` says it, whose words are about a range, a repeat and a value of literals alone.
+- No value is cut by `head`, `tail`, `limit` or the length of a slice given a number below nothing: Polars casts the length
+  to an unsigned number and refuses it with "unable to extract length", whether what it cuts is a column, a range or a repeat,
+  or a value of literals alone, as `lit(5).head(-2)` is. The places counted from the end, such as `slice(-2)`, run. The rule
+  `range-is-valid` says it, whose words are about a range, a repeat and a length below nothing.
 - The dates, moments and times of day of `date_range`, `datetime_range` and `time_range` are counted by Polars, which the
   engine asks with the arguments typed in, as it asks of a duration: how many months fit between two dates, the last day
   of a month, a clock put back or forward in a time zone and a range counted in nanoseconds are Polars' to say. A range of

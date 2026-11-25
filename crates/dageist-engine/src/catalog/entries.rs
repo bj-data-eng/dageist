@@ -49,13 +49,14 @@ const CUM_MAX: &[Dtypes] = &[
     Dtypes::String,
     Dtypes::Boolean,
 ];
-// What Polars replaces the values of: every dtype it orders, and an array, whose values it meets one
-// whole. It has no replacement for a list, which it refuses as not yet implemented.
+// What Polars replaces the values of: every dtype it orders, and a list and an array, whose values it
+// meets one whole.
 const REPLACEABLE: &[Dtypes] = &[
     Dtypes::Numeric,
     Dtypes::Temporal,
     Dtypes::String,
     Dtypes::Boolean,
+    Dtypes::List,
     Dtypes::Array,
 ];
 const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
@@ -2517,7 +2518,10 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Aggregate,
         accepts: CUM_MAX,
         parameters: &[
-            required("quantile", Kind::Expression(NUMERIC), Shape::One).with_role(Role::Share),
+            required("quantile", Kind::Expression(NUMERIC), Shape::One)
+                .with_role(Role::Share)
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "method",
                 Kind::Choice(APPROX_QUANTILE_METHOD),
@@ -2854,7 +2858,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(bottom_k),
     },
@@ -3908,7 +3912,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pct_change),
     },
@@ -3936,7 +3940,7 @@ pub(super) const ENTRIES: &[Entry] = &[
             required("quantile", Kind::Expression(NUMERIC), Shape::One)
                 .with_role(Role::Share)
                 .not_broadcasting()
-                .reading_one_value(OneValue::SingleRow),
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "interpolation",
                 Kind::Choice(QUANTILE_METHOD),
@@ -4122,10 +4126,12 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("offset", Kind::Expression(INTEGER), Shape::One)
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional("length", Kind::Expression(INTEGER), Shape::One, "None")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(slice),
@@ -4492,7 +4498,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(top_k),
     },
