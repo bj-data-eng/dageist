@@ -1505,14 +1505,15 @@ Today the declared gaps are these:
   the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 - A flag typed in. A document may hold one as the value of `lit`, but the host
   reads typed text as a number or as text and never as a flag, so the editor has
-  no way to type one.
+  no way to type one ([#177](https://github.com/bj-data-eng/dageist/issues/177)).
 - A flag a document holds as the value of `lit`, which the editor does not show.
   The start is drawn as a function and its value by the literal control, which
   shows a number or text, so the value is drawn as its empty label, marked wrong
-  ([#171](https://github.com/bj-data-eng/dageist/issues/171)). The grid test runs a
+  ([#177](https://github.com/bj-data-eng/dageist/issues/177)). The grid test runs a
   start of it and finds a method can be added after it.
 - The dtypes of a chain that gives several columns, which the editor does not show:
-  it shows the dtype after a chain only where it is one column.
+  it shows the dtype after a chain only where it is one column
+  ([#177](https://github.com/bj-data-eng/dageist/issues/177)).
 
 A document holds a number, text or a flag as the value of `lit` and no other value
 typed in: a date, a time, a moment or a length of time is not a literal a document

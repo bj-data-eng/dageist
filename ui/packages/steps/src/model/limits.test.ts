@@ -63,6 +63,14 @@ describe('the declared gaps', () => {
     }
   });
 
+  it('name the issue that is to show a flag a document holds, to type one and to show the dtypes of several columns', () => {
+    const keys = ['typed flag', 'shown literal flag', 'shown resolution several'];
+    for (const gap of GAPS.filter((held) => keys.includes(coverKey(held.cover)))) {
+      expect(gap.reason, coverKey(gap.cover)).toContain('#177');
+    }
+    expect(GAPS.filter((gap) => keys.includes(coverKey(gap.cover)))).toHaveLength(3);
+  });
+
   it('are keyed by what they cover, so that two places or two parameters are two gaps', () => {
     expect(coverKey({ kind: 'place', outer: 'select', nested: null })).not.toBe(
       coverKey({ kind: 'place', outer: 'select', nested: 'over.order_by' }),

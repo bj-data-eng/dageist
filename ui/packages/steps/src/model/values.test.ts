@@ -50,7 +50,7 @@ describe('how what is typed in is shown', () => {
     expect(shownOf({ kind: 'columns', names: ['a'] })).toBeNull();
   });
 
-  it('is nothing for a flag typed in, which the editor does not show yet (#171)', () => {
+  it('is nothing for a flag typed in, which the editor does not show yet (#177)', () => {
     expect(shownOf({ kind: 'flag', value: true })).toBeNull();
     expect(shownOf({ kind: 'flag', value: null })).toBeNull();
   });

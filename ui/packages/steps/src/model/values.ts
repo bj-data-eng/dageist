@@ -30,7 +30,7 @@ export interface Shown {
 /**
  * Returns how an argument that holds something typed in is shown, or `null` where it holds nothing
  * the editor shows: no argument, a time zone that is none, and a kind of argument that is not typed
- * in. A flag is one of them, so a flag typed in as a value is not shown (#171).
+ * in. A flag is one of them, so a flag typed in as a value is not shown (#177).
  */
 export function shownOf(argument: ArgumentView | undefined): Shown | null {
   switch (argument?.kind) {

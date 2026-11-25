@@ -114,15 +114,15 @@ const NOTHING_AFTER_A_WORD =
 
 /** Why no flag can be typed in. */
 const NO_TYPED_FLAG =
-  'a document may hold a flag typed in as the value of lit, which the engine allows, but the host reads typed text as a number or as text and never as a flag, so the editor has no way to type one';
+  'a document may hold a flag typed in as the value of lit, which the engine allows, but the host reads typed text as a number or as text and never as a flag, so the editor has no way to type one (#177)';
 
 /** Why a flag a document holds is not shown. */
 const FLAG_NOT_SHOWN =
-  'a flag a document holds typed in as the value of lit is drawn as a function whose value is the literal control, which shows a number or text and no flag, so the value is drawn as its empty label, marked wrong (#171)';
+  'a flag a document holds typed in as the value of lit is drawn as a function whose value is the literal control, which shows a number or text and no flag, so the value is drawn as its empty label, marked wrong (#177)';
 
 /** Why the dtypes of an expression that gives several columns are not shown. */
 const SEVERAL_NOT_SHOWN =
-  'the editor shows the dtype after a chain only where it gives one column; the dtypes of a chain that gives several are not shown';
+  'the editor shows the dtype after a chain only where it gives one column; the dtypes of a chain that gives several are not shown (#177)';
 
 /** Declares the entry `entry`, which the editor cannot pick or make, for `reason`. */
 function entryGap(entry: string, reason: string): Gap {
