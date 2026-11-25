@@ -243,6 +243,7 @@ describe('what the engine says of why it refused', () => {
     expect(stepOf(run, 'build').problem).toBe('a parameter is missing');
     expect(stepOf(run, 'rule').problem).toBe('the reason');
     expect(stepOf(run, 'rows_stage').problem).toBe('the reason');
+    expect(stepOf(run, 'polars').problem).toBe('the reason');
   });
 });
 

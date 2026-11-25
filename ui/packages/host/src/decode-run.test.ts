@@ -426,6 +426,8 @@ describe('the report built by hand for the variants no document gives together',
       kind: 'notAllowed',
       refusal: { source: { by: 'polars', stage: 'rows' }, reason: 'the reason' },
     });
+    // Polars refuses a step that the tables allow, which a step the tables refuse never comes to.
+    expect(refusedCause('polars')).toEqual({ kind: 'polars', reason: 'the reason' });
   });
 
   it('places a refusal at the start of an expression', () => {

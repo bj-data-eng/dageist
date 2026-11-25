@@ -231,6 +231,13 @@ pub(crate) fn variants() -> RunView {
                 },
             ),
             rows_stage,
+            // Polars refuses a step that the tables allow: a step the tables refuse is not run.
+            refused(
+                "polars",
+                CauseView::Polars {
+                    reason: "the reason".to_owned(),
+                },
+            ),
             failed,
         ],
     }
