@@ -87,7 +87,7 @@ describe('the places the engine was asked about', () => {
 });
 
 /** Whether the first start of `kind` leads to a place of a value of the class `dtype` and shape `shape`. */
-function leadsTo(kind: string, dtype: string, shape: 'one' | 'many'): boolean {
+function leadsTo(kind: string, dtype: string, shape: 'one' | 'many' | 'counted'): boolean {
   return (
     STARTS.find((start) => start.kind === kind)?.leads({ kind: 'value', dtype, shape }) ?? false
   );
@@ -131,12 +131,14 @@ describe('the starts that are run', () => {
     expect(leadsTo('typedFlag', 'Boolean', 'many')).toBe(false);
   });
 
-  it('lead to the places of one value for a connected value and a typed value, and of many for a field and a list', () => {
+  it('lead to the places of one value for a connected value and a typed value, of many for a field, and of a count for a list', () => {
     expect(leadsTo('connectedValue', 'Int32', 'one')).toBe(true);
     expect(leadsTo('connectedValue', 'Int32', 'many')).toBe(false);
     expect(leadsTo('field', 'Int32', 'many')).toBe(true);
     expect(leadsTo('field', 'Int32', 'one')).toBe(false);
-    expect(leadsTo('connectedList', 'Int32', 'many')).toBe(true);
+    // A list is the values of another table: a count of its own, and not the rows of this one.
+    expect(leadsTo('connectedList', 'Int32', 'counted')).toBe(true);
+    expect(leadsTo('connectedList', 'Int32', 'many')).toBe(false);
     expect(leadsTo('connectedList', 'Int32', 'one')).toBe(false);
   });
 });
