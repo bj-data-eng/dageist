@@ -200,10 +200,10 @@ export function findGaps(
       const methods = new Set(
         methodFamilies(using, view)
           .flatMap((family) => family.offers)
-          .flatMap((row) => (row.reason === null ? [row.id] : [])),
+          .flatMap((row) => (row.stoppedBy !== 'engine' ? [row.id] : [])),
       );
       const functions = new Set(
-        startOffers(using, view).flatMap((row) => (row.reason === null ? [row.id] : [])),
+        startOffers(using, view).flatMap((row) => (row.stoppedBy !== 'engine' ? [row.id] : [])),
       );
 
       // Every start that leads here must have a way to add what the engine allows after it.

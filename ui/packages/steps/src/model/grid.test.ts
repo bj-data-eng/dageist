@@ -210,6 +210,40 @@ describe('a gap that is found and not declared, or declared and not found', () =
     expect(compare(found, [...GAPS, extra])).toEqual({ undeclared: [], stale: ['start field'] });
   });
 
+  it('fails the check where a gap is declared for an entry the editor offers, such as a method', () => {
+    const extra: Gap = { cover: { kind: 'entry', entry: 'Expr.abs' }, reason: 'wrongly declared' };
+
+    expect(compare(found, [...GAPS, extra])).toEqual({ undeclared: [], stale: ['entry Expr.abs'] });
+  });
+
+  it('fails the check where a gap is declared for a parameter the editor sets, such as the field of `col`', () => {
+    const extra: Gap = {
+      cover: { kind: 'parameter', entry: 'polars.col', parameter: 'name' },
+      reason: 'wrongly declared',
+    };
+
+    expect(compare(found, [...GAPS, extra])).toEqual({
+      undeclared: [],
+      stale: ['parameter polars.col name'],
+    });
+  });
+
+  it('fails the check where a parameter is not set and no gap is declared for it', () => {
+    const without = GAPS.filter(
+      (gap) =>
+        !(
+          gap.cover.kind === 'parameter' &&
+          gap.cover.entry === 'polars.lit' &&
+          gap.cover.parameter === 'dtype'
+        ),
+    );
+
+    expect(compare(found, without)).toEqual({
+      undeclared: ['parameter polars.lit dtype'],
+      stale: [],
+    });
+  });
+
   it('is found at a place the grid allows but no word draws, such as a position nothing draws', () => {
     // A catalogue whose only step parameter at the filter position is not drawn has no word there.
     const sparse: Catalogue = {
