@@ -79,6 +79,7 @@ pub struct WalkedExpression {
     ending: Option<Ending>,
     count: Option<Count>,
     fields: Vec<Option<Fields>>,
+    output_name: Option<String>,
 }
 
 impl WalkedExpression {
@@ -230,6 +231,7 @@ impl Step {
         let mut walker = Walker {
             zones: Vec::new(),
             fieldsets: Vec::new(),
+            names: Vec::new(),
             written: Vec::new(),
             pair_key: None,
             selected: Vec::new(),
@@ -324,7 +326,13 @@ struct Operand {
     width: Option<usize>,
     /// The fields of the struct it is, where the chain knows them.
     fields: Option<FieldsAt>,
+    /// The name it is written under, where the chain knows it.
+    name: Option<NameAt>,
 }
+
+/// The name an expression is written under that the walk holds, by its place in the list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NameAt(usize);
 
 /// The fields of a struct that the walk holds once, by their place in the list, as it holds a time
 /// zone by its name: what an operand and a link carry is this handle, which can be copied.
@@ -422,6 +430,8 @@ struct Walker<'a> {
     zones: Vec<String>,
     /// The fields of the structs the walk has met, which a [`FieldsAt`] points into.
     fieldsets: Vec<Fields>,
+    /// The names the walk has met expressions written under, which a [`NameAt`] points into.
+    names: Vec<String>,
     /// What each item of a select or of the columns a step adds writes: where the item is, the
     /// names it writes where they are known, and whether it is named by a field of a struct.
     written: Vec<(Place, Option<Vec<String>>, bool)>,
@@ -432,27 +442,6 @@ struct Walker<'a> {
     selected: Vec<(Place, Shape, Count)>,
     /// Where an expression is a chain from a connected list that still gives a count of its values.
     of_lists: Vec<Place>,
-}
-
-/// The output names of a join's keys before the first whose name is not known, in
-/// order. Polars expands each side's keys before it pairs them, so a key that may
-/// expand to several columns, or that is not picked yet, shifts every pair after
-/// it: only the keys before it pair by position. Such a key is one whose name is
-/// not known, as is an item that is no expression.
-fn known_key_names(value: &Value) -> Vec<String> {
-    let names = |items: &[&Value]| {
-        items
-            .iter()
-            .map_while(|item| match item {
-                Value::Expression(expression) => key_name(expression),
-                _ => None,
-            })
-            .collect()
-    };
-    match value {
-        Value::Many(items) => names(&items.iter().collect::<Vec<_>>()),
-        other => names(&[other]),
-    }
 }
 
 /// Whether the parameter `parameter` of `step` holds a list of keys, whose items
@@ -468,31 +457,34 @@ fn left_is_many(step: &Call, parameter: &str) -> bool {
 /// a hole. A key is never given a name by an alias, which Polars refuses in a
 /// join's key and the catalogue does not hold.
 fn key_name(key: &Expression) -> Option<String> {
-    output_name(key.start(), key.links())
+    start_name(key.start(), key.links())
 }
 
-/// The output name of the expression that starts with `start` and goes on with `links`, which is
-/// the name of its start unless a link says otherwise: reading a field names the value by the field,
-/// and an unnest writes a column for each field, so it has no one name.
-fn output_name(start: &Start, links: &[Call]) -> Option<String> {
-    let mut name = start_name(start, links);
-    for link in links {
-        match link.entry().id().as_str() {
-            "Expr.struct.field" => {
-                let several = matches!(
-                    link.argument("more_names"),
-                    Some(Value::Many(more)) if !more.is_empty()
-                );
-                name = match link.argument("name") {
-                    Some(Value::Field(field)) if !several => Some(field.clone()),
-                    _ => None,
-                };
+/// The name an expression is written under after `link`, which `before` is the name it was written
+/// under before it: reading a field names the value by the field, an unnest of a struct of one
+/// field by that field and of several by none, for it writes a column for each, and any other call
+/// keeps the name. `followed` is the fields of the struct the call follows, where they are known.
+fn name_after(link: &Call, before: Option<String>, followed: Option<&Fields>) -> Option<String> {
+    match link.entry().id().as_str() {
+        "Expr.struct.field" => {
+            let several = matches!(
+                link.argument("more_names"),
+                Some(Value::Many(more)) if !more.is_empty()
+            );
+            match link.argument("name") {
+                Some(Value::Field(field)) if !several => Some(field.clone()),
+                _ => None,
             }
-            "Expr.struct.unnest" => name = None,
-            _ => {}
         }
+        "Expr.struct.unnest" => {
+            let mut names = followed?.names();
+            match (names.next(), names.next()) {
+                (Some(only), None) => Some(only.to_owned()),
+                _ => None,
+            }
+        }
+        _ => before,
     }
-    name
 }
 
 /// The name that the start of an expression gives it, which `links` tell where a condition's
@@ -1165,6 +1157,31 @@ impl Walker<'_> {
         }
     }
 
+    /// The output names of the keys the parameter `parameter` of the join holds, before the first
+    /// whose name is not known, in order, as the walk found them: Polars expands each side's keys
+    /// before it pairs them, so a key that may expand, or is not picked yet, shifts every pair after it.
+    fn known_key_names(&self, parameter: &str, value: &Value, side: Outer) -> Vec<String> {
+        let items = match value {
+            Value::Many(items) => items.len(),
+            _ => 1,
+        };
+        (0..items)
+            .map_while(|at| {
+                let mut path = vec![Segment::Parameter(parameter.to_owned())];
+                if matches!(value, Value::Many(_)) {
+                    path.push(Segment::Item(at));
+                }
+                let place = path.into_iter().fold(self.base.clone(), Place::then);
+                self.walked
+                    .iter()
+                    .find(|walked| {
+                        walked.place == place && walked.context == Some(Context::step(side))
+                    })
+                    .and_then(|walked| walked.output_name.clone())
+            })
+            .collect()
+    }
+
     /// Asks whether a join's keys pair the same two output names twice, which
     /// Polars refuses, at the later key that makes the pair again. Only the pairs
     /// before the first key on either side whose name is not known are judged:
@@ -1185,7 +1202,15 @@ impl Walker<'_> {
         } else {
             "on"
         };
-        let (left, right) = (known_key_names(left), known_key_names(right));
+        let right_parameter = if self.step.argument("right_on").is_some() {
+            "right_on"
+        } else {
+            "on"
+        };
+        let (left, right) = (
+            self.known_key_names(left_parameter, left, Outer::JoinLeft),
+            self.known_key_names(right_parameter, right, Outer::JoinRight),
+        );
         let mut paired: Vec<(&String, &String)> = Vec::new();
         for (at, pair) in left.iter().zip(&right).enumerate() {
             if !paired.contains(&pair) {
@@ -1225,7 +1250,12 @@ impl Walker<'_> {
     /// The names the item `expression` of a select writes, where they are known: the name it is
     /// given by a pair, or the one its start and the fields it reads give it, or the names of the
     /// fields an unnest ends it with.
-    fn names_written(&self, expression: &Expression, calls: &[Standing]) -> Option<Vec<String>> {
+    fn names_written(
+        &self,
+        expression: &Expression,
+        calls: &[Standing],
+        name: Option<&String>,
+    ) -> Option<Vec<String>> {
         let several = |link: &Call| match link.entry().id().as_str() {
             "Expr.struct.unnest" => true,
             "Expr.struct.field" => matches!(
@@ -1242,10 +1272,7 @@ impl Walker<'_> {
             let columns = calls.last()?.verdict()?.allowance()?.columns()?;
             return Some(columns.names().map(str::to_owned).collect());
         }
-        let name = self
-            .pair_key
-            .clone()
-            .or_else(|| output_name(expression.start(), expression.links()))?;
+        let name = self.pair_key.clone().or_else(|| name.cloned())?;
         Some(vec![name])
     }
 
@@ -1713,9 +1740,9 @@ impl Walker<'_> {
         struct_inputs(start)
             .into_iter()
             .zip(listed.chain(named))
-            .map(|((name, expression), (_, operand))| {
+            .map(|((name, _), (_, operand))| {
                 (
-                    name.or_else(|| key_name(expression)),
+                    name.or_else(|| operand.name.map(|at| self.names[at.0].clone())),
                     operand.dtype,
                     operand.fields.map(|at| self.fieldsets[at.0].clone()),
                 )
@@ -1815,6 +1842,7 @@ impl Walker<'_> {
             zone: None,
             width: None,
             fields: None,
+            name: None,
         };
         // Whether the chain starts from a connected list, which the words of a refusal then say.
         let from_a_list =
@@ -1822,6 +1850,7 @@ impl Walker<'_> {
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
         let mut cur = Cur::Dead;
+        let mut start_given: Option<String> = None;
         let mut start_arguments: Vec<(String, Operand)> = Vec::new();
         match expression.start() {
             Start::Call(start) => {
@@ -1841,6 +1870,7 @@ impl Walker<'_> {
                 ending: None,
                 count: None,
                 fields: Vec::new(),
+                output_name: None,
             });
             return unsaid;
         };
@@ -1904,6 +1934,7 @@ impl Walker<'_> {
                         Input::new(name.as_deref(), *class, fields.as_ref())
                     })
                     .collect();
+                start_given = inputs_made.first().and_then(|(name, _, _)| name.clone());
                 let names = start.names();
                 let numbers = start.numbers();
                 let chosen = Chosen::default()
@@ -2112,6 +2143,12 @@ impl Walker<'_> {
             _ => None,
         };
         held_fields.push(fields);
+        // The name the chain is written under: its start's, then what a field read or an unnest
+        // says. A struct is named as the first value it is made of, as the walk found it.
+        let mut name: Option<String> = match expression.start() {
+            Start::Call(start) if start.entry().id().as_str() == "polars.struct" => start_given,
+            start => start_name(start, expression.links()),
+        };
         let mut compares_with_a_fraction = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -2153,7 +2190,8 @@ impl Walker<'_> {
                                 && operand.shape == Shape::Many
                                 && operand.dtype.is_some_and(is_a_whole_number)
                         }));
-            let name_before = output_name(expression.start(), &expression.links()[..at]);
+            let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
+            let name_before = name.clone();
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -2175,6 +2213,7 @@ impl Walker<'_> {
             unit = unit_after(link, unit, &standing);
             width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
+            name = name_after(link, name, fields_followed.as_ref());
             fields = self.fields_after(&standing);
             held_fields.push(fields);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
@@ -2289,7 +2328,7 @@ impl Walker<'_> {
         let held_here = held.is_some() && context == Context::step(Outer::Select);
         let held_place = held_here.then(|| place.clone());
         if held_here {
-            let names = self.names_written(expression, &calls);
+            let names = self.names_written(expression, &calls, name.as_ref());
             let by_a_field = expression.links().iter().any(|link| {
                 matches!(
                     link.entry().id().as_str(),
@@ -2309,6 +2348,11 @@ impl Walker<'_> {
                 .iter()
                 .map(|at| at.map(|at| self.fieldsets[at.0].clone()))
                 .collect(),
+            output_name: name.clone(),
+        });
+        let name_at = name.clone().map(|held| {
+            self.names.push(held);
+            NameAt(self.names.len() - 1)
         });
         let operand = match cur {
             Cur::Value {
@@ -2331,6 +2375,7 @@ impl Walker<'_> {
                 zone,
                 width,
                 fields,
+                name: name_at,
             },
             Cur::Condition {
                 values,
@@ -2352,6 +2397,7 @@ impl Walker<'_> {
                 reliable: !branches_are_one,
                 zone: None,
                 fields: None,
+                name: None,
                 // The width the arrays among the values share, where they are of one.
                 width: widths
                     .iter()
