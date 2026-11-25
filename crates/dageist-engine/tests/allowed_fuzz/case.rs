@@ -114,3 +114,67 @@ impl Case {
         Ok(case)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The document `select(a.struct.field("k"))`.
+    const READS_K: &str = r#"{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.struct.field","arguments":{"name":{"field":"k"}}}]}}]}}}}]}"#;
+
+    fn text(header: &str) -> String {
+        format!("{header}\n{READS_K}")
+    }
+
+    #[test]
+    fn a_case_that_names_the_fields_of_its_struct_columns_is_read_and_written_as_it_is() {
+        let written = text(
+            r#"{"a":"Struct(x: Int64, y: String)","a_struct":[["k","Int64"],["l","List(String)"],["n",[["p","Boolean"],["q","Datetime(us, UTC)"]]]],"b":"Struct(x: Int64, y: String)","b_struct":[],"revision":1}"#,
+        );
+        let case = Case::decode(written.as_bytes()).expect("a case");
+        assert_eq!(case.receiver, Representative::Struct);
+        assert_eq!(case.argument, Representative::Struct);
+        assert_eq!(String::from_utf8(case.encode()).expect("text"), written);
+    }
+
+    #[test]
+    fn a_case_that_names_no_fields_keeps_the_struct_the_tables_measured() {
+        let written = text(r#"{"a":"Struct(x: Int64, y: String)","b":"Int8","revision":1}"#);
+        let case = Case::decode(written.as_bytes()).expect("a case");
+        assert_eq!(String::from_utf8(case.encode()).expect("text"), written);
+    }
+
+    #[test]
+    fn fields_named_for_a_column_that_is_no_struct_are_refused_and_the_column_is_named() {
+        let written = text(r#"{"a":"Int64","a_struct":[["k","Int64"]],"b":"Int8","revision":1}"#);
+        let refusal = Case::decode(written.as_bytes()).expect_err("a refusal");
+        assert!(refusal.to_string().contains("a_struct"), "{refusal}");
+    }
+
+    #[test]
+    fn a_struct_given_one_name_twice_is_refused_and_the_name_is_said() {
+        let written = text(
+            r#"{"a":"Struct(x: Int64, y: String)","a_struct":[["k","Int64"],["m","String"],["k","Int8"]],"b":"Int8","revision":1}"#,
+        );
+        let refusal = Case::decode(written.as_bytes()).expect_err("a refusal");
+        assert!(refusal.to_string().contains("\"k\""), "{refusal}");
+    }
+
+    #[test]
+    fn a_field_of_a_dtype_no_field_may_be_is_refused_and_the_dtype_is_said() {
+        for kind in [
+            r#""Array(Int64, 2)""#,
+            r#""Struct(x: Int64, y: String)""#,
+            r#""Nothing""#,
+        ] {
+            let written = text(&format!(
+                r#"{{"a":"Struct(x: Int64, y: String)","a_struct":[["k",{kind}]],"b":"Int8","revision":1}}"#
+            ));
+            let refusal = Case::decode(written.as_bytes()).expect_err("a refusal");
+            assert!(
+                refusal.to_string().contains(kind.trim_matches('"')),
+                "{kind}: {refusal}"
+            );
+        }
+    }
+}

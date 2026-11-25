@@ -3187,4 +3187,426 @@ mod tests {
             "a window is given more_exprs without partition_by"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Structs
+
+    /// The methods and functions a campaign focused on structs names.
+    const STRUCT_FOCUS: &str =
+        "struct.,value_counts,str.split_exact,str.splitn,list.to_struct,arr.to_struct,struct";
+
+    /// The first line of the case, which says what its columns are.
+    fn header_of(case: &Case) -> serde_json::Value {
+        let text = String::from_utf8(case.encode()).expect("a case is text");
+        serde_json::from_str(text.lines().next().expect("a first line")).expect("a header")
+    }
+
+    /// The document of the case as JSON.
+    fn document_of(case: &Case) -> serde_json::Value {
+        serde_json::from_str(case.document.write().as_str()).expect("a document")
+    }
+
+    /// Every call of the entry `id` in `value`, at any depth.
+    fn calls_of<'v>(
+        value: &'v serde_json::Value,
+        id: &str,
+        found: &mut Vec<&'v serde_json::Value>,
+    ) {
+        match value {
+            serde_json::Value::Object(map) => {
+                if map.get("entry").and_then(serde_json::Value::as_str) == Some(id) {
+                    found.push(value);
+                }
+                map.values().for_each(|inside| calls_of(inside, id, found));
+            }
+            serde_json::Value::Array(items) => {
+                items.iter().for_each(|inside| calls_of(inside, id, found));
+            }
+            _ => {}
+        }
+    }
+
+    /// The calls of `id` in the case, with the arguments each is given.
+    fn arguments_of(case: &Case, id: &str) -> Vec<serde_json::Value> {
+        let document = document_of(case);
+        let mut found = Vec::new();
+        calls_of(&document, id, &mut found);
+        found
+            .into_iter()
+            .map(|call| call["arguments"].clone())
+            .collect()
+    }
+
+    /// The name and the kind of each field a header says of a struct column: the kind is the name of
+    /// a dtype, or the fields of a struct that the field is.
+    fn fields_in(
+        header: &serde_json::Value,
+        key: &str,
+    ) -> Option<Vec<(String, serde_json::Value)>> {
+        header.get(key).map(|fields| {
+            fields
+                .as_array()
+                .expect("the fields are a list")
+                .iter()
+                .map(|field| {
+                    let pair = field.as_array().expect("a field is a name and a kind");
+                    assert_eq!(pair.len(), 2, "{field}");
+                    (
+                        pair[0].as_str().expect("a name").to_owned(),
+                        pair[1].clone(),
+                    )
+                })
+                .collect()
+        })
+    }
+
+    /// Every name of a field in `fields`, at any depth.
+    fn names_in(fields: &[(String, serde_json::Value)], names: &mut Vec<String>) {
+        for (name, kind) in fields {
+            names.push(name.clone());
+            if let Some(inner) = kind.as_array() {
+                let inner: Vec<(String, serde_json::Value)> = inner
+                    .iter()
+                    .map(|field| {
+                        (
+                            field[0].as_str().expect("a name").to_owned(),
+                            field[1].clone(),
+                        )
+                    })
+                    .collect();
+                names_in(&inner, names);
+            }
+        }
+    }
+
+    /// The names of the fields of the struct columns of the case, at any depth.
+    fn field_names_of(case: &Case) -> Vec<String> {
+        let header = header_of(case);
+        let mut names = Vec::new();
+        for key in ["a_struct", "b_struct"] {
+            if let Some(fields) = fields_in(&header, key) {
+                names_in(&fields, &mut names);
+            }
+        }
+        names
+    }
+
+    /// The cases that a campaign focused on `text` makes of the first `offsets` entropies.
+    fn focused_cases(text: &str, offsets: u64) -> Vec<Case> {
+        let focus = Focus::parse(text).unwrap().unwrap();
+        (0..offsets)
+            .filter_map(|offset| generate(&entropy(offset), Some(&focus)))
+            .collect()
+    }
+
+    /// The texts of the list a call is given for `parameter`, whatever the kind of each.
+    fn listed(arguments: &serde_json::Value, parameter: &str) -> Option<Vec<String>> {
+        let items = arguments.get(parameter)?["many"].as_array()?;
+        Some(
+            items
+                .iter()
+                .map(|item| {
+                    item.as_object()
+                        .and_then(|object| object.values().next())
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned()
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_focus_on_structs_draws_struct_columns_of_several_field_sets() {
+        let cases = focused_cases(STRUCT_FOCUS, 4000);
+        let mut sets = std::collections::BTreeSet::new();
+        let mut counts = std::collections::BTreeSet::new();
+        let mut kinds = std::collections::BTreeSet::new();
+        let (mut nested, mut lists, mut of_the_argument) = (0, 0, 0);
+        for case in &cases {
+            let header = header_of(case);
+            for key in ["a_struct", "b_struct"] {
+                let column = if key == "a_struct" {
+                    case.receiver
+                } else {
+                    case.argument
+                };
+                let Some(fields) = fields_in(&header, key) else {
+                    continue;
+                };
+                assert_eq!(
+                    column,
+                    Representative::Struct,
+                    "{key} of a column that is none"
+                );
+                sets.insert(serde_json::to_string(&header[key]).expect("JSON"));
+                counts.insert(fields.len());
+                of_the_argument += usize::from(key == "b_struct");
+                for (_, kind) in &fields {
+                    match kind {
+                        serde_json::Value::String(name) => {
+                            kinds.insert(name.clone());
+                            lists += usize::from(name.starts_with("List("));
+                        }
+                        _ => nested += 1,
+                    }
+                }
+            }
+        }
+        assert!(
+            sets.len() >= 40,
+            "{} field sets in {} cases",
+            sets.len(),
+            cases.len()
+        );
+        assert!(
+            counts.contains(&0)
+                && counts.contains(&1)
+                && counts.contains(&2)
+                && counts.contains(&3),
+            "struct columns of {counts:?} fields"
+        );
+        assert!(kinds.len() >= 12, "fields of only {kinds:?}");
+        assert!(nested > 20, "{nested} fields are a struct");
+        assert!(lists > 20, "{lists} fields are a list");
+        assert!(
+            of_the_argument > 20,
+            "{of_the_argument} columns `b` are structs"
+        );
+    }
+
+    #[test]
+    fn a_campaign_without_a_focus_draws_only_the_struct_that_the_tables_measured() {
+        for offset in 0..3000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let header = header_of(&case);
+            assert!(
+                header.get("a_struct").is_none() && header.get("b_struct").is_none(),
+                "offset {offset}: {header}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_focus_on_a_field_read_draws_names_that_are_fields_and_names_that_are_not() {
+        let (mut fields, mut absent, mut read) = (0, 0, 0);
+        for case in focused_cases("struct.field", 3000) {
+            let names = field_names_of(&case);
+            for arguments in arguments_of(&case, "Expr.struct.field") {
+                let name = arguments["name"]["field"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("a field is read by no name: {arguments}"));
+                read += 1;
+                if names.iter().any(|field| field == name) {
+                    fields += 1;
+                } else {
+                    absent += 1;
+                }
+            }
+        }
+        assert!(read > 500, "{read} fields read");
+        assert!(fields > 100, "{fields} names are fields");
+        assert!(absent > 40, "{absent} names are no field");
+    }
+
+    #[test]
+    fn a_focus_on_naming_fields_draws_names_of_each_number_repeated_names_and_both_strictnesses() {
+        let (mut counts, mut repeated, mut absent) = (std::collections::BTreeSet::new(), 0, 0);
+        let (mut strict, mut lenient, mut unset) = (0, 0, 0);
+        let mut dropped = 0;
+        for case in focused_cases("struct.rename_fields,struct.drop", 3000) {
+            let names = field_names_of(&case);
+            for arguments in arguments_of(&case, "Expr.struct.rename_fields") {
+                let given = listed(&arguments, "names")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                counts.insert(given.len());
+                repeated +=
+                    usize::from((1..given.len()).any(|at| given[..at].contains(&given[at])));
+            }
+            for arguments in arguments_of(&case, "Expr.struct.drop") {
+                let given = listed(&arguments, "names")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                dropped += 1;
+                absent += given.iter().filter(|name| !names.contains(name)).count();
+                match &arguments.get("strict").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => strict += 1,
+                    Some(serde_json::Value::Bool(false)) => lenient += 1,
+                    _ => unset += 1,
+                }
+            }
+        }
+        assert!(
+            counts.contains(&1) && counts.contains(&2) && counts.contains(&3) && counts.len() >= 4,
+            "renames of {counts:?} names"
+        );
+        assert!(repeated > 10, "{repeated} renames repeat a name");
+        assert!(dropped > 100, "{dropped} drops");
+        assert!(absent > 20, "{absent} dropped names are no field");
+        assert!(
+            strict > 10 && lenient > 10 && unset > 10,
+            "{strict} {lenient} {unset}"
+        );
+    }
+
+    #[test]
+    fn a_focus_on_value_counts_draws_it_with_each_option() {
+        let (mut sorted, mut unsorted, mut normalized, mut counted) = (0, 0, 0, 0);
+        let (mut named, mut named_as_the_column, mut named_as_the_count, mut unnamed) =
+            (0, 0, 0, 0);
+        for case in focused_cases("value_counts", 2000) {
+            for arguments in arguments_of(&case, "Expr.value_counts") {
+                match arguments.get("sort").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => sorted += 1,
+                    Some(serde_json::Value::Bool(false)) => unsorted += 1,
+                    _ => {}
+                }
+                match arguments.get("normalize").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => normalized += 1,
+                    Some(serde_json::Value::Bool(false)) => counted += 1,
+                    _ => {}
+                }
+                match arguments
+                    .get("name")
+                    .and_then(|name| name["string"].as_str())
+                {
+                    Some("a" | "b") => {
+                        named += 1;
+                        named_as_the_column += 1;
+                    }
+                    Some("count" | "proportion") => {
+                        named += 1;
+                        named_as_the_count += 1;
+                    }
+                    Some(_) => named += 1,
+                    None => unnamed += 1,
+                }
+            }
+        }
+        assert!(
+            sorted > 30 && unsorted > 30,
+            "{sorted} sorted, {unsorted} not"
+        );
+        assert!(
+            normalized > 30 && counted > 30,
+            "{normalized} normalized, {counted} not"
+        );
+        assert!(named > 50 && unnamed > 50, "{named} named, {unnamed} not");
+        assert!(
+            named_as_the_column > 5,
+            "{named_as_the_column} named as the column"
+        );
+        assert!(
+            named_as_the_count > 5,
+            "{named_as_the_count} named as the count"
+        );
+    }
+
+    #[test]
+    fn a_focus_on_the_splits_into_fields_draws_every_small_number_of_parts_from_nought() {
+        for method in ["Expr.str.split_exact", "Expr.str.splitn"] {
+            let mut parts = std::collections::BTreeSet::new();
+            let mut inclusive = 0;
+            for case in focused_cases("str.split_exact,str.splitn", 2000) {
+                for arguments in arguments_of(&case, method) {
+                    parts.insert(
+                        arguments["n"]["integer"]
+                            .as_i64()
+                            .expect("a number of parts"),
+                    );
+                    inclusive += usize::from(arguments.get("inclusive").is_some());
+                }
+            }
+            assert!(
+                [0, 1, 2, 3].iter().all(|n| parts.contains(n)),
+                "{method} splits into {parts:?} parts"
+            );
+            assert!(method.ends_with("splitn") || inclusive > 10, "{inclusive}");
+        }
+    }
+
+    #[test]
+    fn a_focus_on_the_conversions_to_a_struct_draws_names_of_the_width_of_an_array_and_of_others() {
+        let mut lists = std::collections::BTreeSet::new();
+        let mut arrays = std::collections::BTreeSet::new();
+        let (mut repeated, mut unnamed) = (0, 0);
+        for case in focused_cases("list.to_struct,arr.to_struct", 3000) {
+            for arguments in arguments_of(&case, "Expr.list.to_struct") {
+                let given = listed(&arguments, "fields")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                lists.insert(given.len());
+                repeated +=
+                    usize::from((1..given.len()).any(|at| given[..at].contains(&given[at])));
+            }
+            for arguments in arguments_of(&case, "Expr.arr.to_struct") {
+                match listed(&arguments, "fields") {
+                    Some(given) => {
+                        arrays.insert(given.len());
+                    }
+                    None => unnamed += 1,
+                }
+            }
+        }
+        assert!(
+            lists.contains(&1) && lists.contains(&2) && lists.contains(&3),
+            "{lists:?}"
+        );
+        // The arrays of the sample are two wide: the width, narrower names and wider ones.
+        assert!(
+            arrays.contains(&1) && arrays.contains(&2) && arrays.contains(&3),
+            "{arrays:?}"
+        );
+        assert!(unnamed > 20, "{unnamed} arrays are named by their places");
+        assert!(repeated > 5, "{repeated} lists are given a name twice");
+    }
+
+    #[test]
+    fn a_focus_on_polars_struct_draws_columns_literals_fields_of_structs_and_named_values() {
+        let (mut made, mut several, mut columns, mut literals, mut fields, mut named) =
+            (0, 0, 0, 0, 0, 0);
+        for case in focused_cases("struct", 3000) {
+            for arguments in arguments_of(&case, "polars.struct") {
+                made += 1;
+                let written = arguments.to_string();
+                several += usize::from(
+                    arguments["exprs"]["many"]
+                        .as_array()
+                        .is_some_and(|items| items.len() >= 2),
+                );
+                columns += usize::from(written.contains("polars.col"));
+                literals += usize::from(written.contains("polars.lit"));
+                fields += usize::from(written.contains("Expr.struct.field"));
+                named += usize::from(
+                    arguments["named_exprs"]["pairs"]
+                        .as_array()
+                        .is_some_and(|pairs| !pairs.is_empty()),
+                );
+            }
+        }
+        assert!(made > 300, "{made} structs made");
+        assert!(several > 100, "{several} are made of several");
+        assert!(
+            columns > 100 && literals > 50,
+            "{columns} columns, {literals} literals"
+        );
+        assert!(fields > 30, "{fields} hold the field of a struct");
+        assert!(named > 30, "{named} hold a named value");
+    }
+
+    #[test]
+    fn a_focus_on_structs_makes_most_cases_with_a_struct_to_read() {
+        // The methods that read a struct follow one, so most of the cases of a focus on them have a
+        // column that is.
+        let cases = focused_cases("struct.", 1500);
+        let with = cases
+            .iter()
+            .filter(|case| case.receiver == Representative::Struct)
+            .count();
+        assert!(
+            with * 100 > cases.len() * 40,
+            "{with} of {} cases",
+            cases.len()
+        );
+    }
 }

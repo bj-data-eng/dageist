@@ -1386,4 +1386,73 @@ mod tests {
         assert_eq!(counted(&tally, "excused by a limit"), Some(1), "{tally:?}");
         assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
     }
+
+    /// The case `select(a.struct.field(name))` on a column `a` of the struct that `fields` write.
+    fn reads_a_field(fields: &str, name: &str) -> &'static str {
+        let text = format!(
+            r#"{{"a":"Struct(x: Int64, y: String)","a_struct":{fields},"b":"Int8","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.struct.field","arguments":{{"name":{{"field":"{name}"}}}}}}]}}}}]}}}}}}}}]}}"#
+        );
+        Box::leak(text.into_boxed_str())
+    }
+
+    #[test]
+    fn a_field_read_of_a_struct_column_of_the_fields_a_case_names_is_checked_against_polars() {
+        // Polars is given a column `a` whose fields are the ones the case names, so what it says of
+        // the read is what it says of that struct, and the walk says the same: the dtype of the field.
+        for (fields, name) in [
+            (r#"[["k","Int64"],["s","String"]]"#, "s"),
+            (r#"[["only","Boolean"]]"#, "only"),
+            (r#"[["k","Int64"],["l","List(String)"]]"#, "l"),
+            (
+                r#"[["k","Int64"],["n",[["p","Date"],["q","Float32"]]]]"#,
+                "n",
+            ),
+        ] {
+            let (outcome, tally) = evaluated_and_tallied(reads_a_field(fields, name));
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::Evaluated,
+                "{fields} {name}: {outcome:?}"
+            );
+            assert_eq!(
+                counted(&tally, "cases agreeing"),
+                Some(1),
+                "{fields} {name}: {tally:?}"
+            );
+            assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+        }
+    }
+
+    #[test]
+    fn a_name_that_is_no_field_of_the_struct_a_case_names_is_refused_by_both() {
+        // `x` is a field of the struct the tables measured and of no struct here.
+        let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "x"));
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+        let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "k"));
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+    }
+
+    #[test]
+    fn a_struct_column_with_no_fields_is_run_as_a_struct_column_and_is_judged() {
+        let text = r#"{"a":"Struct(x: Int64, y: String)","a_struct":[],"b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.is_null","arguments":{}}]}}]}}}}]}"#;
+        let (outcome, tally) = evaluated_and_tallied(text);
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
 }
