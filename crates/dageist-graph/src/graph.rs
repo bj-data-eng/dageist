@@ -33,8 +33,6 @@ pub enum Gap {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Graph {
     pub(crate) nodes: BTreeMap<NodeId, Node>,
-    /// Ids of removed nodes, which are not given again.
-    pub(crate) retired: BTreeSet<NodeId>,
 }
 
 impl Graph {
@@ -209,22 +207,6 @@ impl Graph {
                 Name::new(&text).expect("a kind's default name is a name")
             })
             .find(|name| !self.name_taken(name, None))
-            .expect("some number is free")
-    }
-
-    /// The id made from `name`, then with `-2`, `-3` and so on, that no node
-    /// has and no removed node had.
-    pub(crate) fn fresh_id(&self, name: &Name) -> NodeId {
-        let base = NodeId::from_name(name);
-        (1..)
-            .map(|number| {
-                if number == 1 {
-                    base.clone()
-                } else {
-                    base.numbered(number)
-                }
-            })
-            .find(|id| !self.nodes.contains_key(id) && !self.retired.contains(id))
             .expect("some number is free")
     }
 }

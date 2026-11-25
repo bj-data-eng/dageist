@@ -78,8 +78,16 @@ fn make(session: &mut Session, edit: &Edit) -> Result<Option<NodeId>, ErrorView>
         .map_err(|refused| ErrorView::new(format!("building the starting graph: {refused}")))
 }
 
+/// The id of the starting graph's node added `number`th. The starting graph's ids are fixed, so
+/// that its views are the same on every run, and sort in the order the nodes are added.
+fn starting_id(number: u8) -> NodeId {
+    NodeId::new(format!("00000000-0000-7000-8000-{number:012}"))
+        .unwrap_or_else(|error| unreachable!("a starting id: {error}"))
+}
+
 fn add_named(
     session: &mut Session,
+    number: u8,
     kind: Kind,
     name: &str,
     follows: Option<&NodeId>,
@@ -88,6 +96,7 @@ fn add_named(
     make(
         session,
         &Edit::Add {
+            id: starting_id(number),
             kind,
             follows: follows.cloned(),
             name: Some(name),
@@ -96,8 +105,13 @@ fn add_named(
     .ok_or_else(|| ErrorView::new("building the starting graph: a node was not added"))
 }
 
-fn add_source(session: &mut Session, name: &str, path: &Path) -> Result<NodeId, ErrorView> {
-    let node = add_named(session, Kind::Source, name, None)?;
+fn add_source(
+    session: &mut Session,
+    number: u8,
+    name: &str,
+    path: &Path,
+) -> Result<NodeId, ErrorView> {
+    let node = add_named(session, number, Kind::Source, name, None)?;
     make(
         session,
         &Edit::SetFile {
@@ -128,11 +142,11 @@ pub(crate) fn starting_session(
 ) -> Result<Session, ErrorView> {
     let files = ClaimTiming::write_tables(directory).map_err(ErrorView::from)?;
     let mut session = Session::new(revision);
-    let claims = add_source(&mut session, "Claims", &files.claims)?;
-    let sla = add_source(&mut session, "SLA by step", &files.step_sla)?;
-    let names = add_source(&mut session, "Step names", &files.step_names)?;
-    let calendar = add_source(&mut session, "Holiday calendar", &files.holidays)?;
-    let parameters = add_named(&mut session, Kind::Parameters, "Parameters", None)?;
+    let claims = add_source(&mut session, 1, "Claims", &files.claims)?;
+    let sla = add_source(&mut session, 2, "SLA by step", &files.step_sla)?;
+    let names = add_source(&mut session, 3, "Step names", &files.step_names)?;
+    let calendar = add_source(&mut session, 4, "Holiday calendar", &files.holidays)?;
+    let parameters = add_named(&mut session, 5, Kind::Parameters, "Parameters", None)?;
     for (name, dtype, text) in [
         ("sla_cutoff", "Int64", "1"),
         ("as_of", "Date", "2026-03-02"),
@@ -149,7 +163,13 @@ pub(crate) fn starting_session(
             },
         )?;
     }
-    let transform = add_named(&mut session, Kind::Transform, "Claim timing", Some(&claims))?;
+    let transform = add_named(
+        &mut session,
+        6,
+        Kind::Transform,
+        "Claim timing",
+        Some(&claims),
+    )?;
     let inputs = [
         ("step_sla", Reference::Table { node: sla }),
         ("step_names", Reference::Table { node: names }),
@@ -195,6 +215,7 @@ pub(crate) fn starting_session(
     }
     add_named(
         &mut session,
+        7,
         Kind::Output,
         "Claim timing output",
         Some(&transform),
@@ -214,7 +235,7 @@ pub(crate) fn starting_session(
 /// The id of the transform the starting graph's steps belong to.
 #[cfg(test)]
 pub(crate) fn starting_transform() -> NodeId {
-    NodeId::new("claim-timing").unwrap_or_else(|error| unreachable!("a starting id: {error}"))
+    starting_id(6)
 }
 
 // -- Views ---------------------------------------------------------------------------------
@@ -681,7 +702,7 @@ fn input_name(text: &str) -> Result<InputName, ErrorView> {
 #[serde(tag = "edit", rename_all = "camelCase", deny_unknown_fields)]
 pub enum GraphEditRequest {
     /// Adds a node of `kind`, reading the table of `follows` when it is given, named `name` or
-    /// after its kind.
+    /// after its kind. The host mints its id.
     Add {
         kind: KindView,
         follows: Option<String>,
@@ -740,6 +761,7 @@ impl GraphEditRequest {
                 follows,
                 name,
             } => Edit::Add {
+                id: NodeId::mint(),
                 kind: kind.kind(),
                 follows: follows.as_deref().map(known_id).transpose()?,
                 name: name

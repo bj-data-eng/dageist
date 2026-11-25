@@ -100,9 +100,14 @@ the names its steps already use, as `{ "input": "holidays" }` or
 `{ "table": "step_sla" }`, so a step document is unchanged by being put in a
 graph.
 
-A node's id is made from its name when it is added, such as `claim-timing` for
-Claim timing. It stays the same when the node is renamed, and the graph does not
-give it to another node after the node is removed.
+A node's id is a UUID of version 7, such as
+`0197a3c2-7a44-7f02-8b3d-91c5e7f2a610`, which the host mints when the node is
+asked for and the edit that adds the node carries. Making an edit is therefore
+the same every time it is made, and the graph does not mint. An id stays the
+same when the node is renamed and is never given to another node, so a
+workspace on disk will be able to name a node's folder by it. Version 7 holds
+the time an id was made: ids minted by one run of the application sort in the
+order their nodes were added, and across runs as far as the clock keeps time.
 
 ### Edits And Checks
 

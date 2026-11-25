@@ -3,7 +3,7 @@
   "layoutRevision": 0,
   "nodes": [
     {
-      "id": "claims",
+      "id": "00000000-0000-7000-8000-000000000001",
       "name": "Claims",
       "kind": "source",
       "summary": "claims.parquet",
@@ -40,52 +40,7 @@
       "frame": null
     },
     {
-      "id": "holiday-calendar",
-      "name": "Holiday calendar",
-      "kind": "source",
-      "summary": "holidays.parquet",
-      "slots": [],
-      "newInput": null,
-      "columns": [
-        {
-          "name": "date",
-          "dtype": "Date"
-        }
-      ],
-      "parameters": [],
-      "file": {
-        "path": "/sample/holidays.parquet",
-        "format": "parquet"
-      },
-      "problems": [],
-      "frame": null
-    },
-    {
-      "id": "parameters",
-      "name": "Parameters",
-      "kind": "parameters",
-      "summary": "2 values",
-      "slots": [],
-      "newInput": null,
-      "columns": null,
-      "parameters": [
-        {
-          "name": "as_of",
-          "dtype": "Date",
-          "text": "2026-03-02"
-        },
-        {
-          "name": "sla_cutoff",
-          "dtype": "Int64",
-          "text": "1"
-        }
-      ],
-      "file": null,
-      "problems": [],
-      "frame": null
-    },
-    {
-      "id": "sla-by-step",
+      "id": "00000000-0000-7000-8000-000000000002",
       "name": "SLA by step",
       "kind": "source",
       "summary": "step_sla.parquet",
@@ -110,7 +65,7 @@
       "frame": null
     },
     {
-      "id": "step-names",
+      "id": "00000000-0000-7000-8000-000000000003",
       "name": "Step names",
       "kind": "source",
       "summary": "step_names.parquet",
@@ -131,7 +86,52 @@
       "frame": null
     },
     {
-      "id": "claim-timing",
+      "id": "00000000-0000-7000-8000-000000000004",
+      "name": "Holiday calendar",
+      "kind": "source",
+      "summary": "holidays.parquet",
+      "slots": [],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "date",
+          "dtype": "Date"
+        }
+      ],
+      "parameters": [],
+      "file": {
+        "path": "/sample/holidays.parquet",
+        "format": "parquet"
+      },
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "00000000-0000-7000-8000-000000000005",
+      "name": "Parameters",
+      "kind": "parameters",
+      "summary": "2 values",
+      "slots": [],
+      "newInput": null,
+      "columns": null,
+      "parameters": [
+        {
+          "name": "as_of",
+          "dtype": "Date",
+          "text": "2026-03-02"
+        },
+        {
+          "name": "sla_cutoff",
+          "dtype": "Int64",
+          "text": "1"
+        }
+      ],
+      "file": null,
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "00000000-0000-7000-8000-000000000006",
       "name": "Claim timing",
       "kind": "transform",
       "summary": "12 steps",
@@ -143,24 +143,24 @@
           "takes": "table",
           "from": {
             "kind": "table",
-            "node": "claims"
+            "node": "00000000-0000-7000-8000-000000000001"
           },
           "fits": [
             {
               "kind": "table",
-              "node": "claims"
+              "node": "00000000-0000-7000-8000-000000000001"
             },
             {
               "kind": "table",
-              "node": "holiday-calendar"
+              "node": "00000000-0000-7000-8000-000000000002"
             },
             {
               "kind": "table",
-              "node": "sla-by-step"
+              "node": "00000000-0000-7000-8000-000000000003"
             },
             {
               "kind": "table",
-              "node": "step-names"
+              "node": "00000000-0000-7000-8000-000000000004"
             }
           ]
         },
@@ -172,18 +172,18 @@
           "takes": "value",
           "from": {
             "kind": "parameter",
-            "node": "parameters",
+            "node": "00000000-0000-7000-8000-000000000005",
             "name": "as_of"
           },
           "fits": [
             {
               "kind": "parameter",
-              "node": "parameters",
+              "node": "00000000-0000-7000-8000-000000000005",
               "name": "as_of"
             },
             {
               "kind": "parameter",
-              "node": "parameters",
+              "node": "00000000-0000-7000-8000-000000000005",
               "name": "sla_cutoff"
             }
           ]
@@ -196,25 +196,25 @@
           "takes": "list",
           "from": {
             "kind": "column",
-            "node": "holiday-calendar",
+            "node": "00000000-0000-7000-8000-000000000004",
             "column": "date"
           },
           "fits": [
             {
               "kind": "table",
-              "node": "claims"
+              "node": "00000000-0000-7000-8000-000000000001"
             },
             {
               "kind": "table",
-              "node": "holiday-calendar"
+              "node": "00000000-0000-7000-8000-000000000002"
             },
             {
               "kind": "table",
-              "node": "sla-by-step"
+              "node": "00000000-0000-7000-8000-000000000003"
             },
             {
               "kind": "table",
-              "node": "step-names"
+              "node": "00000000-0000-7000-8000-000000000004"
             }
           ]
         },
@@ -226,18 +226,18 @@
           "takes": "value",
           "from": {
             "kind": "parameter",
-            "node": "parameters",
+            "node": "00000000-0000-7000-8000-000000000005",
             "name": "sla_cutoff"
           },
           "fits": [
             {
               "kind": "parameter",
-              "node": "parameters",
+              "node": "00000000-0000-7000-8000-000000000005",
               "name": "as_of"
             },
             {
               "kind": "parameter",
-              "node": "parameters",
+              "node": "00000000-0000-7000-8000-000000000005",
               "name": "sla_cutoff"
             }
           ]
@@ -250,24 +250,24 @@
           "takes": "table",
           "from": {
             "kind": "table",
-            "node": "step-names"
+            "node": "00000000-0000-7000-8000-000000000003"
           },
           "fits": [
             {
               "kind": "table",
-              "node": "claims"
+              "node": "00000000-0000-7000-8000-000000000001"
             },
             {
               "kind": "table",
-              "node": "holiday-calendar"
+              "node": "00000000-0000-7000-8000-000000000002"
             },
             {
               "kind": "table",
-              "node": "sla-by-step"
+              "node": "00000000-0000-7000-8000-000000000003"
             },
             {
               "kind": "table",
-              "node": "step-names"
+              "node": "00000000-0000-7000-8000-000000000004"
             }
           ]
         },
@@ -279,24 +279,24 @@
           "takes": "table",
           "from": {
             "kind": "table",
-            "node": "sla-by-step"
+            "node": "00000000-0000-7000-8000-000000000002"
           },
           "fits": [
             {
               "kind": "table",
-              "node": "claims"
+              "node": "00000000-0000-7000-8000-000000000001"
             },
             {
               "kind": "table",
-              "node": "holiday-calendar"
+              "node": "00000000-0000-7000-8000-000000000002"
             },
             {
               "kind": "table",
-              "node": "sla-by-step"
+              "node": "00000000-0000-7000-8000-000000000003"
             },
             {
               "kind": "table",
-              "node": "step-names"
+              "node": "00000000-0000-7000-8000-000000000004"
             }
           ]
         }
@@ -304,29 +304,29 @@
       "newInput": [
         {
           "kind": "table",
-          "node": "claims"
+          "node": "00000000-0000-7000-8000-000000000001"
         },
         {
           "kind": "table",
-          "node": "holiday-calendar"
+          "node": "00000000-0000-7000-8000-000000000002"
+        },
+        {
+          "kind": "table",
+          "node": "00000000-0000-7000-8000-000000000003"
+        },
+        {
+          "kind": "table",
+          "node": "00000000-0000-7000-8000-000000000004"
         },
         {
           "kind": "parameter",
-          "node": "parameters",
+          "node": "00000000-0000-7000-8000-000000000005",
           "name": "as_of"
         },
         {
           "kind": "parameter",
-          "node": "parameters",
+          "node": "00000000-0000-7000-8000-000000000005",
           "name": "sla_cutoff"
-        },
-        {
-          "kind": "table",
-          "node": "sla-by-step"
-        },
-        {
-          "kind": "table",
-          "node": "step-names"
         }
       ],
       "columns": [
@@ -357,7 +357,7 @@
       "frame": null
     },
     {
-      "id": "claim-timing-output",
+      "id": "00000000-0000-7000-8000-000000000007",
       "name": "Claim timing output",
       "kind": "output",
       "summary": "No file chosen",
@@ -369,28 +369,28 @@
           "takes": "table",
           "from": {
             "kind": "table",
-            "node": "claim-timing"
+            "node": "00000000-0000-7000-8000-000000000006"
           },
           "fits": [
             {
               "kind": "table",
-              "node": "claim-timing"
+              "node": "00000000-0000-7000-8000-000000000001"
             },
             {
               "kind": "table",
-              "node": "claims"
+              "node": "00000000-0000-7000-8000-000000000002"
             },
             {
               "kind": "table",
-              "node": "holiday-calendar"
+              "node": "00000000-0000-7000-8000-000000000003"
             },
             {
               "kind": "table",
-              "node": "sla-by-step"
+              "node": "00000000-0000-7000-8000-000000000004"
             },
             {
               "kind": "table",
-              "node": "step-names"
+              "node": "00000000-0000-7000-8000-000000000006"
             }
           ]
         }

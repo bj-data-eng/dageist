@@ -3,8 +3,21 @@ use crate::{
     Layout, Name, NodeId, Parameter, ParameterName, Place, Reference, Slot,
 };
 
-fn id(text: &str) -> NodeId {
-    NodeId::new(text).unwrap()
+/// The id a test calls `label`: a UUID whose bytes are the label's, so that
+/// ids sort as their labels do.
+fn id(label: &str) -> NodeId {
+    let mut bytes = [0_u8; 16];
+    bytes[..label.len()].copy_from_slice(label.as_bytes());
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    NodeId::new(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    ))
+    .unwrap()
 }
 
 fn table(node: &str) -> Reference {
@@ -17,15 +30,30 @@ fn edited(graph: &Graph, edit: Edit) -> (Graph, Option<NodeId>) {
     (edited.graph, edited.added)
 }
 
+/// Adds a node of `kind`, with the id labelled by its kind's word, then with
+/// `-2`, `-3` and so on, that no node of the graph has.
 fn add(graph: &Graph, kind: Kind, follows: Option<&str>) -> (Graph, NodeId) {
+    let word = kind.default_name().to_lowercase();
+    let label = (1..)
+        .map(|number| {
+            if number == 1 {
+                word.clone()
+            } else {
+                format!("{word}-{number}")
+            }
+        })
+        .find(|label| graph.node(&id(label)).is_none())
+        .unwrap();
     let (graph, added) = edited(
         graph,
         Edit::Add {
+            id: id(&label),
             kind,
             follows: follows.map(id),
             name: None,
         },
     );
+    assert_eq!(added.as_ref(), Some(&id(&label)));
     (graph, added.unwrap())
 }
 
@@ -42,7 +70,6 @@ fn chain() -> Graph {
 fn added_nodes_are_named_after_their_kind_and_numbered_apart() {
     let (graph, first) = add(&Graph::new(), Kind::Source, None);
     let (graph, second) = add(&graph, Kind::Source, None);
-    assert_eq!((first.as_str(), second.as_str()), ("source", "source-2"));
     assert_eq!(graph.node(&first).unwrap().name().as_str(), "Source");
     assert_eq!(graph.node(&second).unwrap().name().as_str(), "Source 2");
 }
@@ -71,6 +98,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
     let (graph, _) = add(&graph, Kind::Source, None);
     assert_eq!(
         graph.edit(&Edit::Add {
+            id: id("new"),
             kind: Kind::Source,
             follows: Some(id("source")),
             name: None,
@@ -79,6 +107,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
     );
     assert_eq!(
         graph.edit(&Edit::Add {
+            id: id("new"),
             kind: Kind::Transform,
             follows: Some(id("parameters")),
             name: None,
@@ -87,6 +116,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
     );
     assert_eq!(
         graph.edit(&Edit::Add {
+            id: id("new"),
             kind: Kind::Transform,
             follows: Some(id("missing")),
             name: None,
@@ -302,7 +332,7 @@ fn a_column_reference_needs_a_column_name() {
 }
 
 #[test]
-fn removing_a_node_clears_the_references_to_it_and_retires_its_id() {
+fn removing_a_node_clears_the_references_to_it_and_frees_its_name() {
     let (graph, _) = edited(
         &chain(),
         Edit::Remove {
@@ -314,9 +344,19 @@ fn removing_a_node_clears_the_references_to_it_and_retires_its_id() {
         graph.gaps(&id("output")),
         vec![Gap::Unconnected(Slot::Written), Gap::NoFile]
     );
-    let (graph, added) = add(&graph, Kind::Transform, None);
-    assert_eq!(added.as_str(), "transform-2");
-    assert_eq!(graph.node(&added).unwrap().name().as_str(), "Transform");
+    let (graph, added) = edited(
+        &graph,
+        Edit::Add {
+            id: id("transform-2"),
+            kind: Kind::Transform,
+            follows: None,
+            name: None,
+        },
+    );
+    assert_eq!(
+        graph.node(&added.unwrap()).unwrap().name().as_str(),
+        "Transform"
+    );
 }
 
 #[test]
@@ -407,8 +447,10 @@ fn the_order_puts_every_node_after_the_nodes_it_reads() {
             from: table("source"),
         },
     );
-    let order: Vec<_> = graph.order().into_iter().map(NodeId::as_str).collect();
-    assert_eq!(order, vec!["source", "transform", "output"]);
+    assert_eq!(
+        graph.order(),
+        vec![&id("source"), &id("transform"), &id("output")]
+    );
 }
 
 #[test]
@@ -501,16 +543,25 @@ fn an_input_added_by_name_waits_unconnected_and_its_name_is_not_given_twice() {
 }
 
 #[test]
-fn a_node_added_with_a_name_takes_its_id_from_it_and_a_name_taken_is_refused() {
-    let named = |name: &str| Edit::Add {
+fn a_node_is_added_with_the_id_and_name_it_is_given_and_neither_may_be_taken() {
+    let named = |label: &str, name: &str| Edit::Add {
+        id: id(label),
         kind: Kind::Source,
         follows: None,
         name: Some(Name::new(name).unwrap()),
     };
-    let (graph, added) = edited(&Graph::new(), named("Holiday calendar"));
-    assert_eq!(added.unwrap().as_str(), "holiday-calendar");
+    let (graph, added) = edited(&Graph::new(), named("holidays", "Holiday calendar"));
+    assert_eq!(added, Some(id("holidays")));
     assert_eq!(
-        graph.edit(&named("holiday CALENDAR")),
+        graph.node(&id("holidays")).unwrap().name().as_str(),
+        "Holiday calendar"
+    );
+    assert_eq!(
+        graph.edit(&named("other", "holiday CALENDAR")),
         Err(EditError::NameTaken(Name::new("holiday CALENDAR").unwrap()))
+    );
+    assert_eq!(
+        graph.edit(&named("holidays", "Calendar")),
+        Err(EditError::IdTaken(id("holidays")))
     );
 }

@@ -21,17 +21,26 @@ function refusal(decode: (value: unknown) => unknown, value: unknown): DecodeErr
   throw new Error('the value was not refused');
 }
 
+// The ids the host gives the starting graph's nodes, in the order it adds them.
+const CLAIMS = '00000000-0000-7000-8000-000000000001';
+const SLA = '00000000-0000-7000-8000-000000000002';
+const NAMES = '00000000-0000-7000-8000-000000000003';
+const CALENDAR = '00000000-0000-7000-8000-000000000004';
+const PARAMETERS = '00000000-0000-7000-8000-000000000005';
+const TIMING = '00000000-0000-7000-8000-000000000006';
+const OUTPUT = '00000000-0000-7000-8000-000000000007';
+
 describe('the graph the application opens on', () => {
   it('lists every node after the nodes it reads', () => {
     const decoded = decodeGraph(graph);
     expect(decoded.nodes.map((node) => [node.id, node.kind])).toEqual([
-      ['claims', 'source'],
-      ['holiday-calendar', 'source'],
-      ['parameters', 'parameters'],
-      ['sla-by-step', 'source'],
-      ['step-names', 'source'],
-      ['claim-timing', 'transform'],
-      ['claim-timing-output', 'output'],
+      [CLAIMS, 'source'],
+      [SLA, 'source'],
+      [NAMES, 'source'],
+      [CALENDAR, 'source'],
+      [PARAMETERS, 'parameters'],
+      [TIMING, 'transform'],
+      [OUTPUT, 'output'],
     ]);
     expect(decoded.parameterDtypes).toEqual(['Int64', 'Float64', 'Boolean', 'String', 'Date']);
   });
@@ -57,31 +66,31 @@ describe('the graph the application opens on', () => {
   });
 
   it('gives the transform its slots, what fills each and what could', () => {
-    const transform = decodeGraph(graph).nodes.find((node) => node.id === 'claim-timing');
+    const transform = decodeGraph(graph).nodes.find((node) => node.id === TIMING);
     expect(transform?.summary).toBe('12 steps');
     expect(transform?.slots.map((slot) => [slot.slot, slot.takes, slot.from])).toEqual([
-      [{ kind: 'start' }, 'table', { kind: 'table', node: 'claims' }],
+      [{ kind: 'start' }, 'table', { kind: 'table', node: CLAIMS }],
       [
         { kind: 'input', name: 'as_of' },
         'value',
-        { kind: 'parameter', node: 'parameters', name: 'as_of' },
+        { kind: 'parameter', node: PARAMETERS, name: 'as_of' },
       ],
       [
         { kind: 'input', name: 'holidays' },
         'list',
-        { kind: 'column', node: 'holiday-calendar', column: 'date' },
+        { kind: 'column', node: CALENDAR, column: 'date' },
       ],
       [
         { kind: 'input', name: 'sla_cutoff' },
         'value',
-        { kind: 'parameter', node: 'parameters', name: 'sla_cutoff' },
+        { kind: 'parameter', node: PARAMETERS, name: 'sla_cutoff' },
       ],
-      [{ kind: 'input', name: 'step_names' }, 'table', { kind: 'table', node: 'step-names' }],
-      [{ kind: 'input', name: 'step_sla' }, 'table', { kind: 'table', node: 'sla-by-step' }],
+      [{ kind: 'input', name: 'step_names' }, 'table', { kind: 'table', node: NAMES }],
+      [{ kind: 'input', name: 'step_sla' }, 'table', { kind: 'table', node: SLA }],
     ]);
     expect(transform?.slots[1]?.fits).toEqual([
-      { kind: 'parameter', node: 'parameters', name: 'as_of' },
-      { kind: 'parameter', node: 'parameters', name: 'sla_cutoff' },
+      { kind: 'parameter', node: PARAMETERS, name: 'as_of' },
+      { kind: 'parameter', node: PARAMETERS, name: 'sla_cutoff' },
     ]);
     expect(transform?.newInput).toHaveLength(6);
   });

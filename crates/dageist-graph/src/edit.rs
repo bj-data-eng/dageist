@@ -9,10 +9,12 @@ use crate::node::{Body, File, Input, InputKind, Kind, Node, Parameter, Reference
 /// One change to a graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Edit {
-    /// Adds a node of `kind`, named `name` or, without one, after its kind,
-    /// with its id made from that name. With `follows`, a transform starts
-    /// from that node's table and an output writes it.
+    /// Adds a node of `kind` with the id `id`, named `name` or, without one,
+    /// after its kind. With `follows`, a transform starts from that node's
+    /// table and an output writes it.
     Add {
+        /// The new node's id, [minted](NodeId::mint) by whoever asks for it.
+        id: NodeId,
         /// What the node is.
         kind: Kind,
         /// The node whose table the new node reads, if any.
@@ -104,6 +106,8 @@ pub enum Edit {
 pub enum EditError {
     /// The graph has no node with this id.
     NoSuchNode(NodeId),
+    /// The graph already has a node with this id.
+    IdTaken(NodeId),
     /// The node is of a kind the edit does not apply to.
     WrongKind {
         /// The node.
@@ -152,6 +156,7 @@ impl fmt::Display for EditError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoSuchNode(node) => write!(formatter, "there is no node {node}"),
+            Self::IdTaken(node) => write!(formatter, "there is already a node {node}"),
             Self::WrongKind { node, kind } => {
                 write!(
                     formatter,
@@ -230,15 +235,17 @@ impl Graph {
     fn apply(&mut self, edit: &Edit) -> Result<Option<NodeId>, EditError> {
         match edit {
             Edit::Add {
+                id,
                 kind,
                 follows,
                 name,
-            } => self.add(*kind, follows.as_ref(), name.as_ref()).map(Some),
+            } => self
+                .add(id, *kind, follows.as_ref(), name.as_ref())
+                .map(Some),
             Edit::Remove { node } => {
                 if self.nodes.remove(node).is_none() {
                     return Err(EditError::NoSuchNode(node.clone()));
                 }
-                self.retired.insert(node.clone());
                 for other in self.nodes.values_mut() {
                     other.clear_references(|reference| reference.node() != node);
                 }
@@ -396,10 +403,14 @@ impl Graph {
 
     fn add(
         &mut self,
+        id: &NodeId,
         kind: Kind,
         follows: Option<&NodeId>,
         name: Option<&Name>,
     ) -> Result<NodeId, EditError> {
+        if self.nodes.contains_key(id) {
+            return Err(EditError::IdTaken(id.clone()));
+        }
         if let Some(name) = name
             && self.name_taken(name, None)
         {
@@ -426,9 +437,8 @@ impl Graph {
             }
         }
         let name = name.cloned().unwrap_or_else(|| self.fresh_name(kind));
-        let id = self.fresh_id(&name);
         self.nodes.insert(id.clone(), Node { name, body });
-        Ok(id)
+        Ok(id.clone())
     }
 
     /// Checks that `from` names an output its node gives, and that `node`
