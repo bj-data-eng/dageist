@@ -800,6 +800,129 @@ fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of
 }
 
 #[test]
+fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_as_polars_takes_it()
+{
+    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers at once, for none is 1.5,
+    // and refuses the join for a key that is not elementwise, in both engines. Polars swaps the
+    // operands when it coerces them, so `lit(1.5).ne_missing(k)` is decided the same way. A number
+    // with no fraction is held by whole numbers, so the comparison is kept and the key is taken, and
+    // so is a number given the dtype of whole numbers, which makes `1.5` the whole number 1, and a
+    // key that is one value, as the count of a column is, and the same comparison in no join.
+    let number = |value: f64, whole_dtype: Option<&str>| {
+        let mut arguments = json!({ "value": { "float": value } });
+        if let Some(name) = whole_dtype {
+            arguments["dtype"] = dtype(name);
+        }
+        chain(
+            json!({ "entry": "polars.lit", "arguments": arguments }),
+            Vec::new(),
+        )
+    };
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    // `k` compared with the number, and the number compared with `k`.
+    let beside = |method: &str, value: Value| {
+        chain(
+            col_call("k"),
+            vec![call(method, json!({ "other": value })), cast()],
+        )
+    };
+    let swapped = |method: &str, value: Value| {
+        chain(
+            value["expression"]["start"].clone(),
+            vec![call(method, json!({ "other": field("k") })), cast()],
+        )
+    };
+    let refused = |said: &str, report: &Ran| {
+        assert!(
+            polars_says(report).is_some_and(|reason| reason.contains("elementwise")),
+            "{said}: {:?} {:?}",
+            polars_says(report),
+            outcome(report)
+        );
+        assert!(
+            walk(report).refusal().is_some_and(|refusal| matches!(
+                refusal.refusal().source(),
+                RefusalSource::Rule(Rule::KeyIsElementwise)
+            )),
+            "{said}: {:?}",
+            walk(report).refusal()
+        );
+    };
+    let taken = |said: &str, report: &Ran| {
+        assert!(
+            polars_says(report).is_none(),
+            "{said}: {:?}",
+            outcome(report)
+        );
+        assert_eq!(walk(report).refusal(), None, "{said}");
+    };
+    for method in ["Expr.ne_missing", "Expr.eq_missing"] {
+        refused(
+            &format!("{method} of k"),
+            &join_on(beside(method, number(1.5, None))),
+        );
+        refused(
+            &format!("{method} beside k"),
+            &join_on(swapped(method, number(1.5, None))),
+        );
+        refused(
+            &format!("{method} of k, a float given"),
+            &join_on(beside(method, number(1.5, Some("Float32")))),
+        );
+        refused(
+            &format!("{method} beside k, a float given"),
+            &join_on(swapped(method, number(1.5, Some("Float32")))),
+        );
+        taken(
+            &format!("{method} of k, no fraction"),
+            &join_on(beside(method, number(2.0, None))),
+        );
+        taken(
+            &format!("{method} beside k, no fraction"),
+            &join_on(swapped(method, number(2.0, None))),
+        );
+        taken(
+            &format!("{method} of k, whole numbers given"),
+            &join_on(beside(method, number(1.5, Some("Int64")))),
+        );
+        taken(
+            &format!("{method} beside k, whole numbers given"),
+            &join_on(swapped(method, number(1.5, Some("Int64")))),
+        );
+    }
+    // A key that is one value is taken whole.
+    taken(
+        "the count of k",
+        &join_on(chain(
+            col_call("k"),
+            vec![
+                call("Expr.len", json!({})),
+                call("Expr.ne_missing", json!({ "other": number(1.5, None) })),
+                cast(),
+            ],
+        )),
+    );
+    taken(
+        "beside the count of k",
+        &join_on(chain(
+            json!({ "entry": "polars.lit", "arguments": { "value": { "float": 1.5 } } }),
+            vec![
+                call(
+                    "Expr.ne_missing",
+                    json!({ "other": chain(col_call("k"), vec![call("Expr.len", json!({}))]) }),
+                ),
+                cast(),
+            ],
+        )),
+    );
+    let selected = report_of(
+        "LazyFrame.select",
+        select(vec![beside("Expr.ne_missing", number(1.5, None))]),
+    );
+    taken("a select", &selected);
+}
+
+#[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
     // what its other bound reads is not met, where the interval of a count and a column bounded
