@@ -22,6 +22,7 @@ import { HOLE_START, chain } from '../../test-support/expressions';
 import { isDrawn } from '../../test-support/places';
 import { sorted } from '../../test-support/sorted';
 import { stepOptionParameters } from './catalogue';
+import { chainBodyOf, listsOf, startWordOf } from './words';
 import type { Catalogue } from './catalogue';
 import { settingOf } from './controls';
 import type { Gap } from './limits';
@@ -142,6 +143,22 @@ describe('the starts that are run', () => {
     expect(leadsTo('connectedList', 'Int32', 'counted')).toBe(true);
     expect(leadsTo('connectedList', 'Int32', 'many')).toBe(false);
     expect(leadsTo('connectedList', 'Int32', 'one')).toBe(false);
+  });
+});
+
+describe('the starts that are typed in', () => {
+  it('are drawn by a word that lists the typed values, so that a value can be retyped where it stands', () => {
+    // A typed value with methods after it has no other word to be retyped by: a start is changed by
+    // the word it is drawn with.
+    const typed = STARTS.filter(
+      (start) => start.kind.startsWith('typed') && start.kind !== 'typedFlag',
+    );
+    expect(typed).toHaveLength(3);
+    for (const start of typed) {
+      const body = chainBodyOf(start.expression);
+      expect(body.body, start.kind).toBe('typed');
+      expect(listsOf(startWordOf(body)), start.kind).toContain('values');
+    }
   });
 });
 

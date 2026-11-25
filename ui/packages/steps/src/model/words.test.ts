@@ -14,6 +14,7 @@ import {
   listsChainRow,
   listsOf,
   noAddition,
+  startWordOf,
   valueDrawing,
 } from './words';
 
@@ -28,6 +29,7 @@ const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 /** Every word of the editor that opens a list, in each form it takes. */
 const WORDS: readonly ListedWord[] = [
   { word: 'chainStart' },
+  { word: 'typedStart' },
   { word: 'method', options: true },
   { word: 'method', options: false },
   { word: 'insertion' },
@@ -66,6 +68,11 @@ describe('the groups each kind of word may list', () => {
 describe('the groups a word lists', () => {
   it('are the functions, inputs and fields for the word a chain starts from', () => {
     expect(listsOf({ word: 'chainStart' })).toEqual(['functions', 'inputs', 'fields']);
+  });
+
+  it('are the typed values first, then the functions, inputs and fields, for the word a typed value starts from', () => {
+    // The typed value is retyped where it stands, so its list offers what a value is typed as.
+    expect(listsOf({ word: 'typedStart' })).toEqual(['values', 'functions', 'inputs', 'fields']);
   });
 
   it('are the options, where the method has some, then the methods, for the name of a method', () => {
@@ -242,6 +249,28 @@ describe('how a chain is laid out', () => {
     expect(
       chainBodyOf(chain(calls(lit({ kind: 'string', value: 'a' })), [bare('Expr.abs')])),
     ).toEqual({ body: 'typed', shown: 'a', text: true });
+  });
+});
+
+describe('the word a chain starts from', () => {
+  it('lists the typed values where the chain starts from a number or text typed in, so it can be retyped', () => {
+    const typed = chainBodyOf(
+      chain(calls(lit({ kind: 'integer', shown: '5' })), [bare('Expr.abs')]),
+    );
+
+    expect(startWordOf(typed)).toEqual({ word: 'typedStart' });
+    expect(listsOf(startWordOf(typed))).toContain('values');
+  });
+
+  it('is the word that lists no typed value for a field, an input and nothing yet', () => {
+    for (const body of [
+      chainBodyOf(chain(calls(col('dcn')))),
+      chainBodyOf(chain(input('as_of'))),
+      chainBodyOf(chain(HOLE_START)),
+    ]) {
+      expect(startWordOf(body)).toEqual({ word: 'chainStart' });
+      expect(listsOf(startWordOf(body))).not.toContain('values');
+    }
   });
 });
 
