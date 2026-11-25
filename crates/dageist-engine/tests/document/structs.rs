@@ -975,3 +975,33 @@ fn keys_that_an_unnest_of_one_field_names_alike_are_refused_as_a_repeated_pair()
         "two keys of the field v paired with rk twice",
     );
 }
+
+#[test]
+fn a_field_of_an_untyped_number_adapts_to_what_it_meets_so_the_walk_says_no_dtype_for_it() {
+    // Polars keeps a number typed without a dtype open inside a struct, so reading its field and
+    // meeting an unsigned number gives that unsigned dtype, where a field of a column, which has
+    // its dtype, meets it at the dtype both hold. The walk does not say which of the two it is.
+    let null = call(
+        "polars.lit",
+        json!({ "value": { "flag": null }, "dtype": { "dtype": "UInt32" } }),
+    );
+    let read = chain(
+        call("polars.struct", json!({ "exprs": many(vec![whole(1)]) })),
+        vec![the_field("literal")],
+    );
+    let found = ask_step(select_of(
+        null,
+        vec![call("Expr.and_", json!({ "others": many(vec![read]) }))],
+    ));
+    assert_eq!(found.polars, Said::Accepts, "Polars refuses the meeting");
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk writes the dtype {:?}",
+        found.walked_name
+    );
+}
