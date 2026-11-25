@@ -4493,6 +4493,9 @@ fn applies(
                         .starts_with("could not evaluate comparison between series")
                     && refusal.reason.matches("Struct(").count() >= 2)
                 || (unplaced(refusal) && refusal.reason == "Cannot cast from struct to other types")
+                // The values of a condition are structs that Polars finds no dtype of both for.
+                || (refusal.reason.starts_with("failed to determine supertype of struct[")
+                    && refusal.reason.contains(" and struct["))
         }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
@@ -11779,6 +11782,16 @@ mod tests {
                 None,
                 Stage::Rows,
                 "Cannot cast from struct to other types",
+                Vec::new()
+            ),
+            vec![Limit::AStructMetByAStructOfOtherFields]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Schema,
+                "failed to determine supertype of struct[2] and struct[1]",
                 Vec::new()
             ),
             vec![Limit::AStructMetByAStructOfOtherFields]
