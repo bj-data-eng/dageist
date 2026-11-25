@@ -1765,6 +1765,96 @@ fn a_connected_list_is_not_met_with_the_rows_of_the_table() {
     );
 }
 
+/// What a refusal says, with its rule where a rule refused.
+fn refused_with(walk: &Walk) -> (RefusalSource, String) {
+    let refusal = walk.refusal().expect("a refusal").refusal();
+    (refusal.source(), refusal.reason().to_owned())
+}
+
+/// Whether the words of a refusal say the list is the values of another table.
+fn says_another_table(said: &str) -> bool {
+    said.contains("a connected list is the values of another table")
+}
+
+#[test]
+fn a_connected_list_that_meets_the_rows_is_refused_in_words_that_say_whose_values_it_has() {
+    let holidays = || from_input("holidays", vec![]);
+    let select = |items: Vec<Value>| walk_of("LazyFrame.select", json!({ "exprs": many(items) }));
+    let cases: Vec<(&str, Walk)> = vec![
+        (
+            "a column and a list added",
+            adding_day(field_then(
+                "a",
+                vec![call("Expr.add", json!({ "other": holidays() }))],
+            )),
+        ),
+        (
+            "a list and a column added",
+            adding_day(from_input(
+                "holidays",
+                vec![call("Expr.add", json!({ "other": field("a") }))],
+            )),
+        ),
+        (
+            "a list as the value of a condition on a column",
+            adding_day(chain(
+                call(
+                    "polars.when",
+                    json!({ "predicates": many(vec![field("f")]) }),
+                ),
+                vec![call("When.then", json!({ "statement": holidays() }))],
+            )),
+        ),
+        (
+            "a list as a bound of a column",
+            adding_day(field_then(
+                "a",
+                vec![call("Expr.clip", json!({ "lower_bound": holidays() }))],
+            )),
+        ),
+        (
+            "a list and a column selected",
+            select(vec![holidays(), field("a")]),
+        ),
+        (
+            "a column and a list selected",
+            select(vec![field("a"), holidays()]),
+        ),
+    ];
+    for (name, walk) in cases {
+        let (source, said) = refused_with(&walk);
+        assert_eq!(
+            source,
+            RefusalSource::Rule(Rule::ValuesMeetInCount),
+            "{name}"
+        );
+        assert!(says_another_table(&said), "{name}: {said}");
+    }
+}
+
+#[test]
+fn a_refusal_of_a_connected_list_that_is_not_about_counts_does_not_say_whose_values_it_has() {
+    // A list of whole numbers is no predicate: the rule that a filter takes a Boolean says so, and a
+    // count has nothing to do with it.
+    let predicate = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![from_input("holidays", vec![])]) }),
+    );
+    let (source, said) = refused_with(&predicate);
+    assert_eq!(source, RefusalSource::Rule(Rule::FilterPredicateIsBoolean));
+    assert!(!says_another_table(&said), "{said}");
+    // The same of a method Polars refuses the dtype of, where the list stands as the receiver.
+    let text = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "holidays",
+            vec![call("Expr.str.to_uppercase", json!({}))],
+        )]) }),
+    );
+    let (_, said) = refused_with(&text);
+    assert!(!says_another_table(&said), "{said}");
+}
+
 #[test]
 fn uses_that_take_a_count_of_values_stay_allowed_for_a_connected_list() {
     // The values of a list are looked up, counted or aggregated: none needs as many as the rows.
