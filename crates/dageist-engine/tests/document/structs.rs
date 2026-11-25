@@ -1005,3 +1005,55 @@ fn a_field_of_an_untyped_number_adapts_to_what_it_meets_so_the_walk_says_no_dtyp
         found.walked_name
     );
 }
+
+/// The column `s_one` with its one field dropped and the struct unnested: no expression at all.
+fn unnest_of_none() -> Vec<Value> {
+    vec![drop_fields(&["v"], None), unnest()]
+}
+
+#[test]
+fn an_unnest_of_a_struct_with_no_field_is_refused_in_a_filter_as_polars_does() {
+    let held = step(
+        "s",
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![chain(col_call("s_one"), unnest_of_none())]) }),
+    );
+    let found = ask_step(held);
+    assert_refused_by(
+        &found,
+        "one-column-is-needed",
+        &["none"],
+        "a filter of an unnest of a struct with no field",
+    );
+}
+
+#[test]
+fn an_unnest_of_a_struct_with_no_field_is_left_out_by_what_holds_it_and_the_walk_cannot_tell() {
+    // Polars makes a struct of what is left, a column of the one literal.
+    let found = a_struct_of(
+        vec![whole(1), chain(col_call("s_one"), unnest_of_none())],
+        vec![],
+    );
+    assert_eq!(found.polars, Said::Accepts, "Polars refuses the struct");
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what it gives: {:?}",
+        found.walked_name
+    );
+    // A column meets it as it meets nothing: the schema is empty.
+    let beside = ask_step(select_of(
+        col_call("k"),
+        vec![call(
+            "Expr.add",
+            json!({ "other": chain(col_call("s_one"), unnest_of_none()) }),
+        )],
+    ));
+    assert_eq!(beside.polars, Said::Accepts, "Polars refuses the sum");
+    assert!(beside.walk_refusal.is_none(), "{:?}", beside.walk_refusal);
+    assert!(beside.walk_knows_nothing_of_it.is_some());
+}
