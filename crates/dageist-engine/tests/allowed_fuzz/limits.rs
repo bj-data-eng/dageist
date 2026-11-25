@@ -458,8 +458,9 @@ pub enum Limit {
     /// Polars matches a join's key with the other table's by the dtype of the key it gives, which
     /// does not agree with the dtype that the struct has once it is resolved. The tables measured
     /// a struct of columns, which have dtypes of their own. Polars refusing the join at the step
-    /// with the refusal that the dtypes of the keys do not match, naming a struct with a field of
-    /// a dtype that is `dyn`, in a case that joins on a key.
+    /// with the refusal that the dtypes of the keys do not match, naming a dtype that is `dyn`, in
+    /// a join that holds `polars.struct`: the key is the struct, or a field read or unnested from
+    /// one.
     AStructOfAnUntypedNumberInAJoinKey,
     /// Polars does arithmetic on a struct field by field where every field is a number, and
     /// refuses it where one is not. The tables measured a struct of a whole number and text, so
@@ -473,11 +474,21 @@ pub enum Limit {
     /// the plan with the refusal that it cannot cast a struct to another, naming both, which only
     /// structs of other fields meet.
     AStructMetByAStructOfOtherFields,
+    /// A count of values that the data or the arguments decide is one value, or the rows, by what
+    /// the values are made of, as a test of a struct is, which is never null, a comparison with a
+    /// null, and a column of the dtype Null: no rows the sample can give, nor ties, nor a null in
+    /// every column, make it another, so it is no count that is the rows by chance. The tables
+    /// refuse a count where the rows or one value are needed, or where it meets values that are
+    /// not its own count, and Polars allows it where it is one value, which it broadcasts. The
+    /// tables refusing a count, or a rule about counts doing so, in a case that holds one count,
+    /// which Polars allows on the sample's rows and on twelve rows, on four rows that tie and on
+    /// rows where every column holds a null.
+    ACountNoRowsChange,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -516,6 +527,7 @@ impl Limit {
         Self::AStructOfAnUntypedNumberInAJoinKey,
         Self::ArithmeticOnAStructOfNumbers,
         Self::AStructMetByAStructOfOtherFields,
+        Self::ACountNoRowsChange,
     ];
 
     /// The name a kept case is filed under.
@@ -571,6 +583,7 @@ impl Limit {
             }
             Self::ArithmeticOnAStructOfNumbers => "arithmetic-on-a-struct-of-numbers",
             Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
+            Self::ACountNoRowsChange => "a-count-no-rows-change",
         }
     }
 
@@ -654,6 +667,9 @@ impl Limit {
             }
             Self::AStructOfAnUntypedNumberInAJoinKey => {
                 "a number typed without a dtype stays open in a struct that is a join's key, which Polars does not match with the key of the other table, where the tables measured a struct of columns"
+            }
+            Self::ACountNoRowsChange => {
+                "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
             }
             Self::ArithmeticOnAStructOfNumbers => {
                 "Polars does arithmetic on a struct field by field where every field is a number, where the tables measured a struct with a text field, which it refuses"
@@ -4352,12 +4368,19 @@ fn applies(
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
         (Limit::AStructOfAnUntypedNumberInAJoinKey, Disagreement::PolarsRefuses(refusal)) => {
+            // The number is open in a struct, or in the field that a call read from one.
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
-                && refusal.reason.contains("struct {")
                 && refusal.reason.contains("dyn ")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "polars.struct")))
         }
+        (
+            Limit::ACountNoRowsChange,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => super::counts::is_a_count_no_rows_change(case, refused, prediction, observed),
         (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsAllows(refused)) => {
             matches!(refused.source, Source::Polars)
                 && refused
@@ -11333,30 +11356,30 @@ mod tests {
     #[test]
     fn a_struct_that_holds_an_open_number_is_the_refusal_of_a_join_that_names_it() {
         let reason = "datatypes of join keys don't match - `_POLARS_0`: struct {literal: dyn float} on left does not match `key`: struct {literal: f64} on right (and no other type was available to cast to)";
-        let case = join(chain(column("a"), &[]), chain(column("key"), &[]));
+        let number = chain(call("polars.lit", vec![("value", Value::Float(1.5))]), &[]);
+        let key = chain(
+            call("polars.struct", vec![("exprs", many(vec![number]))]),
+            &[],
+        );
+        let case = join(key.clone(), chain(column("key"), &[]));
         assert_eq!(
             polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
             vec![Limit::AStructOfAnUntypedNumberInAJoinKey]
         );
-        // Two structs of fields that are no open number, and a key that is no struct, are no cause.
-        for not_open in [
-            "datatypes of join keys don't match - `a`: struct {literal: i64} on left does not match `key`: struct {literal: f64} on right",
-            "datatypes of join keys don't match - `a`: dyn float on left does not match `key`: f64 on right",
-        ] {
-            assert_eq!(
-                polars_refuses(
-                    &case,
-                    Some(step_place()),
-                    Stage::Schema,
-                    not_open,
-                    Vec::new()
-                ),
-                vec![],
-                "{not_open}"
-            );
-        }
+        // Two structs of fields that are no open number are no cause.
+        let not_open = "datatypes of join keys don't match - `a`: struct {literal: i64} on left does not match `key`: struct {literal: f64} on right";
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(step_place()),
+                Stage::Schema,
+                not_open,
+                Vec::new()
+            ),
+            vec![]
+        );
         // Nor is the refusal of anything but a join.
-        let select = select(vec![chain(column("a"), &[])]);
+        let select = select(vec![key]);
         assert_eq!(
             polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
             vec![]
@@ -11419,6 +11442,64 @@ mod tests {
                 "casting from String to Int64 not supported",
                 Vec::new()
             ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn an_open_number_read_from_a_struct_that_is_a_join_key_is_the_same_cause() {
+        let reason = "datatypes of join keys don't match - `key`: i32 on left does not match `_POLARS_0`: dyn int on right (and no other type was available to cast to)";
+        let number = chain(call("polars.lit", vec![("value", Value::Integer(1))]), &[]);
+        let made = chain(
+            call("polars.struct", vec![("exprs", many(vec![number]))]),
+            &["Expr.struct.unnest"],
+        );
+        let case = join(chain(column("key"), &[]), made);
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            vec![Limit::AStructOfAnUntypedNumberInAJoinKey]
+        );
+        // The same words in a join that makes no struct are no cause.
+        let plain = join(chain(column("a"), &[]), chain(column("key"), &[]));
+        assert_eq!(
+            polars_refuses(
+                &plain,
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_count_no_rows_change_is_a_limit_and_a_count_that_the_rows_decide_is_not() {
+        let place = at(&[
+            Segment::Parameter("predicates".to_owned()),
+            Segment::Item(0),
+        ]);
+        let reason = "it cannot end here: a count of values that the data or the arguments decide, which is neither one value nor the table's rows, may not end an expression in filter: lengths don't match: zip node received non-equal length inputs";
+        // The values of a test of a struct are never null, so their count is one on any rows.
+        let constant = filtered(chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("g"), &[])]))],
+            ),
+            &["Expr.is_null", "Expr.value_counts", "Expr.is_null"],
+        ));
+        assert_eq!(
+            tables_refuse(&constant, place.clone(), Some(TableStage::Rows), reason),
+            vec![Limit::ACountNoRowsChange]
+        );
+        // The values that differ of a column that holds some are two on rows with a null in them,
+        // which is a count that the rows decide, by design and no limit.
+        let decided = filtered(chain(
+            column("g"),
+            &["Expr.is_not_null", "Expr.value_counts", "Expr.is_not_null"],
+        ));
+        assert_eq!(
+            tables_refuse(&decided, place, Some(TableStage::Rows), reason),
             vec![]
         );
     }

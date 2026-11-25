@@ -37,8 +37,8 @@ use dageist_engine::document::{Call, Document, Expression, Segment, Start, Step,
 
 use super::case::Case;
 use super::limits::{case_changed, changed};
-use super::observe::{Rows, Tables, observe, observe_probe};
-use super::predict::{Refused, Source, Verdict, predict};
+use super::observe::{Observed, Rows, Tables, observe, observe_probe};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{counts_alone, is_a_count_that_may_not_end, is_a_refusal_of_lengths};
 
 /// What the outcome of a case says where the tables refuse a count that Polars allows because the
@@ -281,6 +281,53 @@ fn is_asked_of_one_count(case: &Case) -> bool {
     counting_places(case) == 1
         && observe(case).refusal.is_none()
         && matches!(&predict(case).verdict, Verdict::Refuses(refused) if is_a_count_refusal(refused))
+}
+
+/// Whether the count the tables refuse is no count the rows decide: Polars allows the case on the
+/// sample's rows and on every control above that makes a count another, so what is counted is
+/// one value, or the rows, by what it is made of, as a test of a struct, which is never null, a
+/// comparison with a null and a column of nulls are. The tables cannot know it, and no rows show it
+/// by chance, so it is no count that is by design the rows by chance: it is what the rows cannot
+/// change. `false` where the tables' refusal is not of a count, the case holds a count in more than
+/// one place, or Polars refuses the case on the sample's rows or on any control.
+pub fn is_a_count_no_rows_change(
+    case: &Case,
+    refused: &Refused,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> bool {
+    if !is_a_count_refusal(refused) {
+        return false;
+    }
+    // A count that a control makes another, or a part that Polars does not evaluate, which a probe
+    // of the part alone shows, is settled by that evidence and is no limit.
+    if settle(case, refused).is_some()
+        || super::probe::settle(case, refused).is_some()
+        || super::probe::settle_apart(case, refused, prediction, observed).is_some()
+    {
+        return false;
+    }
+    let Some(item) = only_the_item(case, refused).filter(is_asked_of_one_count) else {
+        return false;
+    };
+    let unchanged = |case: &Case, rows: Rows| {
+        let tables = Tables {
+            rows,
+            ..Tables::default()
+        };
+        (0..RUNS).all(|_| {
+            let observed = if rows == Rows::Sample {
+                observe(case)
+            } else {
+                observe_probe(case, tables)
+            };
+            observed.refusal.is_none()
+        })
+    };
+    [Rows::Repeated, Rows::Tied, Rows::Nulled]
+        .into_iter()
+        .all(|rows| unchanged(&item, rows))
+        && case_with_other_counts(&item).is_none_or(|other| unchanged(&other, Rows::Sample))
 }
 
 /// Whether the tables' refusal of a count that Polars allows is by design, shown by Polars
