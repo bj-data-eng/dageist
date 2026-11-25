@@ -1204,3 +1204,32 @@ fn a_struct_of_an_untyped_number_as_a_key_is_not_said_by_the_walk_where_polars_m
     assert_eq!(typed.polars, Said::Accepts, "{:?}", typed.polars);
     assert!(typed.walk_refusal.is_none(), "{:?}", typed.walk_refusal);
 }
+
+// ---------------------------------------------------------------------------
+// A struct filled by a strategy
+
+fn filled_by(strategy: &str) -> Value {
+    call(
+        "Expr.fill_null",
+        json!({ "strategy": { "choice": strategy } }),
+    )
+}
+
+#[test]
+fn a_struct_is_filled_forward_or_backward_and_by_no_other_strategy() {
+    // Polars fills a struct forward and backward, and refuses the others where it holds a null and
+    // does nothing where it holds none, so the walk refuses them whatever the rows hold.
+    for strategy in ["forward", "backward"] {
+        let found = ask("s_xz", vec![filled_by(strategy)]);
+        assert_accepted_as_polars_has_it(&found, strategy);
+    }
+    for strategy in ["min", "max", "mean", "zero", "one"] {
+        let found = ask("s_xz", vec![filled_by(strategy)]);
+        assert_refused_by(
+            &found,
+            "struct-is-filled-forward-or-backward",
+            &[strategy],
+            &format!("a struct filled by {strategy}"),
+        );
+    }
+}
