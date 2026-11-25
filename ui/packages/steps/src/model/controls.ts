@@ -9,7 +9,7 @@
 
 import type { ChoiceView, EntryView, KindView, NoneView, ParameterView } from '@dageist/host';
 
-import { argumentOf } from './catalogue';
+import { CONDITION_TESTS, argumentOf } from './catalogue';
 
 /**
  * What is typed into a literal: a number of a stated type, text, a duration, a pattern, a path or
@@ -133,9 +133,9 @@ const SET_BY_THE_ENTRY: Readonly<Record<string, readonly string[]>> = {
   // A number or text is typed in; a literal of a given dtype is not drawn.
   'polars.lit': ['value'],
   // A condition is its predicates; keyword constraints are not drawn.
-  'polars.when': ['predicates'],
-  'Then.when': ['predicates'],
-  'ChainedThen.when': ['predicates'],
+  'polars.when': [CONDITION_TESTS],
+  'Then.when': [CONDITION_TESTS],
+  'ChainedThen.when': [CONDITION_TESTS],
 };
 
 /** How the editor gives one parameter of an entry its value. */

@@ -31,7 +31,7 @@ import type { Asked } from './ask';
 import { useOptions, useStepStarts } from './ask';
 import { useListState } from './positions';
 import { stepColour, stepHead, stepNote } from './verbs';
-import type { Catalogue } from './model/catalogue';
+import type { Catalogue, HeadName } from './model/catalogue';
 import {
   HEAD,
   VERBS,
@@ -146,7 +146,7 @@ function StepParameter({
   call,
   name,
   frame,
-}: HeadProps & { readonly name: string }): React.JSX.Element {
+}: HeadProps & { readonly name: HeadName }): React.JSX.Element {
   const catalogue = useCatalogue();
   const parameter = catalogue.entries
     .get(call.entry)

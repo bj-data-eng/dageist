@@ -14,6 +14,8 @@ import type {
   StartView,
 } from '@dageist/host';
 
+import { CONDITION_TESTS } from './catalogue';
+
 /** The way from a step to a thing inside it, outermost first. */
 export type Path = readonly SegmentView[];
 
@@ -252,7 +254,7 @@ export function whenOf(expression: ExpressionView): WhenLayout | null {
   if (call?.entry !== 'polars.when') return null;
   const [then, otherwise] = expression.links;
   if (then?.entry !== THEN || otherwise?.entry !== OTHERWISE) return null;
-  return { call, predicates: givenOf(call, 'predicates'), before: 2 };
+  return { call, predicates: givenOf(call, CONDITION_TESTS), before: 2 };
 }
 
 /** Returns whether `call` is the start `polars.element`. */

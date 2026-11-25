@@ -48,6 +48,7 @@ import { matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import type { Catalogue, ConditionWord } from './model/catalogue';
 import {
+  CONDITION_TESTS,
   argumentRule,
   conditionEntry,
   conditionId,
@@ -559,7 +560,10 @@ export function ChainBlocks({
           startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
             if (id === 'polars.when') {
               fresh.mark(
-                freshKey(step.id, under(startPath, parameterSegment('predicates'), itemSegment(0))),
+                freshKey(
+                  step.id,
+                  under(startPath, parameterSegment(CONDITION_TESTS), itemSegment(0)),
+                ),
               );
             } else {
               fresh.mark(`${freshKey(step.id, path)}:method`);
@@ -694,12 +698,12 @@ export function ChainBlocks({
             </Hint>
           </Piece>
           <ConditionBlocks
-            path={under(startPath, parameterSegment('predicates'))}
+            path={under(startPath, parameterSegment(CONDITION_TESTS))}
             argument={when.predicates}
             frame={frame}
             positions={within(
               positions,
-              positionOfParameter(conditionEntry(catalogue, 'when'), 'predicates'),
+              positionOfParameter(conditionEntry(catalogue, 'when'), CONDITION_TESTS),
             )}
             tone="function"
           />

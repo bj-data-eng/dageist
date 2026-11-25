@@ -4,6 +4,7 @@ import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import {
+  CONDITION_TESTS,
   HEAD,
   VERBS,
   comparisonOption,
@@ -12,6 +13,7 @@ import {
   stepOptionParameters,
   verbOf,
 } from './catalogue';
+import type { HeadName } from './catalogue';
 
 // The catalogue as the host wrote it, with the signs of the language file.
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
@@ -92,5 +94,37 @@ describe('the parameters a step draws in its head', () => {
     expect(names('LazyFrame.sort')).not.toContain('more_by');
     expect(names('LazyFrame.join')).not.toContain('on');
     expect(names('LazyFrame.join')).toContain('how');
+  });
+});
+
+describe('the names a step’s head gives its parameters', () => {
+  it('are the type of the name of a step parameter the head draws, one for each name HEAD holds', () => {
+    // Each name is a key of this record, which compiles only while the record holds every name
+    // HEAD gives, and no other: a name added to HEAD or taken from it fails here until it is listed.
+    const named = {
+      named_exprs: true,
+      exprs: true,
+      predicates: true,
+      by: true,
+      mapping: true,
+      other: true,
+      left_on: true,
+      right_on: true,
+      on: true,
+      index: true,
+      values: true,
+      aggregate_function: true,
+    } as const satisfies Readonly<Record<HeadName, true>>;
+    const given = new Set(VERBS.flatMap((verb) => Object.values<string>(HEAD[verb])));
+
+    expect(new Set(Object.keys(named))).toEqual(given);
+  });
+
+  it('are those of a condition’s tests too: a filter and a `when` hold them under one name', () => {
+    expect(CONDITION_TESTS).toBe(HEAD.filter.predicates);
+    for (const id of ['LazyFrame.filter', 'polars.when', 'Then.when', 'ChainedThen.when']) {
+      const parameters = catalogue.entries.get(id)?.parameters.map((parameter) => parameter.name);
+      expect(parameters, id).toContain(CONDITION_TESTS);
+    }
   });
 });
