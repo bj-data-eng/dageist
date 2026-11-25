@@ -1383,6 +1383,37 @@ pub fn refuse_a_receiver_not_judged(
     Ok(())
 }
 
+/// The refusal of a method that depends on the element dtype of a list or an array, given an
+/// expression of the dtype `argument` that the tables do not judge: a list or an array of a list,
+/// an array or a struct has no class, and a class the method is not measured on is not judged.
+/// Polars panics on some of what it is given, as it does of a receiver of such a dtype. It does not
+/// matter whether the tables could follow the chain before the call: they say nothing of an
+/// argument of no class either way.
+///
+/// # Errors
+/// The rule `element-dtype-is-measured`, with the dtype the method is not measured on.
+pub fn refuse_an_argument_not_judged(
+    entry: &'static Entry,
+    argument: &DataType,
+) -> Result<(), Refusal> {
+    let id = entry.id().as_str();
+    if !SENSITIVE.contains(&id) {
+        return Ok(());
+    }
+    let unjudged = match Representative::of(argument) {
+        None => matches!(argument, DataType::List(_) | DataType::Array(..)),
+        Some(class) => read_as(id, class).is_none(),
+    };
+    if unjudged {
+        Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {}", dtype_name(argument)),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// The refusal of a rule that forbids `entry` to start or continue a chain in
 /// `context`, if one does, without the tables: the rules alone. Polars is left
 /// to decide the rest, as it builds.

@@ -748,6 +748,7 @@ impl Builder<'_> {
                     }),
                 _ => None,
             };
+            let from_another_table = from_table.is_some();
             let built = if let Some(table) = from_table {
                 let own = self.probe.take();
                 self.probe = own.as_ref().and_then(|_| probe_of(table));
@@ -757,6 +758,17 @@ impl Builder<'_> {
             } else {
                 self.argument(argument.value())?
             };
+            // What Polars panics on is not run: a value of a dtype the tables do not judge, given to
+            // a method that depends on the element dtype, as a list of lists is.
+            if !from_another_table {
+                for dtype in self.argument_dtypes(&built) {
+                    if let Err(refusal) =
+                        allowed::refuse_an_argument_not_judged(call.entry(), &dtype)
+                    {
+                        return self.stop(RunCause::NotAllowed(refusal));
+                    }
+                }
+            }
             given.push((argument.parameter(), built));
             if position.is_some() {
                 self.positions.pop();
@@ -964,6 +976,28 @@ impl Builder<'_> {
                 }
             })
             .collect()
+    }
+
+    /// The dtypes of the expressions `argument` holds, when the dtypes are wanted and Polars can
+    /// work them out here.
+    fn argument_dtypes(&self, argument: &Argument) -> Vec<DataType> {
+        let Some(probe) = &self.probe else {
+            return Vec::new();
+        };
+        match argument {
+            Argument::Expression(expr) => {
+                let mut frame = probe.clone().select([expr.clone()]);
+                match frame.collect_schema() {
+                    Ok(schema) => schema.iter().map(|(_, dtype)| dtype.clone()).collect(),
+                    Err(_) => Vec::new(),
+                }
+            }
+            Argument::Many(items) => items
+                .iter()
+                .flat_map(|item| self.argument_dtypes(item))
+                .collect(),
+            _ => Vec::new(),
+        }
     }
 
     /// The dtypes of the values a pivot aggregates, from the table the probe stands for.

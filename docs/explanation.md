@@ -1549,7 +1549,9 @@ the tables do not cover. Where the walk loses a dtype so, the run asks the table
 for each call that follows, as the walk would have: a method that depends on the element dtype, or
 a method of lists or arrays, is refused after a list or an array of a list, an array or a struct,
 after a class the tables do not measure it on, and after one whose lines record a panic or rows
-that contradict the schema. A dtype of a class is any member of it: an array of any width
+that contradict the schema. A method that depends on the element dtype is refused given an
+expression of such a dtype, or of a class it is not measured on, as an argument, whether it is a
+column, a value taken of one or a connected input, and whether the walk lost the dtype or not. A dtype of a class is any member of it: an array of any width
 is its class, and the tables measure arrays at width 2, which the walk carries as it carries the
 unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which of the
 classes each method is measured on.
