@@ -685,7 +685,7 @@ impl Limit {
                 "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
             }
             Self::ArithmeticOnAStructOfNumbers => {
-                "Polars does arithmetic on a struct field by field where every field is a number, where the tables measured a struct with a text field, which it refuses"
+                "Polars does arithmetic on a struct field by field, each field by its own dtype and the other value's, where the tables measured a struct of a whole number and text: it refuses a text field, and a field that is a list of text, which the tables do not say of the fields a struct has"
             }
             Self::AStructMetByAStructOfOtherFields => {
                 "Polars refuses to meet two structs of other fields, which it casts to one another, where the tables measured a struct met by the struct measured"
@@ -4462,6 +4462,7 @@ fn applies(
                     "arithmetic on dtypes",
                     "multiple fields with name",
                     "failed to determine supertype",
+                    "cannot add two list columns with non-numeric inner types",
                 ]
                 .iter()
                 .any(|said| refusal.reason.contains(said))
