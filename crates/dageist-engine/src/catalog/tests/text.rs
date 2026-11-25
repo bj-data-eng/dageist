@@ -661,7 +661,7 @@ fn a_test_for_a_pattern_finds_a_regular_expression_or_plain_text_as_the_flag_say
 }
 
 #[test]
-fn matches_are_counted_and_found_by_their_place_in_bytes() {
+fn matches_are_counted_and_found_by_their_place_in_characters() {
     let rows = dated();
     let digits = || given("pattern", pattern(r"\d"));
     assert_eq!(
@@ -677,7 +677,7 @@ fn matches_are_counted_and_found_by_their_place_in_bytes() {
         ),
         [Some(1), Some(2), Some(1), None, Some(0)]
     );
-    // The place is where the first match starts, counted in bytes from 0, and nothing where
+    // The place is where the first match starts, counted in characters from 0, and nothing where
     // there is none.
     assert_eq!(
         counts(&rows, "Expr.str.find", &a()),
@@ -692,11 +692,11 @@ fn matches_are_counted_and_found_by_their_place_in_bytes() {
         ),
         [None, None, Some(3), None, None]
     );
-    // `é` takes two bytes, so what follows it is two places further than its characters say.
+    // `é` takes two bytes and is one character, so what follows it is counted by characters.
     let accented = df!("t" => ["aé b"]).unwrap();
     assert_eq!(
         counts(&accented, "Expr.str.find", &given("pattern", pattern("b"))),
-        [Some(4)]
+        [Some(3)]
     );
     for id in ["Expr.str.count_matches", "Expr.str.find"] {
         assert_eq!(
