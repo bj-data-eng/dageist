@@ -629,14 +629,18 @@ fn the_walk_reports_the_fields_of_the_struct_each_place_follows() {
         })
         .expect("the item");
     // The first place follows the column of text, which holds no fields; the one a link added at
-    // the end would follow is the struct of the values and their counts.
+    // the end would follow is the struct of the values and their counts, written as the engine
+    // writes it.
     assert_eq!(item["fields"][0], Value::Null);
     assert_eq!(
         item["fields"][1],
-        json!([
-            { "name": "dcn", "dtype": "String" },
-            { "name": "count", "dtype": "UInt32" }
-        ])
+        json!({
+            "dtype": "Struct(dcn: String, count: UInt32)",
+            "fields": [
+                { "name": "dcn", "dtype": "String" },
+                { "name": "count", "dtype": "UInt32" }
+            ]
+        })
     );
 }
 

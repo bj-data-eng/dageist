@@ -31,6 +31,8 @@ describe('the declared gaps', () => {
         'entry polars.struct',
         'entry polars.time',
         'entry polars.time_range',
+        'parameter Expr.struct.drop names',
+        'parameter Expr.struct.field name',
         'parameter polars.col more_names',
         'parameter polars.lit allow_object',
         'parameter polars.lit dtype',
