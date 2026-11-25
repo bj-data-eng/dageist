@@ -11421,6 +11421,28 @@ mod tests {
             ),
             vec![Limit::AJsonOfANumberInAPivot]
         );
+        // Where the text is no cause of the refusal, as the length of it asks none, the json is not
+        // why Polars allows: a text of one value given in its place is allowed as well.
+        let length = chain(
+            call("polars.element", Vec::new()),
+            &[
+                "Expr.count",
+                "Expr.struct.json_encode",
+                "Expr.str.len_chars",
+            ],
+        );
+        assert_eq!(
+            tables_refuse(
+                &pivot(length),
+                at(&[
+                    Segment::Parameter("aggregate_function".to_owned()),
+                    Segment::Link(2)
+                ]),
+                Some(TableStage::Schema),
+                reason
+            ),
+            vec![]
+        );
         // Without the call, or in a select, the text is not the json of a number.
         let without = chain(
             call("polars.element", Vec::new()),
