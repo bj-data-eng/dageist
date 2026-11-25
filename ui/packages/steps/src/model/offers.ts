@@ -22,6 +22,7 @@ import type {
 } from '@dageist/host';
 
 import type { Catalogue } from './catalogue';
+import { START_FUNCTIONS } from './catalogue';
 import { editorLimit } from './limits';
 
 /** Returns the first line of `reason`, which is what Polars says before it prints more. */
@@ -128,6 +129,21 @@ export function prepareOffers(
   const present = families.filter((family) => family.offers.length > 0);
   present.sort((left, right) => left.offers.length - right.offers.length);
   return present;
+}
+
+/** Prepares the methods of `view`, by family: the calls that may follow what comes before. */
+export function methodFamilies(catalogue: Catalogue, view: OffersView): PreparedFamily[] {
+  return prepareOffers(catalogue, view, ['expression']);
+}
+
+/**
+ * Prepares the functions of `view` that the editor starts a chain from besides a field, an input
+ * and a typed value, which the engine allows or refuses at the place, in the engine's order.
+ */
+export function startOffers(catalogue: Catalogue, view: OffersView): PreparedOffer[] {
+  return prepareOffers(catalogue, view, ['function', 'condition'])
+    .flatMap((family) => family.offers)
+    .filter((offered) => START_FUNCTIONS.has(offered.id));
 }
 
 /** What the engine says of a candidate in a slot. */

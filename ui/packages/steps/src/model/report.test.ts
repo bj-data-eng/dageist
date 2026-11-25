@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { DocumentStepView } from '@dageist/host';
+import type { CallView, DocumentStepView } from '@dageist/host';
 import { decodeDocumentState, decodeRun, HostError } from '@dageist/host';
 
 import documentFixture from '../../../host/fixtures/node-document.json';
@@ -10,7 +10,7 @@ import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
 import type { PreparedRun, PreparedStep } from './report';
-import { prepareRun, rowsFailure, rowsToShow } from './report';
+import { prepareRun, rowEndOf, rowsFailure, rowsToShow, sayingOf } from './report';
 
 // What the host reports of the claim-timing steps, and what the editor shows of it. The fixtures
 // are written from Rust; the expectations are written by hand from what the steps do.
@@ -365,5 +365,108 @@ describe('the rows shown after a step is chosen', () => {
         step,
       ),
     ).toEqual({ kind: 'message', text: 'no network' });
+  });
+});
+
+describe('what the editor says of a step beside its row', () => {
+  const refused = decodeRun(refusedFixture);
+  const refusedRun = prepareRun(named(...refused.steps.map((step) => step.id)), refused);
+  const incomplete = decodeRun(incompleteFixture);
+  const incompleteRun = prepareRun(named(...incomplete.steps.map((step) => step.id)), incomplete);
+  const variants = decodeRun(variantsFixture);
+  const variantsRun = prepareRun(named(...variants.steps.map((step) => step.id)), variants);
+
+  it('is that its rows were counted, for a step the engine ran on the rows', () => {
+    expect(sayingOf(stepOf(prepared, 'sort'))).toEqual({ says: 'rows' });
+    expect(sayingOf(stepOf(prepared, 'pivot'))).toEqual({ says: 'rows' });
+  });
+
+  it('is what is the matter, for a step Polars refused, and for a step with something still to be picked', () => {
+    expect(sayingOf(stepOf(refusedRun, 'total')).says).toBe('problem');
+    expect(sayingOf(stepOf(incompleteRun, 'later'))).toEqual({
+      says: 'problem',
+      lines: ['Something in this step is still to be picked.'],
+    });
+  });
+
+  it('is that a step before it was refused, or has something to be picked, for a step that was not run', () => {
+    expect(sayingOf(stepOf(refusedRun, 'after'))).toEqual({
+      says: 'problem',
+      lines: ['Not run: step 2 was refused.'],
+    });
+    expect(sayingOf(stepOf(incompleteRun, 'after'))).toEqual({
+      says: 'problem',
+      lines: ['Not run: step 2 still has something to be picked.'],
+    });
+  });
+
+  it('is what went wrong on the sample rows, for a step Polars accepts and the engine could not run there', () => {
+    expect(sayingOf(stepOf(variantsRun, 'failed'))).toEqual({
+      says: 'problem',
+      lines: ['Could not be run on the sample rows: no rows'],
+    });
+  });
+
+  it('is nothing for a step that is accepted and was not counted, whatever the cause', () => {
+    const [first] = variants.steps;
+    if (first === undefined) throw new Error('no step');
+    const uncounted = { ...first, count: { kind: 'notCounted' } } as const;
+    const run = prepareRun(named(first.id), { ...variants, steps: [uncounted] });
+
+    expect(sayingOf(stepOf(run, first.id))).toEqual({ says: 'nothing' });
+  });
+});
+
+/** A call of `entry` with no arguments. */
+function call(entry: string): CallView {
+  return { entry, arguments: [] };
+}
+
+/** The call of the step `id` of the claim-timing document. */
+function stepCall(id: string): CallView {
+  const found = held.document.steps.find((step) => step.id === id);
+  if (found === undefined) throw new Error(`no step ${id}`);
+  return found.call;
+}
+
+describe('what stands at the end of a step’s row', () => {
+  it('is the columns a pivot returns, and which of them are new', () => {
+    expect(rowEndOf(stepCall('pivot'), stepOf(prepared, 'pivot'))).toEqual({
+      kind: 'pivot',
+      columns: 5,
+      added: ['Intake', 'Review', 'Pending', 'Complete'],
+    });
+  });
+
+  it('is the dtype and the first values of the column an added column step makes', () => {
+    expect(rowEndOf(stepCall('step_index'), stepOf(prepared, 'step_index'))).toEqual({
+      kind: 'column',
+      alias: 'step_index',
+      dtype: 'UInt32',
+      first: '1, 2, 3, 4, …',
+    });
+  });
+
+  it('is the columns a join adds, each with its dtype and first values', () => {
+    expect(rowEndOf(stepCall('join'), stepOf(prepared, 'join'))).toEqual({
+      kind: 'join',
+      added: [{ name: 'sla_days', dtype: 'Int64', first: '1, 1, 2, 3, …' }],
+    });
+  });
+
+  it('is how many rows a filter kept of those it was given', () => {
+    // The sort kept seven of seven rows; given as a filter, the row says so.
+    expect(rowEndOf(call('LazyFrame.filter'), stepOf(prepared, 'sort'))).toEqual({
+      kind: 'kept',
+      kept: 7,
+      received: 7,
+    });
+  });
+
+  it('is nothing for a step that says nothing there, and for one that is not accepted', () => {
+    expect(rowEndOf(stepCall('sort'), stepOf(prepared, 'sort'))).toBeNull();
+    const refused = decodeRun(refusedFixture);
+    const run = prepareRun(named(...refused.steps.map((step) => step.id)), refused);
+    expect(rowEndOf(call('LazyFrame.filter'), stepOf(run, 'total'))).toBeNull();
   });
 });

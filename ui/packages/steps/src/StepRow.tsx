@@ -16,6 +16,7 @@ import { Hint, OfferList, Peek, Piece, Popover, Slot, TypedBlock, Word, cx } fro
 
 import { StepProvider, useListEdits, useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
+import { listedGroups } from './engineLists';
 import { FreshContext } from './Lists';
 import {
   OptionRows,
@@ -42,12 +43,13 @@ import {
   valueSegment,
 } from './model/doc';
 import type { Frame } from './model/frame';
-import { findColumn } from './model/frame';
 import { findTable, tablesOf } from './model/inputs';
 import { chosenOptions } from './model/offers';
 import type { PreparedStep } from './model/report';
+import { rowEndOf, sayingOf } from './model/report';
 import { NO_POSITIONS, within } from './model/place';
 import { fieldArgument, listArgument } from './model/requests';
+import { actionsOf } from './model/words';
 import { PreparedStepProvider } from './engine';
 
 /** The sortable group every step row belongs to. */
@@ -364,79 +366,68 @@ interface OutcomeProps {
   readonly result: PreparedStep;
 }
 
-/** Returns the name of the column an `Add column` step adds. */
-function addedAlias(call: CallView): string | null {
-  const named = givenOf(call, 'named_exprs');
-  const key = named?.kind === 'pairs' ? named.entries[0]?.key : undefined;
-  return key?.kind === 'columns' ? (key.names[0] ?? null) : null;
-}
-
-/** Returns the names of the columns `result` says its step added. */
-function addedBy(result: PreparedStep): string[] {
-  return result.changes.filter((change) => change.change === 'added').map((change) => change.name);
-}
-
 /** Draws what stands at the end of a step's row: the dtype it returns, what it adds, or the rows it keeps. */
 function Outcome({ call, result }: OutcomeProps): React.JSX.Element | null {
-  if (result.status !== 'valid') return null;
-  const dtypeOf = (name: string): string => findColumn(result.after, name)?.dtype ?? '';
-  const added = addedBy(result);
-  if (call.entry === 'LazyFrame.pivot') {
-    return (
-      <Peek
-        describedAs="The columns the pivot returns"
-        lines={[
-          added.join(', '),
-          'These are the values of the connected table that give its columns.',
-        ]}
-        code={false}
-      >
-        <span className="dg-dtype">{String(result.after.length)} columns</span>
-      </Peek>
-    );
-  }
-  if (call.entry === 'LazyFrame.with_columns') {
-    const alias = addedAlias(call);
-    const dtype = alias === null ? undefined : findColumn(result.after, alias)?.dtype;
-    if (alias === null || dtype === undefined) return null;
-    const first = result.first.get(alias);
-    // The first values come from the rows the engine ran; without them the dtype is all there is.
-    if (first === undefined) return <span className="dg-dtype">{dtype}</span>;
-    return (
-      <Peek describedAs={`${alias} is ${dtype}: show its first values`} lines={[first]} code>
-        <span className="dg-dtype">{dtype}</span>
-      </Peek>
-    );
-  }
-  if (call.entry === 'LazyFrame.join') {
-    const [only] = added;
-    return (
-      <Peek
-        describedAs="The columns the join adds: show their first values"
-        lines={added.flatMap((name) => {
-          const first = result.first.get(name);
-          return [`${name} · ${dtypeOf(name)}`, ...(first === undefined ? [] : [first])];
-        })}
-        code
-      >
-        <span className="text-xs text-muted">
-          adds{' '}
-          <span className="dg-dtype">
-            {added.length === 1 && only !== undefined ? only : `${String(added.length)} columns`}
+  const end = rowEndOf(call, result);
+  if (end === null) return null;
+  switch (end.kind) {
+    case 'pivot':
+      return (
+        <Peek
+          describedAs="The columns the pivot returns"
+          lines={[
+            end.added.join(', '),
+            'These are the values of the connected table that give its columns.',
+          ]}
+          code={false}
+        >
+          <span className="dg-dtype">{String(end.columns)} columns</span>
+        </Peek>
+      );
+    case 'column':
+      // The first values come from the rows the engine ran; without them the dtype is all there is.
+      if (end.first === null) return <span className="dg-dtype">{end.dtype}</span>;
+      return (
+        <Peek
+          describedAs={`${end.alias} is ${end.dtype}: show its first values`}
+          lines={[end.first]}
+          code
+        >
+          <span className="dg-dtype">{end.dtype}</span>
+        </Peek>
+      );
+    case 'join': {
+      const [only] = end.added;
+      return (
+        <Peek
+          describedAs="The columns the join adds: show their first values"
+          lines={end.added.flatMap((column) => [
+            `${column.name} · ${column.dtype}`,
+            ...(column.first === null ? [] : [column.first]),
+          ])}
+          code
+        >
+          <span className="text-xs text-muted">
+            adds{' '}
+            <span className="dg-dtype">
+              {end.added.length === 1 && only !== undefined
+                ? only.name
+                : `${String(end.added.length)} columns`}
+            </span>
           </span>
+        </Peek>
+      );
+    }
+    case 'kept':
+      return (
+        <span className="text-xs text-muted">
+          keeps{' '}
+          <span className="dg-dtype">{`${String(end.kept)} of ${String(end.received)} rows`}</span>
         </span>
-      </Peek>
-    );
+      );
+    default:
+      return end satisfies never;
   }
-  if (call.entry === 'LazyFrame.filter' && result.rows !== null) {
-    return (
-      <span className="text-xs text-muted">
-        keeps{' '}
-        <span className="dg-dtype">{`${String(result.rows.kept)} of ${String(result.rows.received)} rows`}</span>
-      </span>
-    );
-  }
-  return null;
 }
 
 /** What a step row shows and reports. */
@@ -526,6 +517,8 @@ function Row({
   const parameters = stepOptionParameters(catalogue, call.entry);
   const given = new Set(call.arguments.map((held) => held.parameter));
   const tables = tablesOf(node);
+  const saying = sayingOf(result);
+  const actions = actionsOf('step');
   return (
     <div
       ref={ref}
@@ -560,13 +553,17 @@ function Row({
         <div data-dg-flow className="dg-code">
           {/* The step's name is the word that names it: its list adds a step after and removes it. */}
           <Piece
-            remove={{
-              label: `Remove ${name}`,
-              onPress: () => {
-                void listEdits.removeStep({ index, id: step.id });
-              },
-            }}
-            add={{ label: `Add a step after ${name}`, onPress: setAdding }}
+            remove={
+              actions.remove
+                ? {
+                    label: `Remove ${name}`,
+                    onPress: () => {
+                      void listEdits.removeStep({ index, id: step.id });
+                    },
+                  }
+                : null
+            }
+            add={actions.add ? { label: `Add a step after ${name}`, onPress: setAdding } : null}
           >
             <Hint lines={result.summary === '' ? [] : [result.summary]} code={false}>
               <Slot
@@ -576,21 +573,25 @@ function Row({
                 names
                 describedAs={`Step ${number}: ${name}. Change what the step does`}
                 placeholder="Search the steps"
-                offers={(typed) => [
+                offers={(typed) =>
                   // The parameters the step can be given, then the steps it can be changed to.
-                  ...(parameters.length === 0
-                    ? []
-                    : [optionOffers(parameters, given, typed, toggle, optionsAsked)]),
-                  ...stepOffers(catalogue, typed, changeStarts, (picked) => {
-                    if (picked !== call.entry) {
-                      void listEdits.swapStep(
-                        { index, id: step.id },
-                        picked,
-                        frameRequest(frame, tables),
-                      );
-                    }
-                  }),
-                ]}
+                  listedGroups(
+                    { word: 'step', options: parameters.length > 0 },
+                    {
+                      options: () => [optionOffers(parameters, given, typed, toggle, optionsAsked)],
+                      steps: () =>
+                        stepOffers(catalogue, typed, changeStarts, (picked) => {
+                          if (picked !== call.entry) {
+                            void listEdits.swapStep(
+                              { index, id: step.id },
+                              picked,
+                              frameRequest(frame, tables),
+                            );
+                          }
+                        }),
+                    },
+                  )
+                }
                 onOpenChange={list.onOpenChange}
               />
             </Hint>
@@ -609,12 +610,12 @@ function Row({
               {`The catalogue has no entry ${call.entry}, so this step has no words to show.`}
             </span>
           )}
-          {result.problem !== null && (
-            <span className="dg-line font-sans text-xs text-wrong">{result.problem}</span>
-          )}
-          {result.rowsProblem !== null && (
-            <span className="dg-line font-sans text-xs text-wrong">{result.rowsProblem}</span>
-          )}
+          {saying.says === 'problem' &&
+            saying.lines.map((line) => (
+              <span key={line} className="dg-line font-sans text-xs text-wrong">
+                {line}
+              </span>
+            ))}
         </div>
         <span className="shrink-0 pl-3 text-xs text-muted">
           <Outcome call={call} result={result} />
@@ -625,9 +626,15 @@ function Row({
           <OfferList
             placeholder="Search the steps"
             groups={(typed) =>
-              stepOffers(catalogue, typed, addStarts, (picked) => {
-                onAdd(index + 1, picked, frameRequest(result.after, tables));
-              })
+              listedGroups(
+                { word: 'newStep' },
+                {
+                  steps: () =>
+                    stepOffers(catalogue, typed, addStarts, (picked) => {
+                      onAdd(index + 1, picked, frameRequest(result.after, tables));
+                    }),
+                },
+              )
             }
             keepOpen={false}
             wide={false}

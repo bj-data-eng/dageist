@@ -54,6 +54,7 @@ import type { Dtype, Frame } from './model/frame';
 import { findInput } from './model/inputs';
 import type { PreparedOption, PreparedReading } from './model/offers';
 import { placeRequest, within } from './model/place';
+import { actionsOf } from './model/words';
 import {
   HOLE,
   canBeLeftUnpicked,
@@ -837,6 +838,8 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
   // Keyword arguments are named; a dictionary maps one thing to another.
   const between = parameter.default.kind === 'empty' ? '=' : '→';
   const described = describe(parameter);
+  // An entry of pairs is taken away; nothing is added after it, a faint word adds one at the end.
+  const entryActions = actionsOf('entry');
   /** Puts a new entry in the document once both sides are known: an expression may wait as a hole. */
   const send = (key: ValueRequest | null, value: ValueRequest | null): void => {
     const held = value ?? (canBeLeftUnpicked(kind.value) ? HOLE : null);
@@ -859,12 +862,16 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
         return (
           <Piece
             key={at}
-            remove={{
-              label: 'Remove this entry',
-              onPress: () => {
-                void edits.removeEntry(keyPath);
-              },
-            }}
+            remove={
+              entryActions.remove
+                ? {
+                    label: 'Remove this entry',
+                    onPress: () => {
+                      void edits.removeEntry(keyPath);
+                    },
+                  }
+                : null
+            }
             add={null}
           >
             <OneDrawing
@@ -898,12 +905,16 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
       {draft?.kind === 'entry' && (
         // An entry with a side still to be picked is not in the document: it waits here.
         <Piece
-          remove={{
-            label: 'Remove this entry',
-            onPress: () => {
-              drafts.clear(draftAt);
-            },
-          }}
+          remove={
+            entryActions.remove
+              ? {
+                  label: 'Remove this entry',
+                  onPress: () => {
+                    drafts.clear(draftAt);
+                  },
+                }
+              : null
+          }
           add={null}
         >
           <OneDrawing

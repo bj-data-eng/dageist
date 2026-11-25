@@ -15,6 +15,7 @@ import { useStepStarts } from './ask';
 import { DragSettingsContext, dragSettingsFor } from './Chain';
 import { useListEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
+import { listedGroups } from './engineLists';
 import type { Fresh } from './Lists';
 import { FreshContext } from './Lists';
 import { useListState } from './positions';
@@ -145,13 +146,19 @@ export function StepList({
               describedAs="Add a step at the end"
               placeholder="Search the steps"
               offers={(typed) =>
-                stepOffers(catalogue, typed, endStarts, (entry) => {
-                  addStep(
-                    steps.length,
-                    entry,
-                    frameRequest(results.at(-1)?.after ?? source, tablesOf(node)),
-                  );
-                })
+                listedGroups(
+                  { word: 'newStep' },
+                  {
+                    steps: () =>
+                      stepOffers(catalogue, typed, endStarts, (entry) => {
+                        addStep(
+                          steps.length,
+                          entry,
+                          frameRequest(results.at(-1)?.after ?? source, tablesOf(node)),
+                        );
+                      }),
+                  },
+                )
               }
               onOpenChange={endList.onOpenChange}
             />

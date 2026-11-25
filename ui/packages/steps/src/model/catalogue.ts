@@ -137,6 +137,9 @@ export function conditionEntry(catalogue: Catalogue, word: ConditionWord): Entry
 /** The identifier the catalogue gives `element`, which stands for the values of one cell of a pivot. */
 export const ELEMENT_ID = 'polars.element';
 
+/** The functions the editor starts a chain from besides a field, an input and a value typed in. */
+export const START_FUNCTIONS: ReadonlySet<string> = new Set([conditionId('when'), ELEMENT_ID]);
+
 /** Returns the catalogue entry of `element`, or `null` when there is none. */
 export function elementEntry(catalogue: Catalogue): EntryView | null {
   return catalogue.entries.get(ELEMENT_ID) ?? null;

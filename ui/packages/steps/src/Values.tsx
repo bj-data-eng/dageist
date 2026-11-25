@@ -24,7 +24,14 @@ import { ChainBlocks } from './Chain';
 import { useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
-import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
+import {
+  fieldGroup,
+  inputGroup,
+  listedGroups,
+  refusalOf,
+  startFunctions,
+  valueGroup,
+} from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
@@ -37,8 +44,6 @@ import {
   linkSegment,
   parameterSegment,
   pathKey,
-  shapeOf,
-  testOf,
   under,
 } from './model/doc';
 import type { Frame } from './model/frame';
@@ -53,6 +58,8 @@ import {
   listArgument,
   literalExpression,
 } from './model/requests';
+import type { WordShape } from './model/words';
+import { OFFERED_INPUTS, actionsOf, lineDrawing, listsChainRow, valueDrawing } from './model/words';
 
 /** Returns whether the engine's report puts what is wrong with the step in or at `path`. */
 export function useIsWrongAt(): (path: Path) => boolean {
@@ -112,7 +119,7 @@ export function ValueSlot({
   const fieldHint = useFieldHint();
   const edits = useStepEdits();
   const list = useListState();
-  const shape = expression === null ? ({ kind: 'unset' } as const) : shapeOf(expression);
+  const drawing = valueDrawing(expression, path !== null);
   // What may stand here, as the engine says of the place: the functions that may start an
   // expression, and which of the fields, inputs and values typed in fit.
   const startKnown = positions !== null && positions.length > 0;
@@ -130,7 +137,7 @@ export function ValueSlot({
       typed,
       fits,
       readings,
-      inputs: ['value', 'list'] as const,
+      inputs: OFFERED_INPUTS,
       onLiteral: (picked: LiteralView) => {
         onSet(literalExpression(picked));
       },
@@ -154,21 +161,25 @@ export function ValueSlot({
       { id: 'chain', look: 'dots', act: true, reason: chainRefusal },
     );
     // The groups go from the shortest to the longest, so a long one never hides a short one.
-    return [
-      titled(null, typed === '' ? [chain] : []),
-      valueGroup({ ...rows, readings }),
-      inputGroup(rows),
-      fieldGroup(rows),
-      // A function starts the expression that is in the document, so it has a place to start at.
-      ...(path === null
-        ? []
-        : startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-            void edits.startWith(path, id);
-          })),
-    ];
+    return listedGroups(
+      { word: 'value', fromPath: path !== null },
+      {
+        chain: () => [titled(null, listsChainRow(typed) ? [chain] : [])],
+        values: () => [valueGroup({ ...rows, readings })],
+        inputs: () => [inputGroup(rows)],
+        fields: () => [fieldGroup(rows)],
+        // A function starts the expression that is in the document, so it has a place to start at.
+        functions: () =>
+          path === null
+            ? []
+            : startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+                void edits.startWith(path, id);
+              }),
+      },
+    );
   };
 
-  if (expression !== null && path !== null && (shape.kind === 'column' || shape.kind === 'chain')) {
+  if (drawing.drawn === 'chain' && expression !== null && path !== null) {
     // A chain is written where it stands. Its start takes the whole chain away.
     return (
       <PositionsContext.Provider value={positions ?? NO_POSITIONS}>
@@ -187,6 +198,9 @@ export function ValueSlot({
     );
   }
 
+  // A chain that is not in the document cannot be written where it stands, so it says nothing is picked.
+  const shape: WordShape = drawing.drawn === 'word' ? drawing.shape : { kind: 'unset' };
+  const actions = actionsOf('word', onRemove !== undefined);
   let shown: { label: string; tone: Tone; look: Look; wrong: boolean; lines: string[] };
   if (shape.kind === 'input') {
     const input = findInput(node, shape.name);
@@ -215,13 +229,14 @@ export function ValueSlot({
   return (
     <Piece
       remove={
-        onRemove === undefined
-          ? null
-          : {
+        actions.remove && onRemove !== undefined
+          ? {
               label: 'Remove this one',
               onPress: onRemove,
             }
+          : null
       }
+      // The model says nothing can be added after a word of one value: a declared gap.
       add={null}
     >
       <Hint lines={shown.lines} code={false}>
@@ -405,6 +420,7 @@ export function ConditionBlocks({
     setAdding(null);
   }, []);
   const comparisons = catalogue.comparisons;
+  const headActions = actionsOf('conditionHead');
   const items = argument?.kind === 'many' ? argument.items : [];
 
   /** Puts a new test at `at`, in the list as it is: given, or about to be. */
@@ -469,18 +485,26 @@ export function ConditionBlocks({
     ) : (
       <>
         <Piece
-          remove={{
-            label: 'Remove the condition',
-            onPress: () => {
-              void edits.setArgument(path, listArgument([]));
-            },
-          }}
-          add={{
-            label: 'Add a line to all of',
-            onPress: (anchor: HTMLElement) => {
-              setAdding({ at: 0, anchor });
-            },
-          }}
+          remove={
+            headActions.remove
+              ? {
+                  label: 'Remove the condition',
+                  onPress: () => {
+                    void edits.setArgument(path, listArgument([]));
+                  },
+                }
+              : null
+          }
+          add={
+            headActions.add
+              ? {
+                  label: 'Add a line to all of',
+                  onPress: (anchor: HTMLElement) => {
+                    setAdding({ at: 0, anchor });
+                  },
+                }
+              : null
+          }
         >
           <span data-tone={tone} className="dg-block dg-fixed">
             all of
@@ -490,21 +514,24 @@ export function ConditionBlocks({
           {items.map((item, at) => {
             const itemPath = under(path, itemSegment(at));
             const expression = expressionOf(item);
-            const test = expression === null ? null : testOf(expression, comparisons);
-            const remove = {
-              label: 'Remove this line',
-              onPress: () => {
-                void edits.removeItem(itemPath);
-              },
-            };
-            const add = {
-              label: 'Add a line after this one, joined by and',
-              onPress: (anchor: HTMLElement) => {
-                setAdding({ at: at + 1, anchor });
-              },
-            };
             if (expression === null) return null;
-            if (test === null) {
+            const drawing = lineDrawing(expression, comparisons);
+            const lineActions = actionsOf('conditionLine');
+            const removeLine = (): void => {
+              void edits.removeItem(itemPath);
+            };
+            const remove = lineActions.remove
+              ? { label: 'Remove this line', onPress: removeLine }
+              : null;
+            const add = lineActions.add
+              ? {
+                  label: 'Add a line after this one, joined by and',
+                  onPress: (anchor: HTMLElement) => {
+                    setAdding({ at: at + 1, anchor });
+                  },
+                }
+              : null;
+            if (drawing.drawn === 'chain') {
               // A chain is a line of its own, and its start takes the line away.
               return (
                 <Line key={at}>
@@ -512,7 +539,7 @@ export function ConditionBlocks({
                     expression={expression}
                     path={itemPath}
                     frame={frame}
-                    onRemove={remove.onPress}
+                    onRemove={removeLine}
                   />
                 </Line>
               );
@@ -520,7 +547,7 @@ export function ConditionBlocks({
             return (
               <Line key={at}>
                 <Piece remove={remove} add={add}>
-                  <TestBlocks test={test} path={itemPath} frame={frame} />
+                  <TestBlocks test={drawing.test} path={itemPath} frame={frame} />
                 </Piece>
               </Line>
             );
