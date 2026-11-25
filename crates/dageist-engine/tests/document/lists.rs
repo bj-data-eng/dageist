@@ -1913,40 +1913,89 @@ fn a_refused_call_of_lists_or_arrays_is_not_run_into_a_panic_of_polars() {
 }
 
 /// A call that Polars refuses after a list or an array is not run into a panic where both branches
-/// of a condition share it: one that is given nothing is not built, and one that is given an
-/// expression is planned with its error, as a text, a comparison and a sum of a column show. Every
-/// call that needs no argument, the few that take one, and those three are shared so after each
-/// class of a list or an array.
+/// of a condition share it, whatever it is given: one that is given nothing, one that is given an
+/// expression, as a sum with a column that no list takes, and one that is given a column of a
+/// dtype that no list takes. Every call that needs no argument, the few that take one, and every
+/// method outside the two namespaces that needs expressions alone, given each of a whole number,
+/// text, a boolean, a list of whole numbers, a list of nothing, an array of text and an array of
+/// three, are shared so after each class of a list or an array, and after a value taken of a
+/// column of two levels.
 #[test]
 fn a_refused_call_after_a_list_or_an_array_is_not_run_into_a_panic_of_polars() {
     let array = column_of(Representative::Array(Inner::String));
-    let mut found = Vec::new();
-    let mut asked = 0;
+    let mut starts: Vec<(String, Vec<Value>)> = Vec::new();
     for class in Representative::ALL
         .into_iter()
         .filter(|class| class.is_nested())
     {
-        let column = column_of(class);
-        for (label, link) in followers().into_iter().chain([
-            (
-                "str.len_chars".to_owned(),
-                call("Expr.str.len_chars", json!({})),
-            ),
-            ("dt.year".to_owned(), call("Expr.dt.year", json!({}))),
-            (
-                "le a".to_owned(),
-                call("Expr.le", json!({ "other": field("a") })),
-            ),
-            (
-                "add g".to_owned(),
-                call("Expr.add", json!({ "other": field("g") })),
-            ),
-            (
-                "strip_suffix g".to_owned(),
-                call("Expr.str.strip_suffix", json!({ "suffix": field("g") })),
-            ),
-        ]) {
-            let inner = chain(col_call(&column), vec![link]);
+        starts.push((column_of(class), Vec::new()));
+    }
+    for (prefix, outer_is_array) in DEPTH_TWO_KINDS {
+        let namespace = if outer_is_array { "arr" } else { "list" };
+        for element in [Inner::Null, Inner::String, Inner::Date] {
+            starts.push((
+                depth_two_name(prefix, element),
+                vec![call(&format!("Expr.{namespace}.first"), json!({}))],
+            ));
+        }
+    }
+    let arguments = [
+        "a".to_owned(),
+        "g".to_owned(),
+        "f".to_owned(),
+        column_of(Representative::List(Inner::Int64)),
+        column_of(Representative::List(Inner::Null)),
+        array.clone(),
+        WIDE.to_owned(),
+    ];
+    let mut links: Vec<(String, Value)> = followers();
+    links.extend([
+        (
+            "str.len_chars".to_owned(),
+            call("Expr.str.len_chars", json!({})),
+        ),
+        ("dt.year".to_owned(), call("Expr.dt.year", json!({}))),
+    ]);
+    for entry in catalog::entries().iter().filter(|entry| {
+        entry.applies() == catalog::Applies::Expression
+            && !entry.id().as_str().starts_with("Expr.list.")
+            && !entry.id().as_str().starts_with("Expr.arr.")
+    }) {
+        let needed: Vec<_> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.is_needed())
+            .collect();
+        if needed.is_empty()
+            || !needed
+                .iter()
+                .all(|parameter| matches!(parameter.kind(), catalog::Kind::Expression(_)))
+        {
+            continue;
+        }
+        for column in &arguments {
+            let mut given = serde_json::Map::new();
+            for parameter in &needed {
+                let value = if parameter.shape() == catalog::Shape::Many {
+                    many(vec![field(column)])
+                } else {
+                    field(column)
+                };
+                given.insert(parameter.name().to_owned(), value);
+            }
+            links.push((
+                format!("{} given {column}", entry.id().as_str()),
+                call(entry.id().as_str(), Value::Object(given)),
+            ));
+        }
+    }
+    let mut found = Vec::new();
+    let mut asked = 0;
+    for (column, before) in &starts {
+        for (label, link) in &links {
+            let mut chained = before.clone();
+            chained.push(link.clone());
+            let inner = chain(col_call(column), chained);
             let held = a_condition_that_holds_twice(&inner, &array);
             let value = step(
                 "s",
@@ -1961,7 +2010,7 @@ fn a_refused_call_after_a_list_or_an_array_is_not_run_into_a_panic_of_polars() {
                 read.run_on(&inputs(), &frame())
             }));
             if ran.is_err() {
-                found.push(format!("{column} then {label}"));
+                found.push(format!("{column} {before:?} then {label}"));
             }
         }
     }
@@ -1969,7 +2018,12 @@ fn a_refused_call_after_a_list_or_an_array_is_not_run_into_a_panic_of_polars() {
         found.is_empty(),
         "{} of {asked} documents reach a panic of Polars':\n{}",
         found.len(),
-        found.join("\n")
+        found
+            .iter()
+            .take(40)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }
 
