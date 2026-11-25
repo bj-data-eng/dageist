@@ -21,6 +21,7 @@ import type {
   CallView,
   ChoiceView,
   EntryView,
+  FieldView,
   KindView,
   LiteralView,
   NoneView,
@@ -90,7 +91,14 @@ export interface Surroundings {
    * The method whose parameters these are, and where the engine reported it stands, when they
    * are a method's: an expression one of them holds is the argument of that method.
    */
-  readonly method?: { readonly entry: string; readonly place: OfferPlaceView | null } | undefined;
+  readonly method?:
+    | {
+        readonly entry: string;
+        readonly place: OfferPlaceView | null;
+        /** The fields of the struct the method follows, where the engine knows them. */
+        readonly fields: readonly FieldView[] | null;
+      }
+    | undefined;
 }
 
 /** The key a fresh thing at `path` of the step being drawn is known by, which a drawing opens at. */
@@ -161,6 +169,53 @@ export function FlagDrawing({
             offer('true', 'value', '', choose(true)),
             offer('false', 'value', '', choose(false)),
           ].filter((row) => matches(typed, row.label)),
+        ),
+      ]}
+    />
+  );
+}
+
+/**
+ * Draws the name of a field of the struct the method follows, among the fields the engine says the
+ * struct has, each with its dtype. Where the engine does not know them, none is offered.
+ */
+export function FieldDrawing({
+  fields,
+  describedAs,
+  names,
+  openId,
+  value,
+  onChange,
+}: DrawingProps<string | null> & {
+  readonly fields: readonly FieldView[] | null;
+}): React.JSX.Element {
+  const known = fields ?? [];
+  return (
+    <Slot
+      label={value ?? 'field'}
+      tone="column"
+      look={value === null ? 'none' : 'plain'}
+      wrong={value === null || !known.some((field) => field.name === value)}
+      names={names ?? false}
+      openNow={useIsFresh(openId)}
+      describedAs={describedAs}
+      placeholder="Search"
+      offers={(typed) => [
+        titled(
+          null,
+          known
+            .filter((field) => matches(typed, field.name, field.dtype))
+            .map((field) =>
+              offer(
+                field.name,
+                'column',
+                field.dtype,
+                () => {
+                  onChange(field.name);
+                },
+                { id: field.name },
+              ),
+            ),
         ),
       ]}
     />
@@ -401,8 +456,6 @@ function typedInto(type: LiteralType): TypedKind {
       return { kind: 'timeZone' };
     case 'path':
       return { kind: 'path' };
-    case 'field':
-      return { kind: 'value', type: 'string' };
     default:
       return { kind: 'value', type };
   }
@@ -419,7 +472,6 @@ const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
   pattern: 'Type a pattern, such as [aeiou]',
   timeZone: 'Type a time zone, such as Europe/Berlin',
   path: 'Type a path',
-  field: 'Type the name of a field',
 };
 
 /** What is waiting to be typed, for each type of literal. */
@@ -433,7 +485,6 @@ const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   pattern: 'pattern',
   timeZone: 'time zone',
   path: 'path',
-  field: 'field',
 };
 
 /**
@@ -630,6 +681,17 @@ function OneDrawing({
           {...common}
           frame={around.frame}
           value={wordOf(argument)}
+          onChange={(name) => {
+            onSet(wordArgument(kind, name));
+          }}
+        />
+      );
+    case 'field':
+      return (
+        <FieldDrawing
+          {...common}
+          fields={around.method?.fields ?? null}
+          value={argument?.kind === 'field' ? argument.name : null}
           onChange={(name) => {
             onSet(wordArgument(kind, name));
           }}

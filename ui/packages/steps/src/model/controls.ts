@@ -24,8 +24,7 @@ export type LiteralType =
   | 'duration'
   | 'pattern'
   | 'timeZone'
-  | 'path'
-  | 'field';
+  | 'path';
 
 /** How one argument of one kind is drawn. */
 export type OneControl =
@@ -33,6 +32,8 @@ export type OneControl =
   | { readonly control: 'expression' }
   /** One field of the rows. */
   | { readonly control: 'column' }
+  /** One field of the struct the method follows, among those the engine says it has. */
+  | { readonly control: 'field' }
   /** Something typed into the search box of its list. */
   | { readonly control: 'literal'; readonly type: LiteralType }
   | { readonly control: 'flag' }
@@ -52,9 +53,7 @@ export function oneControlOf(kind: KindView): OneControl {
     case 'column':
       return { control: 'column' };
     case 'field':
-      // The name of a field is typed in; the engine refuses a name that is no field of the struct
-      // the method follows, and names the fields it has.
-      return { control: 'literal', type: 'field' };
+      return { control: 'field' };
     case 'value':
       return { control: 'literal', type: kind.type };
     case 'duration':

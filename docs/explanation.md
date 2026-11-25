@@ -1622,7 +1622,7 @@ result:
 | Which groups of offers a word's list holds, and the connected inputs it offers; the word a chain starts from lists the typed values too where it starts from a number or text typed in, so that the value is retyped where it stands and its methods stay | `listsOf`, `listsChainRow`, `startWordOf`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile; `listsOf` takes its groups from `GROUPS_OF_WORD`, the table `listedGroups` is made from, and leaves out only the options of a name with none and the functions of a value outside the document |
 | Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `noAddition` in `model/words.ts`; a component that draws no adding for a piece stops compiling when the model gives that piece one |
 | How a value is drawn: as one word, as one word that a method can follow, as a chain, or as the lines of a condition; a connected input or a number or text typed in is drawn as a word a method can follow where it stands in the document, and as a word with its methods after it where it has some | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
-| Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
+| Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts); the name of a field of a struct gets the control `field`, which offers the fields the walk reports for the place the method stands at (`fields` of each walked expression, one for each of its places), each with its dtype, and none where the walk does not know them |
 | Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts); `HeadName` is the type of those names, a step parameter is drawn by one, and `CONDITION_TESTS`, which a `when` reads for its predicates, is the name `HEAD` gives a filter's |
 | Which functions a chain starts from besides a field and a typed value | `START_FUNCTIONS` in `model/catalogue.ts`, which the start list reads through `startOffers` |
 | What a step's report and its rows say, beside its row and at its end | `sayingOf`, `rowEndOf`, `rowsFailure` in [model/report.ts](../ui/packages/steps/src/model/report.ts) |
@@ -1709,7 +1709,7 @@ The census holds:
   and `element` among them; and the 4 kinds of typed value a document holds as
   the value of `lit`, each with its class of dtype and whether the host reads
   typed text as one, and the 17 ways a slot reads a text typed into it.
-- The 13 kinds of parameter, the 5 types of literal, the 3 shapes, the 18 forms
+- The 13 kinds of parameter, among them the name of a field, the 5 types of literal, the 3 shapes, the 18 forms
   of kind and shape the catalogue's parameters have, and the 2 kinds that are set
   as options, a flag and a choice.
 - The 67 classes of dtype, the 3 shapes of a value, the 3 kinds of place and the

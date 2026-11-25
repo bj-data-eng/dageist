@@ -72,6 +72,8 @@ function oneFits(control: OneControl, value: ArgumentView): string | null {
         return ['expression'];
       case 'column':
         return ['columns'];
+      case 'field':
+        return ['field'];
       case 'literal':
         switch (control.type) {
           case 'integer':
@@ -91,8 +93,6 @@ function oneFits(control: OneControl, value: ArgumentView): string | null {
             return ['timeZone'];
           case 'path':
             return ['path'];
-          case 'field':
-            return ['field'];
           default:
             return control.type satisfies never;
         }

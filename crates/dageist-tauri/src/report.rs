@@ -495,6 +495,9 @@ struct WalkedExpressionView {
     /// end would have; absent where the context or what comes before is not
     /// known.
     places: Vec<Option<OfferPlaceView>>,
+    /// The fields of the struct each of the places follows, in the same order, and none where the
+    /// value there is no struct or the walk does not know what it holds.
+    fields: Vec<Option<Vec<FieldView>>>,
     ending: Option<EndingView>,
 }
 
@@ -514,6 +517,21 @@ fn walked_expression_view(expression: &WalkedExpression) -> WalkedExpressionView
             .places()
             .iter()
             .map(|place| place.as_ref().map(offer_place_view))
+            .collect(),
+        fields: expression
+            .fields()
+            .iter()
+            .map(|held| {
+                held.as_ref().map(|fields| {
+                    fields
+                        .iter()
+                        .map(|field| FieldView {
+                            name: field.name().to_owned(),
+                            dtype: field.written().to_owned(),
+                        })
+                        .collect()
+                })
+            })
             .collect(),
         ending: expression.ending().map(ending_view),
     }

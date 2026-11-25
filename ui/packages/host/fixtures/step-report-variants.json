@@ -134,6 +134,15 @@
               },
               null
             ],
+            "fields": [
+              [
+                {
+                  "name": "x",
+                  "dtype": "Int64"
+                }
+              ],
+              null
+            ],
             "ending": {
               "kind": "notKnown",
               "because": "the dtype is not known"

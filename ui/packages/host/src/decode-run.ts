@@ -241,12 +241,13 @@ const readStanding: Decode<StandingView> = readRecord(['follows', 'verdict'], (f
 }));
 
 const readWalkedExpression: Decode<WalkedExpressionView> = readRecord(
-  ['place', 'context', 'calls', 'places', 'ending'],
+  ['place', 'context', 'calls', 'places', 'fields', 'ending'],
   (fields, path) => ({
     place: readField(fields, path, 'place', readPlace),
     context: readField(fields, path, 'context', readNullable(readContext)),
     calls: readField(fields, path, 'calls', readList(readStanding)),
     places: readField(fields, path, 'places', readList(readNullable(readOfferPlace))),
+    fields: readField(fields, path, 'fields', readList(readNullable(readList(readFieldView)))),
     ending: readField(fields, path, 'ending', readNullable(readEnding)),
   }),
 );

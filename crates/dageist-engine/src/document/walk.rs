@@ -78,6 +78,7 @@ pub struct WalkedExpression {
     next: Option<After>,
     ending: Option<Ending>,
     count: Option<Count>,
+    fields: Vec<Option<Fields>>,
 }
 
 impl WalkedExpression {
@@ -115,6 +116,13 @@ impl WalkedExpression {
         follows
             .map(|after| Some(OfferPlace::new(self.context?, after?)))
             .collect()
+    }
+
+    /// The fields of the struct that each of [`places`](Self::places) follows, in the same order,
+    /// and none where the value there is no struct or the walk does not know what it holds.
+    #[must_use]
+    pub fn fields(&self) -> &[Option<Fields>] {
+        &self.fields
     }
 
     /// Whether the expression may end where it does, when a position holds it
@@ -1832,6 +1840,7 @@ impl Walker<'_> {
                 next: None,
                 ending: None,
                 count: None,
+                fields: Vec::new(),
             });
             return unsaid;
         };
@@ -2087,6 +2096,7 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
+        let mut held_fields: Vec<Option<FieldsAt>> = Vec::new();
         let mut fields: Option<FieldsAt> = match expression.start() {
             Start::Call(start) => {
                 let held = self
@@ -2101,6 +2111,7 @@ impl Walker<'_> {
             }
             _ => None,
         };
+        held_fields.push(fields);
         let mut compares_with_a_fraction = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -2165,6 +2176,7 @@ impl Walker<'_> {
             width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
             fields = self.fields_after(&standing);
+            held_fields.push(fields);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
@@ -2293,6 +2305,10 @@ impl Walker<'_> {
             next,
             ending,
             count,
+            fields: held_fields
+                .iter()
+                .map(|at| at.map(|at| self.fieldsets[at.0].clone()))
+                .collect(),
         });
         let operand = match cur {
             Cur::Value {

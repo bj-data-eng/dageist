@@ -693,6 +693,11 @@ export interface WalkedExpressionView {
    * would have; `null` where the context or what comes before is not known.
    */
   readonly places: ReadonlyArray<OfferPlaceView | null>;
+  /**
+   * The fields of the struct each of the places follows, in the same order; `null` where the value
+   * there is no struct or the walk does not know what it holds.
+   */
+  readonly fields: ReadonlyArray<readonly FieldView[] | null>;
   readonly ending: EndingView | null;
 }
 

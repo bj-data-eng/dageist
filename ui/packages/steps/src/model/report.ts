@@ -14,6 +14,7 @@ import type {
   CountView,
   DocumentStepView,
   ErrorKind,
+  FieldView,
   OfferPlaceView,
   PlaceView,
   ResolutionView,
@@ -46,6 +47,8 @@ export interface ChainDtypes {
    * may stand at a place is asked of the engine at it.
    */
   readonly places: ReadonlyArray<OfferPlaceView | null>;
+  /** The fields of the struct each of the places follows; `null` where it follows none the walk knows. */
+  readonly fields: ReadonlyArray<readonly FieldView[] | null>;
 }
 
 /** What a step is, as far as anyone knows. */
@@ -131,6 +134,7 @@ function chainsOf(report: StepReportView): ReadonlyMap<string, ChainDtypes> {
       source: dtypeOf(expression.start),
       links: expression.links.map(dtypeOf),
       places: [],
+      fields: [],
     });
   }
   // A join's `on` is walked twice, as a left key and as a right key, so the walk holds two
@@ -145,6 +149,7 @@ function chainsOf(report: StepReportView): ReadonlyMap<string, ChainDtypes> {
       source: held?.source ?? null,
       links: held?.links ?? [],
       places: expression.places,
+      fields: expression.fields,
     });
   }
   return found;

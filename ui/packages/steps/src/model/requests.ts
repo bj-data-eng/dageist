@@ -95,8 +95,6 @@ export function literalArgument(kind: KindView, literal: LiteralView): ValueRequ
       return { kind: 'timeZone', zone: textOf(literal) };
     case 'path':
       return { kind: 'path', text: textOf(literal) };
-    case 'field':
-      return { kind: 'field', name: textOf(literal) };
     default:
       return { kind: 'string', value: textOf(literal) };
   }

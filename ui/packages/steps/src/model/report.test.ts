@@ -196,6 +196,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
         selectAfter('UInt32', 'many'),
         selectAfter('UInt32', 'many'),
       ],
+      // No value there is a struct.
+      fields: [null, null, null],
     });
     expect(stepOf(prepared, 'resolved_day').chains.get(pathKey(COLUMN))).toMatchObject({
       source: 'Datetime(us)',
@@ -223,6 +225,7 @@ describe('the dtype the editor shows after each link of a chain', () => {
       links: ['UInt32'],
       // A list of dates is a count of values of its own; its length is one value.
       places: [selectAfter('Date', 'counted'), selectAfter('UInt32', 'one')],
+      fields: [null, null],
     });
   });
 

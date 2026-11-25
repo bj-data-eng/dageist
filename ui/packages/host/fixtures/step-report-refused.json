@@ -130,6 +130,7 @@
                 }
               }
             ],
+            "fields": [null],
             "ending": {
               "kind": "allowed"
             }
@@ -246,6 +247,7 @@
               },
               null
             ],
+            "fields": [null, null],
             "ending": null
           }
         ],

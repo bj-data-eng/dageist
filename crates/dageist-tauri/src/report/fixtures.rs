@@ -149,6 +149,13 @@ pub(crate) fn variants() -> RunView {
                     }),
                     None,
                 ],
+                fields: vec![
+                    Some(vec![FieldView {
+                        name: "x".to_owned(),
+                        dtype: "Int64".to_owned(),
+                    }]),
+                    None,
+                ],
                 ending: Some(EndingView::NotKnown {
                     because: "the dtype is not known".to_owned(),
                 }),
