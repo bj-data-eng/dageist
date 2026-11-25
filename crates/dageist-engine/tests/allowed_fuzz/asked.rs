@@ -17,6 +17,12 @@
 //! or an array is not asked of an element the tables do not measure, nor one Polars has no
 //! implementation of. Every other step is asked of the step engine, whose answer is Polars' and
 //! the engine's own checks together.
+//!
+//! [`ask_polars`] copies what the step engine builds, as the engine's builder is private. So that
+//! the copy does not drift from it, a case of a campaign whose step the walk allows is asked of
+//! both, and the two answers, which Polars refuses and where, and the dtype of each expression,
+//! must be the same: [`drift_between`](super::observe::drift_between) names a difference, which
+//! is a finding of the target.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
@@ -33,25 +39,44 @@ use super::observe::{
 /// How many rows the rows stage collects, as the step engine's preview of a step does.
 const ROWS: usize = 100;
 
-/// Whether the step of `document` on the tables `frames` holds is one the walk refuses and Polars
-/// may be asked about: not one refused by a rule that is there because Polars panics on what it
-/// refuses, which no run of Polars is asked.
-pub fn is_refused_by_the_walk_and_may_be_asked(document: &Document, frames: &Frames) -> bool {
+/// What the walk says of the step of `document` on the tables `frames` holds, as far as asking
+/// Polars of it goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Walked {
+    /// The walk refuses it, and Polars may be asked.
+    AskPolars,
+    /// The walk refuses it by a rule that is there because Polars panics on what it refuses: no
+    /// run of Polars is asked.
+    NotAsked,
+    /// The walk refuses nothing and knows the step to its end.
+    Allows,
+    /// The walk refuses nothing and could not follow the step to its end, or could not be made.
+    NotKnown,
+}
+
+/// What the walk says of the step of `document` on the tables `frames` holds.
+pub fn walked(document: &Document, frames: &Frames) -> Walked {
     // A walk that panics is not asked again here: the step engine's run meets the same panic.
     catch_unwind(AssertUnwindSafe(|| {
-        document.steps()[0]
-            .walk(0, frames.rows.schema(), &frames.inputs(false))
-            .refusal()
-            .is_some_and(|found| {
-                !matches!(
+        let walk = document.steps()[0].walk(0, frames.rows.schema(), &frames.inputs(false));
+        match (walk.refusal(), walk.not_known()) {
+            (Some(found), _) => {
+                if matches!(
                     found.refusal().source(),
                     RefusalSource::Rule(
                         Rule::ElementDtypeIsImplemented | Rule::ElementDtypeIsMeasured
                     )
-                )
-            })
+                ) {
+                    Walked::NotAsked
+                } else {
+                    Walked::AskPolars
+                }
+            }
+            (None, Some(_)) => Walked::NotKnown,
+            (None, None) => Walked::Allows,
+        }
     }))
-    .unwrap_or(false)
+    .unwrap_or(Walked::NotKnown)
 }
 
 fn seen(said: Said) -> Seen {
