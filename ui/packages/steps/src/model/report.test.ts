@@ -198,7 +198,7 @@ describe('the dtype the editor shows after each link of a chain', () => {
 });
 
 describe('a refusal', () => {
-  // The claims sorted, then a sum of a text column, which Polars refuses, then a step never run.
+  // The claims sorted, then a sum of a text column, which the tables refuse, then a step never run.
   const run = prepareRun(named('sort', 'total', 'after'), decodeRun(refusedFixture));
 
   it('is shown on the way it marks: here, the method the engine refused', () => {
@@ -225,10 +225,10 @@ describe('a refusal', () => {
     expect(stepOf(run, 'sort')).toMatchObject({ status: 'valid', problem: null });
   });
 
-  it('keeps the dtype the chain had before the method that was refused', () => {
+  it('has no dtype for the chain, as a step the tables refuse is not planned', () => {
     expect(stepOf(run, 'total').chains.get(pathKey(COLUMN))).toMatchObject({
-      source: 'String',
-      links: [null],
+      source: null,
+      links: [],
     });
   });
 });

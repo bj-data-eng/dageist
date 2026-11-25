@@ -565,7 +565,8 @@ enum CauseView {
     UnknownInput { name: String },
     /// The catalogue could not build the call.
     Build { reason: String },
-    /// A named rule does not let a call stand where it does.
+    /// The tables of allowed combinations or a named rule do not let a call stand where it
+    /// does, so the step was not run.
     NotAllowed { refusal: RefusalView },
     /// Polars refused, with this reason.
     Polars { reason: String },

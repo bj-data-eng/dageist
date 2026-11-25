@@ -242,8 +242,8 @@ snapshot test fails and names the file that differs. Eight files in
 `node_inputs`, `node-document.json` from `node_document`, the claim-timing
 sample's own steps as the host holds them with the report of running them,
 `step-report.json` from running the claim-timing steps,
-`step-report-refused.json` from a document whose second step Polars refuses and
-whose third is not run, `step-report-incomplete.json` from one whose second step
+`step-report-refused.json` from a document whose second step the tables refuse, with
+the words they recorded of Polars, and whose third is not run, `step-report-incomplete.json` from one whose second step
 holds something still to be picked, which the third waits for,
 `step-rows.json` from the rows after the `days_open` step,
 `step-report-variants.json`, a report the host builds by hand to hold the

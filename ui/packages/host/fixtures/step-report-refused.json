@@ -165,41 +165,20 @@
           ]
         },
         "cause": {
-          "kind": "polars",
-          "reason": "`sum` operation not supported for dtype `str`\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF [\"dcn\", \"timestamp\", \"step_to\", \"owner\", ...]; PROJECT */5 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n"
+          "kind": "notAllowed",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "`sum` operation not supported for dtype `str`"
+          }
         }
       },
       "count": {
         "kind": "notCounted"
       },
-      "expressions": [
-        {
-          "place": {
-            "stepIndex": 1,
-            "stepId": "total",
-            "path": [
-              {
-                "kind": "parameter",
-                "name": "named_exprs"
-              },
-              {
-                "kind": "value",
-                "index": 0
-              }
-            ]
-          },
-          "start": {
-            "kind": "dtype",
-            "dtype": "String"
-          },
-          "links": [
-            {
-              "kind": "refused",
-              "reason": "`sum` operation not supported for dtype `str`\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF [\"dcn\", \"timestamp\", \"step_to\", \"owner\", ...]; PROJECT */5 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n"
-            }
-          ]
-        }
-      ],
+      "expressions": [],
       "walk": {
         "expressions": [
           {
