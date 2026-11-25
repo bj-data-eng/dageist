@@ -80,8 +80,14 @@ import { chosenOptions } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import type { ChainDtypes } from './model/report';
 import { linkHint } from './model/report';
-import { fieldArgument, inputArgument, listArgument, literalExpression } from './model/requests';
-import { OFFERED_INPUTS, actionsOf, chainBodyOf } from './model/words';
+import {
+  fieldArgument,
+  inputArgument,
+  listArgument,
+  literalExpression,
+  literalStart,
+} from './model/requests';
+import { OFFERED_INPUTS, actionsOf, chainBodyOf, startWordOf } from './model/words';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -564,6 +570,17 @@ export function ChainBlocks({
     frame,
     node,
   );
+  // What is typed into the list of a start that is a number or text typed in is read as the value
+  // it is retyped as.
+  const startReadings = useReadTyped(
+    startList.open && chainBody.body === 'typed'
+      ? {
+          text: startList.typed,
+          typed: { kind: 'expression' },
+          slot: startKnown ? { start: positions, argument: null } : null,
+        }
+      : null,
+  );
   const addAt = (at: number): ((anchor: HTMLElement) => void) => {
     return (anchor) => {
       setOpensMethods(false);
@@ -586,7 +603,11 @@ export function ChainBlocks({
       node,
       typed,
       fits: startFits,
+      readings: startReadings,
       inputs: OFFERED_INPUTS,
+      onLiteral: (picked: LiteralView) => {
+        void edits.setStart(path, literalStart(picked));
+      },
       onInput: (picked: string) => {
         void edits.setStart(path, { kind: 'input', name: picked });
       },
@@ -594,27 +615,25 @@ export function ChainBlocks({
         void edits.setStart(path, { kind: 'field', name: picked });
       },
     };
-    return listedGroups(
-      { word: 'chainStart' },
-      {
-        functions: () =>
-          startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-            if (id === 'polars.when') {
-              fresh.mark(
-                freshKey(
-                  step.id,
-                  under(startPath, parameterSegment(CONDITION_TESTS), itemSegment(0)),
-                ),
-              );
-            } else {
-              fresh.mark(`${freshKey(step.id, path)}:method`);
-            }
-            void edits.startWith(path, id);
-          }),
-        inputs: () => [inputGroup(rows)],
-        fields: () => [fieldGroup(rows)],
-      },
-    );
+    return listedGroups(startWordOf(chainBody), {
+      values: () => [valueGroup(rows)],
+      functions: () =>
+        startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+          if (id === 'polars.when') {
+            fresh.mark(
+              freshKey(
+                step.id,
+                under(startPath, parameterSegment(CONDITION_TESTS), itemSegment(0)),
+              ),
+            );
+          } else {
+            fresh.mark(`${freshKey(step.id, path)}:method`);
+          }
+          void edits.startWith(path, id);
+        }),
+      inputs: () => [inputGroup(rows)],
+      fields: () => [fieldGroup(rows)],
+    });
   };
 
   // Each chain sorts its own methods, so a method cannot leave its chain.

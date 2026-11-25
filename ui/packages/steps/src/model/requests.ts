@@ -10,6 +10,7 @@ import type {
   KindView,
   LiteralRequest,
   LiteralView,
+  StartRequest,
   ValueRequest,
 } from '@dageist/host';
 
@@ -48,6 +49,11 @@ function literalOf(literal: LiteralView): LiteralRequest {
 /** Returns the expression that is `literal`, as an argument. */
 export function literalExpression(literal: LiteralView): ValueRequest {
   return expressionArgument({ kind: 'literal', literal: literalOf(literal) });
+}
+
+/** Returns what an expression starts from where it starts from `literal`, typed in, as an edit puts it where the start was. */
+export function literalStart(literal: LiteralView): StartRequest {
+  return { kind: 'literal', literal: literalOf(literal) };
 }
 
 /** Returns the text a literal holds, whichever kind it is. */

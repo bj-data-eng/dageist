@@ -38,6 +38,8 @@ export const OFFERED_INPUTS = ['value', 'list'] as const;
 export type ListedWord =
   /** The word a chain starts from, which swaps the start. */
   | { readonly word: 'chainStart' }
+  /** The word a chain starts from where it starts from a number or text typed in, which also retypes it. */
+  | { readonly word: 'typedStart' }
   /** The name of a method, which swaps the method and sets its options. */
   | { readonly word: 'method'; readonly options: boolean }
   /** The list that adds a method after a piece. */
@@ -54,6 +56,7 @@ export type ListedWord =
 /** What each kind of word may list, in the order it shows it: the groups its components make. */
 export const GROUPS_OF_WORD = {
   chainStart: ['functions', 'inputs', 'fields'],
+  typedStart: ['values', 'functions', 'inputs', 'fields'],
   method: ['options', 'methods'],
   insertion: ['methods'],
   value: ['chain', 'values', 'inputs', 'fields', 'functions'],
@@ -79,6 +82,7 @@ export function listsOf(word: ListedWord): readonly Group[] {
     case 'value':
       return word.fromPath ? groups : groups.filter((group) => group !== 'functions');
     case 'chainStart':
+    case 'typedStart':
     case 'insertion':
     case 'argument':
     case 'newStep':
@@ -153,6 +157,17 @@ export function chainBodyOf(expression: ExpressionView): ChainBody {
   if (typed !== null) return { body: 'typed', shown: typed.shown, text: typed.text };
   if (call !== null && fieldNameOf(call) === null) return { body: 'function' };
   return { body: 'start' };
+}
+
+/**
+ * Returns the word the chain laid out as `body` starts from: one that starts from a number or text
+ * typed in lists the typed values too, since its value is retyped where it stands and a method
+ * that follows it stays.
+ */
+export function startWordOf(
+  body: ChainBody,
+): Extract<ListedWord, { readonly word: 'chainStart' | 'typedStart' }> {
+  return body.body === 'typed' ? { word: 'typedStart' } : { word: 'chainStart' };
 }
 
 /** How a line of a condition is drawn. */

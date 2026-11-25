@@ -878,7 +878,8 @@ export type ExpressionRequest =
 export type StartRequest =
   | { readonly kind: 'hole' }
   | { readonly kind: 'input'; readonly name: string }
-  | { readonly kind: 'field'; readonly name: string };
+  | { readonly kind: 'field'; readonly name: string }
+  | { readonly kind: 'literal'; readonly literal: LiteralRequest };
 
 /**
  * An argument an edit gives a parameter. Its kind is the kind of the parameter it is for, as the
