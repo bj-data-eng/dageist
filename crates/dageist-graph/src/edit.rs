@@ -45,7 +45,9 @@ pub enum Edit {
         /// What fills it.
         from: Reference,
     },
-    /// Adds an input to a transform, named after what feeds it, and fills it.
+    /// Adds an input to a transform and fills it. It is named after the node
+    /// it reads, or after the parameter it reads, with a number when the
+    /// transform has an input of that name.
     ConnectNew {
         /// The transform.
         node: NodeId,
@@ -258,12 +260,12 @@ impl Graph {
             }
             Edit::ConnectNew { node, from } => {
                 self.check_reference(node, from)?;
+                // A table or a column is named after the node it reads, and a
+                // value after the parameter.
                 let base = match from {
-                    Reference::Table { node: read } => {
-                        let read = &self.nodes[read];
-                        InputName::made_from(read.name.as_str())
+                    Reference::Table { node: read } | Reference::Column { node: read, .. } => {
+                        InputName::made_from(self.nodes[read].name.as_str())
                     }
-                    Reference::Column { column, .. } => InputName::made_from(column),
                     Reference::Parameter { name, .. } => InputName::made_from(name.as_str()),
                 };
                 let target = self.node_mut(node)?;
