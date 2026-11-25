@@ -41,6 +41,7 @@ use dageist_engine::document::{
     Call, Document, Expression, Place, Segment, Start, Step, StepId, Value,
 };
 
+use super::asked;
 use super::case::Case;
 use super::frames::Frames;
 use super::frames::stand_in_column;
@@ -2066,9 +2067,7 @@ fn converts_when_selected(frames: &Frames, expression: &Expression, upto: usize)
     let Ok(document) = Document::new(vec![step]) else {
         return false;
     };
-    document
-        .preview(&frames.inputs(false), &frames.rows, &id, 100)
-        .is_ok()
+    asked::first_rows(&document, frames).is_some()
 }
 
 /// Whether Polars gives a null in each row of the left table for the first `upto` links of
@@ -2112,11 +2111,13 @@ fn gives_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bo
     let Ok(document) = Document::new(vec![step]) else {
         return false;
     };
-    document
-        .preview(&frames.inputs(false), &frames.rows, &id, 100)
-        .is_ok_and(|preview| {
-            !preview.rows().is_empty() && preview.rows().iter().all(|row| row[0].is_none())
-        })
+    asked::first_rows(&document, frames).is_some_and(|rows| {
+        rows.height() > 0
+            && rows
+                .columns()
+                .first()
+                .is_some_and(|column| column.null_count() == rows.height())
+    })
 }
 
 /// Whether a call undoes the argument `parameter` of the call `call`.
@@ -12569,15 +12570,12 @@ mod tests {
     }
 
     #[test]
-    fn an_interval_that_follows_a_list_and_a_null_literal_is_refused_and_excused_by_no_limit() {
-        // Polars folds the comparisons of a null literal into nulls, so the interval would be
-        // allowed where the tables refuse a list for the comparison of its `closed`. The
-        // interval follows a list and the tables refuse it, so the step is not built: it is
-        // refused as the tables say, no limit excuses what Polars is not asked, and the
-        // other kept cases of the literal show the limit.
+    fn an_interval_that_follows_a_null_literal_is_excused_as_a_literal_whatever_its_closed_says() {
+        // Polars folds the comparisons of a null literal into nulls, so the interval is allowed
+        // where the tables refuse a list for the comparison of its `closed`.
         assert_eq!(
             excused_by_kept("uncovered-a-literal--an-interval-that-follows-a-null-literal.case"),
-            Vec::<Limit>::new()
+            vec![Limit::ALiteral]
         );
     }
 

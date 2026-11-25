@@ -2993,16 +2993,12 @@ mod tests {
         // `sort(by=when(b <= b - 1).then(b).last())` of `List(Int64)`: the tables
         // do not know what `b - 1` gives, and refuse the comparison for every
         // dtype it might give, with the reason Polars gave for one of them. Polars
-        // drops a sort key that is one value, but the comparison follows a list and the
-        // tables refuse it, so the step is not built: the document is refused with the
-        // tables' own words, and so is the part asked alone. Asked as written, it is
-        // refused, for the dtype the argument really has.
+        // drops a sort key that is one value; asked as written, it refuses the
+        // comparison, for the dtype the argument really has.
         let case =
             kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
         let refused = refusal(&case);
-        let alone = settle(&case, &refused).expect("a comparison that is refused alone");
-        assert_eq!(alone.reason, refused.reason);
-        assert_eq!(alone.showing, Showing::TheSameReason);
+        assert_eq!(settle(&case, &refused), None);
         let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
             .expect("a comparison that Polars refuses");
         assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
@@ -3014,16 +3010,19 @@ mod tests {
     fn a_replacement_is_settled_by_polars_refusing_it_whatever_value_it_names() {
         // `sort(by=f // a.replace(1, 1).len())` of `List(Int64)`: the tables refuse the
         // replacement for the values it lists apart, beside a companion that is a list, and Polars
-        // drops a sort key that is one value, but the replacement follows a list and the tables
-        // refuse it, so the step is not built: the document is refused with the tables' own
-        // words, and so is the replacement asked alone.
+        // drops a sort key that is one value; asked as written, it refuses the replacement for
+        // the dtypes the values really have, and for another reason than the companion's.
         let case = kept("stricter-a-replacement-of-a-list-in-a-sort-key-of-one-value.case");
         let refused = refusal(&case);
         assert!(!refused.argument_unknown);
-        let found = settle(&case, &refused).expect("a replacement that is refused alone");
+        let found = settle(&case, &refused).expect("a replacement that Polars refuses");
         assert!(found.probe.contains("Expr.replace"), "{}", found.probe);
-        assert_eq!(found.reason, refused.reason);
+        assert_ne!(found.reason, refused.reason);
         assert_eq!(found.showing, Showing::TheSameReason);
+        // A call that is no replacement or interval is settled for the tables' reason only.
+        let other =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        assert_eq!(settle(&other, &refusal(&other)), None);
     }
 
     #[test]

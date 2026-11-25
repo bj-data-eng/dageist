@@ -8,10 +8,11 @@
 //! not refused.
 
 use dageist_engine::allowed::{Context, Ending, Outer, RefusalSource, Rule};
-use dageist_engine::document::{Document, Inputs, Outcome, Report, RunCause, Segment, Walk};
+use dageist_engine::document::{Document, Inputs, Report, Segment, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
+use crate::ask_polars::{self, Connected};
 use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 /// The table a join starts from: `k` and `a` are whole numbers, `g` text, `f` Booleans.
@@ -44,24 +45,48 @@ fn inputs_of(other: DataFrame) -> Inputs {
     inputs
 }
 
-/// What running a join of `left` and `other` given `arguments` reports: Polars'
-/// outcome, and what the walk says of it.
-fn join_of(left: DataFrame, other: DataFrame, arguments: Value) -> Report {
+/// What Polars says of a join: it works out the schema, or refuses.
+#[derive(Debug)]
+enum Polars {
+    Allows,
+    Refuses(String),
+}
+
+/// What running a join reports, and what Polars said of it when asked apart from the step engine,
+/// which does not run a join the walk refuses.
+struct Joined {
+    report: Report,
+    polars: Polars,
+}
+
+/// What running a join of `left` and `other` given `arguments` reports: Polars' answer, and what
+/// the walk says of it.
+fn join_of(left: DataFrame, other: DataFrame, arguments: Value) -> Joined {
     let mut given = arguments;
     given["other"] = json!({ "table": "other" });
     let document =
         Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document");
-    document
+    let tables = |name: &str| (name == "other").then(|| other.clone().lazy());
+    let polars = match ask_polars::plan(&document.steps()[0], 0, &left, Connected::tables(&tables))
+    {
+        Some(planned) => match planned.schema {
+            Ok(_) => Polars::Allows,
+            Err(refused) => Polars::Refuses(refused.reason),
+        },
+        None => Polars::Refuses("the join cannot be asked".to_owned()),
+    };
+    let report = document
         .run(&inputs_of(other), left.lazy())
-        .expect("the left table has a schema")
+        .expect("the left table has a schema");
+    Joined { report, polars }
 }
 
-fn walk(report: &Report) -> &Walk {
-    report.steps()[0].walk()
+fn walk(joined: &Joined) -> &Walk {
+    joined.report.steps()[0].walk()
 }
 
-fn outcome(report: &Report) -> &Outcome {
-    report.steps()[0].outcome()
+fn outcome(joined: &Joined) -> &Polars {
+    &joined.polars
 }
 
 fn keys(left_on: Vec<Value>, right_on: Vec<Value>) -> Value {
@@ -72,17 +97,14 @@ fn first(name: &str) -> Value {
     field_then(name, vec![call("Expr.first", json!({}))])
 }
 
-fn polars_refuses(outcome: &Outcome) -> bool {
-    matches!(
-        outcome,
-        Outcome::Refused(refusal) if matches!(refusal.cause(), RunCause::Polars(_))
-    )
+fn polars_refuses(outcome: &Polars) -> bool {
+    matches!(outcome, Polars::Refuses(_))
 }
 
-fn polars_reason(outcome: &Outcome) -> String {
+fn polars_reason(outcome: &Polars) -> String {
     match outcome {
-        Outcome::Refused(refusal) => refusal.to_string(),
-        other => panic!("Polars allows it: {other:?}"),
+        Polars::Refuses(reason) => reason.clone(),
+        Polars::Allows => panic!("Polars allows it"),
     }
 }
 
@@ -131,7 +153,7 @@ fn a_name_repeated_on_one_side_only_is_not_refused() {
     ] {
         let report = join_of(left(), right(), keys(left_on, right_on));
         assert!(
-            matches!(outcome(&report), Outcome::Valid { .. }),
+            matches!(outcome(&report), Polars::Allows),
             "Polars allows it: {:?}",
             outcome(&report)
         );
@@ -231,7 +253,7 @@ fn a_literal_is_named_literal_and_a_condition_by_its_first_value() {
         ),
     );
     assert!(
-        matches!(outcome(&report), Outcome::Valid { .. }),
+        matches!(outcome(&report), Polars::Allows),
         "{:?}",
         outcome(&report)
     );
@@ -257,7 +279,7 @@ fn keys_given_as_on_are_paired_with_themselves() {
         json!({ "on": many(vec![field("k"), field("a")]) }),
     );
     assert!(
-        matches!(outcome(&report), Outcome::Valid { .. }),
+        matches!(outcome(&report), Polars::Allows),
         "{:?}",
         outcome(&report)
     );
@@ -312,7 +334,7 @@ fn on_a_column_both_tables_have_is_known_and_allowed() {
         json!({ "on": many(vec![field("k")]) }),
     );
     assert!(
-        matches!(outcome(&report), Outcome::Valid { .. }),
+        matches!(outcome(&report), Polars::Allows),
         "{:?}",
         outcome(&report)
     );
@@ -382,7 +404,7 @@ fn a_key_that_expands_to_several_shifts_the_pairs_after_it_so_none_is_judged() {
             ),
         );
         assert!(
-            matches!(outcome(&report), Outcome::Valid { .. }),
+            matches!(outcome(&report), Polars::Allows),
             "Polars allows it: {:?}",
             outcome(&report)
         );
@@ -543,7 +565,7 @@ fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
     let mut disagreements = Vec::new();
     for (name, arguments, allowed) in cases {
         let report = join_of(with_lists(), right(), arguments);
-        let polars_allows = matches!(outcome(&report), Outcome::Valid { .. });
+        let polars_allows = matches!(outcome(&report), Polars::Allows);
         let walk_allows = refused(walk(&report)).is_none();
         if polars_allows != allowed {
             disagreements.push(format!(
@@ -573,7 +595,7 @@ fn a_right_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it
         keys(vec![field("rf")], vec![is_in("a", field("l"))]),
     );
     assert!(
-        matches!(outcome(&report), Outcome::Valid { .. }),
+        matches!(outcome(&report), Polars::Allows),
         "Polars allows it: {:?}",
         outcome(&report)
     );

@@ -21,6 +21,7 @@ use dageist_engine::document::{
 use polars::prelude::*;
 use serde_json::{Value, json};
 
+use crate::ask_polars::{self, Connected};
 use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 /// The table: a column of each dtype a range is given, of seven rows.
@@ -68,59 +69,109 @@ fn frame() -> DataFrame {
     .expect("columns of seven rows")
 }
 
-/// A table that a join takes: `rk` holds whole numbers.
+/// The table that a join takes: `rk` holds whole numbers.
+fn other_table() -> DataFrame {
+    df!("ra" => ["x", "y", "z"], "rk" => [1_i64, 2, 3]).expect("the other table")
+}
+
+/// The connected value, which Polars meets as a literal of its dtype.
+fn connected_value() -> Scalar {
+    Scalar::new(DataType::Int64, AnyValue::Int64(5))
+}
+
+/// The connected list, which Polars meets as a literal of its dtype.
+fn connected_list() -> Series {
+    Series::new("lst".into(), [3_i64, 1, 2, 5])
+}
+
 fn inputs() -> Inputs {
     let mut inputs = Inputs::new();
-    // A connected value and a connected list, which Polars meets as literals of their dtype.
+    inputs.add_value("v", connected_value()).expect("a value");
     inputs
-        .add_value("v", Scalar::new(DataType::Int64, AnyValue::Int64(5)))
-        .expect("a value");
-    inputs
-        .add_list(
-            "lst",
-            ListOrigin::Parameter,
-            Series::new("lst".into(), [3_i64, 1, 2, 5]),
-        )
+        .add_list("lst", ListOrigin::Parameter, connected_list())
         .expect("a list");
     inputs
-        .add_table(
-            "other",
-            "Other",
-            df!("ra" => ["x", "y", "z"], "rk" => [1_i64, 2, 3])
-                .expect("the other table")
-                .lazy(),
-        )
+        .add_table("other", "Other", other_table().lazy())
         .expect("a first input");
     inputs
 }
 
+/// What the step engine reported of a step, and what Polars said of it when asked apart from the
+/// engine, which does not run a step the walk refuses.
+struct Ran {
+    report: Report,
+    polars: Said,
+    /// How many rows Polars gave, where it ran the rows.
+    polars_rows: Option<usize>,
+}
+
+/// What Polars says of the step of `document` on the table: its schema, and, where `rows` is
+/// asked for, its first rows.
+fn polars_asked(document: &Document, rows: bool) -> (Said, Option<usize>) {
+    let (tables, literals) = (
+        |name: &str| (name == "other").then(|| other_table().lazy()),
+        |name: &str| match name {
+            "v" => Some(polars::prelude::lit(connected_value())),
+            "lst" => Some(polars::prelude::lit(connected_list())),
+            _ => None,
+        },
+    );
+    let connected = Connected::new(&tables, &literals);
+    let step = &document.steps()[0];
+    let Some(planned) = ask_polars::plan(step, 0, &frame(), connected) else {
+        return (Said::Refuses("the step cannot be asked".to_owned()), None);
+    };
+    if let Err(refused) = planned.schema {
+        return (Said::Refuses(refused.reason), None);
+    }
+    if !rows {
+        return (Said::Accepts, None);
+    }
+    match ask_polars::collect(step, 0, &frame(), connected, 100) {
+        Ok(collected) => (Said::Accepts, Some(collected.height())),
+        Err(reason) => (Said::Refuses(reason), None),
+    }
+}
+
 /// The document of the one step `entry` given `arguments`, run on the table.
-fn run(entry: &str, arguments: Value) -> Report {
+fn run(entry: &str, arguments: Value) -> Ran {
     let document =
         Document::read(&document(vec![step("s", entry, arguments)])).expect("a document");
-    document
+    let report = document
         .run_on(&inputs(), &frame())
-        .expect("the table has a schema")
+        .expect("the table has a schema");
+    let (polars, polars_rows) = polars_asked(&document, true);
+    Ran {
+        report,
+        polars,
+        polars_rows,
+    }
 }
 
 /// The report of the step with the plan built and no rows run, which a range of more values than
 /// Polars holds is asked of.
-fn planned(entry: &str, arguments: Value) -> Report {
+fn planned(entry: &str, arguments: Value) -> Ran {
     let document =
         Document::read(&document(vec![step("s", entry, arguments)])).expect("a document");
-    document
+    let report = document
         .run(&inputs(), frame().lazy())
-        .expect("the table has a schema")
+        .expect("the table has a schema");
+    let (polars, polars_rows) = polars_asked(&document, false);
+    Ran {
+        report,
+        polars,
+        polars_rows,
+    }
 }
 
-fn select_of(items: Vec<Value>) -> Report {
+fn select_of(items: Vec<Value>) -> Ran {
     run("LazyFrame.select", json!({ "exprs": many(items) }))
 }
 
 /// The expression of the `at`th item of the select, with what the walk says of it.
-fn item(report: &Report, at: usize) -> &WalkedExpression {
+fn item(ran: &Ran, at: usize) -> &WalkedExpression {
     let path = [Segment::Parameter("exprs".to_owned()), Segment::Item(at)];
-    report.steps()[0]
+    ran.report.steps()[0]
         .walk()
         .expressions()
         .iter()
@@ -143,14 +194,8 @@ impl Said {
     }
 }
 
-fn polars_says(report: &Report) -> Said {
-    let step = &report.steps()[0];
-    match (step.outcome(), step.rows()) {
-        (Outcome::Valid { .. }, StepRows::Counted(_)) => Said::Accepts,
-        (Outcome::Valid { .. }, StepRows::Failed(error)) => Said::Refuses(first_line(error)),
-        (Outcome::Refused(refusal), _) => Said::Refuses(first_line(refusal)),
-        (other, _) => Said::Refuses(format!("{other:?}")),
-    }
+fn polars_says(ran: &Ran) -> Said {
+    ran.polars.clone()
 }
 
 fn first_line(text: &impl ToString) -> String {
@@ -161,8 +206,8 @@ fn first_line(text: &impl ToString) -> String {
         .to_owned()
 }
 
-fn walk_says(report: &Report) -> Said {
-    match report.steps()[0].walk().refusal() {
+fn walk_says(ran: &Ran) -> Said {
+    match ran.report.steps()[0].walk().refusal() {
         None => Said::Accepts,
         Some(refusal) => Said::Refuses(match refusal.refusal().source() {
             RefusalSource::Rule(rule) => rule.name().to_owned(),
@@ -948,7 +993,7 @@ fn a_range_typed_in_gives_the_count_polars_gives_it() {
             }
             None => {
                 let polars = polars_says(&report);
-                let StepRows::Counted(rows) = report.steps()[0].rows() else {
+                let StepRows::Counted(rows) = report.report.steps()[0].rows() else {
                     disagreements.push(format!(
                         "{}: Polars did not run it, {polars:?}, and the walk says {said:?}",
                         case.name
@@ -1105,7 +1150,7 @@ fn a_range_whose_arguments_are_not_typed_in_has_a_count_that_is_not_known() {
     let mut disagreements = Vec::new();
     for (name, start) in cases {
         let report = select_of(vec![start]);
-        if let Some(refusal) = report.steps()[0].walk().refusal() {
+        if let Some(refusal) = report.report.steps()[0].walk().refusal() {
             disagreements.push(format!("{name}: refused, {:?}", refusal.refusal().reason()));
             continue;
         }
@@ -1556,9 +1601,9 @@ fn a_range_is_always_lazy_and_never_offers_eager() {
         ("eager", json!({ "flag": true })),
     ])]);
     assert!(
-        matches!(report.steps()[0].outcome(), Outcome::Refused(_)),
+        matches!(report.report.steps()[0].outcome(), Outcome::Refused(_)),
         "a step of `eager` is refused: {:?}",
-        report.steps()[0].outcome()
+        report.report.steps()[0].outcome()
     );
 }
 
@@ -1648,7 +1693,7 @@ fn forms(column: &str) -> Vec<(&'static str, Value)> {
 
 /// The places that hold a start, each a step of a document that is built from the start, with
 /// what it holds named: where the values it gives are one count, beside the rows, a fill, a key.
-fn places(start: &Value) -> Vec<(&'static str, Report)> {
+fn places(start: &Value) -> Vec<(&'static str, Ran)> {
     vec![
         ("a select", select_of(vec![start.clone()])),
         (
@@ -1866,7 +1911,7 @@ fn every_expression_parameter_of_a_range_is_in_the_sweep() {
 // What the editor refuses that Polars takes, pinned
 
 /// The refusal of the walk by the name of its rule.
-fn refused_by(report: &Report, rule: &str) -> bool {
+fn refused_by(report: &Ran, rule: &str) -> bool {
     walk_says(report) == Said::Refuses(rule.to_owned())
 }
 
@@ -1913,15 +1958,15 @@ fn an_interval_of_nothing_is_refused_where_polars_gives_no_values_for_the_end_be
     let mut found = Vec::new();
     for (name, start) in cases {
         let report = select_of(vec![start]);
-        let StepRows::Counted(rows) = report.steps()[0].rows() else {
+        let Some(rows) = report.polars_rows else {
             found.push(format!(
                 "{name}: Polars does not give the table: {:?}",
                 polars_says(&report)
             ));
             continue;
         };
-        if rows.kept() != 0 {
-            found.push(format!("{name}: Polars gives {} values", rows.kept()));
+        if rows != 0 {
+            found.push(format!("{name}: Polars gives {rows} values"));
         }
         if !refused_by(&report, "range-is-valid") {
             found.push(format!("{name}: the walk says {:?}", walk_says(&report)));

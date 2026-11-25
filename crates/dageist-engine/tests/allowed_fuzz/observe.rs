@@ -11,6 +11,7 @@ use dageist_engine::document::{
 };
 use polars::prelude::{DataType, IntoLazy};
 
+use super::asked;
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
 
@@ -92,7 +93,7 @@ pub struct Observed {
     pub keys_conflict: bool,
 }
 
-fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
+pub fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
         .map(|text| (*text).to_owned())
@@ -124,7 +125,15 @@ fn seen(resolution: &Resolution) -> Seen {
 
 /// Runs the case's one step on `frames`: the schema, then the rows, then the
 /// empty table.
+///
+/// The step engine does not run a step whose walk is refused, so Polars is asked of such a step
+/// directly, by [`asked`]: that is how a table that is stricter than Polars is found.
 fn run_on(document: &Document, frames: &Frames) -> Observed {
+    if asked::is_refused_by_the_walk_and_may_be_asked(document, frames)
+        && let Some(observed) = asked::ask(document, frames)
+    {
+        return observed;
+    }
     let id = document.steps()[0].id().clone();
     let mut observed = Observed::default();
     let rows_inputs = frames.inputs(false);
@@ -205,7 +214,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
 /// What the schema says and the rows give, when they are not the same dtypes
 /// of the same columns, as the tables count it: two dtypes are the same when
 /// they are equal or of one class.
-fn schema_disagrees(
+pub fn schema_disagrees(
     schema: &polars::prelude::Schema,
     rows: &polars::prelude::DataFrame,
 ) -> Option<String> {
