@@ -24,6 +24,7 @@ pub mod catalog;
 pub mod claim_timing;
 pub mod document;
 mod error;
+pub mod frame;
 mod sample;
 mod startup;
 mod stored;
@@ -32,6 +33,7 @@ mod text;
 
 pub use block::{Block, ColumnInfo};
 pub use error::EngineError;
+pub use frame::{FileFormat, Frame, InputError, PARAMETER_DTYPES};
 pub use sample::{SampleSpec, claims_generated, generate_claims};
 pub use startup::PolarsSession;
 pub use stored::ParquetTable;

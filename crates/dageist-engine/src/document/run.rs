@@ -262,10 +262,21 @@ impl StepReport {
 }
 
 /// What running a document reported, step by step.
-#[derive(Debug)]
 pub struct Report {
     source: SchemaRef,
     steps: Vec<StepReport>,
+    output: Option<LazyFrame>,
+}
+
+impl fmt::Debug for Report {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Report")
+            .field("source", &self.source)
+            .field("steps", &self.steps)
+            .field("output", &self.output.as_ref().map(|_| "a plan"))
+            .finish()
+    }
 }
 
 impl Report {
@@ -279,6 +290,14 @@ impl Report {
     #[must_use]
     pub fn steps(&self) -> &[StepReport] {
         &self.steps
+    }
+
+    /// The table the last step gives, as a plan, when every step was built:
+    /// the table the document was run on when it has no steps, and nothing
+    /// when a step was refused or is still to be completed.
+    #[must_use]
+    pub fn output(&self) -> Option<crate::frame::Frame> {
+        self.output.clone().map(crate::frame::Frame::of_lazy)
     }
 }
 
@@ -396,7 +415,22 @@ impl Document {
         Ok(Report {
             source: source_schema,
             steps,
+            output: blocked_by.is_none().then_some(frame),
         })
+    }
+
+    /// Runs the document as [`run`](Self::run) does, the first step on the
+    /// table `start` gives.
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot work out the schema of `start` itself.
+    pub fn run_frame(
+        &self,
+        inputs: &Inputs,
+        start: &crate::frame::Frame,
+    ) -> Result<Report, PolarsError> {
+        self.run(inputs, start.lazy())
     }
 
     /// Runs the document as [`run`](Self::run) does, on the rows of `working`,

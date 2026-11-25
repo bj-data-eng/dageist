@@ -1,8 +1,8 @@
-//! The node's step document, which the host holds, and the edits that change it.
+//! A transform's step document, which the core's session holds, and the edits that change it.
 //!
-//! The host owns the document and its revision. A window asks for both with
-//! `node_document`, and changes the document by sending an edit with the revision
-//! it was made against: the host refuses one made against another revision, so a
+//! The session holds each transform's document and its revision. A window asks for both with
+//! `node_document`, naming the transform, and changes the document by sending an edit with the
+//! revision it was made against: the host refuses one made against another revision, so a
 //! place from an earlier document never lands on a step that has taken its identifier.
 //! Each edit is a call of the engine's editing API, which the engine checks as it makes
 //! it; this module only reads the request and writes the answer. The shapes mirror
@@ -17,17 +17,18 @@
 //! document holds, with the words the engine shows each number as, so that the view
 //! formats no value and never reads a number it cannot hold.
 
-use std::sync::{Mutex, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use dageist::{Bindings, DocumentError, Stale};
 
 use dageist_engine::allowed::{Literal, Place as OfferPlace};
 use dageist_engine::catalog::StepFrame;
-use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::{
     Call, Document, EditError, EditProblem, Expression, Start, Thing, Value, ValueKind, Wanted,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::graph::{Workspace, known_id};
 use crate::offers::PlaceRequest;
 use crate::report::{EditPlace, PlaceView, RunView, place_view};
 use crate::sample_table::{ErrorKind, ErrorView};
@@ -807,119 +808,14 @@ pub enum EditAnswerView {
     },
 }
 
-// -- What the host holds -------------------------------------------------------------------
+// -- Answers -------------------------------------------------------------------------------
 
-/// A document and the revision it is at.
-#[derive(Debug)]
-struct Held {
-    document: Document,
-    revision: u64,
-}
-
-/// The documents the host holds, which is one: the sample node's. Tauri keeps it as managed
-/// state; the bridge keeps it for as long as it runs.
-#[derive(Debug)]
-pub struct Documents {
-    held: Mutex<Held>,
-}
-
-impl Documents {
-    /// The documents of a node whose steps are `document`, at `revision`.
-    fn starting_at(document: Document, revision: u64) -> Self {
-        Self {
-            held: Mutex::new(Held { document, revision }),
-        }
-    }
-
-    /// The documents of a node whose steps are `document`, at revision 1, so that a test can name
-    /// the revision it expects. A host does not start there: see [`first_revision`].
-    #[cfg(test)]
-    pub fn of(document: Document) -> Self {
-        Self::starting_at(document, 1)
-    }
-
-    /// The documents of the sample node, which starts with its own steps.
-    ///
-    /// # Errors
-    ///
-    /// When the sample node cannot be made.
-    pub fn sample() -> Result<Self, ErrorView> {
-        let node = ClaimTiming::new().map_err(ErrorView::from)?;
-        Ok(Self::starting_at(
-            node.steps().clone(),
-            first_revision(SystemTime::now()),
-        ))
-    }
-
-    /// The document and its revision, together.
-    pub(crate) fn snapshot(&self) -> (Document, u64) {
-        let held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
-        (held.document.clone(), held.revision)
-    }
-
-    /// Holds the revision `revision`, for a test that starts a document at another.
-    #[cfg(test)]
-    pub(crate) fn set_revision(&self, revision: u64) {
-        self.held
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .revision = revision;
-    }
-
-    /// The document at `revision`.
-    ///
-    /// # Errors
-    ///
-    /// When the document is at another revision.
-    pub fn at(&self, revision: u64) -> Result<Document, ErrorView> {
-        let (document, current) = self.snapshot();
-        if current == revision {
-            Ok(document)
-        } else {
-            Err(stale(revision, current))
-        }
-    }
-
-    /// Makes `request` on the document at `revision` and answers it: the edited document at the
-    /// next revision with what `report` made of it, or why the engine refused.
-    ///
-    /// The edited document is held only once `report` has given its answer, and the lock is held
-    /// from the check of the revision to that, so that an answer that fails leaves the document
-    /// and its revision as they were and two edits made against one revision cannot both be made.
-    fn edit(
-        &self,
-        revision: u64,
-        request: &EditRequest,
-        report: impl FnOnce(&Document, u64) -> Result<DocumentStateView, ErrorView>,
-    ) -> Result<EditAnswerView, ErrorView> {
-        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
-        if held.revision != revision {
-            return Err(stale(revision, held.revision));
-        }
-        match request.make(&held.document)? {
-            Ok(edited) => {
-                let next = held.revision + 1;
-                let state = report(&edited, next)?;
-                held.document = edited;
-                held.revision = next;
-                Ok(EditAnswerView::Edited(state))
-            }
-            Err(error) => Ok(EditAnswerView::Refused {
-                revision: held.revision,
-                place: place_view(error.place()),
-                problem: problem_view(error.problem()),
-                message: error.to_string(),
-            }),
-        }
-    }
-}
-
-/// The revision a host starts its document at: the milliseconds from the Unix epoch to `now`,
+/// The revision a host starts its session at: the milliseconds from the Unix epoch to `now`,
 /// a whole number far below what the view holds exactly. A page that outlives its host holds a
 /// revision of that host, so each start of a host is at a revision a page of an earlier one
 /// cannot hold, unless that host made as many edits as there were milliseconds before the next
 /// one started. Edits then count up from it by one.
-fn first_revision(now: SystemTime) -> u64 {
+pub(crate) fn first_revision(now: SystemTime) -> u64 {
     let millis = now
         .duration_since(UNIX_EPOCH)
         .map_or(1, |since| since.as_millis());
@@ -933,33 +829,96 @@ fn stale(asked: u64, current: u64) -> ErrorView {
     )
 }
 
-/// The document the host holds, its revision, and what running it reported.
-pub fn document_state_view(documents: &Documents) -> Result<DocumentStateView, ErrorView> {
-    let (document, revision) = documents.snapshot();
-    state_of(&document, revision)
+/// The failure of a command on a transform's document, which the session refused.
+pub(crate) fn document_error(error: DocumentError) -> ErrorView {
+    match error {
+        DocumentError::NoSuchTransform(node) => ErrorView::of(
+            ErrorKind::UnknownName,
+            format!("there is no transform {node}"),
+        ),
+        DocumentError::Stale(Stale { asked, current }) => stale(asked, current),
+    }
 }
 
-fn state_of(document: &Document, revision: u64) -> Result<DocumentStateView, ErrorView> {
-    Ok(DocumentStateView {
-        revision,
-        document: document_view(document),
-        run: crate::node::run_view(document)?,
-    })
-}
-
-/// Makes `request` on the document at `revision` and reports it: the edited document at its new
-/// revision with what running it reported, or why the engine refused.
+/// The document of the transform `node`, the revision it is at, and what running it reported.
 ///
 /// # Errors
 ///
-/// A command that fails is a `stale` revision, a request that names a place or a dtype the engine
-/// has no word for, or a failure to run the document.
+/// When the graph has no such transform, or its steps have no table to start from.
+pub fn document_state_view(
+    workspace: &Workspace,
+    node: &str,
+) -> Result<DocumentStateView, ErrorView> {
+    let node = known_id(node)?;
+    let session = workspace.snapshot();
+    let (document, revision) = session
+        .document(&node)
+        .ok_or_else(|| document_error(DocumentError::NoSuchTransform(node.clone())))?;
+    let bindings = crate::node::bindings_of(&session, &node)?;
+    state_of(document, revision, &bindings)
+}
+
+fn state_of(
+    document: &Document,
+    revision: u64,
+    bindings: &Bindings,
+) -> Result<DocumentStateView, ErrorView> {
+    Ok(DocumentStateView {
+        revision,
+        document: document_view(document),
+        run: crate::node::run_view(document, bindings)?,
+    })
+}
+
+/// Makes `request` on the document of the transform `node`, which must be at `revision`, and
+/// reports it: the edited document at its new revision with what running it reported, or why the
+/// engine refused.
+///
+/// The edit and its report are made on a snapshot of the session, which must be at `revision`,
+/// without holding the lock. The edited document is then held only if the document is still at
+/// `revision`, under the lock, so that an answer that fails leaves the document and its revision
+/// as they were and two edits made against one revision cannot both be made.
+///
+/// # Errors
+///
+/// A command that fails is a `stale` revision, a transform the graph lacks, a request that names
+/// a place or a dtype the engine has no word for, or a failure to run the document.
 pub fn edit_view(
-    documents: &Documents,
+    workspace: &Workspace,
+    node: &str,
     revision: u64,
     request: &EditRequest,
 ) -> Result<EditAnswerView, ErrorView> {
-    documents.edit(revision, request, state_of)
+    let node = known_id(node)?;
+    let snapshot = workspace.snapshot();
+    // A stale edit is said to be stale before anything else about it.
+    let (document, current) = snapshot
+        .document(&node)
+        .ok_or_else(|| document_error(DocumentError::NoSuchTransform(node.clone())))?;
+    if current != revision {
+        return Err(stale(revision, current));
+    }
+    let edited = match request.make(document)? {
+        Ok(edited) => edited,
+        Err(error) => {
+            return Ok(EditAnswerView::Refused {
+                revision,
+                place: place_view(error.place()),
+                problem: problem_view(error.problem()),
+                message: error.to_string(),
+            });
+        }
+    };
+    let bindings = crate::node::bindings_of(&snapshot, &node)?;
+    let state = state_of(&edited, revision + 1, &bindings)?;
+    workspace
+        .lock()
+        .edit_document(&node, revision, |_| {
+            Ok::<_, std::convert::Infallible>(edited)
+        })
+        .map_err(document_error)?
+        .unwrap_or_else(|never| match never {});
+    Ok(EditAnswerView::Edited(state))
 }
 
 #[cfg(test)]

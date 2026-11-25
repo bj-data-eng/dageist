@@ -210,6 +210,12 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 reason: "wry, Tauri's webview, turns them on",
             },
             ExpectedFeatures {
+                package: "objc2-core-foundation",
+                only_here: &["CFUserNotification"],
+                only_in_release: &[],
+                reason: "rfd, which Tauri's dialog plugin and the bridge's file dialog use, turns it on for its alert",
+            },
+            ExpectedFeatures {
                 package: "proc-macro2",
                 only_here: &["span-locations"],
                 only_in_release: &[],

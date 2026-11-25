@@ -1,96 +1,165 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeNode } from '@dageist/host';
+import { decodeGraph } from '@dageist/host';
 
-import nodeFixture from '../../host/fixtures/node-inputs.json';
-import { canvasGraph, guessedHeights, placesOf } from './graph';
+import graphFixture from '../../host/fixtures/graph.json';
+import { NEW_INPUT_PIN, canvasGraph, connectEdit, guessedHeight, placesOf } from './graph';
 
-// What the host writes of the claim-timing node.
-const graph = canvasGraph(decodeNode(nodeFixture));
+// What the host writes of the graph the application opens on.
+const graph = canvasGraph(decodeGraph(graphFixture));
 
-describe('the graph of the claim-timing node', () => {
-  it('has one box for each node that supplies it and one for the parameters', () => {
-    expect(graph.suppliers.map((supplier) => supplier.title)).toEqual([
-      'Claims',
-      'Parameters',
-      'Holiday calendar',
-      'Step names',
-      'SLA by step',
+describe('the graph the application opens on', () => {
+  it('has one box for each node, each after the boxes it reads', () => {
+    expect(graph.boxes.map((box) => box.id)).toEqual([
+      'claims',
+      'holiday-calendar',
+      'parameters',
+      'sla-by-step',
+      'step-names',
+      'claim-timing',
+      'claim-timing-output',
     ]);
   });
 
-  it('gives the parameters one output for each value set on the graph', () => {
-    const parameters = graph.suppliers.find((supplier) => supplier.kind === 'parameters');
-    expect(parameters?.outputs.map((output) => output.gives)).toEqual([
-      { kind: 'parameter', name: 'as_of', dtype: 'Date', value: '2026-03-02' },
-      { kind: 'parameter', name: 'sla_cutoff', dtype: 'Int64', value: '1' },
+  it('gives a Parameters node an output for each value', () => {
+    const parameters = graph.boxes.find((box) => box.kind === 'parameters');
+    expect(parameters?.outputs).toEqual([
+      { kind: 'value', pin: 'parameter:as_of', name: 'as_of', dtype: 'Date', text: '2026-03-02' },
+      { kind: 'value', pin: 'parameter:sla_cutoff', name: 'sla_cutoff', dtype: 'Int64', text: '1' },
     ]);
   });
 
-  it('gives a node that supplies one column an output for that column', () => {
-    const calendar = graph.suppliers.find((supplier) => supplier.title === 'Holiday calendar');
-    expect(calendar?.outputs).toEqual([
-      { id: 'column:date', gives: { kind: 'column', column: 'date', dtype: 'Date' } },
+  it('gives the transform a pin for the table it starts from and for each input', () => {
+    const transform = graph.boxes.find((box) => box.id === 'claim-timing');
+    expect(transform?.slots.map((slot) => [slot.pin, slot.label, slot.takes])).toEqual([
+      ['start', 'starts from', 'table'],
+      ['input:as_of', 'as_of', 'value'],
+      ['input:holidays', 'holidays', 'list'],
+      ['input:sla_cutoff', 'sla_cutoff', 'value'],
+      ['input:step_names', 'step_names', 'table'],
+      ['input:step_sla', 'step_sla', 'table'],
     ]);
   });
 
-  it('gives a node that supplies its table the columns of that table', () => {
-    const claims = graph.suppliers.find((supplier) => supplier.title === 'Claims');
-    expect(claims?.outputs.map((output) => output.id)).toEqual(['table']);
-    const gives = claims?.outputs[0]?.gives;
-    expect(gives?.kind === 'table' ? gives.columns.map((column) => column.name) : []).toEqual([
-      'dcn',
-      'timestamp',
-      'step_to',
-      'owner',
-      'row_days',
-    ]);
+  it('draws a wire for each reference, a list from its table with the column it reads', () => {
+    expect(graph.wires).toHaveLength(7);
+    expect(graph.wires).toContainEqual({
+      id: 'holiday-calendar/table->claim-timing/input:holidays',
+      source: 'holiday-calendar',
+      sourcePin: 'table',
+      target: 'claim-timing',
+      targetPin: 'input:holidays',
+      column: 'date',
+    });
+    expect(graph.wires).toContainEqual({
+      id: 'parameters/parameter:as_of->claim-timing/input:as_of',
+      source: 'parameters',
+      sourcePin: 'parameter:as_of',
+      target: 'claim-timing',
+      targetPin: 'input:as_of',
+      column: null,
+    });
+  });
+});
+
+describe('a dragged connection', () => {
+  it('connects a table to a table slot the host says it fits', () => {
+    expect(
+      connectEdit(graph, {
+        source: 'step-names',
+        sourcePin: 'table',
+        target: 'claim-timing',
+        targetPin: 'start',
+      }),
+    ).toEqual({
+      edit: 'connect',
+      node: 'claim-timing',
+      slot: { kind: 'start' },
+      from: { kind: 'table', node: 'step-names' },
+    });
   });
 
-  it('lists the table the steps start from first, then every other input', () => {
-    expect(graph.inputs).toEqual([
-      { name: 'claims', takes: 'table · 5 columns' },
-      { name: 'as_of', takes: 'Date' },
-      { name: 'holidays', takes: 'list of Date' },
-      { name: 'sla_cutoff', takes: 'Int64' },
-      { name: 'step_names', takes: 'table · 1 column' },
-      { name: 'step_sla', takes: 'table · 2 columns' },
-    ]);
+  it('connects a parameter to a value slot, and not to a table slot', () => {
+    const value = {
+      source: 'parameters',
+      sourcePin: 'parameter:sla_cutoff',
+      target: 'claim-timing',
+      targetPin: 'input:as_of',
+    };
+    expect(connectEdit(graph, value)).toMatchObject({ edit: 'connect' });
+    expect(connectEdit(graph, { ...value, targetPin: 'start' })).toBeNull();
   });
 
-  it('wires each input from the output that feeds it', () => {
-    expect(graph.wires).toEqual([
-      { supplier: 'node:Claims', output: 'table', input: 'claims' },
-      { supplier: 'parameters:Parameters', output: 'parameter:as_of', input: 'as_of' },
-      { supplier: 'node:Holiday calendar', output: 'column:date', input: 'holidays' },
-      { supplier: 'parameters:Parameters', output: 'parameter:sla_cutoff', input: 'sla_cutoff' },
-      { supplier: 'node:Step names', output: 'table', input: 'step_names' },
-      { supplier: 'node:SLA by step', output: 'table', input: 'step_sla' },
-    ]);
+  it('does not connect a table to a list, which is read from a column', () => {
+    expect(
+      connectEdit(graph, {
+        source: 'holiday-calendar',
+        sourcePin: 'table',
+        target: 'claim-timing',
+        targetPin: 'input:holidays',
+      }),
+    ).toBeNull();
+  });
+
+  it('does not connect what the host did not offer, such as the transform to its own source', () => {
+    expect(
+      connectEdit(graph, {
+        source: 'claim-timing',
+        sourcePin: 'table',
+        target: 'claim-timing',
+        targetPin: NEW_INPUT_PIN,
+      }),
+    ).toBeNull();
+  });
+
+  it('adds an input when a wire is dropped on the new-input pin', () => {
+    expect(
+      connectEdit(graph, {
+        source: 'step-names',
+        sourcePin: 'table',
+        target: 'claim-timing',
+        targetPin: NEW_INPUT_PIN,
+      }),
+    ).toEqual({
+      edit: 'connectNew',
+      node: 'claim-timing',
+      from: { kind: 'table', node: 'step-names' },
+    });
+  });
+
+  it('is nothing while either end is missing', () => {
+    expect(
+      connectEdit(graph, { source: null, sourcePin: null, target: 'claims', targetPin: 'start' }),
+    ).toBeNull();
   });
 });
 
 describe('where the boxes stand', () => {
-  it('stacks the suppliers by height with a gap and levels the node with their middle', () => {
-    const places = placesOf(graph, { supplier: () => 100, node: 200 });
-    expect(graph.suppliers.map((supplier) => places.suppliers.get(supplier.id))).toEqual([
-      { x: 0, y: 0 },
-      { x: 0, y: 128 },
-      { x: 0, y: 256 },
-      { x: 0, y: 384 },
-      { x: 0, y: 512 },
-    ]);
-    // The column is five boxes of 100 and four gaps of 28: 612 high.
-    expect(places.node).toEqual({ x: 440, y: 206 });
+  it('puts each box no further left than the boxes it reads, in columns by depth', () => {
+    const places = placesOf(graph, () => 100);
+    expect(places.get('claims')).toEqual({ x: 0, y: 0 });
+    expect(places.get('holiday-calendar')).toEqual({ x: 0, y: 132 });
+    expect(places.get('claim-timing')).toEqual({ x: 400, y: 0 });
+    expect(places.get('claim-timing-output')).toEqual({ x: 800, y: 0 });
   });
 
-  it('puts the node at the top when it is taller than the column of suppliers', () => {
-    expect(placesOf(graph, { supplier: () => 10, node: 1000 }).node.y).toBe(0);
+  it('keeps a box where the host placed it', () => {
+    const view = decodeGraph(graphFixture);
+    const placed = canvasGraph({
+      ...view,
+      nodes: view.nodes.map((node) =>
+        node.id === 'claims'
+          ? { ...node, frame: { x: -40, y: 12, width: null, height: null } }
+          : node,
+      ),
+    });
+    expect(placesOf(placed, () => 100).get('claims')).toEqual({ x: -40, y: 12 });
   });
 
-  it('guesses a taller box for a supplier that lists more lines', () => {
-    const guess = guessedHeights(graph);
-    // Claims lists its table and five columns; the holiday calendar lists one column.
-    expect(guess.supplier('node:Claims')).toBeGreaterThan(guess.supplier('node:Holiday calendar'));
+  it('guesses a taller box for more lines', () => {
+    const [claims, calendar] = graph.boxes;
+    expect(claims !== undefined && calendar !== undefined).toBe(true);
+    if (claims === undefined || calendar === undefined) return;
+    expect(guessedHeight(claims)).toBeGreaterThan(guessedHeight(calendar));
   });
 });

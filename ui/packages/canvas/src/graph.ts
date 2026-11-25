@@ -1,172 +1,259 @@
 /**
- * @file The graph the canvas draws, prepared from what the host reports of
- * the node: one box for each thing that supplies an input, one box for the
- * node, and a wire from each supplier's output to the input it feeds.
+ * @file The graph the canvas draws, prepared from the graph view the host
+ * reports: one box for each node, with a pin for each of its slots and
+ * outputs, and a wire for each reference a node holds. A connection dragged
+ * between two pins is turned into the edit of the graph it asks for, only
+ * where the host reported that the output fits the slot.
  */
 
-import type { FieldView, InputView, NodeView, OriginView } from '@dageist/host';
+import type {
+  FieldView,
+  FileView,
+  GraphEdit,
+  GraphFitView,
+  GraphParameterView,
+  GraphView,
+  NodeBoxView,
+  NodeKind,
+  ReferenceView,
+  SlotView,
+  Takes,
+} from '@dageist/host';
 
-/** What one output of a supplier gives. */
-export type Gives =
-  /** The whole table a node gives, with its columns when the host reports them. */
-  | { readonly kind: 'table'; readonly columns: readonly FieldView[] }
-  /** One column of the table a node gives. */
-  | { readonly kind: 'column'; readonly column: string; readonly dtype: string }
-  /** A value set on the graph itself, as the engine writes it. */
+/** The pin of the table a source or a transform gives. */
+export const TABLE_PIN = 'table';
+/** The pin on a transform that a wire is dropped on to add an input. */
+export const NEW_INPUT_PIN = 'new-input';
+
+/** Returns the pin of the value `name` of a Parameters node. */
+export function parameterPin(name: string): string {
+  return `parameter:${name}`;
+}
+
+/** Returns the pin of a slot. */
+export function slotPin(slot: SlotView): string {
+  switch (slot.kind) {
+    case 'start':
+      return 'start';
+    case 'input':
+      return `input:${slot.name}`;
+    case 'written':
+      return 'written';
+    default:
+      return slot satisfies never;
+  }
+}
+
+/** Returns the pin a reference leaves from: a table, or a column of it, from its table. */
+export function outputPin(reference: ReferenceView): string {
+  switch (reference.kind) {
+    case 'table':
+    case 'column':
+      return TABLE_PIN;
+    case 'parameter':
+      return parameterPin(reference.name);
+    default:
+      return reference satisfies never;
+  }
+}
+
+/** One slot of a box, with its pin. */
+export interface BoxSlot {
+  readonly pin: string;
+  readonly slot: SlotView;
+  /** What the slot is called beside its pin. */
+  readonly label: string;
+  readonly takes: Takes;
+  readonly from: ReferenceView | null;
+  readonly fits: readonly GraphFitView[];
+}
+
+/** One output of a box, with its pin. */
+export type BoxOutput =
+  | { readonly kind: 'table'; readonly pin: string; readonly columns: readonly FieldView[] | null }
   | {
-      readonly kind: 'parameter';
+      readonly kind: 'value';
+      readonly pin: string;
       readonly name: string;
       readonly dtype: string;
-      readonly value: string;
+      readonly text: string;
     };
 
-/** One output of a supplier, which wires leave from. */
-export interface Output {
-  /** Unique within its box. */
+/** A node as the canvas draws it. */
+export interface CanvasBox {
   readonly id: string;
-  readonly gives: Gives;
-}
-
-/** Something that supplies the node: another node, or the graph's parameters. */
-export interface Supplier {
-  /** Unique within the graph. */
-  readonly id: string;
-  readonly kind: 'node' | 'parameters';
-  /** The node's name, or `Parameters`. */
-  readonly title: string;
-  readonly outputs: readonly Output[];
-}
-
-/** One input of the node, by the name its steps use for it. */
-export interface Input {
+  readonly kind: NodeKind;
   readonly name: string;
-  /** What the input takes, in a few words. */
-  readonly takes: string;
+  readonly summary: string;
+  readonly slots: readonly BoxSlot[];
+  readonly outputs: readonly BoxOutput[];
+  /** For a transform, what may feed a new input; `null` for other kinds. */
+  readonly newInput: readonly GraphFitView[] | null;
+  /** The columns the node gives or would write, when they are known. */
+  readonly columns: readonly FieldView[] | null;
+  readonly parameters: readonly GraphParameterView[];
+  readonly file: FileView | null;
+  readonly problems: readonly string[];
 }
 
-/** A wire from a supplier's output to one of the node's inputs. */
-export interface Wire {
-  readonly supplier: string;
-  readonly output: string;
-  readonly input: string;
+/** A wire from an output's pin to the slot it fills. */
+export interface CanvasWire {
+  readonly id: string;
+  readonly source: string;
+  readonly sourcePin: string;
+  readonly target: string;
+  readonly targetPin: string;
+  /** The column a list is read from, which the wire says. */
+  readonly column: string | null;
 }
 
-/** Everything the canvas draws. The node's own box is the one target of every wire. */
+/** Everything the canvas draws. */
 export interface CanvasGraph {
-  readonly suppliers: readonly Supplier[];
-  /** The table the steps start from first, then every other input. */
-  readonly inputs: readonly Input[];
-  readonly wires: readonly Wire[];
+  readonly revision: number;
+  readonly layoutRevision: number;
+  /** Every box, each after the boxes it reads. */
+  readonly boxes: readonly CanvasBox[];
+  readonly wires: readonly CanvasWire[];
+  readonly parameterDtypes: readonly string[];
+  /** Where each box the host has placed stands. */
+  readonly placed: ReadonlyMap<string, Place>;
 }
 
-/** The name of the box that holds the graph's parameters. */
-const PARAMETERS = 'Parameters';
-
-/** Returns the shown values of a list input as one line, with how many more follow. */
-function listText(values: InputView & { readonly kind: 'list' }): string {
-  const shown = values.values.shown.map((value) => value ?? 'null').join(', ');
-  return values.values.more > 0 ? `${shown}, … ${values.values.more} more` : shown;
-}
-
-/** Returns `count` columns in words. */
-function columnsText(count: number): string {
-  return count === 1 ? '1 column' : `${count} columns`;
-}
-
-/** Returns what an input takes, in a few words. */
-function takes(input: InputView): string {
-  switch (input.kind) {
-    case 'table':
-      return `table · ${columnsText(input.columns.length)}`;
-    case 'value':
-      return input.dtype;
-    case 'list':
-      return `list of ${input.dtype}`;
+/** Returns what a slot is called beside its pin. */
+function slotLabel(slot: SlotView): string {
+  switch (slot.kind) {
+    case 'start':
+      return 'starts from';
+    case 'input':
+      return slot.name;
+    case 'written':
+      return 'writes';
     default:
-      return input satisfies never;
+      return slot satisfies never;
   }
 }
 
-/** Returns the output an input is fed from, given where it comes from. */
-function outputFor(input: InputView, from: OriginView): Output {
-  switch (from.kind) {
-    case 'node':
-      return {
-        id: 'table',
-        gives: { kind: 'table', columns: input.kind === 'table' ? input.columns : [] },
-      };
-    case 'column':
-      return {
-        id: `column:${from.column}`,
-        gives: {
-          kind: 'column',
-          column: from.column,
-          dtype: input.kind === 'table' ? 'table' : input.dtype,
+/** Returns the outputs of a node. */
+function outputsOf(node: NodeBoxView): BoxOutput[] {
+  switch (node.kind) {
+    case 'source':
+    case 'transform':
+      return [{ kind: 'table', pin: TABLE_PIN, columns: node.columns }];
+    case 'parameters':
+      return node.parameters.map((value) => ({
+        kind: 'value',
+        pin: parameterPin(value.name),
+        name: value.name,
+        dtype: value.dtype,
+        text: value.text,
+      }));
+    case 'output':
+      return [];
+    default:
+      return node.kind satisfies never;
+  }
+}
+
+/** Returns the graph the canvas draws of `view`. */
+export function canvasGraph(view: GraphView): CanvasGraph {
+  const boxes = view.nodes.map((node): CanvasBox => ({
+    id: node.id,
+    kind: node.kind,
+    name: node.name,
+    summary: node.summary,
+    slots: node.slots.map((state) => ({
+      pin: slotPin(state.slot),
+      slot: state.slot,
+      label: slotLabel(state.slot),
+      takes: state.takes,
+      from: state.from,
+      fits: state.fits,
+    })),
+    outputs: outputsOf(node),
+    newInput: node.newInput,
+    columns: node.columns,
+    parameters: node.parameters,
+    file: node.file,
+    problems: node.problems,
+  }));
+  const wires = boxes.flatMap((box) =>
+    box.slots.flatMap((slot): CanvasWire[] => {
+      const from = slot.from;
+      if (from === null) return [];
+      const sourcePin = outputPin(from);
+      return [
+        {
+          id: `${from.node}/${sourcePin}->${box.id}/${slot.pin}`,
+          source: from.node,
+          sourcePin,
+          target: box.id,
+          targetPin: slot.pin,
+          column: from.kind === 'column' ? from.column : null,
         },
-      };
-    case 'parameter':
-      return {
-        id: `parameter:${input.name}`,
-        gives: {
-          kind: 'parameter',
-          name: input.name,
-          dtype: input.kind === 'table' ? 'table' : input.dtype,
-          value:
-            input.kind === 'value'
-              ? (input.value ?? 'null')
-              : input.kind === 'list'
-                ? listText(input)
-                : columnsText(input.columns.length),
-        },
-      };
-    default:
-      return from satisfies never;
+      ];
+    }),
+  );
+  const placed = new Map<string, Place>();
+  for (const node of view.nodes) {
+    if (node.frame !== null) placed.set(node.id, { x: node.frame.x, y: node.frame.y });
   }
+  return {
+    revision: view.revision,
+    layoutRevision: view.layoutRevision,
+    boxes,
+    wires,
+    parameterDtypes: view.parameterDtypes,
+    placed,
+  };
 }
 
-/** Returns the id and title of the supplier an origin belongs to. */
-function supplierOf(from: OriginView): { readonly kind: Supplier['kind']; readonly title: string } {
-  switch (from.kind) {
-    case 'node':
-      return { kind: 'node', title: from.name };
-    case 'column':
-      return { kind: 'node', title: from.node };
-    case 'parameter':
-      return { kind: 'parameters', title: PARAMETERS };
-    default:
-      return from satisfies never;
+/** Returns the reference an output's pin on `node` gives, or `null` for a pin it lacks. */
+function referenceOf(node: string, pin: string): ReferenceView | null {
+  if (pin === TABLE_PIN) return { kind: 'table', node };
+  if (pin.startsWith('parameter:')) {
+    return { kind: 'parameter', node, name: pin.slice('parameter:'.length) };
   }
+  return null;
+}
+
+/** Returns whether `reference` is among `fits`. A list is filled from a column, so a dragged table never fits it. */
+function fitsAmong(fits: readonly GraphFitView[], reference: ReferenceView): boolean {
+  return fits.some((fit) =>
+    fit.kind === 'table'
+      ? reference.kind === 'table' && reference.node === fit.node
+      : reference.kind === 'parameter' &&
+        reference.node === fit.node &&
+        reference.name === fit.name,
+  );
+}
+
+/** A connection dragged from an output's pin to a slot's pin. */
+export interface Dragged {
+  readonly source: string | null;
+  readonly sourcePin: string | null;
+  readonly target: string | null;
+  readonly targetPin: string | null;
 }
 
 /**
- * Returns the graph of `node`. Suppliers are in the order their first input
- * is reported, the table the steps start from first. An output that feeds
- * several inputs is drawn once, with a wire to each.
+ * Returns the edit a connection dragged on `graph` asks for, or `null` when
+ * the host did not report that the output fits the slot. A wire dropped on a
+ * transform's new-input pin adds an input named after what feeds it.
  */
-export function canvasGraph(node: NodeView): CanvasGraph {
-  const source: InputView = {
-    kind: 'table',
-    name: node.source.name,
-    from: node.source.from,
-    columns: node.source.columns,
-  };
-  const all = [source, ...node.inputs];
-  const suppliers = new Map<string, { kind: Supplier['kind']; title: string; outputs: Output[] }>();
-  const wires: Wire[] = [];
-  for (const input of all) {
-    const owner = supplierOf(input.from);
-    const id = `${owner.kind}:${owner.title}`;
-    const box = suppliers.get(id) ?? { ...owner, outputs: [] };
-    suppliers.set(id, box);
-    const output = outputFor(input, input.from);
-    if (!box.outputs.some((known) => known.id === output.id)) box.outputs.push(output);
-    wires.push({ supplier: id, output: output.id, input: input.name });
+export function connectEdit(graph: CanvasGraph, dragged: Dragged): GraphEdit | null {
+  const { source, sourcePin, target, targetPin } = dragged;
+  if (source === null || sourcePin === null || target === null || targetPin === null) return null;
+  const from = referenceOf(source, sourcePin);
+  const box = graph.boxes.find((candidate) => candidate.id === target);
+  if (from === null || box === undefined) return null;
+  if (targetPin === NEW_INPUT_PIN) {
+    return box.newInput !== null && fitsAmong(box.newInput, from)
+      ? { edit: 'connectNew', node: target, from }
+      : null;
   }
-  return {
-    suppliers: [...suppliers].map(([id, box]) => ({ id, ...box })),
-    inputs: all.map((input) => ({ name: input.name, takes: takes(input) })),
-    wires,
-  };
+  const slot = box.slots.find((candidate) => candidate.pin === targetPin);
+  if (slot === undefined || slot.takes === 'list' || !fitsAmong(slot.fits, from)) return null;
+  return { edit: 'connect', node: target, slot: slot.slot, from };
 }
 
 /** Where a box's top-left corner sits on the canvas. */
@@ -175,61 +262,55 @@ export interface Place {
   readonly y: number;
 }
 
-/** The height of each box, in canvas units. */
-export interface Heights {
-  /** The height of the supplier's box with this id. */
-  readonly supplier: (id: string) => number;
-  readonly node: number;
-}
-
-/** The room between two suppliers, one above the other. */
-const GAP = 28;
-/** How far right of the suppliers' left edge the node's box stands. */
-const NODE_X = 440;
-/** The room a header and the stand-ins take, and each listed line, before a box is measured. */
-const HEADER = 44;
-const STAND_INS = 70;
-const LINE = 22;
+/** The room between two boxes in a column. */
+const GAP = 32;
+/** The room from one column of boxes to the next. */
+const COLUMN = 400;
 
 /**
- * Returns a guess at the height of each box, from the lines it lists, for
- * the first frame before the boxes are measured.
- */
-export function guessedHeights(graph: CanvasGraph): Heights {
-  const lines = new Map(
-    graph.suppliers.map((supplier) => [
-      supplier.id,
-      supplier.outputs.reduce(
-        (count, output) =>
-          count + 1 + (output.gives.kind === 'table' ? output.gives.columns.length : 0),
-        0,
-      ),
-    ]),
-  );
-  return {
-    supplier: (id) => HEADER + STAND_INS + LINE * (lines.get(id) ?? 0),
-    node: HEADER + STAND_INS * 2 + LINE * graph.inputs.length,
-  };
-}
-
-/**
- * Returns where each box stands: the suppliers in a column, one under
- * another, and the node's box to their right, level with their middle. The
- * boxes can be moved from there.
+ * Returns where each box stands. A box the host has placed stands there. The
+ * others are set out in columns by how many boxes lie before them along the
+ * wires, each column one box under another, so a box stands to the right of
+ * everything it reads. `height` gives each box's height.
  */
 export function placesOf(
   graph: CanvasGraph,
-  heights: Heights,
-): {
-  readonly suppliers: ReadonlyMap<string, Place>;
-  readonly node: Place;
-} {
-  const suppliers = new Map<string, Place>();
-  let y = 0;
-  for (const supplier of graph.suppliers) {
-    suppliers.set(supplier.id, { x: 0, y });
-    y += heights.supplier(supplier.id) + GAP;
+  height: (id: string) => number,
+): ReadonlyMap<string, Place> {
+  const depth = new Map<string, number>();
+  // The boxes come after the boxes they read, so each depth is known when it is needed.
+  for (const box of graph.boxes) {
+    const before = graph.wires
+      .filter((wire) => wire.target === box.id)
+      .map((wire) => (depth.get(wire.source) ?? 0) + 1);
+    depth.set(box.id, Math.max(0, ...before));
   }
-  const column = Math.max(0, y - GAP);
-  return { suppliers, node: { x: NODE_X, y: Math.max(0, (column - heights.node) / 2) } };
+  const places = new Map<string, Place>();
+  const columnBottom = new Map<number, number>();
+  for (const box of graph.boxes) {
+    const placed = graph.placed.get(box.id);
+    if (placed !== undefined) {
+      places.set(box.id, placed);
+      continue;
+    }
+    const column = depth.get(box.id) ?? 0;
+    const y = columnBottom.get(column) ?? 0;
+    places.set(box.id, { x: column * COLUMN, y });
+    columnBottom.set(column, y + height(box.id) + GAP);
+  }
+  return places;
+}
+
+/** The room a header, a summary and the buttons take, and each listed line, before a box is measured. */
+const HEADER = 96;
+const LINE = 22;
+
+/** Returns a guess at a box's height, from the lines it lists, for the first frame before it is measured. */
+export function guessedHeight(box: CanvasBox): number {
+  const lines =
+    box.slots.length +
+    box.parameters.length +
+    box.problems.length +
+    (box.columns === null ? 0 : box.columns.length + 1);
+  return HEADER + LINE * lines;
 }

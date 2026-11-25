@@ -18,7 +18,8 @@ use dageist_engine::document::Document;
 use serde_json::{Value, json};
 
 use super::{Bridge, Deadlines, Session, admits, bind, serve, serve_connection};
-use crate::document::Documents;
+use crate::dialog::Dialogs;
+use crate::graph::Workspace;
 use crate::sample_table::Sample;
 use crate::test_support::split_block;
 
@@ -58,9 +59,9 @@ impl Drop for SampleFolder {
     }
 }
 
-/// The documents of the sample node, as the host starts with them.
-fn sample_documents() -> Documents {
-    Documents::of(
+/// The starting graph, as the host starts with it, with every revision starting at 0.
+fn sample_documents() -> Workspace {
+    crate::graph::tests::sample_of(
         Document::read(ClaimTiming::STEPS_JSON).expect("the sample's steps are a document"),
     )
 }
@@ -68,7 +69,11 @@ fn sample_documents() -> Documents {
 fn bridge(folder: &SampleFolder, port: u16) -> Bridge {
     Bridge::new(
         port,
-        Session::new(Sample::new(folder.path.clone(), SMALL), sample_documents()),
+        Session::new(
+            Sample::new(folder.path.clone(), SMALL),
+            sample_documents(),
+            Dialogs::none(),
+        ),
     )
 }
 
@@ -146,6 +151,17 @@ fn exchange(bridge: &Bridge, raw: Vec<u8>) -> Reply {
 
 /// Calls the command as a well-formed request does, with `arguments` as its JSON body.
 fn call(bridge: &Bridge, command: &str, arguments: &Value) -> Reply {
+    // A command on a transform names the starting graph's when the arguments name none.
+    let mut arguments = arguments.clone();
+    if matches!(
+        command,
+        "node_inputs" | "node_document" | "edit_document" | "rows_after_step"
+    ) && let Some(fields) = arguments.as_object_mut()
+    {
+        fields
+            .entry("node")
+            .or_insert_with(|| json!(crate::graph::tests::NODE));
+    }
     let headers = command_headers(PORT);
     let headers: Vec<(&str, &str)> = headers
         .iter()
@@ -905,7 +921,7 @@ fn through_a_socket_the_bridge_answers_a_command_and_refuses_a_wrong_host_and_ty
             "POST",
             "/bridge/node_inputs",
             &[("Host", &own_host), ("Content-Type", "application/json")],
-            b"{}",
+            br#"{"node": "claim-timing"}"#,
         ),
     );
     assert_eq!(answered.status, 200);
@@ -1010,7 +1026,11 @@ fn the_bridge_listens_on_the_loopback_address_only() {
             &listener,
             Bridge::new(
                 address.port(),
-                Session::new(Sample::new(std::env::temp_dir(), SMALL), sample_documents()),
+                Session::new(
+                    Sample::new(std::env::temp_dir(), SMALL),
+                    sample_documents(),
+                    Dialogs::none(),
+                ),
             ),
         );
     });

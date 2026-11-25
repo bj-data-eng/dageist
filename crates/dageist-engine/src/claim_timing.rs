@@ -8,9 +8,12 @@
 //! days of each step, flag late and holiday rows, and pivot the days of each
 //! step into columns of one row for each key.
 
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
+
 use polars::prelude::{
-    AnyValue, DataFrame, DataType, IntoLazy, PolarsResult, Scalar, StrptimeOptions, TimeUnit, col,
-    df, lit,
+    AnyValue, DataFrame, DataType, IntoLazy, ParquetWriter, PolarsResult, Scalar, StrptimeOptions,
+    TimeUnit, col, df, lit,
 };
 
 use crate::document::{
@@ -72,6 +75,35 @@ impl ClaimTiming {
     #[must_use]
     pub const fn source(&self) -> &DataFrame {
         &self.source
+    }
+
+    /// Writes the sample's tables as Parquet files in `directory`, which is
+    /// made when it is missing, so that a graph can read them as sources.
+    ///
+    /// # Errors
+    ///
+    /// When the directory or a file cannot be written.
+    pub fn write_tables(directory: &Path) -> Result<SampleFiles, EngineError> {
+        crate::startup::ensure();
+        fs::create_dir_all(directory)
+            .map_err(|error| EngineError::io("making the sample's folder", error))?;
+        let write = |name: &str, table: PolarsResult<DataFrame>| {
+            let polars = |error| EngineError::polars("writing a sample table", error);
+            let mut table = table.map_err(polars)?;
+            let path = directory.join(format!("{name}.parquet"));
+            let file = File::create(&path)
+                .map_err(|error| EngineError::io("writing a sample table", error))?;
+            ParquetWriter::new(file)
+                .finish(&mut table)
+                .map_err(polars)?;
+            Ok::<_, EngineError>(path)
+        };
+        Ok(SampleFiles {
+            claims: write("claims", source())?,
+            step_sla: write("step_sla", step_sla())?,
+            step_names: write("step_names", step_names())?,
+            holidays: write("holidays", holidays())?,
+        })
     }
 
     /// The columns of [`source`](Self::source) with their dtypes.
@@ -148,6 +180,37 @@ fn source() -> PolarsResult<DataFrame> {
     .collect()
 }
 
+/// The allowed days of each step.
+fn step_sla() -> PolarsResult<DataFrame> {
+    df!(
+        "step" => ["Intake", "Review", "Pending", "Complete"],
+        "sla_days" => [1_i64, 1, 2, 3],
+    )
+}
+
+/// The names of the steps.
+fn step_names() -> PolarsResult<DataFrame> {
+    df!("step_to" => ["Intake", "Review", "Pending", "Complete"])
+}
+
+/// The holiday calendar: one column of dates, `date`.
+fn holidays() -> PolarsResult<DataFrame> {
+    dates(&["2026-03-03", "2026-03-05"])
+}
+
+/// The files [`ClaimTiming::write_tables`] writes the sample's tables to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SampleFiles {
+    /// The claim rows the steps start from.
+    pub claims: PathBuf,
+    /// The allowed days of each step: `step` and `sla_days`.
+    pub step_sla: PathBuf,
+    /// The names of the steps: `step_to`.
+    pub step_names: PathBuf,
+    /// The holiday calendar: `date`.
+    pub holidays: PathBuf,
+}
+
 /// The dates in `texts`, as a column of dtype `Date`.
 fn dates(texts: &[&str]) -> PolarsResult<DataFrame> {
     df!("date" => texts)?
@@ -175,21 +238,14 @@ fn inputs() -> Result<Inputs, EngineError> {
         .add_table(
             "step_sla",
             "SLA by step",
-            df!(
-                "step" => ["Intake", "Review", "Pending", "Complete"],
-                "sla_days" => [1_i64, 1, 2, 3],
-            )
-            .map_err(polars)?
-            .lazy(),
+            step_sla().map_err(polars)?.lazy(),
         )
         .map_err(duplicate)?;
     inputs
         .add_table(
             "step_names",
             "Step names",
-            df!("step_to" => ["Intake", "Review", "Pending", "Complete"])
-                .map_err(polars)?
-                .lazy(),
+            step_names().map_err(polars)?.lazy(),
         )
         .map_err(duplicate)?;
     inputs
@@ -208,7 +264,7 @@ fn inputs() -> Result<Inputs, EngineError> {
                 node: "Holiday calendar".to_owned(),
                 column: "date".to_owned(),
             },
-            dates(&["2026-03-03", "2026-03-05"])
+            holidays()
                 .and_then(|frame| {
                     frame
                         .column("date")

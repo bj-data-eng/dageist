@@ -7,9 +7,11 @@ use dageist_engine::document::{Place, Segment};
 use serde_json::{Value, json};
 
 use super::{
-    Documents, EditAnswerView, EditRequest, ProblemView, ThingView, ValueKindView, WantedView,
+    EditAnswerView, EditRequest, ProblemView, ThingView, ValueKindView, WantedView,
     document_state_view, edit_view,
 };
+use crate::graph::Workspace;
+use crate::graph::tests::NODE;
 use crate::node::tests::{documents_of, invoke_on, json};
 use crate::sample_table::{ErrorKind, ErrorView};
 
@@ -51,12 +53,12 @@ fn small_text() -> String {
     .to_string()
 }
 
-fn state(documents: &Documents) -> Value {
-    json(&document_state_view(documents).expect("a state"))
+fn state(documents: &Workspace) -> Value {
+    json(&document_state_view(documents, NODE).expect("a state"))
 }
 
-/// Sends `edit` against `revision` on `documents`, as the view's IPC does.
-fn edit(documents: Documents, revision: u64, edit: Value) -> Result<Value, Value> {
+/// Sends `edit` against `revision` on the transform of `documents`, as the view's IPC does.
+fn edit(documents: Workspace, revision: u64, edit: Value) -> Result<Value, Value> {
     invoke_on(
         documents,
         "edit_document",
@@ -70,6 +72,12 @@ fn step_place(index: usize, id: &str) -> Value {
 
 fn place(index: usize, id: &str, path: Value) -> Value {
     json!({ "stepIndex": index, "stepId": id, "path": path })
+}
+
+/// A workspace holding a copy of the session `documents` holds, for a command sent through IPC,
+/// which takes the workspace it is sent to.
+fn documents_clone(documents: &Workspace) -> Workspace {
+    Workspace::of(documents.lock().clone())
 }
 
 #[test]
@@ -264,6 +272,7 @@ fn a_typed_value_that_starts_an_expression_with_methods_is_retyped_with_its_meth
     let make = |revision: u64, edit: Value| {
         edit_view(
             &documents,
+            NODE,
             revision,
             &serde_json::from_value::<EditRequest>(edit).expect("a request"),
         )
@@ -306,6 +315,7 @@ fn an_edit_made_against_an_older_revision_is_refused_and_changes_nothing() {
     // The edit at the right revision is made; the host now holds revision 2.
     let after = edit_view(
         &documents,
+        NODE,
         1,
         &serde_json::from_value::<EditRequest>(
             json!({ "kind": "removeStep", "step": step_place(1, "earlier") }),
@@ -315,12 +325,18 @@ fn an_edit_made_against_an_older_revision_is_refused_and_changes_nothing() {
     .expect("an answer");
     assert_eq!(json(&after)["revision"], 2);
     // A second edit that was made against revision 1 is stale, whatever it says.
-    let again = invoke_on(
-        documents_clone(&documents),
-        "edit_document",
-        json!({ "revision": 1, "edit": { "kind": "removeStep", "step": step_place(0, "sort") } }),
-    )
-    .expect_err("a rejection");
+    let again = json(
+        &edit_view(
+            &documents,
+            NODE,
+            1,
+            &serde_json::from_value::<EditRequest>(
+                json!({ "kind": "removeStep", "step": step_place(0, "sort") }),
+            )
+            .expect("a request"),
+        )
+        .expect_err("a rejection"),
+    );
     assert_eq!(again["kind"], "stale");
     assert!(
         again["message"]
@@ -336,13 +352,6 @@ fn an_edit_made_against_an_older_revision_is_refused_and_changes_nothing() {
             .map(Vec::len),
         Some(1)
     );
-}
-
-fn documents_clone(documents: &Documents) -> Documents {
-    let (document, revision) = documents.snapshot();
-    let held = Documents::of(document);
-    held.set_revision(revision);
-    held
 }
 
 #[test]
@@ -607,16 +616,22 @@ fn an_edit_whose_answer_cannot_be_given_is_not_made() {
         serde_json::from_value(json!({ "kind": "removeStep", "step": step_place(1, "earlier") }))
             .expect("a request");
 
-    let failed = documents.edit(1, &request, |_, _| {
-        Err(ErrorView::of(ErrorKind::Failed, "the run failed"))
-    });
+    // The edit is made, and then its answer fails.
+    let failed =
+        documents
+            .lock()
+            .edit_document(&crate::graph::starting_transform(), 1, |document| {
+                let _edited = request.make(document);
+                Err::<dageist_engine::document::Document, _>(ErrorView::of(
+                    ErrorKind::Failed,
+                    "the run failed",
+                ))
+            });
 
-    assert!(failed.is_err());
+    assert!(matches!(failed, Ok(Err(_))));
     assert_eq!(state(&documents), before);
     // The same edit then goes through, against the same revision.
-    let made = documents
-        .edit(1, &request, super::state_of)
-        .expect("an answer");
+    let made = super::edit_view(&documents, NODE, 1, &request).expect("an answer");
     assert!(matches!(made, EditAnswerView::Edited(_)));
     assert_eq!(state(&documents)["revision"], 2);
 }
@@ -635,7 +650,7 @@ fn two_writers_on_one_revision_make_one_edit_and_the_other_is_stale() {
                         "step": step_place(1, "earlier")
                     }))
                     .expect("a request");
-                    super::edit_view(&documents, 1, &request)
+                    super::edit_view(&documents, NODE, 1, &request)
                         .map(|answer| json(&answer))
                         .map_err(|error| json(&error))
                 })
@@ -661,9 +676,18 @@ fn a_host_starts_at_a_revision_that_no_other_lifetime_of_it_does() {
     // A page that outlives its host holds a revision of that host. If every host started at the
     // same revision, the next one could be at it, and an edit made on the old document would
     // land on the new one as if nothing had changed.
-    let first = Documents::sample().expect("the sample's documents");
+    let start = || {
+        let folder = std::env::temp_dir().join(format!(
+            "dageist-starts-{}-{:?}",
+            std::process::id(),
+            std::time::SystemTime::now()
+        ));
+        Workspace::starting(super::first_revision(std::time::SystemTime::now()), &folder)
+            .expect("the starting graph")
+    };
+    let first = start();
     std::thread::sleep(std::time::Duration::from_millis(5));
-    let second = Documents::sample().expect("the sample's documents");
+    let second = start();
 
     let (first, second) = (
         state(&first)["revision"].as_u64(),

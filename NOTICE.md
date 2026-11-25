@@ -236,6 +236,11 @@ This product depends on recursive 0.1.1, distributed by Orson Peters:
 * License: [MIT License](licenses/recursive/LICENSE)
 * Homepage: [recursive](https://github.com/orlp/recursive)
 
+This product depends on rfd 0.17.2, distributed by Bartłomiej Maryńczak:
+
+* License: [MIT License](licenses/rfd/LICENSE)
+* Homepage: [rfd](https://github.com/PolyMeilex/rfd)
+
 This product's public API audit generator depends on public-api 0.50.0 and
 rustdoc-json 0.9.7, distributed by the contributors to cargo-public-api:
 
@@ -272,6 +277,13 @@ your choice of either license:
 * License: [Apache License 2.0](licenses/tauri/LICENSE-APACHE-2.0)
 * License: [MIT License](licenses/tauri/LICENSE-MIT)
 * Homepage: [Tauri](https://tauri.app/)
+
+This product depends on tauri-plugin-dialog 2.8.4, distributed by the Tauri
+Programme within The Commons Conservancy, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/tauri-plugins-workspace/LICENSE_APACHE-2.0)
+* License: [MIT License](licenses/tauri-plugins-workspace/LICENSE_MIT)
+* Homepage: [Tauri plugins](https://github.com/tauri-apps/plugins-workspace)
 
 This product depends on tikv-jemalloc-sys 0.7.1, as patched by the Polars
 project at revision `e947a0d1a786e221ac1c14ba1566b55151e61ec9` of

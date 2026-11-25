@@ -36,8 +36,8 @@ export interface EditorWindow {
 const NO_STEPS: readonly DocumentStepView[] = [];
 
 /** Holds the document, what the engine reported of it and the chosen step, for one window. */
-export function useEditorWindow(host: Host, role: Role): EditorWindow {
-  const editor = useEditor(host);
+export function useEditorWindow(host: Host, node: string, graph: number, role: Role): EditorWindow {
+  const editor = useEditor(host, node, graph);
   const drafts = useDraftStore();
   const selection = useSelection(host, role);
   const { state } = editor;
@@ -70,6 +70,6 @@ export function useEditorWindow(host: Host, role: Role): EditorWindow {
     choose(beside?.id ?? null);
   }, [state, selectedIndex, steps, choose]);
 
-  const rows = useRows(host, revision, selectedId, run?.steps[selectedIndex] ?? null);
+  const rows = useRows(host, node, graph, revision, selectedId, run?.steps[selectedIndex] ?? null);
   return { editor, drafts, selection, steps, run, selectedIndex, rows };
 }

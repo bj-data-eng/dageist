@@ -60,7 +60,7 @@ export interface Editor {
  * Holds the node's document for one window: asks the host for it, asks again when another window
  * says it changed it, and sends the person's actions in order.
  */
-export function useEditor(host: Host): Editor {
+export function useEditor(host: Host, node: string, graph: number): Editor {
   const [state, setState] = useState<DocumentStateView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,25 +69,25 @@ export function useEditor(host: Host): Editor {
   useEffect(() => {
     const made = createSession(
       {
-        load: async () => host.nodeDocument(),
-        edit: async (revision, edit) => host.editDocument(revision, edit),
+        load: async () => host.nodeDocument(node),
+        edit: async (revision, edit) => host.editDocument(node, revision, edit),
       },
       {
         held: setState,
         failure: setFailure,
         notice: setNotice,
         edited: (revision) => {
-          host.broadcast(TOPIC, { revision });
+          host.broadcast(TOPIC, { node, revision });
         },
       },
     );
     session.current = made;
     void made.load();
     const stop = host.listen(TOPIC, (message) => {
-      const said =
-        typeof message === 'object' && message !== null && 'revision' in message
-          ? message.revision
-          : null;
+      if (typeof message !== 'object' || message === null) return;
+      // A change to another transform's document is not this one's.
+      if (!('node' in message) || message.node !== node) return;
+      const said = 'revision' in message ? message.revision : null;
       if (typeof said === 'number') made.heard(said);
     });
     // A window that has been away, or whose host was restarted, may draw an old document: ask
@@ -104,7 +104,16 @@ export function useEditor(host: Host): Editor {
       session.current = null;
       stop();
     };
-  }, [host]);
+  }, [host, node]);
+
+  // What the steps run on is what the graph binds to them, so a changed graph is a changed report:
+  // the document is asked for again at each revision of the graph after the one it was loaded at.
+  const loadedAt = useRef(graph);
+  useEffect(() => {
+    if (loadedAt.current === graph) return;
+    loadedAt.current = graph;
+    void session.current?.load();
+  }, [graph]);
 
   const act = useCallback(async (drawn: number | null, edits: Action): Promise<Sent> => {
     const open = session.current;

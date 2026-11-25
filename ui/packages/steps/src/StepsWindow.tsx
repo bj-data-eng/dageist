@@ -22,6 +22,12 @@ import { useEditorWindow } from './window';
 export interface StepsWindowProps {
   /** Carries the chosen step between this window and the main one. */
   readonly host: Host;
+  /** The id of the transform whose steps are edited. */
+  readonly node: string;
+  /** The transform's name, which the panel's title shows. */
+  readonly name: string;
+  /** The graph's revision, which the editor asks again with when it changes. */
+  readonly graph: number;
   /**
    * The nonce the page's content security policy accepts for injected styles,
    * or `null` when there is no policy. Dragging injects a few style rules.
@@ -29,21 +35,30 @@ export interface StepsWindowProps {
   readonly styleNonce: string | null;
 }
 
-/** Draws every step of the sample claims so that it can be edited, once the catalogue is there. */
-export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
+/**
+ * Draws every step of the transform so that it can be edited, once the catalogue is there.
+ * Another transform is drawn afresh, with nothing carried over.
+ */
+export function StepsWindow({
+  host,
+  node,
+  name,
+  graph,
+  styleNonce,
+}: StepsWindowProps): React.JSX.Element {
   return (
-    <EngineProvider host={host} title="Steps · Claim timing">
-      <Editor host={host} styleNonce={styleNonce} />
+    <EngineProvider key={node} host={host} node={node} graph={graph} title={`Steps · ${name}`}>
+      <Editor host={host} node={node} name={name} graph={graph} styleNonce={styleNonce} />
     </EngineProvider>
   );
 }
 
-function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
-  const window = useEditorWindow(host, 'steps');
+function Editor({ host, node, name, graph, styleNonce }: StepsWindowProps): React.JSX.Element {
+  const window = useEditorWindow(host, node, graph, 'steps');
   return (
     <EditorProvider value={window.editor}>
       <DraftsProvider value={window.drafts}>
-        <Body window={window} styleNonce={styleNonce} />
+        <Body window={window} name={name} styleNonce={styleNonce} />
       </DraftsProvider>
     </EditorProvider>
   );
@@ -51,9 +66,11 @@ function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
 
 function Body({
   window,
+  name,
   styleNonce,
 }: {
   readonly window: ReturnType<typeof useEditorWindow>;
+  readonly name: string;
   readonly styleNonce: string | null;
 }): React.JSX.Element {
   const { editor, selection, steps, run } = window;
@@ -72,7 +89,7 @@ function Body({
   return (
     <Panel
       mark="ƒx"
-      title="Steps · Claim timing"
+      title={`Steps · ${name}`}
       details={[
         'Click a word to change it. The list it opens also adds after the thing the word names, or removes it. Drag a step by its number.',
       ]}

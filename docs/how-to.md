@@ -264,6 +264,21 @@ The test compares the files with the views by value. Review the diff: a change
 that the decoders refuse is a change of shape the view has to follow, in the
 contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
+### Refresh The Graph Snapshot
+
+`ui/packages/host/fixtures/graph.json` is the graph view of the graph the
+application opens on, as the `graph` command reports it. Each file's folder is
+written as `/sample`, so the snapshot does not hold the folder of the machine
+it was written on. After a change to the starting graph, to working a graph out
+or to the graph view, the host's snapshot test fails. Write the file again,
+format it, and run the view's tests, whose decoder and canvas tests read it:
+
+```sh
+DAGEIST_REFRESH_GRAPH=1 cargo test --offline --locked -p dageist-tauri graph::tests::the_snapshot_is_what_the_command_returns
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
 ### Refresh The Edit Snapshots
 
 After a change to the engine's edits, their requests or the views of the

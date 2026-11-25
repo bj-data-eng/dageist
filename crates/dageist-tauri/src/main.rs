@@ -19,8 +19,10 @@ mod catalogue;
 mod cli;
 #[cfg(test)]
 mod corpus;
+mod dialog;
 mod document;
 mod figures;
+mod graph;
 mod identity;
 mod node;
 mod offers;
@@ -33,6 +35,7 @@ mod test_support;
 mod windows;
 
 use std::process::ExitCode;
+use std::time::SystemTime;
 
 use dageist_engine::PolarsSession;
 
@@ -41,15 +44,20 @@ use dageist_engine::PolarsSession;
 ///
 /// The application is run so that it returns, and does not call `std::process::exit` as
 /// `Builder::run` does: the caller's [`PolarsSession`] is dropped only when this returns.
-fn open_application(context: tauri::Context, documents: document::Documents) -> i32 {
+fn open_application(context: tauri::Context, workspace: graph::Workspace) -> i32 {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(sample_table::SampleGate::default())
         .manage(sample_table::OpenTable::default())
-        .manage(documents)
+        .manage(workspace)
         .on_window_event(windows::close_with_main)
         .invoke_handler(tauri::generate_handler![
             identity::core_identity,
             catalogue::operation_catalogue,
+            graph::graph,
+            graph::edit_graph,
+            graph::place_node,
+            dialog::choose_file,
             node::node_inputs,
             node::node_document,
             node::edit_document,
@@ -82,20 +90,31 @@ fn main() -> ExitCode {
     let context = tauri::generate_context!();
     // Held until the job ends, whichever way `main` returns or a panic unwinds out of it.
     let _polars = PolarsSession::start();
-    let documents = match document::Documents::sample() {
-        Ok(documents) => documents,
+    // The starting graph reads the sample's tables from files written for this run, in a folder
+    // made for it that no other run has, which is removed when the run ends.
+    let sample = match sample_folder() {
+        Ok(folder) => folder,
         Err(error) => {
-            eprintln!("dageist: the sample node cannot be made: {error:?}");
+            eprintln!("dageist: a folder for the sample's tables cannot be made: {error}");
             return ExitCode::FAILURE;
         }
     };
-    match invocation {
-        cli::Invocation::Application => match open_application(context, documents) {
+    let workspace =
+        match graph::Workspace::starting(document::first_revision(SystemTime::now()), &sample) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                eprintln!("dageist: the starting graph cannot be made: {error:?}");
+                remove_sample_folder(&sample);
+                return ExitCode::FAILURE;
+            }
+        };
+    let code = match invocation {
+        cli::Invocation::Application => match open_application(context, workspace) {
             0 => ExitCode::SUCCESS,
             code => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         },
         cli::Invocation::Bridge { port } => {
-            match bridge::run(port, &context.config().identifier, documents) {
+            match bridge::run(port, &context.config().identifier, workspace) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("dageist: the bridge stopped: {error}");
@@ -103,5 +122,26 @@ fn main() -> ExitCode {
                 }
             }
         }
-    }
+    };
+    remove_sample_folder(&sample);
+    code
+}
+
+/// Makes a new folder for the sample's tables in the system's temporary folder. It is made, not
+/// found: a folder of that name that is already there is refused, so no file is written through
+/// a folder someone else put there.
+fn sample_folder() -> std::io::Result<std::path::PathBuf> {
+    let started = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos());
+    let folder =
+        std::env::temp_dir().join(format!("dageist-sample-{}-{started}", std::process::id()));
+    std::fs::create_dir(&folder)?;
+    Ok(folder)
+}
+
+/// Removes the sample's folder. A folder that cannot be removed is left for the system, which
+/// clears its temporary folder in time; so is the folder of a bridge stopped by a signal.
+fn remove_sample_folder(folder: &std::path::Path) {
+    let _ = std::fs::remove_dir_all(folder);
 }
