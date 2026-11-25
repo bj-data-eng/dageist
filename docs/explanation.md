@@ -1402,11 +1402,13 @@ What the editor has no way to draw is written once, in
 gaps. Each gap names what it covers, an entry the editor cannot pick or make, a
 place no word of the editor stands at, a kind of start after which it cannot add
 a method, a parameter it does not set, a kind of parameter that has no drawing,
-a state of a step's report that says nothing, or a kind of value a document
-holds typed in that the host cannot read, and it says why. A list shows an entry
-that is declared as disabled with the reason, where it lists the entry.
+a step no list adds, a parameter of a step that is neither drawn in its head nor
+offered as an option, a state of a step's report that says nothing, or a kind of
+value a document holds typed in that the host cannot read, and it says why. A list
+shows an entry that is declared as disabled with the reason, where it lists the
+entry.
 
-Three view tests hold the list against what the engine and the host allow. The
+Four view tests hold the list against what the engine and the host allow. The
 host writes the grid of every call the engine allows at every place of every kind,
 `ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
 classes of dtype in 3 shapes and 4 states of a condition. The grid test,
@@ -1487,6 +1489,9 @@ its reason, and a gap declared and no longer shown fails it too. A change that
 adds a variant to the host or the engine therefore changes the census, and the
 view's tests tell what is left to draw.
 
+The fourth test, `model/corpus.test.ts`, rebuilds whole documents, which the other
+three do not: see [the corpus of step documents](#the-corpus-of-step-documents).
+
 Today the declared gaps are these:
 
 - A further case of a condition, which the editor draws as a `when` after
@@ -1503,6 +1508,14 @@ Today the declared gaps are these:
   allows methods there ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 - A step Polars accepts that was not counted because a step before it failed on
   the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
+- The thirteen steps no list adds: the list holds the seven the editor has heads
+  for, `with_columns`, `filter`, `sort`, `select`, `rename`, `join` and `pivot`,
+  and `drop`, `drop_nans`, `drop_nulls`, `fill_nan`, `first`, `gather_every`,
+  `head`, `last`, `limit`, `reverse`, `slice`, `tail` and `with_row_index` are
+  drawn by their parameters alone, so a document may hold one and nothing adds it.
+- The parameters of a step that its head does not draw and its options do not
+  offer: a sort's `more_by`, because the fields to order by are one list, and a
+  join's `on`, because the keys of the two tables are one list each.
 - A flag typed in. A document may hold one as the value of `lit`, but the host
   reads typed text as a number or as text and never as a flag, so the editor has
   no way to type one ([#177](https://github.com/bj-data-eng/dageist/issues/177)).
@@ -1521,6 +1534,139 @@ holds, and the engine allows none as a start. A date is read from typed text as
 the text of the day, with the class `Date`, and a duration as text with no class,
 each in a slot that takes one as an argument, not at the start of an expression;
 the census lists those readings, and each gets the control of its slot.
+
+### The Corpus Of Step Documents
+
+The grid test takes a piece at a time: an entry at a place, a start, a parameter. A
+document is those pieces put together, and what the engine puts together is what a
+person has built, so the host also writes a corpus of documents, each with the
+report it gives of it, and the view rebuilds every piece of every one.
+
+**What it holds.** The corpus is five files of
+`ui/packages/host/fixtures/`, `corpus-methods.json`, `corpus-starts.json`,
+`corpus-parameters.json`, `corpus-steps.json` and `corpus-refused.json`, 530
+documents in all and about 1.6 MB, written one document to a line and left alone by
+the formatter. Each document has a name that says what it is for, the document as
+the host sends it and the report of running it, which the view decodes with the
+decoders it reads the host with. The files also name what the node is connected to.
+
+- *Methods.* Each method of an expression after each shape of value the engine allows
+  it after, one value, many values and a count of values, in the first context where
+  the walk of the document allows it and, where it can, where an expression may end at
+  it. A chain goes on for up to eight methods after the one it is made for, each one that
+  needs nothing given and that no chain held yet, so 365 chains hold all 247 methods at
+  every shape they stand after, but one.
+- *Starts.* Each function that starts a chain, `when` and `element` among them, a field,
+  a connected value, a connected list, a number, text and a flag typed in, and nothing
+  picked yet, each alone and where the engine allows one with a method after it; a
+  condition with every link of one and one that is followed by a method; and a chain in
+  each of the 30 contexts, which are the six positions of a step alone and with each of
+  the four positions inside an expression.
+- *Parameters.* Each method, function and link of a condition given every parameter the
+  engine offers, where a chain did not.
+- *Steps.* Each of the 20 steps of the catalogue as the editor adds it, with what it
+  must be given, and with each parameter the engine offers given in turn.
+- *Refusals.* Each cause the engine gives for a step: a table that is not connected, an
+  input that is a table, a step with something still to be picked, one that Polars
+  accepts and cannot run on the rows, the step after one that was refused and after one
+  that failed on the rows; and one document for each source of a refusal that the
+  tables give a call at a place: each rule they apply there and each stage of Polars.
+
+**How it is made.** Every document is made by the engine's own edits, as the editor
+makes them: a step is added with `add_step`, a chain starts with `start_with` or
+`set_start`, a method is added with `insert_link` at the place the engine reports,
+and each argument still to be picked is given a field or a number the walk allows the
+call with. A condition is built from the engine's constructors, for its links come in
+orders that no single edit makes. The host asks the engine's offers at every place once
+for the whole test run, a context to a thread, which takes about half a minute, and
+plans from them: in each context, the places a chain can be brought to are a graph from
+a field of each class of dtype, or `element` in a pivot's aggregate, where each method
+the engine allows after one class and shape and says gives another is an edge. Nothing is
+drawn at random, and every list is taken in the order of the catalogue, of the contexts
+and of the classes, so the files are the same each time they are written. One thing in a
+report depends on the process: Polars numbers the temporary columns it makes by how many it
+has made, and a reason that quotes one, as the plan of a failure on the rows does, would
+differ with what else the process has run, so the writer sets that number to 0.
+
+The documents run on one node, which is not the claim-timing sample, whose five
+columns reach few of the places the engine allows an entry at: a table with a column
+of each of the 67 classes of dtype, named for its class, of three rows of nulls; a second
+table of the same for a join's right keys; the table that gives a pivot its columns; a
+connected value, `limit`, and a connected list, `names`. A report lists the columns of the
+table it ran on, so each document runs on the columns it reads and the reports stay short.
+The host's tests build these tables with Polars directly, as a dev-dependency of the
+host, because the engine's public API hands none out; it adds no feature to the build.
+
+**What makes sure it holds everything.** The planning is not the guarantee. The tests in
+`crates/dageist-tauri/src/corpus/tests.rs` read the documents and their reports back and
+hold them against the engine's tables, the catalogue and the census, which the planning
+does not read:
+
+- every method the engine allows after a shape of value at some place is held after that
+  shape, where the walk allows it; one pair is declared as not held, `is_in` after a
+  count of values, whose one argument that meets a count is the form Polars deprecates;
+- every function that starts a chain and every link of a condition is held where the
+  engine allows it;
+- every context the tables cover holds a chain, every step of the catalogue is held, and
+  every parameter the engine offers is given in a document that calls its entry;
+- every kind of start, outcome, state of the rows and cause that the census lists is held;
+- every source of a refusal the tables give a call at a place is held, and every rule is
+  held or declared as not held with its reason, which for 12 rules is that they judge what
+  a call is given or what two keys are together, which the documents do not reach;
+- what the walk says of each call is what the tables say at the place it reports.
+
+The view's test reads the committed files alone and repeats the check of what they hold, so
+that a file that has lost a document fails, naming the entry, the step, the parameter, the
+context or the start that is missing. A change to the catalogue or the tables that adds
+such a thing fails the host's snapshot test first, until the files are written again.
+
+**What the rebuild holds.** The view's test, `model/corpus.test.ts`, with
+`test-support/corpus-gaps.ts`, decodes each document and its report, prepares the report with
+`prepareRun`, and at every piece asks the functions the components call whether the editor
+has the action that made it:
+
+- *a step*: it says something, `sayingOf` gives rows or a problem; it is one of the
+  list of steps, `listsOf` and the grid's route for it; and each parameter it is given is
+  drawn in its head or offered as an option, and gets a control, `controlOf`, of the kind the
+  argument holds;
+- *a start*: it is picked from the list at its place, which is the place the walk reports
+  for the chain, by the words that stand there, `listsOf`, the group of the entry and, for
+  a function, the row `startOffers` makes of the engine's verdict for it; an input is one
+  of those a list offers, a value or a list;
+- *a method*: it is added after the piece before it, `actionsOf` and `valueDrawing` say that
+  a method can be added there, and it is picked from the list at its place with a row that
+  is stopped by the engine where the walk refused it, and by no one where it allowed it;
+- *an argument or an option*: it gets a control, its kind is the kind the control draws, and
+  each expression inside it is rebuilt in the context the walk reports for it; a test of a
+  condition, which is drawn as a line, is a field, a comparison the engine lists and a value.
+
+A piece the editor cannot build is a declared gap, or the test fails naming the document, the
+step, the way down to the piece and what is wrong. A gap is accepted if it is declared, of
+whatever kind: the corpus finds the entries the grid declares, the starts after which no
+method is added and the parameters the entries do not set again where a document holds them,
+and it finds two gaps of its own, a step no list adds and a parameter of a step that is not
+offered. The declared gaps of a kind the corpus finds are held both ways, so one that the editor
+has come to draw fails as stale. The test finds nothing else today, and it names the one expression
+it cannot place: the value of a keyword constraint of a filter, which the walk does not walk. It
+counts about 5,000 pieces and takes under half a second.
+
+The test has its own checks that it can fail: a corpus without the documents of a function, a
+step, a parameter or a kind of start is missing it by name; an entry whose family the catalogue
+lacks has no row, and the documents that hold it are named; a parameter of pairs inside pairs has
+no control, and the document that holds it is named; an argument of a kind its control does not
+draw and a step that says nothing fail with the piece named; and a gap declared for a step the
+editor adds is stale.
+
+**How the three tests fit.** The grid test is the breadth of places: every entry at every one
+of 30 contexts and 206 kinds of what comes before, and every start that leads there, with no
+document. The census is the breadth of kinds: every variant of a type the host or the engine
+has, with the words each is shown with. The corpus is the depth: the pieces together, in
+documents the engine made and reports it gave, so that a piece the grid and the census cannot
+see, such as a step outside the list or a parameter of a step that is not offered, or a chain in
+which a start, a method and its arguments each fail on their own, shows. A gap can show in more
+than one: a method after a connected value is found at every place by the grid and in each
+document that holds one by the corpus. Each declared gap is held both ways by the test that
+finds its kind, `FOUND_BY` in `limits.ts` says which, and the others accept it.
 
 ## The Step Document
 

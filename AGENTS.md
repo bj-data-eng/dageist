@@ -64,6 +64,7 @@ and current source establishes behavior.
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
+| The corpus of step documents the host writes for the view's tests, and how it is made | [crates/dageist-tauri/src/corpus/](crates/dageist-tauri/src/corpus/mod.rs), [the explanation](docs/explanation.md#the-corpus-of-step-documents) |
 | The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
 | The view's bundler and design tokens | [ui/apps/desktop/vite.config.ts](ui/apps/desktop/vite.config.ts), [ui/apps/desktop/src/styles.css](ui/apps/desktop/src/styles.css) |
 | View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/tsconfig.node.json](ui/tsconfig.node.json) |
