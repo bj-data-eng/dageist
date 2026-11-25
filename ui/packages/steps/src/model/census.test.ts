@@ -76,16 +76,29 @@ describe('the census the host wrote', () => {
     expect(compareCensus(planned, GAPS)).toEqual({ undeclared: [], stale: [] });
   });
 
-  it('shows the one gap of a flag a document holds typed in, which the host reads no typed text as', () => {
+  it('shows the gaps of a flag a document holds typed in, which the host cannot type and the editor does not show', () => {
     // The document holds a number, text or a flag as the value of `lit`; the host reads typed text as
-    // a number or text. A date, a time, a moment or a length of time is not held by a document.
+    // a number or text, and the literal control shows a number or text. A date, a time, a moment or
+    // a length of time is not held by a document.
     expect(sorted([...planned.gaps.keys()])).toEqual([
       'report notCountedAfterRowsFailure',
+      'shown literal flag',
+      'shown resolution several',
       'typed flag',
     ]);
     expect(
       census.typedValues.filter((value) => !value.readable).map((value) => value.literal),
     ).toEqual(['flag']);
+  });
+
+  it('lists the families the view decodes and decides on', () => {
+    expect(census.changes).toEqual(['added', 'replaced']);
+    expect(census.resolutions).toEqual(['dtype', 'several', 'unfinished', 'noContext', 'refused']);
+    expect(census.editAnswers).toEqual(['edited', 'refused']);
+    expect(census.problemKinds).toHaveLength(13);
+    expect(census.valueKinds).toHaveLength(15);
+    expect(census.settingKinds).toHaveLength(11);
+    expect(census.defaultKinds).toHaveLength(8);
   });
 
   it('reads the typed text of a date and of a duration where a slot takes one, and no other moment', () => {
@@ -143,7 +156,11 @@ describe('a variant the census gains that the editor lacks', () => {
     };
     const run = planFor(withDate);
 
-    expect(run.unplanned).toEqual(['start typed date', 'typed value date']);
+    expect(run.unplanned).toEqual([
+      'start typed date',
+      'typed value date',
+      'typed value date: no argument',
+    ]);
     // It is a gap too, since the host reads no typed text as one, and the check fails until it is declared.
     expect(compareCensus(run, GAPS)).toEqual({ undeclared: ['typed date'], stale: [] });
   });
@@ -173,7 +190,57 @@ describe('a variant the census gains that the editor lacks', () => {
   it('fails the check where it is a kind of input, an origin or a cell the editor does not show', () => {
     expect(planFor(plus('inputKinds', 'stream')).unplanned).toHaveLength(census.origins.length);
     expect(planFor(plus('origins', 'sensor')).unplanned).toHaveLength(census.inputKinds.length);
+    expect(planFor(plus('origins', 'sensor')).unplanned).toEqual(
+      sorted(census.inputKinds.map((kind) => `input ${kind} from sensor`)),
+    );
     expect(planFor(plus('cells', 'error')).unplanned).toEqual(['cell error']);
+  });
+});
+
+describe('a family of variants the census gains that the editor lacks', () => {
+  it('fails the check where it is a cause, a stage, a source or a rows state the decoders refuse', () => {
+    expect(planFor(plus('causes', 'timedOut')).unplanned).toEqual(['cause timedOut']);
+    expect(planFor(plus('stages', 'planning')).unplanned).toEqual([
+      'refusal by polars at planning: $.steps[0].outcome.cause.refusal.source.stage: must be one of "schema", "rows", "empty", not "planning"',
+    ]);
+    expect(planFor(plus('refusalSources', 'network')).unplanned).toEqual([
+      'refusal source network',
+    ]);
+    expect(planFor(plus('rowsStates', 'partly')).unplanned).toEqual(['rows state partly']);
+    expect(planFor(plus('outcomes', 'paused')).unplanned).toEqual(['outcome paused']);
+  });
+
+  it('fails the check where it is a change, a resolution, a default or a setting the decoders refuse', () => {
+    expect(planFor(plus('changes', 'dropped')).unplanned).toEqual([
+      expect.stringContaining('change dropped'),
+    ]);
+    expect(planFor(plus('resolutions', 'guessed')).unplanned).toEqual(['resolution guessed']);
+    expect(planFor(plus('defaultKinds', 'computed')).unplanned).toEqual(['default computed']);
+    expect(planFor(plus('settingKinds', 'range')).unplanned).toEqual(['setting range']);
+  });
+
+  it('fails the check where it is a kind of edit answer, of refusal, of thing or of value the decoders refuse', () => {
+    expect(planFor(plus('editAnswers', 'deferred')).unplanned).toEqual(['edit answer deferred']);
+    expect(planFor(plus('problemKinds', 'timedOut')).unplanned).toEqual(['problem timedOut']);
+    expect(planFor(plus('thingKinds', 'sheet')).unplanned).toEqual([
+      expect.stringContaining('thing sheet'),
+    ]);
+    expect(planFor(plus('valueKinds', 'moment')).unplanned).toEqual([
+      expect.stringContaining('value kind moment'),
+    ]);
+    expect(planFor(plus('wanted', 'sheet')).unplanned).toEqual([
+      expect.stringContaining('wanted sheet'),
+    ]);
+  });
+
+  it('shows the flag as not shown and an expression of several columns as one that has no dtype shown', () => {
+    expect(planned.gaps.get('shown literal flag')).toEqual({ kind: 'shown', what: 'literal flag' });
+    expect(planned.gaps.get('shown resolution several')).toEqual({
+      kind: 'shown',
+      what: 'resolution several',
+    });
+    // Nothing else the census holds is a value that the editor leaves unshown.
+    expect([...planned.gaps.values()].filter((gap) => gap.kind === 'shown')).toHaveLength(2);
   });
 });
 
@@ -188,7 +255,10 @@ describe('a gap that is declared and the census does not show', () => {
     };
     const run = planFor(without);
 
-    expect(compareCensus(run, GAPS)).toEqual({ undeclared: [], stale: ['typed flag'] });
+    expect(compareCensus(run, GAPS)).toEqual({
+      undeclared: [],
+      stale: ['shown literal flag', 'typed flag'],
+    });
   });
 
   it('declares the flag once, with its reason', () => {

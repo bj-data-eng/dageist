@@ -7,6 +7,7 @@
  */
 
 import type {
+  ArgumentView,
   InputView,
   KindView,
   ParameterView,
@@ -15,15 +16,33 @@ import type {
   TypedKind,
   ValueTypeView,
 } from '@dageist/host';
-import { DecodeError, decodeNode, decodeRun } from '@dageist/host';
+import {
+  DecodeError,
+  decodeCatalogue,
+  decodeEditAnswer,
+  decodeNode,
+  decodeRun,
+} from '@dageist/host';
 
+import catalogueFixture from '../../host/fixtures/catalogue.json';
+import editEditedFixture from '../../host/fixtures/edit-edited.json';
+import editRefusedFixture from '../../host/fixtures/edit-refused.json';
+import { replaced } from '../../host/test-support/tamper';
 import type { Census, CensusForm, CensusKind, CensusState } from '../../host/test-support/census';
-import { controlOf, oneControlOf, startsWithEngineWord } from '../src/model/controls';
+import {
+  controlOf,
+  defaultWordOf,
+  oneControlOf,
+  pairsJoiner,
+  startsWithEngineWord,
+} from '../src/model/controls';
+import { parameterSegment, pathKey } from '../src/model/doc';
+import { handlingOf } from '../src/model/edits';
 import { inputDetail, inputLines, originWords } from '../src/model/inputs';
 import type { Cover, Gap, ReportState } from '../src/model/limits';
 import { FOUND_BY, coverKey } from '../src/model/limits';
-import { prepareRun, sayingOf } from '../src/model/report';
-import { NULL_DASH, cellText } from '../src/model/values';
+import { isChanged, prepareRun, sayingOf } from '../src/model/report';
+import { NULL_DASH, cellText, shownOf } from '../src/model/values';
 import { valueDrawing } from '../src/model/words';
 import { STARTS, grid } from './grid-gaps';
 import { isDrawn } from './places';
@@ -81,7 +100,7 @@ function valueTypeOf(word: string | null): ValueTypeView | null {
 }
 
 /** Returns the kind of parameter the census writes as `kind`, or `null` where the contract has no such kind. */
-export function kindFrom(kind: CensusKind): KindView | null {
+function kindFrom(kind: CensusKind): KindView | null {
   switch (kind.kind) {
     case 'expression':
     case 'column':
@@ -125,7 +144,7 @@ function shapeFrom(shape: string): ShapeView | null {
 }
 
 /** A parameter of `kind` held in `shape`. */
-export function parameterOf(shape: ShapeView, kind: KindView): ParameterView {
+function parameterOf(shape: ShapeView, kind: KindView): ParameterView {
   return {
     name: 'parameter',
     shown: 'parameter',
@@ -202,6 +221,22 @@ function planStarts(census: Census, found: Findings): void {
   }
 }
 
+/** The argument a document holds for a number, text or flag typed in, as the census names its kind. */
+function heldArgument(literal: string): ArgumentView | null {
+  switch (literal) {
+    case 'integer':
+      return { kind: 'integer', shown: '1' };
+    case 'float':
+      return { kind: 'float', shown: '1.5' };
+    case 'text':
+      return { kind: 'string', value: 'a' };
+    case 'flag':
+      return { kind: 'flag', value: true };
+    default:
+      return null;
+  }
+}
+
 /** Holds the numbers, texts and flags a document holds typed in, and the readings of typed text, against the starts and controls. */
 function planTyped(census: Census, found: Findings): void {
   for (const value of census.typedValues) {
@@ -214,6 +249,10 @@ function planTyped(census: Census, found: Findings): void {
     } else if (!start.leads({ kind: 'value', dtype: value.dtype, shape: 'one' })) {
       found.lacks(`typed value ${value.literal}: its start leads nowhere to ${value.dtype}`);
     }
+    // A document that holds it must be shown by the words the model gives a typed value.
+    const held = heldArgument(value.literal);
+    if (held === null) found.lacks(`typed value ${value.literal}: no argument`);
+    else if (shownOf(held) === null) found.gap({ kind: 'shown', what: `literal ${value.literal}` });
   }
   for (const reading of census.typedReadings) {
     const words = `reading ${JSON.stringify(reading.slot)} ${reading.literal ?? 'unread'}`;
@@ -489,6 +528,14 @@ function saidOf(run: RunView): ReturnType<typeof sayingOf> {
 
 /** Holds each state of a step, and each cause and source of a refusal, against the words the editor has for it. */
 function planReports(census: Census, found: Findings): void {
+  for (const rows of census.rowsStates) {
+    if (countOf(rows) === null) found.lacks(`rows state ${rows}`);
+  }
+  for (const outcome of census.outcomes) {
+    if (!['valid', 'refused', 'incomplete', 'notRun'].includes(outcome)) {
+      found.lacks(`outcome ${outcome}`);
+    }
+  }
   for (const state of census.states) {
     const words =
       `state ${state.outcome} ${state.cause ?? ''} ${state.rows} after ${state.after}`.replace(
@@ -577,6 +624,240 @@ function planReports(census: Census, found: Findings): void {
   }
   for (const rule of census.rules) {
     if (rule.statement.trim() === '') found.lacks(`rule ${rule.name}: says nothing`);
+  }
+}
+
+/** The raw step the families below are made from. */
+function plainStep(extra: RawStep): RawStep {
+  return { ...baseStep(), id: 'tested', ...extra };
+}
+
+/** Reads a value the census builds with the host's decoder, or notes `words` as having no plan where it refuses it. */
+function readOr<Read>(found: Findings, words: string, read: () => Read): Read | null {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof DecodeError) {
+      found.lacks(`${words}: ${error.message}`);
+      return null;
+    }
+    throw error;
+  }
+}
+
+/** The resolution of an expression the census names, as the host writes one. */
+function resolutionOf(word: string): unknown {
+  switch (word) {
+    case 'dtype':
+      return { kind: word, dtype: 'Int64' };
+    case 'several':
+      return { kind: word, dtypes: ['Int64', 'String'] };
+    case 'unfinished':
+    case 'noContext':
+      return { kind: word };
+    case 'refused':
+      return { kind: word, reason: 'the reason' };
+    default:
+      return null;
+  }
+}
+
+/** The default of a parameter the census names, as the catalogue writes one. */
+function defaultOf(word: string): unknown {
+  switch (word) {
+    case 'required':
+    case 'none':
+    case 'empty':
+    case 'other':
+      return { kind: word };
+    case 'flag':
+      return { kind: word, value: true };
+    case 'integer':
+      return { kind: word, value: 1 };
+    case 'float':
+      return { kind: word, value: 1.5 };
+    case 'text':
+      return { kind: word, value: 'a' };
+    default:
+      return null;
+  }
+}
+
+/** The setting of a parameter the census names, as the catalogue writes one. */
+function settingOf(word: string): unknown {
+  const unset = { kind: 'unset' };
+  switch (word) {
+    case 'unset':
+      return unset;
+    case 'flag':
+      return { kind: word, value: true };
+    case 'integer':
+      return { kind: word, value: 1, shown: '1' };
+    case 'float':
+      return { kind: word, value: 1.5, shown: '1.5' };
+    case 'text':
+      return { kind: word, value: 'a', shown: 'a' };
+    case 'word':
+      return { kind: word, value: 'a' };
+    case 'field':
+      return { kind: word, column: 'a' };
+    case 'element':
+      return { kind: word, method: 'first' };
+    case 'comparison':
+      return { kind: word, entry: 'Expr.eq', field: unset, other: unset };
+    case 'list':
+      return { kind: word, items: [] };
+    case 'pairs':
+      return { kind: word, entries: [] };
+    default:
+      return null;
+  }
+}
+
+/** The reason for a refusal of an edit the census names, as the host writes one. */
+function problemOf(kind: string, found: unknown, needs: string): unknown {
+  switch (kind) {
+    case 'noStep':
+      return { kind, steps: 1 };
+    case 'stepChanged':
+      return { kind, found: 'a' };
+    case 'nothing':
+    case 'notPerItem':
+    case 'noDefault':
+      return { kind };
+    case 'doesNotFit':
+      return { kind, found };
+    case 'wrongPlace':
+      return { kind, needs, found };
+    case 'outOfRange':
+      return { kind, index: 3, len: 2 };
+    case 'unknownEntry':
+    case 'noStart':
+      return { kind, entry: 'Expr.a' };
+    case 'cannotAdd':
+    case 'refused':
+      return { kind, reason: 'the reason' };
+    case 'needsValue':
+      return { kind, parameter: 'a' };
+    default:
+      return null;
+  }
+}
+
+/** The catalogue with the field `field` of its first parameter changed to `value`. */
+function withParameter(field: string, value: unknown): unknown {
+  return replaced(catalogueFixture, ['entries', 0, 'parameters', 0, field], value);
+}
+
+/** Holds how a column changed, how an expression resolved, what a parameter holds by default and how an edit came out against the model's functions. */
+function planFamilies(census: Census, found: Findings): void {
+  const source = [{ name: 'a', dtype: 'Int64' }];
+  const place = { stepIndex: 0, stepId: 'tested', path: [parameterSegment('exprs')] };
+  for (const change of census.changes) {
+    const words = `change ${change}`;
+    const outcome = {
+      status: 'valid',
+      columns: source,
+      changes: [{ name: 'a', change }],
+    };
+    const run = readOr(found, words, () => decodeRun({ source, steps: [plainStep({ outcome })] }));
+    const step = run === null ? undefined : prepareRun([], run).steps[0];
+    if (step !== undefined && !isChanged(step.changes, 'a')) found.lacks(`${words}: not marked`);
+  }
+  for (const word of census.resolutions) {
+    const words = `resolution ${word}`;
+    const resolution = resolutionOf(word);
+    if (resolution === null) {
+      found.lacks(words);
+      continue;
+    }
+    const expressions = [{ place, start: resolution, links: [resolution] }];
+    const run = readOr(found, words, () =>
+      decodeRun({ source, steps: [plainStep({ expressions })] }),
+    );
+    const dtype =
+      run === null
+        ? null
+        : (prepareRun([], run).steps[0]?.chains.get(pathKey(place.path))?.source ?? null);
+    if (run === null) continue;
+    if (word === 'dtype' && dtype !== 'Int64') found.lacks(`${words}: no dtype shown`);
+    // The dtypes of a chain that gives several columns are not shown, which is a gap; what is
+    // unfinished, has no context or is refused has none to show, and the step says why.
+    if (word === 'several' && dtype === null) {
+      found.gap({ kind: 'shown', what: 'resolution several' });
+    }
+  }
+  for (const word of census.defaultKinds) {
+    const words = `default ${word}`;
+    const held = defaultOf(word);
+    if (held === null) {
+      found.lacks(words);
+      continue;
+    }
+    const read = readOr(found, words, () => decodeCatalogue(withParameter('default', held)));
+    const parameter = read?.entries[0]?.parameters[0];
+    if (parameter !== undefined && pairsJoiner(parameter) !== (word === 'empty' ? '=' : '→')) {
+      found.lacks(`${words}: joins pairs by the wrong word`);
+    }
+  }
+  for (const word of census.settingKinds) {
+    const words = `setting ${word}`;
+    const held = settingOf(word);
+    if (held === null) {
+      found.lacks(words);
+      continue;
+    }
+    const read = readOr(found, words, () => decodeCatalogue(withParameter('defaultSetting', held)));
+    const parameter = read?.entries[0]?.parameters[0];
+    // A flag and a word are held as one the controls draw; any other setting is no default word.
+    if (
+      parameter !== undefined &&
+      (defaultWordOf(parameter) !== '') !== ['flag', 'word'].includes(word)
+    ) {
+      found.lacks(`${words}: is held as a word, or is not`);
+    }
+  }
+  for (const word of census.editAnswers) {
+    const fixture =
+      word === 'edited' ? editEditedFixture : word === 'refused' ? editRefusedFixture : null;
+    if (fixture === null) {
+      found.lacks(`edit answer ${word}`);
+      continue;
+    }
+    const answer = readOr(found, `edit answer ${word}`, () => decodeEditAnswer(fixture));
+    if (answer !== null && answer.status !== word) {
+      found.lacks(`edit answer ${word}: reads as ${answer.status}`);
+    }
+  }
+  /** Reads an edit refused for `problem`, and what the editor does with it. */
+  const refusedFor = (words: string, problem: unknown): void => {
+    if (problem === null) {
+      found.lacks(words);
+      return;
+    }
+    const answer = readOr(found, words, () =>
+      decodeEditAnswer(replaced(editRefusedFixture, ['problem'], problem)),
+    );
+    if (answer?.status !== 'refused') return;
+    const handling = handlingOf(answer.problem);
+    if (handling === 'tell' && answer.message.trim() === '') found.lacks(`${words}: no words`);
+  };
+  const step = { kind: 'step' };
+  for (const kind of census.problemKinds) {
+    refusedFor(`problem ${kind}`, problemOf(kind, step, 'call'));
+  }
+  for (const thing of census.thingKinds) {
+    const found_ =
+      thing === 'value'
+        ? { kind: thing, of: census.valueKinds[0] ?? 'expression' }
+        : { kind: thing };
+    refusedFor(`thing ${thing}`, problemOf('doesNotFit', found_, 'call'));
+  }
+  for (const kind of census.valueKinds) {
+    refusedFor(`value kind ${kind}`, problemOf('doesNotFit', { kind: 'value', of: kind }, 'call'));
+  }
+  for (const needs of census.wanted) {
+    refusedFor(`wanted ${needs}`, problemOf('wrongPlace', step, needs));
   }
 }
 
@@ -671,6 +952,7 @@ export function planFor(census: Census): Planned {
   planParameters(census, found);
   planPlaces(census, found);
   planReports(census, found);
+  planFamilies(census, found);
   planRows(census, found);
   return { unplanned: sorted(found.unplanned), gaps: found.gaps };
 }
