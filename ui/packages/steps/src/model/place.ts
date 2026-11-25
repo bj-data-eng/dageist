@@ -15,6 +15,10 @@ import type {
   PositionView,
 } from '@dageist/host';
 
+import type { Catalogue } from './catalogue';
+import { HEAD_PARAMETERS, VERBS, verbId } from './catalogue';
+import { settingOf } from './controls';
+
 /** What an expression that has nothing yet has: a call would start it. */
 export const START: AfterView = { kind: 'start' };
 
@@ -43,4 +47,33 @@ export function placeRequest(place: OfferPlaceView): PlaceRequest {
 /** Returns the request for where a call would start an expression held at `positions`. */
 export function startRequest(positions: readonly PositionView[]): PlaceRequest {
   return { positions, after: START };
+}
+
+/**
+ * Returns whether the editor draws a position of `context`: the outer position of a step is where
+ * the head of some step draws a parameter there, and the nested one is where the drawing of some
+ * entry sets a parameter that holds an expression there.
+ */
+export function isContextDrawn(catalogue: Catalogue, context: ContextView): boolean {
+  const outer = VERBS.some((verb) => {
+    const entry = catalogue.entries.get(verbId(verb));
+    return (
+      entry?.parameters.some(
+        (parameter) =>
+          HEAD_PARAMETERS[verb].includes(parameter.name) &&
+          parameter.position?.kind === 'outer' &&
+          parameter.position.name === context.outer,
+      ) === true
+    );
+  });
+  if (context.nested === null) return outer;
+  const nested = [...catalogue.entries.values()].some((entry) =>
+    entry.parameters.some(
+      (parameter) =>
+        parameter.position?.kind === 'nested' &&
+        parameter.position.name === context.nested &&
+        ['argument', 'option', 'entry'].includes(settingOf(entry, parameter).by),
+    ),
+  );
+  return outer && nested;
 }

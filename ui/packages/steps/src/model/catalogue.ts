@@ -202,6 +202,20 @@ const COVERED: Readonly<Record<Verb, readonly string[]>> = {
   pivot: ['on', 'index', 'values', 'aggregate_function'],
 };
 
+/**
+ * The parameters each step's head draws, which stand in a position of their own: the head of a
+ * step is laid out by the step, and the other parameters are options added from the step's name.
+ */
+export const HEAD_PARAMETERS: Readonly<Record<Verb, readonly string[]>> = {
+  with_columns: ['named_exprs', 'exprs'],
+  filter: ['predicates'],
+  sort: ['by'],
+  select: ['exprs'],
+  rename: ['mapping'],
+  join: ['other', 'left_on', 'right_on'],
+  pivot: ['on', 'index', 'values', 'aggregate_function'],
+};
+
 /** Returns the verb a step of the entry `entry` is, or `null` for a step the editor draws by its parameters alone. */
 export function verbOf(entry: string): Verb | null {
   return VERBS.find((verb) => verbId(verb) === entry) ?? null;

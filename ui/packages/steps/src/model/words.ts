@@ -270,3 +270,11 @@ export function actionsOf(kind: PieceKind, removable = true): Actions {
       return kind satisfies never;
   }
 }
+
+/**
+ * Returns what can be done to the piece a slot draws for `drawing`: a value drawn as a chain has
+ * the actions of the word it starts from, and one drawn as one word those of a word.
+ */
+export function actionsOfValue(drawing: ValueDrawing, removable = true): Actions {
+  return actionsOf(drawing.drawn === 'chain' ? 'chainStart' : 'word', removable);
+}
