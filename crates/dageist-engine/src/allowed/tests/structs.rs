@@ -4,8 +4,8 @@
 use polars::prelude::{DataType, Field};
 
 use crate::allowed::{
-    After, Chosen, Context, Ending, Fields, Input, Outer, Place, Representative, Shape, Verdict,
-    offer,
+    After, Chosen, Context, Ending, Fields, Input, Nested, Outer, Place, Representative, Shape,
+    Verdict, offer,
 };
 use crate::catalog;
 
@@ -126,4 +126,105 @@ fn a_struct_made_of_the_other_tables_columns_may_stand_as_the_key_of_that_table(
             allowance.can_end()
         );
     }
+}
+
+fn a_struct_of(fields: &[(&str, DataType)]) -> Fields {
+    Fields::of_dtype(&DataType::Struct(
+        fields
+            .iter()
+            .map(|(name, dtype)| Field::new((*name).into(), dtype.clone()))
+            .collect(),
+    ))
+    .expect("a struct")
+}
+
+#[test]
+fn a_field_read_of_a_boolean_may_end_a_filters_predicate_and_one_of_a_number_may_not() {
+    // The tables measured a read of a number, which a predicate refuses; what is read is the field.
+    let fields = a_struct_of(&[("s", DataType::Boolean), ("n", DataType::Int64)]);
+    let place = Place::new(
+        Context::step(Outer::Filter),
+        After::Value {
+            dtype: Representative::Struct,
+            shape: Shape::Many,
+        },
+    );
+    let read = |name: &str| {
+        let names = [("name", name)];
+        offer(
+            entry("Expr.struct.field"),
+            &place,
+            &Chosen::default()
+                .following_fields(Some(&fields))
+                .with_names(&names),
+        )
+    };
+    let boolean = read("s");
+    assert!(
+        matches!(allowed(&boolean).can_end(), Ending::Allowed),
+        "{boolean:?}"
+    );
+    let number = read("n");
+    assert!(
+        matches!(allowed(&number).can_end(), Ending::Refused(_)),
+        "{number:?}"
+    );
+}
+
+#[test]
+fn a_field_read_of_a_boolean_may_end_a_conditions_predicate() {
+    let fields = a_struct_of(&[("s", DataType::Boolean)]);
+    let place = Place::new(
+        Context::inside(Outer::Select, Nested::ConditionPredicate),
+        After::Value {
+            dtype: Representative::Struct,
+            shape: Shape::Many,
+        },
+    );
+    let verdict = offer(
+        entry("Expr.struct.field"),
+        &place,
+        &Chosen::default()
+            .following_fields(Some(&fields))
+            .with_names(&[("name", "s")]),
+    );
+    assert!(
+        matches!(allowed(&verdict).can_end(), Ending::Allowed),
+        "{verdict:?}"
+    );
+}
+
+#[test]
+fn a_count_given_a_name_where_the_name_of_the_values_is_not_known_cannot_say_whether_it_clashes() {
+    // In a pivot's group the values are named by the column the pivot takes them from, which the
+    // chain does not know, and a count named as they are is refused by Polars.
+    let named = offer(
+        entry("Expr.value_counts"),
+        &after_a_struct(),
+        &Chosen::default().with_names(&[("name", "a")]),
+    );
+    assert!(
+        matches!(allowed(&named).can_end(), Ending::NotKnown(_)),
+        "{named:?}"
+    );
+    // Told the name of the values, it is decided: a clash is refused and another name is not.
+    let clash = offer(
+        entry("Expr.value_counts"),
+        &after_a_struct(),
+        &Chosen::default()
+            .named(Some("a"))
+            .with_names(&[("name", "a")]),
+    );
+    assert!(clash.refusal().is_some(), "{clash:?}");
+    let other = offer(
+        entry("Expr.value_counts"),
+        &after_a_struct(),
+        &Chosen::default()
+            .named(Some("a"))
+            .with_names(&[("name", "n")]),
+    );
+    assert!(
+        matches!(allowed(&other).can_end(), Ending::Allowed),
+        "{other:?}"
+    );
 }
