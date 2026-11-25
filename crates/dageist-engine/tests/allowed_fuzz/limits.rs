@@ -3897,10 +3897,39 @@ fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
     })
 }
 
-/// Whether the limit is why the tables and Polars disagree.
-/// Whether a call of arithmetic follows a value that the tables class as a struct, in any expression
-/// the tables followed.
-fn arithmetic_follows_a_struct(case: &Case, prediction: &Prediction) -> bool {
+/// Whether an expression is made, as it is written, of a struct: it starts from one, a column of the
+/// case that is one, or a call that makes one.
+fn is_made_of_a_struct(case: &Case, expression: &Expression) -> bool {
+    const MAKERS: [&str; 6] = [
+        "Expr.value_counts",
+        "Expr.list.to_struct",
+        "Expr.arr.to_struct",
+        "Expr.str.split_exact",
+        "Expr.str.splitn",
+        "Expr.str.extract_groups",
+    ];
+    let start_is_a_struct = match expression.start() {
+        Start::Call(start) if is(start, "polars.struct") => true,
+        Start::Call(start) if is(start, "polars.col") => matches!(
+            start.argument("name"),
+            Some(Value::Columns(names)) if names.first().is_some_and(|name| {
+                (matches!(name.as_str(), "a" | "ra") && case.receiver == Representative::Struct)
+                    || (matches!(name.as_str(), "b" | "rb")
+                        && case.argument == Representative::Struct)
+            })
+        ),
+        _ => false,
+    };
+    start_is_a_struct
+        || expression
+            .links()
+            .iter()
+            .any(|link| MAKERS.contains(&link.entry().id().as_str()))
+}
+
+/// Whether a call of arithmetic meets a struct, in any expression the tables followed: it follows a
+/// value that the tables class as one, or is given an expression made of one.
+fn arithmetic_meets_a_struct(case: &Case, prediction: &Prediction) -> bool {
     prediction.expressions.iter().any(|traced| {
         let Some(chain) = locate(case, &traced.place).inside.last().copied() else {
             return false;
@@ -3912,11 +3941,15 @@ fn arithmetic_follows_a_struct(case: &Case, prediction: &Prediction) -> bool {
                 traced.links.get(at - 1).copied().flatten()
             };
             link.entry().family() == catalog::Family::Arithmetic
-                && before == Some(Representative::Struct)
+                && (before == Some(Representative::Struct)
+                    || operands(link)
+                        .into_iter()
+                        .any(|(_, operand)| is_made_of_a_struct(case, operand)))
         })
     })
 }
 
+/// Whether the limit is why the tables and Polars disagree.
 fn applies(
     limit: Limit,
     case: &Case,
@@ -4422,10 +4455,14 @@ fn applies(
         (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsRefuses(refusal)) => {
             // Polars adds, subtracts and so on field by field, each by the dtypes of the two fields.
             unplaced(refusal)
-                && refusal
-                    .reason
-                    .contains("operation not supported for dtypes")
-                && arithmetic_follows_a_struct(case, prediction)
+                && [
+                    "operation not supported for dtypes",
+                    "multiple fields with name",
+                    "failed to determine supertype",
+                ]
+                .iter()
+                .any(|said| refusal.reason.contains(said))
+                && arithmetic_meets_a_struct(case, prediction)
         }
         (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsAllows(refused)) => {
             matches!(refused.source, Source::Polars)
@@ -4434,10 +4471,17 @@ fn applies(
                     .contains("a struct with non-numeric field: (field: y, dtype: str)")
         }
         (Limit::AStructMetByAStructOfOtherFields, Disagreement::PolarsRefuses(refusal)) => {
-            refusal.stage == Stage::Schema
+            // At the plan, as a fill casts one struct to the other's dtype, and at the rows, as a
+            // replacement casts what it replaces.
+            (refusal.stage == Stage::Schema
                 && refusal.reason.starts_with("casting from Struct(")
                 && refusal.reason.contains(") to Struct(")
-                && refusal.reason.contains("not supported")
+                && refusal.reason.contains("not supported"))
+                || (unplaced(refusal)
+                    && refusal.reason.starts_with("cast from `struct[")
+                    && refusal
+                        .reason
+                        .contains("structs do not have the same number of fields"))
         }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
@@ -11654,6 +11698,58 @@ mod tests {
         );
         assert_eq!(
             tables_refuse(&pivot(without), place, Some(TableStage::Schema), reason),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn arithmetic_given_a_struct_is_excused_for_the_fields_it_makes_of_two_and_a_replacement_for_its_cast()
+     {
+        let operand = chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("rk"), &[])]))],
+            ),
+            &[],
+        );
+        let case = select(vec![
+            Expression::new(
+                Start::Call(column("rk")),
+                vec![call(
+                    "Expr.add",
+                    vec![("other", Value::Expression(operand))],
+                )],
+            )
+            .expect("a chain"),
+        ]);
+        let traced = vec![Traced {
+            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
+            start: Some(Representative::Int64),
+            links: vec![Some(Representative::Struct)],
+        }];
+        for reason in [
+            "duplicate: multiple fields with name 'rk' found",
+            "failed to determine supertype of f64 and struct[2]",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, reason, traced.clone()),
+                vec![Limit::ArithmeticOnAStructOfNumbers],
+                "{reason}"
+            );
+        }
+        let replacement = "cast from `struct[2]` to `struct[1]` failed in column 'a': structs do not have the same number of fields: 2 vs 1";
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, replacement, Vec::new()),
+            vec![Limit::AStructMetByAStructOfOtherFields]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "cast from `i64` to `struct[1]` failed",
+                Vec::new()
+            ),
             vec![]
         );
     }

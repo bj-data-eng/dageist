@@ -399,6 +399,23 @@ fn is_a_later_call_of_the_chain(why: &str, refused: &str) -> bool {
     }
 }
 
+/// Whether Polars refused at a call inside an expression of which the tables said they could not
+/// tell whether it may end: `why` names the place of the expression before its colon, and `refused`
+/// is the place of Polars' refusal, which is a call of it, its start or a link. What the expression's
+/// calls give is not known, so what Polars refuses of one of them contradicts nothing the tables say.
+fn is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+    why: &str,
+    refused: &str,
+) -> bool {
+    let Some((place, said)) = why.split_once(": ") else {
+        return false;
+    };
+    said.starts_with("whether it may end is not known")
+        && refused
+            .strip_prefix(place)
+            .is_some_and(|inside| inside.starts_with(", "))
+}
+
 /// How the difference of a dtype says that the tables allow a part and Polars refuses it, which
 /// the limits excuse where they are the cause, as they do the refusal of the whole case.
 const A_PREFIX_POLARS_REFUSES: &str = "the tables allow it, Polars refuses it";
@@ -421,7 +438,11 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
         Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
             refusal.stage == Stage::Schema
                 && (why.starts_with(&format!("{}: ", refusal.at))
-                    || is_a_later_call_of_the_chain(why, &refusal.at))
+                    || is_a_later_call_of_the_chain(why, &refusal.at)
+                    || is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                        why,
+                        &refusal.at,
+                    ))
                 && refusal
                     .place
                     .as_ref()
@@ -1472,6 +1493,40 @@ mod tests {
             "{outcome:?}"
         );
         assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
+
+    #[test]
+    fn a_refusal_inside_an_expression_the_tables_could_not_end_explains_a_prefix_and_no_other() {
+        let why = "step \"s\", exprs item 1: whether it may end is not known: the dtype that the arguments decide is not known";
+        assert!(
+            is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                why,
+                "step \"s\", exprs item 1, the start"
+            )
+        );
+        assert!(
+            is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                why,
+                "step \"s\", exprs item 1, link 3"
+            )
+        );
+        // Another item, another place of the same one, and another reason are no explanation.
+        for refused in [
+            "step \"s\", exprs item 2, the start",
+            "step \"s\", exprs item 12, the start",
+            "step \"s\", exprs item 1",
+        ] {
+            assert!(
+                !is_inside_an_expression_that_may_not_end_for_all_the_tables_know(why, refused),
+                "{refused}"
+            );
+        }
+        assert!(
+            !is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                "step \"s\", exprs item 1: a count that may not end",
+                "step \"s\", exprs item 1, the start"
+            )
+        );
     }
 
     #[test]

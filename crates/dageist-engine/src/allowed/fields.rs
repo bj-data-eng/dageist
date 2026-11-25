@@ -394,7 +394,9 @@ pub(super) fn gives(
             match made.map(Fields::new) {
                 Some(Ok(fields)) => Ok(Gives::Struct(Some(fields))),
                 Some(Err(name)) => Err(repeated(&name)),
-                None => Ok(Gives::Struct(None)),
+                // A value whose name the chain does not know, as the columns an unnest writes,
+                // may be named as another is, which Polars refuses.
+                None => Ok(Gives::Undecided),
             }
         }
         "Expr.str.extract_groups" => {
