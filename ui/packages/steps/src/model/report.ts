@@ -166,7 +166,16 @@ export function linkHint(dtypes: ChainDtypes | undefined, index: number): string
   const input = index === 0 ? dtypes.source : (dtypes.links[index - 1] ?? null);
   if (input !== null) return `${input} → ${dtypes.links[index] ?? 'does not fit'}`;
   const after = dtypes.places[index]?.after;
-  return after?.kind === 'value' ? `after a value of the class ${after.dtype}` : null;
+  if (after?.kind !== 'value') return null;
+  // The tables measure one struct of two fields, so its class is written with the fields the walk
+  // carries, or as a struct alone where it does not know them.
+  const held = dtypes.fields[index] ?? null;
+  const written = after.dtype.startsWith('Struct(')
+    ? held === null
+      ? 'Struct'
+      : `Struct(${held.map((field) => `${field.name}: ${field.dtype}`).join(', ')})`
+    : after.dtype;
+  return `after a value of the class ${written}`;
 }
 
 /** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
