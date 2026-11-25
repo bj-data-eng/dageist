@@ -2678,8 +2678,8 @@ rule a probe shows right where Polars does not evaluate the part. Any other rule
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about half of the pivot cases (61 of the 144 of
-the fixed seed, and the same share in longer campaigns), so those pivot aggregates are checked
+wherever it refuses, which is more than a quarter of the pivot cases (39 of the 146 of
+the fixed seed, and a similar share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
 A refusal of a [count of values](#a-count-of-values) that Polars allows is of two kinds, and neither is
@@ -2722,11 +2722,11 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, that were refused where a count is the rows by chance, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 9 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 29 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 42 cases
-refused by the rule that is stricter by design, of 144 pivot cases, the 842 that agree, the 87 refused by both for
-another reason and the 9 refused where Polars does not evaluate the part; the cases that a limit excused are 6, and 5 at one thread. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
+1000 cases give none disagreeing; 7 of those that agree are refused by the rule against a
+repeated pair of key names. Its 146 pivot cases, the 39 refused by the rule that is stricter by design,
+the 19 refused where Polars does not evaluate the part and the 5 that a limit excused are the same at one thread,
+at two and at the machine's own; the 850 that agree and the 86 refused by both for another reason are 851 and 85 at one thread,
+where Polars gives, for one case, the reason the tables gave. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
 gives where the tables and Polars both refuse, and a case in which Polars panics at some counts and
 not at others moves a case between them. The test
 asserts none of those.
