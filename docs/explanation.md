@@ -258,7 +258,10 @@ constants in the contract that a test compares with the host's own list of
 the engine's variants, so a variant the engine adds fails a test. The same
 holds for the functions that prepare decoded data for display. Drawing is React
 that only consumes prepared values, and it has no tests while the design
-changes.
+changes. What the step editor can do with a piece is not drawing: it is decided
+in pure functions of the steps package's `model/`, and the components call them
+and draw the answer, as [What The Editor Cannot Express](#what-the-editor-cannot-express)
+says.
 
 ## The Catalogue Of Operations
 
@@ -1351,24 +1354,84 @@ its place among the rest, so a list can be reordered while it waits. A list that
 stays open keeps each row where it stood when the list opened or was last
 searched, so that the row under the pointer does not move when a row is ticked.
 
-### What The Editor Cannot Offer
+### What The Editor Cannot Express
+
+The step editor splits what it can do from how it draws it. Every decision about
+what the editor can do with a piece of an expression is a pure function in
+[ui/packages/steps/src/model/](../ui/packages/steps/src/model/words.ts), and the
+components in `ui/packages/steps/src/`, `Chain.tsx`, `Values.tsx`,
+`Parameters.tsx`, `StepRow.tsx` and `StepList.tsx`, call those functions and
+draw the result. A component decides nothing of its own about these:
+
+| Decision | Function |
+| --- | --- |
+| Which groups of offers a word's list holds, and which words stand at a place | `listsOf`, `wordsAt` in [model/words.ts](../ui/packages/steps/src/model/words.ts) |
+| Which group an entry is picked from, and whether it can be picked at a place | `routeOf`, `canPick` in `model/words.ts` |
+| Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `actionsOfValue` in `model/words.ts` |
+| How a value is drawn: as one word, as a chain, or as the lines of a condition | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
+| Which control a parameter gets, and how an entry sets it | `controlOf`, `settingOf` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
+| What a step's report and its rows say, beside its row and at its end | `sayingOf`, `rowEndOf`, `rowsFailure` in [model/report.ts](../ui/packages/steps/src/model/report.ts) |
+
+What stays in the components is the arrangement: placement, folding to the room
+on a line and the look of a word. The head of each step, which parameters it
+lays out and where, is one such arrangement, so the model lists those
+parameters in `HEAD_PARAMETERS` and the components are not checked against the
+list. Which words stand at which place, `wordsAt`, is the same: the components
+compose their words by their structure, and the model states which words that
+structure puts at a place of each kind.
 
 What the editor has no way to draw is written once, in
-[model/limits.ts](../ui/packages/steps/src/model/limits.ts), and a list shows
-such a call disabled with the reason. The host writes the grid of every call the
-engine allows at every place of every kind, 30 contexts each with nothing, 26
-dtypes in two shapes and 4 states of a condition, as
-`ui/packages/host/fixtures/offers-grid.json`, and a view test lists every
-combination the engine allows that the editor cannot draw against a written
-list. Today that is a further case of a condition, which the editor draws as a
-`when` after `otherwise`, in the 24 contexts where the engine allows one, and the
-parameters of a start or a condition that it does not set: `col`'s further
-names, `lit`'s dtype and its object flag, and the keyword constraints of a
-condition. Changing either side changes the list, which the test then fails on. The check
-covers entries and their parameters. It does not cover which classes of dtype
-the editor can type as an argument: the document holds a number, text or a flag
-as a literal, so a typed date, duration or Boolean literal, which the engine may
-allow, is not on the list.
+[model/limits.ts](../ui/packages/steps/src/model/limits.ts), as declared
+gaps. Each gap names what it covers, an entry the editor cannot pick or make, a
+place no word of the editor stands at, a kind of start after which it cannot add
+a method, a parameter it does not set, a kind of parameter that has no drawing,
+or a state of a step's report that says nothing, and it says why. A list shows
+an entry that is declared as disabled with the reason, where it lists the entry.
+
+Two view tests hold the list against what the engine allows. The host writes
+the grid of every call the engine allows at every place of every kind,
+`ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
+classes of dtype in 3 shapes and 4 states of a condition. The grid test,
+`model/grid.test.ts`, takes every cell of it, every start that leads to the cell
+and every entry the engine allows there. A start is a field, a connected value,
+a connected list, a typed whole number, number or text, or a function that
+starts a chain; a field and a connected list lead to the places of many values,
+a connected value and a typed value to those of one, and a function to every
+place of a value, because what a function gives is the engine's to say. For each
+it runs the model's functions and asks two things: whether the entry can be
+picked or added at that place, and whether each of its parameters and options
+gets a control. The same test asks of each position of a context whether some
+word draws it. What it finds is compared with the declared gaps, and the
+comparison fails both ways: on a gap that is found and not declared, and on a
+gap that is declared and no longer one, so a gap that is drawn is taken off the
+list with the change that draws it. A second test, `model/states.test.ts`, does
+the same for every outcome of a step, every cause of a refusal and every state of
+its rows that the host can report, built from the reports the host writes, and
+asks that each says something.
+
+Today the declared gaps are these:
+
+- A further case of a condition, which the editor draws as a `when` after
+  `otherwise`, in the 24 contexts where the engine allows one.
+- The functions the editor does not start a chain from: `date`, `date_range`,
+  `datetime`, `datetime_range`, `duration`, `from_epoch`, `int_range`,
+  `linear_space`, `repeat`, `time` and `time_range`. It starts a chain from a
+  field, a connected input, a typed value, `when` and `element`.
+- The parameters of a start or a condition that it does not set: `col`'s further
+  names, `lit`'s dtype and its object flag, and the keyword constraints of a
+  condition.
+- A connected value, a connected list and a typed whole number, number or text,
+  each drawn as one word that offers no method after it, though the engine
+  allows methods there ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
+- A step Polars accepts that was not counted because a step before it failed on
+  the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
+
+A step that is accepted and not counted in a run that read no rows says nothing
+either, and it is not a gap: nothing happened to it that a person is owed words
+for. The tests do not cover which classes of dtype the editor can type as an
+argument: the document holds a number, text or a flag as a literal, so a typed
+date, duration or Boolean literal, which the engine may allow, is not on the
+list.
 
 ## The Step Document
 

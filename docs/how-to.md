@@ -294,7 +294,8 @@ fails and names the file that differs. Fourteen files in
 `typed-date.json`, `typed-unread.json` and `typed-sample-values.json` from
 `read_typed`, `options.json` from `option_offers`, `step-starts.json` from
 `step_starts`, and `offers-grid.json`, every call at every place of every kind,
-from which the view lists what the editor cannot offer:
+which the view's grid test runs through the editor's functions to find what the
+editor cannot express:
 
 ```sh
 DAGEIST_REFRESH_OFFERS=1 cargo test --offline --locked -p dageist-tauri offers::tests::the_snapshots_are_what_the_commands_return
@@ -302,10 +303,10 @@ npm --prefix ui run format
 npm --prefix ui run test
 ```
 
-Review the diff. When `offers-grid.json` changes, the view's check of what the
-editor cannot offer, in `ui/packages/steps/src/model/limits.test.ts`, may
-fail: its written list is to be updated with the change, or the editor is to
-draw what the engine allows. Never edit the files by hand.
+Review the diff. When `offers-grid.json` changes, the view's grid test, in
+`ui/packages/steps/src/model/grid.test.ts`, may fail: the declared gaps in
+`ui/packages/steps/src/model/limits.ts` are to be updated with the change, or
+the editor is to draw what the engine allows. Never edit the files by hand.
 
 ## Open The Sample Table
 
