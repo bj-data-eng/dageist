@@ -35,6 +35,7 @@ members = [
     "crates/dageist-fuzz",
     "crates/dageist-graph",
     "crates/dageist-pack",
+    "crates/dageist-workspace",
     "crates/dageist-tauri",
 ]
 # Vendored sources keep their own workspaces; Polars' crates inherit from Polars' root manifest.

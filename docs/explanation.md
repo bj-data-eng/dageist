@@ -104,8 +104,9 @@ A node's id is a UUID of version 7, such as
 `0197a3c2-7a44-7f02-8b3d-91c5e7f2a610`, which the host mints when the node is
 asked for and the edit that adds the node carries. Making an edit is therefore
 the same every time it is made, and the graph does not mint. An id stays the
-same when the node is renamed and is never given to another node, so a
-workspace on disk will be able to name a node's folder by it. Version 7 holds
+same when the node is renamed and is never given to another node, so
+[the workspace on disk](#the-workspace-on-disk) names a node's folder by it.
+Version 7 holds
 the time an id was made: ids minted by one run of the application sort in the
 order their nodes were added, and across runs as far as the clock keeps time.
 
@@ -165,14 +166,70 @@ The host reports the worked-out graph as one view. For each node it gives:
 The step editor edits the transform the canvas chose, by its id, and its
 working rows are the first rows of the table that transform starts from.
 
+## The Workspace On Disk
+
+A graph is saved to a workspace: a folder of text files in a git repository,
+which **`dageist-workspace`** keeps. Saving and committing are one act. Every
+edit is saved as a commit on the branch, so nothing is saved that is not
+committed, and the files on disk are a copy of the latest commit.
+
+```text
+my-workspace/
+  .git/
+  .gitignore          .dageist/
+  .dageist/           the application's own state, never committed
+  workspace.json      the version of the format
+  layout.json         the box of every node that has been placed
+  nodes/
+    0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31/
+      node.json       a source: its name and its file
+    0197a3c2-7a44-7f02-8b3d-91c5e7f2a610/
+      node.json       a transform: its name, its start and its inputs
+      steps.json      its step document
+```
+
+Each node has a folder named by its id, which never changes, so renaming a node
+edits its `node.json` and no path moves. A node's references name the nodes they
+read by id. The layout is a file of its own, so moving a box is not a change to
+what the pipeline does. The path of a data file inside the workspace is written
+relative to it, with `/` between folders, so a workspace can be moved or cloned
+whole; a path outside it is written whole, and a relative path is refused
+when saved. The files are JSON, laid out two
+spaces deep. They are read strictly: a field the format lacks, a value left out,
+a key written twice, or a file the format has no place for is refused, with the
+path of the file it was found in.
+
+Opening a workspace reads the branch's latest commit, not the files on disk.
+It writes again any file of the commit that differs on disk, removes any
+folder in `nodes/` that holds nothing of the commit and a node's file or steps
+the commit lacks, and writes git's index again, leaving other files as they
+are. A save whose commit was made but whose files were not all written is
+finished by the next save. The graph is read back
+by making the edits that would build it: every node is added, then each is set,
+and then each reference is connected. A graph read from a workspace therefore
+passes every check an edit on the canvas passes.
+
+A node's history is the commits that changed its folder, read from the branch's
+one line of commits; moving its box is in the history of the layout, not of the
+node. Undo inside a node will be a new commit that puts back what the last of
+those commits changed.
+
+git keeps each new object as a file of its own until it is packed, about five
+for each edit: the changed file, the folders above it and the commit. Every 100
+commits the workspace packs the objects written since the last pack, each file's
+version as a delta against the version before it. Closing the workspace packs
+everything a ref reaches into one pack, the branch's commits first so that each
+file's versions chain in the order they were made, and then what a branch, tag
+or stash made with git itself reaches and, as far as the repository can read
+them, what git's index holds and what `ORIG_HEAD` and the other `*_HEAD` pseudo
+refs or a reflog name. Any other object is removed.
+
 ## Versions Stored As Deltas
 
-A workspace will keep its files in a git repository and commit every edit, so
-that saving and committing are the same act and each node's history is the
-commits that touched its file. A history of many small edits is small only when
-each version is stored as a delta against the one before it.
+A workspace commits every edit, so its history is many small edits, which is
+small only when each version is stored as a delta against the one before it.
 
-gix, the Rust implementation of git the workspace will use, writes packs but
+gix, the Rust implementation of git the workspace uses, writes packs but
 makes no deltas: an object that is not already in a pack is stored whole.
 **`dageist-pack`** makes them. Its caller lists the objects of a pack and names,
 for each, an earlier object of the same kind as its base, usually the previous
