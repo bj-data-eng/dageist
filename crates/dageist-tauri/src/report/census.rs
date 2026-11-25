@@ -129,6 +129,7 @@ fn causes() -> Vec<CauseView> {
 fn counts() -> Vec<CountView> {
     every_variant!(CountView;
         NotCounted => [CountView::NotCounted],
+        NotReached => [CountView::NotReached { failed: String::new() }],
         Counted => [CountView::Counted { received: 0, kept: 0, first: Vec::new() }],
         Failed => [CountView::Failed { reason: String::new() }],
     )
@@ -162,7 +163,7 @@ enum Before {
     Refused,
     /// It holds something still to be picked, so what follows is not run.
     Incomplete,
-    /// Polars accepted it and could not run it on the rows, so what follows is not counted.
+    /// Polars accepted it and could not run it on the rows, so what follows is not run on them.
     Failed,
     /// It was not run, because a step before it was refused or incomplete.
     NotRun,
@@ -210,12 +211,15 @@ const fn follows(outcome: &OutcomeView, before: Before) -> bool {
 
 /// Whether a step with `outcome` after `before` can be reported as `count`: only a step Polars
 /// accepts, after steps that ran or were not read, is run on the rows, and counts them or fails on
-/// them; every other step is not counted.
+/// them; one Polars accepts after a step that failed there is not reached; every other step is not
+/// counted.
 const fn counts_as(outcome: &OutcomeView, before: Before, count: &CountView) -> bool {
+    let accepted = matches!(outcome, OutcomeView::Valid { .. });
     match count {
-        CountView::NotCounted => true,
+        CountView::NotCounted => !(accepted && matches!(before, Before::Failed)),
+        CountView::NotReached { .. } => accepted && matches!(before, Before::Failed),
         CountView::Counted { .. } | CountView::Failed { .. } => {
-            matches!(outcome, OutcomeView::Valid { .. }) && matches!(before, Before::Nothing)
+            accepted && matches!(before, Before::Nothing)
         }
     }
 }

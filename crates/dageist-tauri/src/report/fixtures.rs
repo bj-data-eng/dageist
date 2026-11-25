@@ -191,6 +191,19 @@ pub(crate) fn variants() -> RunView {
     failed.count = CountView::Failed {
         reason: "no rows".to_owned(),
     };
+    let mut not_reached = refused(
+        "not_reached",
+        CauseView::Polars {
+            reason: "the reason".to_owned(),
+        },
+    );
+    not_reached.outcome = OutcomeView::Valid {
+        columns: Vec::new(),
+        changes: Vec::new(),
+    };
+    not_reached.count = CountView::NotReached {
+        failed: "failed".to_owned(),
+    };
     let mut rows_stage = refused(
         "rows_stage",
         CauseView::NotAllowed {
@@ -239,6 +252,7 @@ pub(crate) fn variants() -> RunView {
                 },
             ),
             failed,
+            not_reached,
         ],
     }
 }

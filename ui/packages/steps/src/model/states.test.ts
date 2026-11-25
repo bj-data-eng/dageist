@@ -15,8 +15,6 @@ import incompleteFixture from '../../../host/fixtures/step-report-incomplete.jso
 import refusedFixture from '../../../host/fixtures/step-report-refused.json';
 import reportFixture from '../../../host/fixtures/step-report.json';
 import variantsFixture from '../../../host/fixtures/step-report-variants.json';
-import { GAPS, coverKey } from './limits';
-import type { ReportState } from './limits';
 import { prepareRun, rowsFailure, sayingOf } from './report';
 
 // Every outcome and every state of the rows that the host can report of a step, built from the
@@ -52,8 +50,6 @@ interface State {
   readonly count: CountView['kind'];
   /** What the editor says of the step beside its row. */
   readonly says: 'rows' | 'problem' | 'nothing';
-  /** The state a gap is declared for where the editor says nothing though it owes words. */
-  readonly gap: ReportState | null;
 }
 
 /** The step `id` of `run` as the first of the steps of a state. */
@@ -75,7 +71,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'counted',
     says: 'rows',
-    gap: null,
   },
   {
     name: 'accepted, counted, and collected the rows to be built',
@@ -84,7 +79,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'counted',
     says: 'rows',
-    gap: null,
   },
   {
     name: 'refused by the tables, with the words they recorded of Polars',
@@ -93,7 +87,6 @@ const STATES: readonly State[] = [
     cause: 'notAllowed',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused by Polars where the tables allowed the step',
@@ -102,7 +95,6 @@ const STATES: readonly State[] = [
     cause: 'polars',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused for a table that is not connected',
@@ -111,7 +103,6 @@ const STATES: readonly State[] = [
     cause: 'unknownTable',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused for an input that is not a connected value or list',
@@ -120,7 +111,6 @@ const STATES: readonly State[] = [
     cause: 'unknownInput',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused because the catalogue could not build the call',
@@ -129,7 +119,6 @@ const STATES: readonly State[] = [
     cause: 'build',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused by a rule the engine holds',
@@ -138,7 +127,6 @@ const STATES: readonly State[] = [
     cause: 'notAllowed',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'refused by a rule where the rows would have been read',
@@ -147,7 +135,6 @@ const STATES: readonly State[] = [
     cause: 'notAllowed',
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'with something still to be picked',
@@ -156,7 +143,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'not run after a step that was refused',
@@ -165,7 +151,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'not run after a step with something still to be picked',
@@ -174,7 +159,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'accepted and failed on the rows',
@@ -183,7 +167,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'failed',
     says: 'problem',
-    gap: null,
   },
   {
     name: 'accepted and not run on the rows after a step that failed there',
@@ -192,7 +175,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notReached',
     says: 'problem',
-    gap: null,
   },
 ];
 
@@ -209,24 +191,9 @@ function sayingAt(state: State): ReturnType<typeof sayingOf> {
   return sayingOf(last);
 }
 
-/**
- * Returns the states of `states` that say nothing without a declared gap, and the declared gaps of
- * states that say something.
- */
-function compare(
-  declared: readonly string[],
-  states: readonly State[] = STATES,
-): {
-  readonly undeclared: string[];
-  readonly stale: string[];
-} {
-  const silent = states
-    .filter((state) => sayingAt(state).says === 'nothing')
-    .flatMap((state) => (state.gap === null ? ['a state with no gap named'] : [state.gap]));
-  return {
-    undeclared: silent.filter((state) => !declared.some((gap) => gap === state)),
-    stale: declared.filter((gap) => !silent.includes(gap)),
-  };
+/** Returns the names of the states of `states` that say nothing, though the step is one to say something of. */
+function silent(states: readonly State[] = STATES): string[] {
+  return states.filter((state) => sayingAt(state).says === 'nothing').map((state) => state.name);
 }
 
 describe('the states a step can be reported in', () => {
@@ -295,15 +262,11 @@ describe('what the editor says of a step in each state', () => {
     }
   });
 
-  it('is nothing only for the states that are declared gaps, and none is', () => {
-    const declared = GAPS.flatMap((gap) => (gap.cover.kind === 'report' ? [gap.cover.state] : []));
-
-    expect(declared).toEqual([]);
-    expect(compare(declared)).toEqual({ undeclared: [], stale: [] });
+  it('is never nothing for a state the host reports, so none is declared as a gap', () => {
+    expect(silent()).toEqual([]);
   });
 
-  it('fails the check where a state says nothing and no gap is declared for it, or a gap is declared for a state that says something', () => {
-    // A step accepted whose rows were not read says nothing of its rows, and nothing is the matter.
+  it('is found where a state says nothing, such as a step accepted whose rows were not read', () => {
     const quiet: State = {
       name: 'accepted and not counted, with no rows read',
       steps: [uncounted(reportOf(refused, 'sort'), 'quiet')],
@@ -311,18 +274,9 @@ describe('what the editor says of a step in each state', () => {
       cause: null,
       count: 'notCounted',
       says: 'nothing',
-      gap: null,
     };
 
-    expect(compare([], [...STATES, quiet])).toEqual({
-      undeclared: ['a state with no gap named'],
-      stale: [],
-    });
-    // The refused states say something, so a gap declared for one of them could not be found.
-    expect(compare(['refusedWithoutWords'])).toEqual({
-      undeclared: [],
-      stale: ['refusedWithoutWords'],
-    });
+    expect(silent([...STATES, quiet])).toEqual([quiet.name]);
   });
 
   it('is said of a step after one that failed on the rows as what the step before it said: a matter, and which step failed', () => {

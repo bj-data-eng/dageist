@@ -578,7 +578,7 @@ describe('the columns a step changed and how its rows were counted', () => {
       refusal(
         replaced(runOf({ kind: 'notReached', failed: 'date' }), ['steps', 0, 'count', 'failed'], 3),
       ).message,
-    ).toBe('$.steps[0].count.failed: must be text, not a number');
+    ).toBe('$.steps[0].count.failed: must be a string, not a number');
     expect(refusal(without(runOf(COUNTED), ['steps', 0], 'count')).message).toBe(
       '$.steps[0]: is missing the field "count"',
     );

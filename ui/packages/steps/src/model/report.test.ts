@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CallView, DocumentStepView } from '@dageist/host';
+import type { CallView, DocumentStepView, StepReportView } from '@dageist/host';
 import { decodeDocumentState, decodeRun, HostError } from '@dageist/host';
 
 import documentFixture from '../../../host/fixtures/node-document.json';
@@ -131,15 +131,16 @@ describe('the rows each step kept and the first values it added', () => {
 
 describe('a step the engine did not run on the rows because an earlier step failed there', () => {
   const variants = decodeRun(variantsFixture);
-  const failed = variants.steps.find((step) => step.id === 'failed');
-  if (failed === undefined) throw new Error('no failed step');
+  const found = variants.steps.find((step) => step.id === 'failed');
+  if (found === undefined) throw new Error('no failed step');
+  const failed: StepReportView = found;
   /** The step `failed` followed by a step Polars accepts, which the host says was not reached. */
   function after(named_: string): PreparedRun {
-    const reached = {
+    const reached: StepReportView = {
       ...failed,
       id: 'later',
       count: { kind: 'notReached', failed: named_ },
-    } as const;
+    };
     return prepareRun(named('failed', 'later'), { ...variants, steps: [failed, reached] });
   }
 

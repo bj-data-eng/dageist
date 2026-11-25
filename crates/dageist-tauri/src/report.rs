@@ -112,8 +112,11 @@ fn column_values_view(column: &ColumnValues) -> ColumnValuesView {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum CountView {
     /// The step was not run on rows: the run read none, or a step before it
-    /// was refused, incomplete or failed on the rows.
+    /// was refused or incomplete, or the step was.
     NotCounted,
+    /// Polars accepts the step, and it was not run on the rows because the step
+    /// called `failed` before it could not be.
+    NotReached { failed: String },
     /// The step was given `received` rows and kept `kept`.
     Counted {
         received: usize,
@@ -128,7 +131,10 @@ pub(crate) enum CountView {
 
 fn count_view(rows: &StepRows) -> CountView {
     match rows {
-        StepRows::NotCounted | StepRows::NotReached { .. } => CountView::NotCounted,
+        StepRows::NotCounted => CountView::NotCounted,
+        StepRows::NotReached { failed } => CountView::NotReached {
+            failed: failed.as_str().to_owned(),
+        },
         StepRows::Counted(count) => CountView::Counted {
             received: count.received(),
             kept: count.kept(),

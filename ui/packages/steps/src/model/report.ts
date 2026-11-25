@@ -83,7 +83,10 @@ export interface PreparedStep {
   readonly first: ReadonlyMap<string, string>;
   /** Whether the step stays in a lazy plan. */
   readonly lazy: boolean;
-  /** Why the engine could not run the step on the sample rows, in words, though it accepts the step, or `null`. */
+  /**
+   * Why the engine could not run the step on the sample rows, in words, though it accepts the step:
+   * it failed there, or a step before it did. `null` where there is none.
+   */
   readonly rowsProblem: string | null;
   /** What is the matter with the step, in words, or `null`. */
   readonly problem: string | null;
@@ -184,11 +187,30 @@ function causeWords(cause: CauseView): string {
   }
 }
 
-/** Returns how many rows a step kept, and the first values of what it changed, from how the engine counted it. */
-function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first' | 'rowsProblem'> {
+/** Returns how a step is called in words: its number in the list `steps`, or `a step before it` where the list lacks it. */
+function stepWords(steps: readonly DocumentStepView[], id: string): string {
+  const at = steps.findIndex((step) => step.id === id);
+  return at < 0 ? 'a step before it' : `step ${String(at + 1)}`;
+}
+
+/**
+ * Returns how many rows a step kept, and the first values of what it changed, from how the engine
+ * counted it. `before` are the steps ahead of it, which name the step that failed where the step
+ * was not reached.
+ */
+function countOf(
+  count: CountView,
+  before: readonly DocumentStepView[],
+): Pick<PreparedStep, 'rows' | 'first' | 'rowsProblem'> {
   switch (count.kind) {
     case 'notCounted':
       return { rows: null, first: new Map(), rowsProblem: null };
+    case 'notReached':
+      return {
+        rows: null,
+        first: new Map(),
+        rowsProblem: `Not run on the sample rows: ${stepWords(before, count.failed)} failed on them.`,
+      };
     case 'counted':
       return {
         rows: { received: count.received, kept: count.kept },
@@ -212,8 +234,7 @@ function waitingWords(
   blockedBy: string,
   incomplete: boolean,
 ): string {
-  const at = steps.findIndex((step) => step.id === blockedBy);
-  const which = at < 0 ? 'a step before it' : `step ${String(at + 1)}`;
+  const which = stepWords(steps, blockedBy);
   return incomplete
     ? `Not run: ${which} still has something to be picked.`
     : `Not run: ${which} was refused.`;
@@ -240,7 +261,7 @@ export function prepareRun(steps: readonly DocumentStepView[], run: RunView): Pr
       lazy: report.lazy,
       chains: chainsOf(report),
       atDefault: new Set(report.atDefault.map((place) => pathKey(wayOf(place)))),
-      ...countOf(report.count),
+      ...countOf(report.count, steps.slice(0, index)),
     };
     const { outcome } = report;
     let result: PreparedStep;
