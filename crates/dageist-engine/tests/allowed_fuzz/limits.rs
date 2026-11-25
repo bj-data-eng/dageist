@@ -471,8 +471,10 @@ pub enum Limit {
     /// Polars meets two structs, as a fill of nulls by another column does, by casting one to the
     /// dtype of the other, and refuses it where their fields are not the same. The tables measured
     /// a struct met by the struct measured, which has the same fields as itself. Polars refusing
-    /// the plan with the refusal that it cannot cast a struct to another, naming both, which only
-    /// structs of other fields meet.
+    /// the plan with the refusal that it cannot cast a struct to another, naming both, or the rows
+    /// with the refusal that structs do not have the same number of fields, that two structs cannot
+    /// be compared or that a struct cannot be cast to other types, which only structs of other
+    /// fields meet.
     AStructMetByAStructOfOtherFields,
     /// A count of values that the data or the arguments decide is one value, or the rows, by what
     /// the values are made of, as a test of a struct is, which is never null, a comparison with a
@@ -4457,6 +4459,7 @@ fn applies(
             unplaced(refusal)
                 && [
                     "operation not supported for dtypes",
+                    "arithmetic on dtypes",
                     "multiple fields with name",
                     "failed to determine supertype",
                 ]
@@ -4482,6 +4485,14 @@ fn applies(
                     && refusal
                         .reason
                         .contains("structs do not have the same number of fields"))
+                // A comparison of two structs, which Polars meets as a cast does, and a cast of one to
+                // another dtype, as a replacement makes of what it replaces.
+                || (unplaced(refusal)
+                    && refusal
+                        .reason
+                        .starts_with("could not evaluate comparison between series")
+                    && refusal.reason.matches("Struct(").count() >= 2)
+                || (unplaced(refusal) && refusal.reason == "Cannot cast from struct to other types")
         }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
@@ -11748,6 +11759,37 @@ mod tests {
                 None,
                 Stage::Rows,
                 "cast from `i64` to `struct[1]` failed",
+                Vec::new()
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn two_structs_of_other_fields_compared_or_a_struct_cast_to_another_dtype_are_the_same_cause() {
+        let case = select(vec![chain(column("a"), &["Expr.eq"])]);
+        let compared = "could not evaluate comparison between series 'b' of dtype: Struct({'literal': Duration('μs')}) and series 'a' of dtype: Struct({'literal': Int8})";
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, compared, Vec::new()),
+            vec![Limit::AStructMetByAStructOfOtherFields]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "Cannot cast from struct to other types",
+                Vec::new()
+            ),
+            vec![Limit::AStructMetByAStructOfOtherFields]
+        );
+        // A comparison of two series that are no structs is no cause.
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "could not evaluate comparison between series 'b' of dtype: Date and series 'a' of dtype: Int8",
                 Vec::new()
             ),
             vec![]
