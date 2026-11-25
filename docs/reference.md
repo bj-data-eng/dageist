@@ -24,7 +24,7 @@ of the Polars release in `vendor/polars`: Polars' forks of `hashbrown` and
 
 | Path | Source | Pinned to |
 | --- | --- | --- |
-| `vendor/polars` | [pola-rs/polars](https://github.com/pola-rs/polars), as a shallow Git submodule declared in [.gitmodules](../.gitmodules) | Python Polars `py-2.1.0`, commit `7f902bd3ffd27ff82d14278a09a295ff2f7aed92`. |
+| `vendor/polars` | [pola-rs/polars](https://github.com/pola-rs/polars), as a shallow Git submodule declared in [.gitmodules](../.gitmodules) | Python Polars `py-2.2.0`, commit `08b2814ce6386c0efe0fea512912353f42a8b7b6`. |
 
 The engine builds Polars from the submodule, with the features, crate
 patches, dependency versions and toolchain of that release's

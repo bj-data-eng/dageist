@@ -914,8 +914,8 @@ with the reason for each:
 - the Python binding's own features and crates, which connect Polars to
   Python;
 - `objc2-exception-helper`, which a feature Tauri turns on in `objc2` adds;
-- features Tauri turns on in packages Polars also uses, such as `serde_json`'s
-  `raw_value`;
+- features Tauri turns on in packages Polars also uses, such as `url`'s
+  `serde`;
 - `std` in `ndarray` and the numeric crates it builds on, and the default
   features of `ndarray`, `num-complex` and `num-integer`, which `numpy`, used by
   the Python binding, turns on in the release.
@@ -997,7 +997,7 @@ on the Polars repository:
 
 ```sh
 git submodule status vendor/polars
-git -C vendor/polars ls-remote --tags origin py-2.1.0
+git -C vendor/polars ls-remote --tags origin py-2.2.0
 ```
 
 The two commits are the same. A fresh clone fetches no Polars tags, so there

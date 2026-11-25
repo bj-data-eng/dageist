@@ -45,5 +45,5 @@ unsafe_code = "forbid"
 [patch.crates-io]
 # Polars calls the prefetch API this fork adds (https://github.com/rust-lang/hashbrown/pull/727).
 hashbrown = { git = "https://github.com/pola-rs/hashbrown", rev = "d76a6f81abd8f388676aff15068236a8d21c7e1a" }
-# The build script change in https://github.com/tikv/jemallocator/pull/168.
-tikv-jemalloc-sys = { git = "https://github.com/pola-rs/jemallocator", rev = "0d683dfb157097e2075d5e0eaf25f71f514a7552" }
+# Polars' purge-before-grow hook with moving reallocation accounting.
+tikv-jemalloc-sys = { git = "https://github.com/pola-rs/jemallocator", rev = "e947a0d1a786e221ac1c14ba1566b55151e61ec9" }
