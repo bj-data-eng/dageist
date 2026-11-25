@@ -504,6 +504,22 @@ fn a_list_made_by_every_variant_holds_the_samples_of_each_arm_in_order() {
 }
 
 #[test]
+#[should_panic(expected = "the arm for Held yields no sample")]
+fn an_arm_of_every_variant_that_yields_no_sample_panics_naming_its_variant() {
+    enum Sample {
+        Plain,
+        Held,
+    }
+    let (_plain, _held) = (Sample::Plain, Sample::Held);
+    let all: Vec<u8> = every_variant!(Sample;
+        Plain => [1],
+        Held => Vec::<u8>::new(),
+    );
+
+    assert!(all.len() > 5, "not reached");
+}
+
+#[test]
 fn no_list_of_words_names_a_variant_twice() {
     let held = census();
     let mut checked = 0;

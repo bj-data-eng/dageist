@@ -12,9 +12,10 @@
 //! - A type that has a list of every variant of its own, such as `Rule::ALL`, is read through it.
 //! - Any other is listed by `every_variant!`, which takes one arm for each variant, by name, and
 //!   expands both a `match` with no wildcard arm and the list the arms give. A variant added to the
-//!   type does not compile until it has an arm, so it is in the list, and no arm can stand for two
-//!   variants, because it names one. An arm gives the samples of its variant, which a test of the
-//!   words checks are distinct.
+//!   type does not compile until it has an arm, and no arm can stand for two variants, because it
+//!   names one. An arm gives the samples of its variant, and one that gives none panics when the
+//!   list is made, so each variant has a sample in the list. A test of the words checks that they
+//!   are distinct.
 //!
 //! A word in a list is, where the view type is serialized, the word the host serializes for the
 //! variant, read from the serialized sample. The words of a few engine types are written here by
@@ -46,14 +47,23 @@ use crate::offers::{TypedRequest, ValueTypeRequest, read_view};
 /// Each arm is `Variant => samples`, where `samples` is anything that iterates the values that
 /// stand for the variant. The macro expands a `match` over the type with one arm for each name and
 /// no wildcard, so a variant the invocation lacks does not compile, and an arm names one variant,
-/// so none is left standing for another. It returns the samples of every arm, in order.
+/// so none is left standing for another. An arm that yields no sample panics, naming its variant,
+/// so a variant cannot be named and left out. It returns the samples of every arm, in order.
 macro_rules! every_variant {
     ($ty:ident; $($variant:ident => $samples:expr),+ $(,)?) => {{
         let _every_variant_is_named = |placed: &$ty| match placed {
             $( $ty::$variant { .. } => () ),+
         };
         let mut all = Vec::new();
-        $( all.extend($samples); )+
+        $({
+            let samples: Vec<_> = IntoIterator::into_iter($samples).collect();
+            assert!(
+                !samples.is_empty(),
+                "the arm for {} yields no sample",
+                stringify!($variant)
+            );
+            all.extend(samples);
+        })+
         all
     }};
 }
