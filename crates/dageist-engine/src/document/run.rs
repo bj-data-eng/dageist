@@ -214,7 +214,8 @@ impl StepReport {
 
     /// The dtypes of every expression in the step's arguments, including the
     /// expressions inside other expressions' arguments, as far as they could
-    /// be built. Empty for a step that was not run.
+    /// be built. Empty for a step that was not run, and for one the walk
+    /// refuses, which is not planned: the walk says what each expression is.
     #[must_use]
     pub fn expressions(&self) -> &[ExpressionDtypes] {
         &self.expressions
@@ -793,7 +794,9 @@ impl Builder<'_> {
             self.path.pop();
         }
         // A separator typed in is a pattern where the call takes it so, and is refused at its
-        // place as one: Polars would refuse it only when the rows run.
+        // place as one: Polars would refuse it only when the rows run. In a traced run the walk
+        // refuses a pattern that is none first, and a step it refuses is not built; this asks
+        // Polars of what the walk let through, and of a run that is not traced.
         for (parameter, text) in call.patterns() {
             let typed_expression = call.entry().parameters().iter().any(|known| {
                 known.name() == parameter && matches!(known.kind(), Kind::Expression(_))
@@ -893,7 +896,9 @@ impl Builder<'_> {
             // at its place when Polars reads it as none for the moment it is given to, whose dtype,
             // unit and zone included, is the one the value before the call has where it is
             // worked out, and the finest `Datetime` otherwise: Polars would refuse it only when
-            // the rows run, or panic.
+            // the rows run, or panic. In a traced run the walk refuses a duration that is none
+            // first, and a step it refuses is not built; this asks Polars of what the walk let
+            // through, and of a run that is not traced.
             let durations = link.durations();
             if !durations.is_empty() {
                 let moment = match self.resolve(&state, from_element) {
