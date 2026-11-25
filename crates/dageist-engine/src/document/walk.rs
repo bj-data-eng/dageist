@@ -3805,8 +3805,9 @@ fn is_a_number_with_a_fraction(expression: &Expression) -> bool {
 }
 
 /// Whether a call is `lit` of a number that has a fraction and is no whole number's: it is given no
-/// dtype or one of floats, for Polars makes the number the whole number it is cut to where it is
-/// given the dtype of whole numbers.
+/// dtype or a 32 or 64 bit float, the two Polars rewrites the number of, for it makes the number the
+/// whole number it is cut to where it is given the dtype of whole numbers and does not rewrite one
+/// of 16 bits.
 fn is_a_fraction(call: &Call) -> bool {
     call.entry().id().as_str() == "polars.lit"
         && matches!(call.argument("value"), Some(Value::Float(number)) if number.is_finite() && number.fract() != 0.0)
@@ -3814,9 +3815,7 @@ fn is_a_fraction(call: &Call) -> bool {
             None => true,
             Some(Value::Dtype(dtype)) => matches!(
                 dtype.as_polars(),
-                polars::prelude::DataType::Float16
-                    | polars::prelude::DataType::Float32
-                    | polars::prelude::DataType::Float64
+                polars::prelude::DataType::Float32 | polars::prelude::DataType::Float64
             ),
             Some(_) => false,
         }
