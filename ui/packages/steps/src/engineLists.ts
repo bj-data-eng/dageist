@@ -14,7 +14,9 @@ import type { Catalogue } from './model/catalogue';
 import { methodNameOf } from './model/catalogue';
 import type { Frame } from './model/frame';
 import type { PreparedFamily, PreparedOffer, PreparedReading } from './model/offers';
-import { candidateKey, prepareOffers, refusalWords } from './model/offers';
+import { candidateKey, methodFamilies, refusalWords, startOffers } from './model/offers';
+import type { Group, GroupOfWord, ListedWord } from './model/words';
+import { listsOf } from './model/words';
 
 /** What a list says while the engine has not answered. */
 const WAITING = 'waiting for the engine';
@@ -238,14 +240,11 @@ export function methodGroups(
   const unanswered = unlessAnswered(asked, known);
   if (unanswered !== null) return [unanswered];
   if (asked.state !== 'ready') return [];
-  return offerGroups(prepareOffers(catalogue, asked.answer, ['expression']), typed, (offered) => {
+  return offerGroups(methodFamilies(catalogue, asked.answer), typed, (offered) => {
     const name = methodNameOf(offered.id);
     if (name !== null) onPick(name, offered);
   });
 }
-
-/** The functions the editor starts a chain from besides a field, an input and a value typed in. */
-const START_FUNCTIONS: ReadonlySet<string> = new Set(['polars.when', 'polars.element']);
 
 /**
  * Returns the group of functions the engine offers to start a chain at the
@@ -262,11 +261,8 @@ export function startFunctions(
   const unanswered = unlessAnswered(asked, known);
   if (unanswered !== null) return [unanswered];
   if (asked.state !== 'ready') return [];
-  const rows = prepareOffers(catalogue, asked.answer, ['function', 'condition'])
-    .flatMap((family) => family.offers)
-    .filter(
-      (offered) => START_FUNCTIONS.has(offered.id) && matches(typed, offered.name, offered.hint),
-    )
+  const rows = startOffers(catalogue, asked.answer)
+    .filter((offered) => matches(typed, offered.name, offered.hint))
     .map((offered) =>
       offer(
         offered.name,
@@ -289,4 +285,24 @@ export function refusalOf(asked: Asked<OffersView>, id: string): string | null {
   if (asked.state !== 'ready') return null;
   const found = asked.answer.entries.find((entry) => entry.entry === id);
   return found?.verdict.kind === 'refused' ? refusalWords(found.verdict.refusal) : null;
+}
+
+/** Makes the rows of one group of a list. */
+export type Maker = () => OfferGroup[];
+
+/** The functions a drawing gives for the list of a word of `Kind`: one for every group a word of that kind may list. */
+export type Makers<Kind extends ListedWord['word']> = Readonly<Record<GroupOfWord<Kind>, Maker>>;
+
+/**
+ * Returns the groups the list of `word` holds, in the order the model says, each made by the
+ * function of `makers` for its group. `makers` must hold one for every group a word of that kind
+ * may list, so a group the drawing does not make is a compile error and not a failure while it
+ * draws; a group the word does not list, as a method with no options lists no options, is not made.
+ */
+export function listedGroups<Kind extends ListedWord['word']>(
+  word: Extract<ListedWord, { readonly word: Kind }>,
+  makers: Makers<Kind>,
+): OfferGroup[] {
+  const made: Readonly<Partial<Record<Group, Maker>>> = makers;
+  return listsOf(word).flatMap((group) => made[group]?.() ?? []);
 }

@@ -182,9 +182,15 @@ export type Shape =
   /** Anything else, which is drawn as a chain. */
   | { readonly kind: 'chain' };
 
+/** The identifier of the function that reads a field. */
+export const FIELD_ID = 'polars.col';
+
+/** The identifier of the function that holds a number or text typed in. */
+export const LITERAL_ID = 'polars.lit';
+
 /** Returns the one name a call of `polars.col` reads, or `null` when it is not one. */
 export function fieldNameOf(call: CallView): string | null {
-  if (call.entry !== 'polars.col') return null;
+  if (call.entry !== FIELD_ID) return null;
   const [only, ...rest] = call.arguments;
   if (rest.length > 0 || only?.parameter !== 'name' || only.value.kind !== 'columns') return null;
   const [name, ...more] = only.value.names;
@@ -203,7 +209,7 @@ export function shapeOf(expression: ExpressionView): Shape {
     case 'call': {
       const name = fieldNameOf(start.call);
       if (name !== null) return { kind: 'column', name };
-      if (start.call.entry === 'polars.lit' && start.call.arguments.length === 1) {
+      if (start.call.entry === LITERAL_ID && start.call.arguments.length === 1) {
         const value = start.call.arguments[0]?.value;
         if (value?.kind === 'integer' || value?.kind === 'float') {
           return { kind: 'literal', shown: value.shown, text: false };
@@ -223,8 +229,8 @@ export function startCall(start: StartView): CallView | null {
 }
 
 /** The links of a condition that the editor draws as `then` and `otherwise`. */
-const THEN = 'When.then';
-const OTHERWISE = 'Then.otherwise';
+export const THEN = 'When.then';
+export const OTHERWISE = 'Then.otherwise';
 
 /** An expression that starts from `when`, with its one case drawn as `then` and `otherwise`. */
 export interface WhenLayout {

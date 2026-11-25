@@ -4,6 +4,7 @@ import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import {
+  HEAD,
   VERBS,
   comparisonOption,
   comparisonOptions,
@@ -66,5 +67,30 @@ describe('the verbs of the steps the editor offers', () => {
     expect(names('LazyFrame.sort')).not.toContain('more_by');
     // A step the editor draws by its parameters alone offers all it has that the engine offers.
     expect(names('LazyFrame.head')).toContain('n');
+  });
+});
+
+describe('the parameters a step draws in its head', () => {
+  it('are parameters of the step’s own entry', () => {
+    for (const verb of VERBS) {
+      const entry = catalogue.entries.get(`LazyFrame.${verb}`);
+      expect(entry, verb).toBeDefined();
+      const parameters = entry?.parameters.map((parameter) => parameter.name) ?? [];
+      for (const name of Object.values<string>(HEAD[verb])) {
+        expect(parameters, `${verb} ${name}`).toContain(name);
+      }
+    }
+  });
+
+  it('are never offered as options, and the parameters a step does not offer are not either', () => {
+    for (const verb of VERBS) {
+      for (const name of Object.values<string>(HEAD[verb])) {
+        expect(names(`LazyFrame.${verb}`), `${verb} ${name}`).not.toContain(name);
+      }
+    }
+    // A sort's second list of keys and a join's shared key are not offered, though no head draws them.
+    expect(names('LazyFrame.sort')).not.toContain('more_by');
+    expect(names('LazyFrame.join')).not.toContain('on');
+    expect(names('LazyFrame.join')).toContain('how');
   });
 });

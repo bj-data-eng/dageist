@@ -32,7 +32,14 @@ import type { FitSlot } from './ask';
 import { useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
-import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from './engineLists';
+import {
+  fieldGroup,
+  inputGroup,
+  listedGroups,
+  methodGroups,
+  startFunctions,
+  valueGroup,
+} from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
 import { OptionRows, freshKey, optionOffers, useOptionToggle } from './Parameters';
 import { useListState, usePositions } from './positions';
@@ -47,23 +54,21 @@ import {
   elementEntry,
   methodId,
   methodNameOf,
-  methodOptionParameters,
   positionOfParameter,
 } from './model/catalogue';
+import { methodOptionParameters } from './model/controls';
 import type { ExpressionView } from './model/doc';
 import {
   START_SEGMENT,
   expressionOf,
   fieldNameOf,
   givenOf,
-  isElement,
   itemSegment,
   linkSegment,
   parameterSegment,
   pathKey,
   shapeOf,
   under,
-  whenOf,
 } from './model/doc';
 import type { Path } from './model/doc';
 import type { Frame } from './model/frame';
@@ -74,6 +79,7 @@ import { chosenOptions } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import type { ChainDtypes } from './model/report';
 import { fieldArgument, inputArgument, listArgument, literalExpression } from './model/requests';
+import { OFFERED_INPUTS, actionsOf, chainBodyOf } from './model/words';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -233,7 +239,7 @@ function ArgumentSlot({
       typed,
       fits,
       readings,
-      inputs: ['value', 'list'] as const,
+      inputs: OFFERED_INPUTS,
       onLiteral: (picked: LiteralView) => {
         set(literalExpression(picked));
       },
@@ -244,7 +250,14 @@ function ArgumentSlot({
         set(fieldArgument(name));
       },
     };
-    return [valueGroup(rows), inputGroup(rows), fieldGroup(rows)];
+    return listedGroups(
+      { word: 'argument' },
+      {
+        values: () => [valueGroup(rows)],
+        inputs: () => [inputGroup(rows)],
+        fields: () => [fieldGroup(rows)],
+      },
+    );
   };
   return (
     <Hint lines={fieldHint(column)} code={false}>
@@ -331,18 +344,23 @@ function MethodLink({
   };
   const parameters = methodOptionParameters(entry);
   const given = new Set(call.arguments.map((held) => held.parameter));
+  const actions = actionsOf('method');
   return (
     <span ref={ref} className="dg-link">
       <Seam />
       <Piece
         dragged={isDragSource}
-        remove={{
-          label: `Remove ${shown}`,
-          onPress: () => {
-            void edits.removeLink(path);
-          },
-        }}
-        add={{ label: `Add a method after ${shown}`, onPress: onAddAfter }}
+        remove={
+          actions.remove
+            ? {
+                label: `Remove ${shown}`,
+                onPress: () => {
+                  void edits.removeLink(path);
+                },
+              }
+            : null
+        }
+        add={actions.add ? { label: `Add a method after ${shown}`, onPress: onAddAfter } : null}
       >
         <Hint
           lines={[
@@ -359,15 +377,19 @@ function MethodLink({
             names
             describedAs={`Method ${shown}: swap it, or drag it to another place`}
             placeholder="Search the methods"
-            offers={(typed) => [
+            offers={(typed) =>
               // The parameters the method can be given, then the methods it can be swapped for.
-              ...(parameters.length === 0
-                ? []
-                : [optionOffers(parameters, given, typed, toggle, optionsAsked)]),
-              ...methodGroups(catalogue, offered, place !== null, typed, (_name, picked) => {
-                swap(picked);
-              }),
-            ]}
+              listedGroups(
+                { word: 'method', options: parameters.length > 0 },
+                {
+                  options: () => [optionOffers(parameters, given, typed, toggle, optionsAsked)],
+                  methods: () =>
+                    methodGroups(catalogue, offered, place !== null, typed, (_name, picked) => {
+                      swap(picked);
+                    }),
+                },
+              )
+            }
             onOpenChange={list.onOpenChange}
             onType={list.onType}
             buttonRef={handleRef}
@@ -465,7 +487,8 @@ export function ChainBlocks({
     setOpensMethods(false);
   }, []);
   const { start, links } = expression;
-  const when = whenOf(expression);
+  const chainBody = chainBodyOf(expression);
+  const when = chainBody.body === 'when' ? chainBody.layout : null;
   // The links of a condition come first, and the methods after them.
   const before = when?.before ?? 0;
   const methods = links.slice(before);
@@ -505,15 +528,23 @@ export function ChainBlocks({
     fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
     void edits.insertLink(path, at, picked.id, standingOf(dtypes?.places[at]));
   };
-  // A chain is taken away by the word it starts from.
-  const removeChain = { label: 'Remove this chain', onPress: onRemove };
+  // A chain is taken away by the word it starts from, and a method is added after it.
+  const chainActions = actionsOf('chainStart');
+  const removeChain = chainActions.remove
+    ? { label: 'Remove this chain', onPress: onRemove }
+    : null;
+  const addAfter = (
+    label: string,
+    at: number,
+  ): { label: string; onPress: (anchor: HTMLElement) => void } | null =>
+    chainActions.add ? { label, onPress: addAt(at) } : null;
   const startOffer = (typed: string): OfferGroup[] => {
     const rows = {
       frame,
       node,
       typed,
       fits: startFits,
-      inputs: ['value', 'list'] as const,
+      inputs: OFFERED_INPUTS,
       onInput: (picked: string) => {
         void edits.setStart(path, { kind: 'input', name: picked });
       },
@@ -521,20 +552,24 @@ export function ChainBlocks({
         void edits.setStart(path, { kind: 'field', name: picked });
       },
     };
-    return [
-      ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-        if (id === 'polars.when') {
-          fresh.mark(
-            freshKey(step.id, under(startPath, parameterSegment('predicates'), itemSegment(0))),
-          );
-        } else {
-          fresh.mark(`${freshKey(step.id, path)}:method`);
-        }
-        void edits.startWith(path, id);
-      }),
-      inputGroup(rows),
-      fieldGroup(rows),
-    ];
+    return listedGroups(
+      { word: 'chainStart' },
+      {
+        functions: () =>
+          startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+            if (id === 'polars.when') {
+              fresh.mark(
+                freshKey(step.id, under(startPath, parameterSegment('predicates'), itemSegment(0))),
+              );
+            } else {
+              fresh.mark(`${freshKey(step.id, path)}:method`);
+            }
+            void edits.startWith(path, id);
+          }),
+        inputs: () => [inputGroup(rows)],
+        fields: () => [fieldGroup(rows)],
+      },
+    );
   };
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
@@ -610,10 +645,7 @@ export function ChainBlocks({
   ): React.JSX.Element => (
     <Piece
       remove={removeChain}
-      add={{
-        label: unset ? 'Add a method after the field' : `Add a method after ${label}`,
-        onPress: addAt(before),
-      }}
+      add={addAfter(unset ? 'Add a method after the field' : `Add a method after ${label}`, before)}
     >
       <Hint lines={lines} code={false}>
         <Slot
@@ -640,10 +672,7 @@ export function ChainBlocks({
     body = (
       <Lines>
         <Line>
-          <Piece
-            remove={removeChain}
-            add={{ label: `Add a method after ${whenWord.text}`, onPress: addAt(before) }}
-          >
+          <Piece remove={removeChain} add={addAfter(`Add a method after ${whenWord.text}`, before)}>
             <Hint lines={[`${whenWord.text} · ${whenWord.hint}`]} code={false}>
               <Slot
                 label={whenWord.text}
@@ -691,13 +720,10 @@ export function ChainBlocks({
         {methods.length > 0 && <Line>{methodsDrawn}</Line>}
       </Lines>
     );
-  } else if (startCall !== null && isElement(startCall)) {
+  } else if (chainBody.body === 'element') {
     body = (
       <>
-        <Piece
-          remove={removeChain}
-          add={{ label: `Add a method after ${elementWord}`, onPress: addAt(0) }}
-        >
+        <Piece remove={removeChain} add={addAfter(`Add a method after ${elementWord}`, 0)}>
           <Hint lines={[`${elementWord} · ${elementHint}`]} code={false}>
             <Slot
               label={elementWord}
@@ -722,7 +748,7 @@ export function ChainBlocks({
         {methodsDrawn}
       </>
     );
-  } else if (startCall !== null && name === null) {
+  } else if (chainBody.body === 'function' && startCall !== null) {
     // A function the editor has no word of its own for is drawn as its name, with what it was given.
     const entry = catalogue.entries.get(startCall.entry) ?? null;
     body = (
@@ -768,9 +794,21 @@ export function ChainBlocks({
           <OfferList
             placeholder="Search the methods"
             groups={(typed) =>
-              methodGroups(catalogue, inserting, addPlace !== null, typed, (_name, picked) => {
-                insert(adding.at, picked);
-              })
+              listedGroups(
+                { word: 'insertion' },
+                {
+                  methods: () =>
+                    methodGroups(
+                      catalogue,
+                      inserting,
+                      addPlace !== null,
+                      typed,
+                      (_name, picked) => {
+                        insert(adding.at, picked);
+                      },
+                    ),
+                },
+              )
             }
             keepOpen={false}
             wide={false}

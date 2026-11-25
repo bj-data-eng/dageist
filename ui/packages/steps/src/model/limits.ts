@@ -1,122 +1,165 @@
 /**
- * @file What the editor cannot draw or express of what the engine allows. The
- * engine decides which calls may stand where; the editor draws a chain as a
- * start and methods, and a condition as one `when`, one `then` and one
- * `otherwise`. What the editor has no word for is written here, once, so that
- * a list shows it disabled with the reason and the check of what the editor
- * cannot offer lists it from the engine's own offers.
+ * @file The one list of what the step editor does not yet express of what the engine allows. Each
+ * declared gap names what it covers, an entry, a place, a start, a parameter or a state of a
+ * report, and says why. The grid test finds every gap by running the model's functions for every
+ * place the engine was asked about and fails on a gap that is found and not declared, and on a gap
+ * that is declared and not found. A change of the engine or of the catalogue that adds something
+ * the editor cannot draw, or a change of the editor that draws it, changes this list.
+ *
+ * A list shows an entry that is declared here as disabled, with the reason, where it lists the
+ * entry at all.
  */
 
-import type { AfterView, EntryView, KindView, OfferPlaceView } from '@dageist/host';
+import type { EntryView } from '@dageist/host';
 
-import type { Catalogue } from './catalogue';
+/** The kinds of what an expression starts from, for a gap in what can follow a start. */
+export type StartKind =
+  /** A field of the rows. */
+  | 'field'
+  /** A connected single value. */
+  | 'connectedValue'
+  /** A connected list. */
+  | 'connectedList'
+  /** A whole number typed in. */
+  | 'typedInteger'
+  /** A number with a fraction typed in. */
+  | 'typedFloat'
+  /** Text typed in. */
+  | 'typedText'
+  /** A function that starts a chain. */
+  | 'function';
 
-/** The links of a condition that the editor draws: one case, which `otherwise` ends. */
-const DRAWN_CONDITION_LINKS: ReadonlySet<string> = new Set([
-  'polars.when',
-  'When.then',
-  'Then.otherwise',
-]);
+/** The states of a step's report that the editor has no words for. */
+export type ReportState =
+  /** A step Polars accepts that was not counted because a step before it failed on the rows. */
+  'notCountedAfterRowsFailure';
+
+/** What a declared gap covers. */
+export type Cover =
+  /** An entry the engine allows that the editor cannot pick or make. */
+  | { readonly kind: 'entry'; readonly entry: string }
+  /** A place that no word of the editor stands at: where the outer position or the nested one is not drawn. */
+  | { readonly kind: 'place'; readonly outer: string; readonly nested: string | null }
+  /** What an expression starts from, after which the editor cannot add a method that the engine allows. */
+  | { readonly kind: 'start'; readonly start: StartKind }
+  /** A parameter of an entry that its drawing does not set. */
+  | { readonly kind: 'parameter'; readonly entry: string; readonly parameter: string }
+  /** A kind of parameter that has no drawing, by the shape and kind that make it up. */
+  | { readonly kind: 'parameterKind'; readonly of: string }
+  /** A state of a step's report that says nothing. */
+  | { readonly kind: 'report'; readonly state: ReportState };
+
+/** One declared gap: what it covers and why. */
+export interface Gap {
+  readonly cover: Cover;
+  readonly reason: string;
+}
+
+/** Returns what tells one cover from another, so that a gap found can be matched with one declared. */
+export function coverKey(cover: Cover): string {
+  switch (cover.kind) {
+    case 'entry':
+      return `entry ${cover.entry}`;
+    case 'place':
+      return `place ${cover.outer} ${cover.nested ?? 'alone'}`;
+    case 'start':
+      return `start ${cover.start}`;
+    case 'parameter':
+      return `parameter ${cover.entry} ${cover.parameter}`;
+    case 'parameterKind':
+      return `parameterKind ${cover.of}`;
+    case 'report':
+      return `report ${cover.state}`;
+    default:
+      return cover satisfies never;
+  }
+}
 
 /** Why a further case of a condition is not drawn. */
 const FURTHER_CASE = 'the editor draws one case of a when; a further case follows otherwise';
 
+/** Why a function that starts a chain is not offered. */
+const NOT_A_START =
+  'the editor starts a chain from a field, an input, a typed value, when and element; this function is not offered where an expression starts';
+
+/** Why nothing is added after a connected input or a typed value. */
+const NOTHING_AFTER_A_WORD =
+  'a connected input or a typed value is drawn as one word that offers no method after it, though the engine allows methods there (#171)';
+
+/** Declares the entry `entry`, which the editor cannot pick or make, for `reason`. */
+function entryGap(entry: string, reason: string): Gap {
+  return { cover: { kind: 'entry', entry }, reason };
+}
+
+/** Declares the parameter `parameter` of `entry`, which its drawing does not set, for `reason`. */
+function parameterGap(entry: string, parameter: string, reason: string): Gap {
+  return { cover: { kind: 'parameter', entry, parameter }, reason };
+}
+
+/** Declares that nothing is added after what an expression starts from as `start`. */
+function startGap(start: StartKind): Gap {
+  return { cover: { kind: 'start', start }, reason: NOTHING_AFTER_A_WORD };
+}
+
+/** Every gap the editor has, declared. */
+export const GAPS: readonly Gap[] = [
+  // The one case of a condition the editor draws ends with otherwise; a further case is not drawn.
+  entryGap('ChainedThen.otherwise', FURTHER_CASE),
+  entryGap('ChainedThen.when', FURTHER_CASE),
+  entryGap('ChainedWhen.then', FURTHER_CASE),
+  entryGap('Then.when', FURTHER_CASE),
+  // The functions the editor does not start a chain from.
+  entryGap('polars.date', NOT_A_START),
+  entryGap('polars.date_range', NOT_A_START),
+  entryGap('polars.datetime', NOT_A_START),
+  entryGap('polars.datetime_range', NOT_A_START),
+  entryGap('polars.duration', NOT_A_START),
+  entryGap('polars.from_epoch', NOT_A_START),
+  entryGap('polars.int_range', NOT_A_START),
+  entryGap('polars.linear_space', NOT_A_START),
+  entryGap('polars.repeat', NOT_A_START),
+  entryGap('polars.time', NOT_A_START),
+  entryGap('polars.time_range', NOT_A_START),
+  // The parameters of the entries the editor draws as a word of their own, which it does not set.
+  parameterGap(
+    'polars.col',
+    'more_names',
+    'a field is picked by its name; several names at once are not drawn',
+  ),
+  parameterGap(
+    'polars.lit',
+    'dtype',
+    'a number or text is typed in; the dtype of a literal is not drawn',
+  ),
+  parameterGap(
+    'polars.lit',
+    'allow_object',
+    'a number or text is typed in; allowing an object is not drawn',
+  ),
+  parameterGap(
+    'polars.when',
+    'constraints',
+    'a condition is its predicates; keyword constraints are not drawn',
+  ),
+  // What an expression starts from, after which the editor offers no method.
+  startGap('connectedValue'),
+  startGap('connectedList'),
+  startGap('typedInteger'),
+  startGap('typedFloat'),
+  startGap('typedText'),
+  {
+    cover: { kind: 'report', state: 'notCountedAfterRowsFailure' },
+    reason:
+      'a step after one that failed on the rows is accepted and not counted, so the editor says nothing of it (#171)',
+  },
+];
+
 /**
- * Returns why the editor cannot draw `entry` wherever the engine allows it, or
- * `null` when it can. It judges only what the editor can draw, not whether the
- * engine allows the entry at a place.
+ * Returns why the editor cannot pick or make `entry` where the engine allows it, or `null` when a
+ * list may offer it. A list that has a row for such an entry shows it disabled with this reason.
  */
 export function editorLimit(entry: EntryView): string | null {
-  if (entry.applies === 'condition' && !DRAWN_CONDITION_LINKS.has(entry.id)) return FURTHER_CASE;
-  return null;
-}
-
-/**
- * The parameters the editor sets of an entry whose parameters it does not all
- * set. An entry that is not here has every parameter set: each kind of
- * parameter has a drawing.
- */
-const SET_BY_THE_EDITOR: Readonly<Record<string, readonly string[]>> = {
-  // A field is picked by its name; several names at once are not drawn.
-  'polars.col': ['name'],
-  // A number or text is typed in; a literal of a given dtype is not drawn.
-  'polars.lit': ['value'],
-  // A condition is its predicates; keyword constraints are not drawn.
-  'polars.when': ['predicates'],
-  'Then.when': ['predicates'],
-  'ChainedThen.when': ['predicates'],
-};
-
-/** Whether the editor draws a parameter of `kind`: each kind has a drawing, but a pair does not hold pairs. */
-function drawn(kind: KindView): boolean {
-  return kind.kind !== 'pairs' || (kind.key.kind !== 'pairs' && kind.value.kind !== 'pairs');
-}
-
-/**
- * Returns the parameters of `entry` that the editor has no way to set: those a function or a
- * condition it draws only in part leaves out, and those of a kind it has no drawing for.
- */
-export function unexpressedParameters(entry: EntryView): readonly string[] {
-  const set = Object.hasOwn(SET_BY_THE_EDITOR, entry.id) ? SET_BY_THE_EDITOR[entry.id] : undefined;
-  return entry.parameters
-    .filter(
-      (parameter) => !drawn(parameter.kind) || (set !== undefined && !set.includes(parameter.name)),
-    )
-    .map((parameter) => parameter.name);
-}
-
-/** The place of one cell of the grid of every place the engine was asked about, and which entries may stand there. */
-export interface Cell {
-  readonly place: OfferPlaceView;
-  readonly allowed: readonly string[];
-}
-
-/** What the engine allows at some places that the editor cannot draw. */
-export interface Unofferable {
-  readonly entry: string;
-  /** What an expression has where the entry may stand, in words: nothing, a value, or a condition at a state. */
-  readonly after: string;
-  /** In how many places of that kind the engine allows it. */
-  readonly places: number;
-  /** What the editor cannot do. */
-  readonly reason: string;
-}
-
-/** Returns what an expression has, in words, without its dtype or shape, which no limit of the editor depends on. */
-function afterWords(after: AfterView): string {
-  switch (after.kind) {
-    case 'start':
-      return 'start';
-    case 'value':
-      return 'value';
-    case 'condition':
-      return `condition at ${after.state}`;
-    default:
-      return after satisfies never;
-  }
-}
-
-/**
- * Returns every combination the engine allows in `cells` that the editor
- * cannot draw, grouped by the entry, what an expression has there and why.
- * An entry the editor does not know is one it cannot draw.
- */
-export function unofferable(catalogue: Catalogue, cells: readonly Cell[]): Unofferable[] {
-  const found = new Map<string, Unofferable>();
-  for (const cell of cells) {
-    for (const id of cell.allowed) {
-      const entry = catalogue.entries.get(id);
-      const reason = entry === undefined ? 'the catalogue has no such entry' : editorLimit(entry);
-      if (reason === null) continue;
-      const after = afterWords(cell.place.after);
-      const key = `${id}\u0000${after}\u0000${reason}`;
-      const held = found.get(key);
-      found.set(key, { entry: id, after, places: (held?.places ?? 0) + 1, reason });
-    }
-  }
-  const listed = [...found.values()];
-  listed.sort(
-    (left, right) => left.entry.localeCompare(right.entry) || left.after.localeCompare(right.after),
+  return (
+    GAPS.find((gap) => gap.cover.kind === 'entry' && gap.cover.entry === entry.id)?.reason ?? null
   );
-  return listed;
 }

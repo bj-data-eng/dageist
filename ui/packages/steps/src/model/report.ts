@@ -8,6 +8,7 @@
  */
 
 import type {
+  CallView,
   CauseView,
   ColumnChangeView,
   CountView,
@@ -22,9 +23,11 @@ import type {
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
+import { HEAD } from './catalogue';
 import type { Path } from './doc';
-import { pathKey } from './doc';
+import { givenOf, pathKey } from './doc';
 import type { Frame } from './frame';
+import { findColumn } from './frame';
 import type { Outcome } from './latest';
 import { valuesLine } from './values';
 
@@ -280,6 +283,92 @@ export function prepareRun(steps: readonly DocumentStepView[], run: RunView): Pr
     before = result.after;
   }
   return { source, steps: prepared };
+}
+
+/** What the editor says of a step beside its row. */
+export type Saying =
+  /** The engine ran the step on the rows and counted them, so the rows say what it did. */
+  | { readonly says: 'rows' }
+  /** Something is the matter, said in these lines. */
+  | { readonly says: 'problem'; readonly lines: readonly string[] }
+  /** The step was not counted and nothing is said to be the matter: the row says nothing of it. */
+  | { readonly says: 'nothing' };
+
+/**
+ * Returns what the editor says of `step` beside its row: the matter with it and what went wrong
+ * running it on the sample rows, one line each, or that its rows were counted, or nothing.
+ */
+export function sayingOf(step: PreparedStep): Saying {
+  const lines = [step.problem, step.rowsProblem].flatMap((line) => (line === null ? [] : [line]));
+  if (lines.length > 0) return { says: 'problem', lines };
+  return step.rows === null ? { says: 'nothing' } : { says: 'rows' };
+}
+
+/** One column a join added, with what the engine said of it. */
+export interface AddedColumn {
+  readonly name: string;
+  readonly dtype: string;
+  /** The first values of the column, as one line, or `null` where the engine ran no rows. */
+  readonly first: string | null;
+}
+
+/** What stands at the end of a step's row. */
+export type RowEnd =
+  /** A pivot: how many columns it returns, and which are new. */
+  | { readonly kind: 'pivot'; readonly columns: number; readonly added: readonly string[] }
+  /** An added column: its name, its dtype and its first values. */
+  | {
+      readonly kind: 'column';
+      readonly alias: string;
+      readonly dtype: string;
+      readonly first: string | null;
+    }
+  /** A join: the columns it adds. */
+  | { readonly kind: 'join'; readonly added: readonly AddedColumn[] }
+  /** A filter: how many rows it kept of those it was given. */
+  | { readonly kind: 'kept'; readonly kept: number; readonly received: number };
+
+/** Returns the name of the column an `Add column` step adds. */
+function addedAlias(call: CallView): string | null {
+  const named = givenOf(call, HEAD.with_columns.named);
+  const key = named?.kind === 'pairs' ? named.entries[0]?.key : undefined;
+  return key?.kind === 'columns' ? (key.names[0] ?? null) : null;
+}
+
+/**
+ * Returns what stands at the end of the row of the step `call`, which `result` reports, or `null`
+ * where nothing does: the step was not accepted, or it is one that says nothing there.
+ */
+export function rowEndOf(call: CallView, result: PreparedStep): RowEnd | null {
+  if (result.status !== 'valid') return null;
+  const added = result.changes
+    .filter((change) => change.change === 'added')
+    .map((change) => change.name);
+  switch (call.entry) {
+    case 'LazyFrame.pivot':
+      return { kind: 'pivot', columns: result.after.length, added };
+    case 'LazyFrame.with_columns': {
+      const alias = addedAlias(call);
+      const dtype = alias === null ? undefined : findColumn(result.after, alias)?.dtype;
+      if (alias === null || dtype === undefined) return null;
+      return { kind: 'column', alias, dtype, first: result.first.get(alias) ?? null };
+    }
+    case 'LazyFrame.join':
+      return {
+        kind: 'join',
+        added: added.map((name) => ({
+          name,
+          dtype: findColumn(result.after, name)?.dtype ?? '',
+          first: result.first.get(name) ?? null,
+        })),
+      };
+    case 'LazyFrame.filter':
+      return result.rows === null
+        ? null
+        : { kind: 'kept', kept: result.rows.kept, received: result.rows.received };
+    default:
+      return null;
+  }
 }
 
 /** What the rows of a step show: the rows, or why there are none. */

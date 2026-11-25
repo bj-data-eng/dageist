@@ -137,6 +137,9 @@ export function conditionEntry(catalogue: Catalogue, word: ConditionWord): Entry
 /** The identifier the catalogue gives `element`, which stands for the values of one cell of a pivot. */
 export const ELEMENT_ID = 'polars.element';
 
+/** The functions the editor starts a chain from besides a field, an input and a value typed in. */
+export const START_FUNCTIONS: ReadonlySet<string> = new Set([conditionId('when'), ELEMENT_ID]);
+
 /** Returns the catalogue entry of `element`, or `null` when there is none. */
 export function elementEntry(catalogue: Catalogue): EntryView | null {
   return catalogue.entries.get(ELEMENT_ID) ?? null;
@@ -170,16 +173,6 @@ export function optionParameters(
   );
 }
 
-/**
- * Returns the parameters of the method `entry` that can be added to it: all but the argument that is
- * drawn where the method is.
- */
-export function methodOptionParameters(entry: EntryView | null): readonly ParameterView[] {
-  if (entry === null) return [];
-  const argument = argumentOf(entry);
-  return optionParameters(entry, argument === null ? [] : [argument.parameter.name]);
-}
-
 /** The step verbs, by their Polars names. */
 export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
 
@@ -194,20 +187,41 @@ export const VERBS: readonly Verb[] = [
   'pivot',
 ];
 
-/** The parameters each step's own structure draws, which are not offered as options. */
-const COVERED: Readonly<Record<Verb, readonly string[]>> = {
+/**
+ * The parameters each step's head draws, by the name each is given here, which the head's
+ * drawing reads: the head of a step is laid out by the step, and the other parameters are
+ * options added from the step's name.
+ */
+export const HEAD = {
   // A column and what it holds are the step's own structure.
-  with_columns: ['exprs', 'named_exprs'],
-  filter: ['predicates'],
-  // The fields to order by are one list, so a second one for more fields is not offered.
-  sort: ['by', 'more_by'],
-  // The fields to keep are one list, so another expression is not offered by name.
-  select: ['exprs'],
-  rename: ['mapping'],
-  // The keys of the two tables are one list each, so `on` for a shared key is not offered.
-  join: ['other', 'on', 'left_on', 'right_on'],
-  pivot: ['on', 'index', 'values', 'aggregate_function'],
+  with_columns: { named: 'named_exprs', exprs: 'exprs' },
+  filter: { predicates: 'predicates' },
+  sort: { by: 'by' },
+  select: { exprs: 'exprs' },
+  rename: { mapping: 'mapping' },
+  join: { other: 'other', leftOn: 'left_on', rightOn: 'right_on' },
+  pivot: { on: 'on', index: 'index', values: 'values', aggregate: 'aggregate_function' },
+} as const satisfies Readonly<Record<Verb, Readonly<Record<string, string>>>>;
+
+/**
+ * The parameters a step's head does not draw and that are not offered as options either: the
+ * fields to order by are one list, so a second one for more fields is not offered, and the keys of
+ * the two tables are one list each, so `on` for a shared key is not offered.
+ */
+const NOT_OFFERED: Readonly<Record<Verb, readonly string[]>> = {
+  with_columns: [],
+  filter: [],
+  sort: ['more_by'],
+  select: [],
+  rename: [],
+  join: ['on'],
+  pivot: [],
 };
+
+/** Returns the parameters the step `verb` draws in its head or does not offer as options. */
+function coveredParameters(verb: Verb): readonly string[] {
+  return [...Object.values(HEAD[verb]), ...NOT_OFFERED[verb]];
+}
 
 /** Returns the verb a step of the entry `entry` is, or `null` for a step the editor draws by its parameters alone. */
 export function verbOf(entry: string): Verb | null {
@@ -222,5 +236,5 @@ export function stepOptionParameters(
   const found = catalogue.entries.get(entry);
   if (found === undefined) return [];
   const verb = verbOf(entry);
-  return optionParameters(found, verb === null ? [] : COVERED[verb]);
+  return optionParameters(found, verb === null ? [] : coveredParameters(verb));
 }
