@@ -264,16 +264,25 @@ fn replay_a_case() {
 /// not evaluate (#103): the probe of the part is refused for the tables' own reason there.
 const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case"];
 
-/// The kept cases that are stricter where Polars does not evaluate the part, or are excused by a
-/// limit, and whose part is a refused method of lists or arrays, or a refused call that is given
-/// nothing after one: such a step is not built, since Polars plans one that both branches of a
-/// condition share and its optimizer then panics, so the document is refused with the words of the
-/// tables and the case agrees, or is refused by both for another reason. The probe of the part,
-/// which the probe tests ask, is unchanged.
-const NOT_BUILT_AS_A_LIST_METHOD_IS_REFUSED: &[&str] = &[
+/// The kept cases whose step is not built, since a method of lists or arrays, or a call after a
+/// list or an array, that the walk refuses is not run: Polars plans a call that both branches of a
+/// condition share without working it out, and its optimizer then panics. They were stricter
+/// where Polars does not evaluate the part, or were excused by a limit, while Polars was asked.
+/// Now the document is refused with the words of the tables and agrees, or is refused by both for
+/// another reason, and the probe tests settle the part asked alone.
+const NOT_BUILT_AS_A_REFUSED_CALL_OF_LISTS_OR_AFTER_LISTS: &[&str] = &[
     "stricter-a-list-max-under-an-outer-window.case",
     "stricter-a-non-boolean-predicate-in-a-sort-key-of-a-max.case",
     "uncovered-a-group-aggregate--a-fill-by-a-strategy-of-a-list.case",
+    "uncovered-a-shift-that-leaves-nulls.case",
+    "uncovered-a-shift-that-leaves-nulls--the-first-that-skips-nulls-of-a-shifted-first.case",
+    "uncovered-a-literal--an-interval-that-follows-a-null-literal.case",
+    "uncovered-a-literal--a-comparison-of-a-list-that-follows-a-null-literal.case",
+    "uncovered-a-literal--a-comparison-after-a-null-literal-of-a-refused-argument.case",
+    "stricter-an-interval-in-the-value-of-a-fill-of-nan-of-whole-numbers.case",
+    "stricter-a-replacement-of-a-list-in-a-sort-key-of-one-value.case",
+    "stricter-a-fraction-floor-divided-from-a-boolean.case",
+    "stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case",
 ];
 
 /// The kept cases that Polars refuses on more than one thread and allows on one (#103), where the
@@ -381,7 +390,7 @@ fn kept_cases_replay_as_settled() {
                 detail_of(outcome)
             );
             by_design += 1;
-        } else if NOT_BUILT_AS_A_LIST_METHOD_IS_REFUSED.contains(&name) {
+        } else if NOT_BUILT_AS_A_REFUSED_CALL_OF_LISTS_OR_AFTER_LISTS.contains(&name) {
             assert!(
                 outcome.kind() == OutcomeKind::Evaluated
                     || outcome.detail().is_some_and(

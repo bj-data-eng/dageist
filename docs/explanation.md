@@ -1552,11 +1552,12 @@ after a class the tables do not measure it on, and after one whose lines record 
 that contradict the schema. A method that depends on the element dtype is refused given an
 expression of such a dtype, or of a class it is not measured on, as an argument, whether it is a
 column, a value taken of one or a connected input, and whether the walk lost the dtype or not. A method of lists or arrays that the tables refuse, as
-`list.max` of an array is, and a call that is given nothing and that the tables refuse after a
-list or an array, is not built either, and the step is refused with the words of the walk and the
-place of the call: Polars may plan one that both branches of a condition share, and its optimizer
-then panics on the plan. A refused call that is given an expression is built, since what the tables
-say of it beside what it is given may be Polars folding or dropping the part. A dtype of a class is any member of it: an array of any width
+`list.max` of an array is, and any call that the tables refuse after a list or an array, whatever
+it is given, is not built either, and the step is refused with the words of the walk and the place
+of the call: Polars may plan one that both branches of a condition share, and its optimizer then
+panics on the plan, as it does of the sum of an array of dates and a boolean. Where the walk lost
+the dtype before the call, the run asks the tables of the dtype Polars gives and of the dtypes of
+what the call is given, and refuses the same calls. A dtype of a class is any member of it: an array of any width
 is its class, and the tables measure arrays at width 2, which the walk carries as it carries the
 unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which of the
 classes each method is measured on.

@@ -12569,12 +12569,15 @@ mod tests {
     }
 
     #[test]
-    fn an_interval_that_follows_a_null_literal_is_excused_as_a_literal_whatever_its_closed_says() {
-        // Polars folds the comparisons of a null literal into nulls, so the interval is allowed
-        // where the tables refuse a list for the comparison of its `closed`.
+    fn an_interval_that_follows_a_list_and_a_null_literal_is_refused_and_excused_by_no_limit() {
+        // Polars folds the comparisons of a null literal into nulls, so the interval would be
+        // allowed where the tables refuse a list for the comparison of its `closed`. The
+        // interval follows a list and the tables refuse it, so the step is not built: it is
+        // refused as the tables say, no limit excuses what Polars is not asked, and the
+        // other kept cases of the literal show the limit.
         assert_eq!(
             excused_by_kept("uncovered-a-literal--an-interval-that-follows-a-null-literal.case"),
-            vec![Limit::ALiteral]
+            Vec::<Limit>::new()
         );
     }
 

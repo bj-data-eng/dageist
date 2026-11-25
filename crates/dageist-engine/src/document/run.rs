@@ -518,6 +518,7 @@ fn run_step(
         probe: trace.then(|| DataFrame::empty_with_schema(schema).lazy()),
         blind: walk.not_known().is_some(),
         elements: Vec::new(),
+        given: Vec::new(),
         base: base.clone(),
         path: Vec::new(),
         positions: Vec::new(),
@@ -625,6 +626,8 @@ struct Builder<'a> {
     /// The dtypes of the values a pivot aggregates, which an expression that starts from `element`
     /// is evaluated against.
     elements: Vec<DataType>,
+    /// The dtypes of the expressions the call built last was given, by the names of its parameters.
+    given: Vec<(String, DataType)>,
     base: Place,
     path: Vec<Segment>,
     /// The named positions, of a step and of the expressions inside it, that
@@ -731,6 +734,7 @@ impl Builder<'_> {
     fn arguments(&mut self, call: &Call) -> Result<Arguments, Stop> {
         let entry = call.entry().id().as_str();
         let mut given: Vec<(&str, Argument)> = Vec::new();
+        let mut dtypes_given: Vec<(String, DataType)> = Vec::new();
         for argument in call.arguments() {
             self.path
                 .push(Segment::Parameter(argument.parameter().to_owned()));
@@ -761,12 +765,16 @@ impl Builder<'_> {
             // What Polars panics on is not run: a value of a dtype the tables do not judge, given to
             // a method that depends on the element dtype, as a list of lists is.
             if !from_another_table {
-                for dtype in self.argument_dtypes(&built) {
+                let dtypes = self.argument_dtypes(&built);
+                for dtype in &dtypes {
                     if let Err(refusal) =
-                        allowed::refuse_an_argument_not_judged(call.entry(), &dtype)
+                        allowed::refuse_an_argument_not_judged(call.entry(), dtype)
                     {
                         return self.stop(RunCause::NotAllowed(refusal));
                     }
+                }
+                if let [dtype] = dtypes.as_slice() {
+                    dtypes_given.push((argument.parameter().to_owned(), dtype.clone()));
                 }
             }
             given.push((argument.parameter(), built));
@@ -785,6 +793,7 @@ impl Builder<'_> {
                 return self.built(Err(BuildError::NotAPattern { parameter, error }));
             }
         }
+        self.given = dtypes_given;
         self.built(call.entry().arguments(given))
     }
 
@@ -894,22 +903,41 @@ impl Builder<'_> {
             // the value before the call has: a panic of its own may not be recovered from. Where
             // the tables lost the dtype, as after a list of lists, they said nothing of the call,
             // so what they record of the dtype Polars gives is asked of it here.
-            if self.probe.is_some() {
-                for receiver in self.receivers(&state, from_element) {
-                    let refused = allowed::rule_forbids_a_receiver(link.entry(), &receiver)
-                        .and_then(|()| {
-                            if self.blind {
-                                allowed::refuse_a_receiver_not_judged(link.entry(), &receiver)
-                            } else {
-                                Ok(())
-                            }
-                        });
-                    if let Err(refusal) = refused {
+            let receivers = if self.probe.is_some() {
+                self.receivers(&state, from_element)
+            } else {
+                Vec::new()
+            };
+            for receiver in &receivers {
+                let refused =
+                    allowed::rule_forbids_a_receiver(link.entry(), receiver).and_then(|()| {
+                        if self.blind {
+                            allowed::refuse_a_receiver_not_judged(link.entry(), receiver)
+                        } else {
+                            Ok(())
+                        }
+                    });
+                if let Err(refusal) = refused {
+                    return self.stop(RunCause::NotAllowed(refusal));
+                }
+            }
+            let arguments = self.arguments(link)?;
+            if self.blind {
+                let given: Vec<(&str, DataType)> = self
+                    .given
+                    .iter()
+                    .map(|(name, dtype)| (name.as_str(), dtype.clone()))
+                    .collect();
+                for receiver in &receivers {
+                    if let Err(refusal) = allowed::refuse_a_call_the_tables_refuse_after_lists(
+                        link.entry(),
+                        receiver,
+                        &given,
+                    ) {
                         return self.stop(RunCause::NotAllowed(refusal));
                     }
                 }
             }
-            let arguments = self.arguments(link)?;
             state = match (link.entry().build(), state) {
                 (Build::Expression(build), Built::Expr(receiver)) => {
                     Built::Expr(self.built(build(receiver, &arguments))?)

@@ -1375,20 +1375,45 @@ pub fn refuse_a_receiver_not_judged(
     if read_as(id, class).is_none() {
         return Err(not_measured());
     }
-    if is_of_nested_dtypes(id) || class.is_nested() {
-        if let Some(reason) = Tables::committed().recorded_danger(id, class) {
-            return Err(Refusal::polars(&reason));
-        }
-        // What Polars refuses of a call that is given nothing, as the walk would have refused it
-        // where it knew the dtype: Polars may plan it nevertheless, and panic on the plan.
-        if required_expressions(entry).next().is_none()
-            && let Err(refusal) = on_receiver(entry, Some(class), &[], &[])
-            && matches!(refusal.source(), RefusalSource::Polars(_))
-        {
-            return Err(refusal);
-        }
-    }
     Ok(())
+}
+
+/// The refusal of a call after a list or an array, or of a method of lists or arrays, that the
+/// tables refuse of the dtype `receiver` given `arguments`, the dtypes of the expressions it is
+/// given by the names of its parameters: Polars plans such a call nevertheless where it does not
+/// work it out, as where both branches of a condition share it, and panics on the plan. The walk
+/// refuses the same call where it knows the dtypes, whatever it is given; this is asked where it
+/// lost them. An argument of no class is left to [`refuse_an_argument_not_judged`], and the
+/// options the call is given are not asked.
+///
+/// # Errors
+/// The refusal of the tables, as the walk would have given it.
+pub fn refuse_a_call_the_tables_refuse_after_lists(
+    entry: &'static Entry,
+    receiver: &DataType,
+    arguments: &[(&str, DataType)],
+) -> Result<(), Refusal> {
+    let Some(class) = Representative::of(receiver) else {
+        return Ok(());
+    };
+    if !(is_of_nested_dtypes(entry.id().as_str()) || class.is_nested()) {
+        return Ok(());
+    }
+    let classes: Vec<(&str, Representative)> = arguments
+        .iter()
+        .filter_map(|(name, dtype)| Some((*name, Representative::of(dtype)?)))
+        .collect();
+    match on_receiver(entry, Some(class), &classes, &[]) {
+        Err(refusal)
+            if matches!(
+                refusal.source(),
+                RefusalSource::Polars(_) | RefusalSource::Rule(_)
+            ) =>
+        {
+            Err(refusal)
+        }
+        _ => Ok(()),
+    }
 }
 
 /// The refusal of a method that depends on the element dtype of a list or an array, given an

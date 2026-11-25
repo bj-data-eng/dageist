@@ -325,6 +325,7 @@ pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -
 pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> alloc::vec::Vec<dageist_engine::allowed::OptionOffer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::read_typed(text: &str, typed: dageist_engine::allowed::Typed) -> alloc::vec::Vec<core::result::Result<dageist_engine::allowed::Read, dageist_engine::allowed::Unread>>
+pub fn dageist_engine::allowed::refuse_a_call_the_tables_refuse_after_lists(entry: &'static dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType, arguments: &[(&str, polars_core::datatypes::dtype::DataType)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::refuse_a_count_that_may_not_end(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::refuse_a_receiver_not_judged(entry: &'static dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::refuse_an_argument_not_judged(entry: &'static dageist_engine::catalog::Entry, argument: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>

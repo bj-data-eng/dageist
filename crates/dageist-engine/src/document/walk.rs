@@ -23,7 +23,7 @@ use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, RefusalSource, Representative, Rule, Shape,
-    Stage, Unknown, Verdict,
+    Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -1037,36 +1037,22 @@ impl Walker<'_> {
         }
     }
 
-    /// Notes a call that is not to be run in Polars: a method of lists or arrays that is refused, a
-    /// call that follows a list or an array and is refused whatever it is given, and a call that
-    /// follows one and is refused only by what the tables recorded, where its schema and its rows
-    /// differ in dtype or Polars panicked.
+    /// Notes a call that is not to be run in Polars: a method of lists or arrays, or a call that
+    /// follows a list or an array, that is refused, whatever it is given.
     ///
     /// What Polars refuses when it works out the schema it may plan nevertheless where the call is
     /// not worked out, as where both branches of a condition share it, and its optimizer then
-    /// panics on the plan, as it does of a `list` method given an array. A call after one whose
+    /// panics on the plan, as it does of a `list` method given an array, of a sum of an array of
+    /// dates and a boolean, and of the combination of a list with a time. A call after one whose
     /// schema and whose rows differ, or on which Polars panicked, that trusts the schema, as an
     /// aggregate or a cut does, panics too. A panic on a thread of Polars' own may not be recovered
     /// from, so the step is refused with the words of the walk and the place of the call, and is
-    /// not built. A call that is given an expression is refused by what the tables say of it
-    /// beside what it is given, which Polars may fold or drop, so only a record says it is not run.
-    fn note_danger(
-        &mut self,
-        entry: &Entry,
-        after: After,
-        refusal: &Refusal,
-        is_given_nothing: bool,
-    ) {
-        let of_lists = entry.id().as_str().starts_with("Expr.list.")
-            || entry.id().as_str().starts_with("Expr.arr.");
-        let after_lists = matches!(after, After::Value { dtype, .. } if dtype.is_nested());
-        let recorded = matches!(refusal.source(), RefusalSource::Polars(Stage::Rows))
-            && (refusal.reason().starts_with("the schema says")
-                || refusal.reason().starts_with("Polars panicked"));
-        let by_polars = matches!(refusal.source(), RefusalSource::Polars(_));
-        if (of_lists || (after_lists && (recorded || (by_polars && is_given_nothing))))
-            && self.unsafe_to_run.is_none()
-        {
+    /// not built.
+    fn note_danger(&mut self, entry: &Entry, after: After, refusal: &Refusal) {
+        let in_lists = entry.id().as_str().starts_with("Expr.list.")
+            || entry.id().as_str().starts_with("Expr.arr.")
+            || matches!(after, After::Value { dtype, .. } if dtype.is_nested());
+        if in_lists && self.unsafe_to_run.is_none() {
             self.unsafe_to_run = Some(WalkRefusal {
                 place: self.here(),
                 refusal: refusal.clone(),
@@ -2446,7 +2432,7 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
-                self.note_danger(entry, after, refusal, false);
+                self.note_danger(entry, after, refusal);
                 self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
@@ -2557,7 +2543,7 @@ impl Walker<'_> {
         };
         let allowance = match &verdict {
             Verdict::Refused(refusal) => {
-                self.note_danger(entry, after, refusal, arguments.is_empty());
+                self.note_danger(entry, after, refusal);
                 self.refuse(refusal, false);
                 return (Cur::Dead, standing);
             }
