@@ -105,14 +105,20 @@ const EDITING_TOPIC = 'editing';
 /** The topic on which the steps window asks the main window which that is. */
 const EDITING_ASKED_TOPIC = 'editing-asked';
 
-/** Reads what the main window said on `EDITING_TOPIC`, or `null` when it is not that. */
-function readEditing(message: unknown): Editing | null {
-  if (typeof message !== 'object' || message === null) return null;
-  if (!('node' in message) || !('name' in message) || !('graph' in message)) return null;
-  const { node, name, graph } = message;
+/**
+ * Reads what the main window said on `EDITING_TOPIC`: `{ editing }`, the transform whose steps
+ * are edited, or `null` when the graph has none. Gives `undefined` for a message of another shape.
+ */
+function readEditing(message: unknown): Editing | null | undefined {
+  if (typeof message !== 'object' || message === null || !('editing' in message)) return undefined;
+  const { editing } = message;
+  if (editing === null) return null;
+  if (typeof editing !== 'object' || !('node' in editing) || !('name' in editing)) return undefined;
+  if (!('graph' in editing)) return undefined;
+  const { node, name, graph } = editing;
   return typeof node === 'string' && typeof name === 'string' && typeof graph === 'number'
     ? { node, name, graph }
-    : null;
+    : undefined;
 }
 
 /** Draws the application window. */
@@ -131,7 +137,19 @@ export function App(): React.JSX.Element {
   const [chosen, setChosen] = useState<string | null>(null);
   // What the main window said is edited, in the steps window.
   const [heard, setHeard] = useState<Editing | null>(null);
-  const shown = useMemo(() => editingOf(graphView, chosen), [graphView, chosen]);
+  // The same transform at the same revision is the same value, so a box moved on the canvas,
+  // which changes only the layout, is not news to the steps window.
+  const edited = editingOf(graphView, chosen);
+  // Whether the canvas has drawn a graph yet, before which the main window says nothing.
+  const drawn = graphView !== null;
+  const [shownNode, shownName, shownGraph] = [edited?.node, edited?.name, edited?.graph];
+  const shown = useMemo(
+    () =>
+      shownNode === undefined || shownName === undefined || shownGraph === undefined
+        ? null
+        : { node: shownNode, name: shownName, graph: shownGraph },
+    [shownNode, shownName, shownGraph],
+  );
   const editing = IS_STEPS_WINDOW ? heard : shown;
 
   useEffect(() => {
@@ -165,21 +183,21 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
-  // The main window tells the steps window which transform is edited, each time it changes and
-  // when the steps window asks.
+  // The main window tells the steps window which transform is edited, or that none is, each time
+  // it changes and when the steps window asks.
   useEffect(() => {
-    if (host === null || IS_STEPS_WINDOW || shown === null) return undefined;
-    host.broadcast(EDITING_TOPIC, shown);
+    if (host === null || IS_STEPS_WINDOW || !drawn) return undefined;
+    host.broadcast(EDITING_TOPIC, { editing: shown });
     return host.listen(EDITING_ASKED_TOPIC, () => {
-      host.broadcast(EDITING_TOPIC, shown);
+      host.broadcast(EDITING_TOPIC, { editing: shown });
     });
-  }, [host, shown]);
+  }, [host, shown, drawn]);
   // The steps window edits what the main window says, and asks it once it can hear the answer.
   useEffect(() => {
     if (host === null || !IS_STEPS_WINDOW) return undefined;
     const stop = host.listen(EDITING_TOPIC, (message) => {
       const said = readEditing(message);
-      if (said !== null) setHeard(said);
+      if (said !== undefined) setHeard(said);
     });
     host.broadcast(EDITING_ASKED_TOPIC, {});
     return stop;
