@@ -174,3 +174,19 @@ export function methodOptionParameters(entry: EntryView | null): readonly Parame
   if (entry === null) return [];
   return entry.parameters.filter((parameter) => settingOf(entry, parameter).by === 'option');
 }
+
+/** Returns the word between the key and the value of an entry of pairs: `=` for keyword arguments, which are named, `→` for a dictionary. */
+export function pairsJoiner(parameter: ParameterView): '=' | '→' {
+  return parameter.default.kind === 'empty' ? '=' : '→';
+}
+
+/**
+ * Returns what a parameter that is not given holds, as a word the controls hold it as: `true` or
+ * `false` for a flag, the word of a choice, a dtype, a column or a table, and the empty text for
+ * any other setting or none.
+ */
+export function defaultWordOf(parameter: ParameterView): string {
+  const held = parameter.defaultSetting;
+  if (held?.kind === 'flag') return String(held.value);
+  return held?.kind === 'word' ? held.value : '';
+}

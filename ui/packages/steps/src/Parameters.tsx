@@ -45,15 +45,24 @@ import { useFieldHint } from './origins';
 import { useListState, usePositions } from './positions';
 import { usePreparedStep } from './engine';
 import type { LiteralType } from './model/controls';
-import { controlOf, oneControlOf, startsWithEngineWord } from './model/controls';
+import {
+  controlOf,
+  defaultWordOf,
+  oneControlOf,
+  pairsJoiner,
+  startsWithEngineWord,
+} from './model/controls';
 import type { Path } from './model/doc';
 import { expressionOf, itemSegment, keySegment, pathKey, under, valueSegment } from './model/doc';
 import { parameterSegment } from './model/doc';
+import { handlingOf } from './model/edits';
 import { findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
 import { findInput } from './model/inputs';
 import type { PreparedOption, PreparedReading } from './model/offers';
 import { placeRequest, within } from './model/place';
+import type { Shown } from './model/values';
+import { shownOf } from './model/values';
 import { actionsOf, noAddition } from './model/words';
 import {
   HOLE,
@@ -87,31 +96,6 @@ export interface Surroundings {
 /** The key a fresh thing at `path` of the step being drawn is known by, which a drawing opens at. */
 export function freshKey(stepId: string, path: Path): string {
   return `${stepId}:${pathKey(path)}`;
-}
-
-/** Returns how a number or text typed in is shown by what the document holds there. */
-interface Shown {
-  readonly text: boolean;
-  readonly shown: string;
-}
-
-/** Returns the words the engine shows what the argument holds as, when it holds a number or text. */
-function shownOf(argument: ArgumentView | undefined): Shown | null {
-  switch (argument?.kind) {
-    case 'integer':
-    case 'float':
-      return { text: false, shown: argument.shown };
-    case 'string':
-      return { text: true, shown: argument.value };
-    case 'duration':
-    case 'pattern':
-    case 'path':
-      return { text: true, shown: argument.text };
-    case 'timeZone':
-      return argument.zone === null ? null : { text: true, shown: argument.zone };
-    default:
-      return null;
-  }
 }
 
 /** Returns the one word a column, choice, dtype or table argument holds, or `null`. */
@@ -836,7 +820,7 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
   const draftAt = draftKey('entry', step.id, pathKey(path));
   const draft = drafts.get(draftAt);
   // Keyword arguments are named; a dictionary maps one thing to another.
-  const between = parameter.default.kind === 'empty' ? '=' : '→';
+  const between = pairsJoiner(parameter);
   const described = describe(parameter);
   // An entry of pairs is taken away; nothing is added after it, a faint word adds one at the end.
   const entryActions = actionsOf('entry');
@@ -1023,13 +1007,6 @@ function heldWord(argument: ArgumentView | undefined): string {
   return argument?.kind === 'choice' ? argument.word : '';
 }
 
-/** Returns what a parameter that is not given holds, as the controls hold it, or the empty text. */
-function defaultWord(parameter: ParameterView): string {
-  const held = parameter.defaultSetting;
-  if (held?.kind === 'flag') return String(held.value);
-  return held?.kind === 'word' ? held.value : '';
-}
-
 /**
  * Draws a parameter that holds one value for each item of another, such as the way each field of a
  * sort is ordered. Its list sets one value for every item, or a value for each.
@@ -1040,7 +1017,7 @@ function EachDrawing({ parameter, argument, path, around }: ListProps): React.JS
   const items = shape.shape === 'perItem' ? around.items(shape.of) : [];
   // The path of the call the parameter is of: the way to the parameter, without it.
   const callPath = path.slice(0, -1);
-  const fallback = defaultWord(parameter);
+  const fallback = defaultWordOf(parameter);
   const valueFor = (index: number): string => {
     const own = argument?.kind === 'many' ? argument.items[index] : argument;
     const held = heldWord(own);
@@ -1290,7 +1267,7 @@ export function useOptionToggle(
     }
     fresh.mark(freshKey(step.id, path));
     void edits.addOption(callPath, parameter.name).then((sent) => {
-      if (sent.status === 'refused' && sent.problem.kind === 'needsValue') {
+      if (sent.status === 'refused' && handlingOf(sent.problem) === 'askForValue') {
         drafts.set(draftAt, { kind: 'option', place: { step: step.id, path } });
       }
     });

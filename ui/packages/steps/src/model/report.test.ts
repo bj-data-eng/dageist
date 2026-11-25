@@ -10,7 +10,7 @@ import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
 import type { PreparedRun, PreparedStep } from './report';
-import { prepareRun, rowEndOf, rowsFailure, rowsToShow, sayingOf } from './report';
+import { isChanged, prepareRun, rowEndOf, rowsFailure, rowsToShow, sayingOf } from './report';
 
 // What the host reports of the claim-timing steps, and what the editor shows of it. The fixtures
 // are written from Rust; the expectations are written by hand from what the steps do.
@@ -469,5 +469,19 @@ describe('what stands at the end of a step’s row', () => {
     const refused = decodeRun(refusedFixture);
     const run = prepareRun(named(...refused.steps.map((step) => step.id)), refused);
     expect(rowEndOf(call('LazyFrame.filter'), stepOf(run, 'total'))).toBeNull();
+  });
+});
+
+describe('the columns a step changed', () => {
+  it('are those it added and those it replaced, by name', () => {
+    const changes = [
+      { name: 'a', change: 'added' },
+      { name: 'b', change: 'replaced' },
+    ] as const;
+
+    expect(isChanged(changes, 'a')).toBe(true);
+    expect(isChanged(changes, 'b')).toBe(true);
+    expect(isChanged(changes, 'c')).toBe(false);
+    expect(isChanged([], 'a')).toBe(false);
   });
 });
