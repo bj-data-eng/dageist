@@ -26,7 +26,9 @@ use dageist_engine::document::{
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, col_call, document, field, many, named, step, whole};
+use crate::support::{
+    call, chain, col_call, document, field, field_then, many, named, step, whole,
+};
 
 /// The methods under test, each with the words that set its options, as Python builds the call.
 /// A method that takes an option is asked with its default and with each word.
@@ -187,6 +189,14 @@ fn frame() -> DataFrame {
     );
     columns.extend(depth_two_columns());
     columns.push(ints("a", [Some(1), Some(2), Some(3)]).into());
+    // Receivers of a dtype with nothing in it and of dates, beside the whole numbers and the text.
+    columns.push(Series::new_null("n".into(), 3).into());
+    columns.push(
+        ints("d", [Some(1), Some(2), Some(3)])
+            .cast(&DataType::Date)
+            .expect("whole numbers cast to dates")
+            .into(),
+    );
     // One group of all three rows, so that the first two values of it, which a window refuses where
     // they are not as many as the group, are not by chance as many as the group has.
     columns.push(ints("k", [Some(1), Some(1), Some(1)]).into());
@@ -1555,5 +1565,228 @@ fn every_call_that_meets_arrays_of_two_widths_is_what_polars_says() {
         "{} of {asked} calls differ from Polars:\n{}",
         agree_on_the_width.len(),
         agree_on_the_width.join("\n")
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Values of two levels, given as an argument
+
+/// The names of the methods whose answer depends on the element dtype of a list or an array.
+const SENSITIVE_METHODS: [&str; 23] = [
+    "Expr.add",
+    "Expr.and_",
+    "Expr.cast",
+    "Expr.diff",
+    "Expr.eq",
+    "Expr.eq_missing",
+    "Expr.fill_nan",
+    "Expr.fill_null",
+    "Expr.floordiv",
+    "Expr.is_close",
+    "Expr.is_in",
+    "Expr.mod",
+    "Expr.mul",
+    "Expr.ne",
+    "Expr.ne_missing",
+    "Expr.or_",
+    "Expr.replace",
+    "Expr.replace_strict",
+    "Expr.reverse",
+    "Expr.search_sorted",
+    "Expr.sub",
+    "Expr.truediv",
+    "Expr.xor",
+];
+
+/// The connected input that holds the column of two levels `column`, as a list of values.
+fn input_of(column: &str) -> String {
+    format!("in_{column}")
+}
+
+/// The connected inputs, and a list of values of each dtype of two levels beside them.
+fn inputs_of_two_levels() -> Inputs {
+    let mut inputs = inputs();
+    let present = frame();
+    for (prefix, _) in DEPTH_TWO_KINDS {
+        for element in DEPTH_TWO_ELEMENTS {
+            let column = depth_two_name(prefix, element);
+            if let Ok(values) = present.column(&column) {
+                inputs
+                    .add_list(
+                        input_of(&column),
+                        dageist_engine::document::ListOrigin::Parameter,
+                        values.as_materialized_series().clone(),
+                    )
+                    .expect("a name that is new");
+            }
+        }
+    }
+    inputs
+}
+
+/// Every method of an expression that takes one, each given `argument` as its expression: the one
+/// it needs, or each it does not need by itself, with a dtype for a dtype's place.
+fn every_method_given(argument: &Value) -> Vec<(String, Value)> {
+    let mut all = Vec::new();
+    for entry in catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == catalog::Applies::Expression)
+    {
+        let id = entry.id().as_str();
+        let expressions: Vec<_> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| matches!(parameter.kind(), catalog::Kind::Expression(_)))
+            .collect();
+        let needs_more = entry.parameters().iter().any(|parameter| {
+            parameter.is_needed()
+                && !matches!(
+                    parameter.kind(),
+                    catalog::Kind::Expression(_) | catalog::Kind::Dtype
+                )
+        });
+        if expressions.is_empty() || needs_more {
+            continue;
+        }
+        let needed: Vec<_> = expressions
+            .iter()
+            .filter(|parameter| parameter.is_needed())
+            .collect();
+        let sets: Vec<Vec<&catalog::Parameter>> = if needed.is_empty() {
+            expressions
+                .iter()
+                .map(|parameter| vec![*parameter])
+                .collect()
+        } else {
+            vec![needed.iter().map(|parameter| **parameter).collect()]
+        };
+        for set in sets {
+            let mut arguments = serde_json::Map::new();
+            for parameter in entry.parameters().iter().filter(|parameter| {
+                parameter.is_needed() && matches!(parameter.kind(), catalog::Kind::Dtype)
+            }) {
+                arguments.insert(parameter.name().to_owned(), json!({ "dtype": "Int64" }));
+            }
+            for parameter in &set {
+                let value = if parameter.shape() == catalog::Shape::Many {
+                    many(vec![argument.clone()])
+                } else {
+                    argument.clone()
+                };
+                arguments.insert(parameter.name().to_owned(), value);
+            }
+            let names: Vec<_> = set.iter().map(|parameter| parameter.name()).collect();
+            all.push((
+                format!("{id}({})", names.join(", ")),
+                call(id, Value::Object(arguments)),
+            ));
+        }
+    }
+    all
+}
+
+/// A value of two levels given as the argument of a method is not run into a panic of Polars, and a
+/// method that depends on the element dtype is not run with one the tables do not judge: the dtype
+/// of an argument that has no class is not known to them, as it is not for a receiver. The
+/// argument is a column of lists of lists, of arrays, of structs or of arrays of lists, or one of
+/// them taken a value of, or a connected input of one, given to every method that takes an
+/// expression, after a column of whole numbers, of nothing, of dates, of text and of lists.
+#[test]
+fn no_argument_of_two_levels_is_run_into_a_panic_of_polars() {
+    let receivers = [
+        "a".to_owned(),
+        "n".to_owned(),
+        "d".to_owned(),
+        "g".to_owned(),
+        column_of(Representative::List(Inner::Int64)),
+    ];
+    let present = frame();
+    let mut arguments: Vec<(String, Value, bool)> = Vec::new();
+    for (prefix, outer_is_array) in DEPTH_TWO_KINDS {
+        for element in DEPTH_TWO_ELEMENTS {
+            let column = depth_two_name(prefix, element);
+            if present.column(&column).is_err() {
+                continue;
+            }
+            let namespace = if outer_is_array { "arr" } else { "list" };
+            arguments.push((column.clone(), field(&column), true));
+            arguments.push((
+                format!("{column} {namespace}.first"),
+                field_then(
+                    &column,
+                    vec![call(&format!("Expr.{namespace}.first"), json!({}))],
+                ),
+                false,
+            ));
+            arguments.push((
+                format!("connected {column}"),
+                chain(json!({ "input": input_of(&column) }), vec![]),
+                true,
+            ));
+        }
+    }
+    let mut panicked: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut accepted: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut asked = 0;
+    for (label, argument, has_no_class) in &arguments {
+        let calls = every_method_given(argument);
+        for receiver in &receivers {
+            for (what, link) in &calls {
+                let sensitive = SENSITIVE_METHODS.iter().any(|name| what.starts_with(name));
+                for place in [Place::Select, Place::PivotAggregate] {
+                    if place == Place::PivotAggregate && !sensitive {
+                        continue;
+                    }
+                    asked += 1;
+                    let links = if place == Place::PivotAggregate {
+                        vec![link.clone(), call("Expr.first", json!({}))]
+                    } else {
+                        vec![link.clone()]
+                    };
+                    let (value, _) = step_of(place, receiver, links);
+                    let Ok(document) = Document::read(&document(vec![value])) else {
+                        continue;
+                    };
+                    let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        document.run_on(&inputs_of_two_levels(), &frame())
+                    }));
+                    let key = format!("{what} given {label}");
+                    match ran {
+                        Err(_) => panicked
+                            .entry(key)
+                            .or_default()
+                            .push(format!("{receiver} in {place:?}")),
+                        Ok(Ok(report))
+                            if sensitive
+                                && *has_no_class
+                                && polars_says(&report) == Said::Accepts =>
+                        {
+                            accepted
+                                .entry(key)
+                                .or_default()
+                                .push(format!("{receiver} in {place:?}"));
+                        }
+                        Ok(_) => {}
+                    }
+                }
+            }
+        }
+    }
+    let list = |found: &BTreeMap<String, Vec<String>>| {
+        found
+            .iter()
+            .take(40)
+            .map(|(chain, places)| format!("{chain}: {}", places.join(", ")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert!(
+        panicked.is_empty() && accepted.is_empty(),
+        "{} chains of {asked} reach a panic of Polars':\n{}\n{} are run with an argument the tables \
+         do not judge:\n{}",
+        panicked.len(),
+        list(&panicked),
+        accepted.len(),
+        list(&accepted)
     );
 }
