@@ -2909,6 +2909,38 @@ mod tests {
     }
 
     #[test]
+    fn a_focus_on_a_pivot_draws_a_pivot_for_most_cases_and_the_group_as_its_start() {
+        let focus = Focus::parse("LazyFrame.pivot").unwrap().unwrap();
+        assert_eq!(focus.names(), "LazyFrame.pivot");
+        // The owner and a dot name the steps that hold no chain, as they did.
+        let all = Focus::parse("LazyFrame.").unwrap().unwrap();
+        assert_eq!(all.names().split(", ").collect::<Vec<_>>(), STEPS);
+        let (mut cases, mut pivots, mut from_the_group) = (0, 0, 0);
+        for offset in 0..2000_u64 {
+            let Some(case) = generate(&entropy(offset), Some(&focus)) else {
+                continue;
+            };
+            let written = case.document.write();
+            cases += 1;
+            if written.contains("\"entry\":\"LazyFrame.pivot\"") {
+                pivots += 1;
+                from_the_group += usize::from(written.contains("\"entry\":\"polars.element\""));
+                // A case that holds the step is judged to hold the focus.
+                assert!(focus.is_held_by(&case.document), "offset {offset}");
+            }
+        }
+        assert!(cases > 1500, "{cases} cases");
+        assert!(
+            pivots * 100 > cases * 55,
+            "{pivots} pivots of {cases} cases"
+        );
+        assert!(
+            from_the_group * 100 > pivots * 60,
+            "{from_the_group} aggregates start from the group of {pivots} pivots"
+        );
+    }
+
+    #[test]
     fn a_focus_draws_its_methods_more_often() {
         let focus = Focus::parse("dt.replace").unwrap().unwrap();
         let holding = |focus: Option<&Focus>| {
