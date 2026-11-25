@@ -2834,6 +2834,7 @@ fn call_with_columns_for(
         &|_| None,
         &|_| false,
         &text_made_of_literals,
+        false,
     )
 }
 
@@ -2849,6 +2850,7 @@ fn call_with_columns_cut_for(
     cast_to: &dyn Fn(&Expression) -> Option<Value>,
     cut_after: &dyn Fn(&Call) -> bool,
     skipped: &dyn Fn(&Expression) -> usize,
+    literal_text: bool,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
@@ -2856,6 +2858,7 @@ fn call_with_columns_cut_for(
         cast_to: &'a dyn Fn(&Expression) -> Option<Value>,
         cut_after: &'a dyn Fn(&Call) -> bool,
         skipped: &'a dyn Fn(&Expression) -> usize,
+        literal_text: bool,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
         Some(match held {
@@ -2879,7 +2882,15 @@ fn call_with_columns_cut_for(
     }
     fn expression_of_columns(expression: &Expression, replacing: &Replacing) -> Option<Expression> {
         let replaced = (replacing.is_it)(expression);
-        let start = if replaced {
+        let start = if replaced && replacing.literal_text {
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.lit")?,
+                    vec![("value", Value::String((replacing.column_of)(expression)))],
+                )
+                .ok()?,
+            )
+        } else if replaced {
             Start::Call(
                 Call::new(
                     catalog::entry("polars.col")?,
@@ -2930,6 +2941,7 @@ fn call_with_columns_cut_for(
             cast_to,
             cut_after,
             skipped,
+            literal_text,
         },
     )
 }
@@ -4334,6 +4346,7 @@ fn applies(
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "Expr.struct.json_encode")))
+                && refused_for_a_conversion_of_text_without_the_json(case) == Some(true)
         }
         (Limit::AStructMetByAStructOfOtherFields, Disagreement::PolarsRefuses(refusal)) => {
             // At the plan, as a fill casts one struct to the other's dtype, and at the rows, as a
@@ -4544,6 +4557,61 @@ fn refused_when_the_join_keeps_the_left_rows(case: &Case, refused: &Refused) -> 
                 same_reason(&refused.source, &refused.reason, &refusal.reason)
                     || is_refused_for_what_it_met_alike(&refused.reason, &refusal.reason)
             })
+        })
+    })
+}
+
+/// Whether the chain holds the json of a struct, whose links up to it make what it writes.
+fn holds_a_json(expression: &Expression) -> bool {
+    expression
+        .links()
+        .iter()
+        .any(|link| is(link, "Expr.struct.json_encode"))
+}
+
+/// How many links make the json of a chain that holds one: up to and with its `json_encode`.
+fn links_that_write_a_json(expression: &Expression) -> usize {
+    expression
+        .links()
+        .iter()
+        .position(|link| is(link, "Expr.struct.json_encode"))
+        .map_or(0, |at| at + 1)
+}
+
+/// The case with the chain that writes a json made a text of one value that is no number, which the
+/// links after the json read as they read it.
+fn case_with_text_for_the_json(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(
+        step.id().clone(),
+        call_with_columns_cut_for(
+            step.call(),
+            &holds_a_json,
+            &|_| "1d".to_owned(),
+            &|_| None,
+            &|_| false,
+            &links_that_write_a_json,
+            true,
+        )?,
+    )
+    .ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        structs: case.structs.clone(),
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case for reading text as a number still when a text that is no number
+/// stands where the json is: the json is then why it allows the case, as its text is a number.
+/// `None` where no chain holds a json.
+fn refused_for_a_conversion_of_text_without_the_json(case: &Case) -> Option<bool> {
+    changed(case_with_text_for_the_json(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.starts_with("conversion from `str` to"))
         })
     })
 }
