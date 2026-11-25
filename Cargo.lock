@@ -976,6 +976,10 @@ dependencies = [
 [[package]]
 name = "dageist"
 version = "0.1.0"
+dependencies = [
+ "dageist-engine",
+ "dageist-graph",
+]
 
 [[package]]
 name = "dageist-engine"
