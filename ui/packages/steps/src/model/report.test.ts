@@ -10,7 +10,15 @@ import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
 import type { PreparedRun, PreparedStep } from './report';
-import { isChanged, prepareRun, rowEndOf, rowsFailure, rowsToShow, sayingOf } from './report';
+import {
+  isChanged,
+  linkHint,
+  prepareRun,
+  rowEndOf,
+  rowsFailure,
+  rowsToShow,
+  sayingOf,
+} from './report';
 
 // What the host reports of the claim-timing steps, and what the editor shows of it. The fixtures
 // are written from Rust; the expectations are written by hand from what the steps do.
@@ -230,6 +238,29 @@ describe('a refusal', () => {
       source: null,
       links: [],
     });
+  });
+
+  it('shows the class before each link, which the walk gives where no dtype is built, worded as a class', () => {
+    const refusedChain = stepOf(run, 'total').chains.get(pathKey(COLUMN));
+
+    // The sum of a text column: the walk puts the sum after a value of the class String.
+    expect(refusedChain?.places[0]).toEqual(selectAfter('String', 'many'));
+    expect(linkHint(refusedChain, 0)).toBe('after a value of the class String');
+  });
+
+  it('shows the dtype in and the dtype out of a link of a step that was planned, not a class', () => {
+    const planned = stepOf(prepared, 'step_index').chains.get(pathKey(COLUMN));
+
+    expect(linkHint(planned, 0)).toBe('String → UInt32');
+    expect(linkHint(planned, 1)).toBe('UInt32 → UInt32');
+  });
+
+  it('shows nothing of a link whose place the walk did not give, or of a chain the engine did not report', () => {
+    const refusedChain = stepOf(run, 'total').chains.get(pathKey(COLUMN));
+
+    // The place after the refused link is not known, and nothing stands after it.
+    expect(linkHint(refusedChain, 1)).toBeNull();
+    expect(linkHint(undefined, 0)).toBeNull();
   });
 });
 
