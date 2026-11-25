@@ -1,0 +1,26 @@
+[package]
+name = "dageist-workspace"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A dageist graph's workspace: its files on disk in a git repository, a commit for each edit, packing as it goes and each node's history."
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# The graph, its layout and the edits a workspace is read back through.
+dageist-graph = { path = "../dageist-graph" }
+# Packs the repository's new objects with deltas against each file's previous version.
+dageist-pack = { path = "../dageist-pack" }
+# The repository: writing objects and commits, moving the branch, reading trees and commits, and
+# the index git reads the checkout against. The newest release whose dependencies fit the libc and
+# syn versions the Polars release pins; Cargo.lock holds its gix-parallel at 0.50.1, since 0.50.2
+# asks for a newer libc.
+gix = { version = "=0.90.0", default-features = false, features = ["sha1", "index"] }
+# The files' shapes, read strictly.
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
