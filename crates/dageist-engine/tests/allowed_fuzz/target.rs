@@ -16,10 +16,12 @@ use super::counts;
 use super::generate::{Focus, generate};
 use super::limits::{excuses, strict};
 use super::observe::{
-    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked,
+    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
+use super::probe::{
+    Settled, cases_of_the_part, is_a_predicate_rule, same_reason, settle, settle_apart,
+};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -274,6 +276,59 @@ fn by_design(case: &Case, refused: &Refused, what: &str) -> Option<Result<CaseOu
     Some(CaseOutcome::expected_rejection(
         Vec::new(),
         one_line(&settled.said()),
+    ))
+}
+
+/// The rule that is stricter than Polars' streaming engine by design: a default of many values
+/// beside one value, which the streaming engine meets with the one value and the in-memory engine
+/// refuses for the lengths the rule names.
+const REPLACEMENT_RULE: &str = "replacement-values-match-in-number";
+
+/// What Polars' in-memory engine says of a replacement given values of other numbers than it takes:
+/// the two refusals for the lengths of what a replacement lists and of its default.
+const LENGTHS_OF_A_REPLACEMENT: [&str; 2] = [
+    "input for `replace_strict` must have the same length as the input or have length 1",
+    "input for `replace` must have the same length as `old` or have length 1",
+];
+
+/// Whether a refusal is one of the two for the lengths of a replacement, and no refusal for the
+/// lengths of another function, as the generic words of a length mismatch are.
+fn is_a_refusal_of_the_lengths_of_a_replacement(reason: &str) -> bool {
+    LENGTHS_OF_A_REPLACEMENT
+        .iter()
+        .any(|words| reason.contains(words))
+}
+
+/// Whether the in-memory engine refuses `case` for the lengths of a replacement.
+fn refused_in_memory_for_lengths(case: &Case) -> Option<String> {
+    refused_in_memory(case).filter(|reason| is_a_refusal_of_the_lengths_of_a_replacement(reason))
+}
+
+/// The outcome of a case where the rule that a replacement is given as many values as it takes
+/// refuses what Polars' streaming engine runs, which the in-memory engine, asked as a control of the
+/// part the rule refused on its own, refuses for those lengths. Both engines may drop the part
+/// where it stands, a sort key of one value as it is, so the control asks of the part alone, not of
+/// the step; a part the in-memory engine also runs settles nothing, nor does a part whose first
+/// calls the in-memory engine refuses for the same lengths.
+fn by_engine(case: &Case, refused: &Refused, rule: &str) -> Option<Result<CaseOutcome>> {
+    if strict() || rule != REPLACEMENT_RULE {
+        return None;
+    }
+    let reason = match cases_of_the_part(case, refused) {
+        Some((part, before)) => {
+            if before.is_some_and(|before| refused_in_memory_for_lengths(&before).is_some()) {
+                return None;
+            }
+            refused_in_memory_for_lengths(&part)?
+        }
+        None => refused_in_memory_for_lengths(case)?,
+    };
+    tally(format!("{STRICTER_THAN_ONE_ENGINE}: {rule}"));
+    Some(CaseOutcome::expected_rejection(
+        Vec::new(),
+        one_line(&format!(
+            "{STRICTER_THAN_ONE_ENGINE}: the in-memory engine refuses the part where the streaming engine runs it: {reason}"
+        )),
     ))
 }
 
@@ -693,6 +748,10 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = by_design(case, &refused, rule) {
                             return outcome;
                         }
+                        // What one of Polars' engines runs and the other refuses.
+                        if let Some(outcome) = by_engine(case, &refused, rule) {
+                            return outcome;
+                        }
                         return failure(
                             ALLOWANCE,
                             &format!("rule-refuses-what-polars-allows-{rule}"),
@@ -771,6 +830,43 @@ impl CaseTarget for AllowedTarget {
 
 #[cfg(test)]
 mod tests {
+
+    use super::super::observe::refused_in_memory;
+    use super::is_a_refusal_of_the_lengths_of_a_replacement;
+
+    #[test]
+    fn a_case_that_both_engines_run_is_not_refused_by_the_control() {
+        // `lit(null).over(lit(null))` and what follows it: Polars runs it in memory as it does on the
+        // streaming engine, so the control says nothing and a refusal by a rule stays a disagreement.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-window-over-a-literal-gives-the-rows.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        assert_eq!(refused_in_memory(&case), None);
+    }
+
+    #[test]
+    fn only_the_two_refusals_of_a_replacement_for_its_lengths_settle_a_difference_of_engines() {
+        for said in [
+            "`default` input for `replace_strict` must have the same length as the input or have length 1",
+            "`new` input for `replace` must have the same length as `old` or have length 1",
+        ] {
+            assert!(is_a_refusal_of_the_lengths_of_a_replacement(said), "{said}");
+        }
+        // What Polars says of the lengths of any other function, or of a zip of unequal inputs, is
+        // no refusal of a replacement, so a case that only that refuses is still a disagreement.
+        for said in [
+            "lengths don't match: cannot compare series of different lengths",
+            "arguments of `fill_null` have different lengths (2 != 3)",
+            "zip node received non-equal length inputs",
+            "incomplete mapping specified for `replace_strict`",
+        ] {
+            assert!(
+                !is_a_refusal_of_the_lengths_of_a_replacement(said),
+                "{said}"
+            );
+        }
+    }
     use dageist_engine::allowed::Representative;
     use dageist_engine::document::{Place, Segment};
 

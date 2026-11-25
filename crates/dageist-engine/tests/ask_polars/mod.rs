@@ -26,8 +26,9 @@ use dageist_engine::catalog::{
 };
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Step, Value};
 use polars::prelude::{
-    DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
+    DataFrame, DataType, Engine, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
+use polars_core::query_result::QueryResult;
 
 /// What is connected to the step, by name: its tables, and the values and lists that start an
 /// expression, as the literals they are.
@@ -159,6 +160,19 @@ pub fn collect(
     tables: Tables,
     limit: usize,
 ) -> Result<DataFrame, String> {
+    collect_on(Engine::Auto, step, index, working, tables, limit)
+}
+
+/// The first `limit` rows of the table `step` gives on `working`, run by `engine`, or the first
+/// line of why not.
+pub fn collect_on(
+    engine: Engine,
+    step: &Step,
+    index: usize,
+    working: &DataFrame,
+    tables: Tables,
+    limit: usize,
+) -> Result<DataFrame, String> {
     let mut asking = Asking::new(step, index, working, tables, true);
     let frame = match asking.step(step.call(), working.clone().lazy()) {
         Ok(frame) => frame,
@@ -167,7 +181,11 @@ pub fn collect(
     };
     frame
         .limit(IdxSize::try_from(limit).unwrap_or(IdxSize::MAX))
-        .collect()
+        .collect_with_engine(engine)
+        .map(|result| match result {
+            QueryResult::Single(frame) => frame,
+            QueryResult::Multiple(_) => DataFrame::empty(),
+        })
         .map_err(|error| first_line(&error.to_string()))
 }
 

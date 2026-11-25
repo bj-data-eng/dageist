@@ -11,8 +11,9 @@ use dageist_engine::allowed::Representative;
 use dageist_engine::document::{
     Document, Expression, Outcome, Place, Resolution, RunCause, Segment, Start, Value,
 };
-use polars::prelude::{DataType, IntoLazy};
+use polars::prelude::{DataType, Engine, IntoLazy};
 
+use super::ask_polars::{self, Connected};
 use super::asked::{self, Walked};
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
@@ -502,6 +503,26 @@ impl Tables {
 /// tables as `tables` changes them.
 pub fn observe_probe(case: &Case, tables: Tables) -> Observed {
     observe_on(case, tables, false)
+}
+
+/// Why Polars' in-memory engine refuses the first rows of the case's step on the sample, which the
+/// step engine runs on the streaming engine, or `None` where it runs them: the control of a case
+/// that one of the two engines runs and the other refuses.
+pub fn refused_in_memory(case: &Case) -> Option<String> {
+    let frames = Tables::default().of(case, &[DataType::Int64]);
+    let tables = |name: &str| frames.table(name, false);
+    catch_unwind(AssertUnwindSafe(|| {
+        ask_polars::collect_on(
+            Engine::InMemory,
+            &case.document.steps()[0],
+            0,
+            &frames.rows,
+            Connected::tables(&tables),
+            100,
+        )
+    }))
+    .ok()?
+    .err()
 }
 
 pub fn observe(case: &Case) -> Observed {

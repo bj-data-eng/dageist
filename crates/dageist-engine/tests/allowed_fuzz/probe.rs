@@ -795,6 +795,27 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     })
 }
 
+/// The cases that ask Polars about the part the tables refused, alone, as [`settle`] does, without
+/// asking: the case of the part, and the case of what stands before the refused call in it, which
+/// is none where the call starts the chain. `None` where the part has no probe.
+pub fn cases_of_the_part(case: &Case, refused: &Refused) -> Option<(Case, Option<Case>)> {
+    let found = find(case, &refused.place)?;
+    let probe = probe_of_the_part(&found, &refused.source)?;
+    let run = |part: Expression, filter: bool| {
+        let document = document_of(case, &found, part, filter)?;
+        Some(Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document,
+        })
+    };
+    let before = match probe.before {
+        Some(before) => Some(run(before, false)?),
+        None => None,
+    };
+    Some((run(probe.part, probe.filter)?, before))
+}
+
 /// The cases that ask Polars about the part a count was refused at, alone, as [`settle`] does,
 /// where it is allowed on the sample's rows: the chain through the refused call, and the chain of
 /// the call that takes it. `None` for a part of a pivot's aggregate or of a join's right key, which

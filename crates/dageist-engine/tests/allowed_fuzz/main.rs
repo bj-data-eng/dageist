@@ -266,19 +266,10 @@ fn replay_a_case() {
 /// tables state they do not cover, and replays as excused by that limit, and
 /// every limit has one. A limit may have others, named
 /// `uncovered-<limit>--<what it shows>.case`.
-/// The kept cases that settle as checked on more than one thread and, on one, as a part Polars does
-/// not evaluate (#103): the probe of the part is refused for the tables' own reason there.
-const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case"];
-
 /// How many threads Polars runs on: the size of its own pool, which `POLARS_MAX_THREADS` sets and
 /// which is the number of cores where it is not set.
 fn polars_threads() -> usize {
     polars_core::runtime::THREAD_POOL.current_num_threads()
-}
-
-/// Whether Polars runs on one thread.
-fn one_thread() -> bool {
-    polars_threads() == 1
 }
 
 #[test]
@@ -322,26 +313,12 @@ fn kept_cases_replay_as_settled() {
             .unwrap_or_else(|error| panic!("{name} could not be replayed: {error:?}"));
         let outcome = &evaluation.outcome;
         if name.starts_with("fixed-") {
-            // On one thread Polars refuses the part the probe asks about for the tables' own
-            // reason, where it does not on more, so the case settles as a part it does not
-            // evaluate.
-            let on_one_thread = one_thread() && SETTLED_AS_STRICTER_ON_ONE_THREAD.contains(&name);
-            if on_one_thread && outcome.kind() == OutcomeKind::ExpectedRejection {
-                assert!(
-                    outcome.detail().is_some_and(
-                        |detail| detail.starts_with(target::STRICTER_WHERE_UNEVALUATED)
-                    ),
-                    "{name} is settled as stricter on one thread: {}",
-                    detail_of(outcome)
-                );
-            } else {
-                assert_eq!(
-                    outcome.kind(),
-                    OutcomeKind::Evaluated,
-                    "{name} is settled and checked: {}",
-                    detail_of(outcome)
-                );
-            }
+            assert_eq!(
+                outcome.kind(),
+                OutcomeKind::Evaluated,
+                "{name} is settled and checked: {}",
+                detail_of(outcome)
+            );
             fixed += 1;
         } else if name.starts_with("by-engine-") {
             assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
