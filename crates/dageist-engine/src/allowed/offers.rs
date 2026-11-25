@@ -268,6 +268,10 @@ pub enum RefusalSource {
     Structure,
 }
 
+/// How the words of the refusal of a count of values begin, before the context it may not end.
+const COUNT_WORDS: &str = "a count of values that the data or the arguments decide, which is \
+     neither one value nor the table's rows, may not end an expression in";
+
 /// Why an entry may not stand at a place.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
@@ -318,11 +322,7 @@ impl Refusal {
         };
         Some(Self {
             source: RefusalSource::Polars(reason.stage),
-            reason: format!(
-                "a count of values that the data or the arguments decide, which is neither one \
-                 value nor the table's rows, may not end an expression in {context}: {}",
-                reason.text
-            ),
+            reason: format!("{COUNT_WORDS} {context}: {}", reason.text),
         })
     }
 
@@ -1556,10 +1556,31 @@ pub fn rule_forbids_values_of_other_counts() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::ValuesMeetInCount))
 }
 
-/// `refusal`, which refused a chain that starts from a connected list, as it is said of such a
-/// chain: the list is the values of another table, a count of its own and not the rows of this one.
+impl Refusal {
+    /// Whether the refusal is about how many values a chain gives: the table of counts refused it,
+    /// or a rule of counts did.
+    fn is_about_counts(&self) -> bool {
+        match self.source {
+            RefusalSource::Rule(rule) => matches!(
+                rule,
+                Rule::ValuesMeetInCount
+                    | Rule::PivotAggregateGivesOneValue
+                    | Rule::WindowInputIsNotCounted
+            ),
+            RefusalSource::Polars(_) => self.reason.starts_with(COUNT_WORDS),
+            RefusalSource::Structure => false,
+        }
+    }
+}
+
+/// `refusal` of a chain that is or meets a connected list, as it is said of such a chain: where it
+/// is about how many values the chain gives, the list is the values of another table, a count of
+/// its own and not the rows of this one. A refusal of anything else, a dtype for one, is as it was.
 #[must_use]
 pub(crate) fn refusal_of_a_connected_list(refusal: &Refusal) -> Refusal {
+    if !refusal.is_about_counts() {
+        return refusal.clone();
+    }
     Refusal {
         source: refusal.source,
         reason: format!(
