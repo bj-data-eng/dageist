@@ -19,8 +19,10 @@ mod catalogue;
 mod cli;
 #[cfg(test)]
 mod corpus;
+mod dialog;
 mod document;
 mod figures;
+mod graph;
 mod identity;
 mod node;
 mod offers;
@@ -33,6 +35,7 @@ mod test_support;
 mod windows;
 
 use std::process::ExitCode;
+use std::time::SystemTime;
 
 use dageist_engine::PolarsSession;
 
@@ -41,15 +44,19 @@ use dageist_engine::PolarsSession;
 ///
 /// The application is run so that it returns, and does not call `std::process::exit` as
 /// `Builder::run` does: the caller's [`PolarsSession`] is dropped only when this returns.
-fn open_application(context: tauri::Context, documents: document::Documents) -> i32 {
+fn open_application(context: tauri::Context, workspace: graph::Workspace) -> i32 {
     tauri::Builder::default()
         .manage(sample_table::SampleGate::default())
         .manage(sample_table::OpenTable::default())
-        .manage(documents)
+        .manage(workspace)
         .on_window_event(windows::close_with_main)
         .invoke_handler(tauri::generate_handler![
             identity::core_identity,
             catalogue::operation_catalogue,
+            graph::graph,
+            graph::edit_graph,
+            graph::place_node,
+            dialog::choose_file,
             node::node_inputs,
             node::node_document,
             node::edit_document,
@@ -82,20 +89,23 @@ fn main() -> ExitCode {
     let context = tauri::generate_context!();
     // Held until the job ends, whichever way `main` returns or a panic unwinds out of it.
     let _polars = PolarsSession::start();
-    let documents = match document::Documents::sample() {
-        Ok(documents) => documents,
-        Err(error) => {
-            eprintln!("dageist: the sample node cannot be made: {error:?}");
-            return ExitCode::FAILURE;
-        }
-    };
+    // The starting graph reads the sample's tables from files written for this run.
+    let sample = std::env::temp_dir().join(format!("dageist-sample-{}", std::process::id()));
+    let workspace =
+        match graph::Workspace::starting(document::first_revision(SystemTime::now()), &sample) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                eprintln!("dageist: the starting graph cannot be made: {error:?}");
+                return ExitCode::FAILURE;
+            }
+        };
     match invocation {
-        cli::Invocation::Application => match open_application(context, documents) {
+        cli::Invocation::Application => match open_application(context, workspace) {
             0 => ExitCode::SUCCESS,
             code => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         },
         cli::Invocation::Bridge { port } => {
-            match bridge::run(port, &context.config().identifier, documents) {
+            match bridge::run(port, &context.config().identifier, workspace) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("dageist: the bridge stopped: {error}");

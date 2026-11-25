@@ -1,27 +1,33 @@
-//! Commands that report a node: what is connected to it, the document it holds with what running
-//! it reports, the edits of that document, and the rows after one of its steps.
+//! Commands that report a transform of the graph: what is connected to it, the document it holds
+//! with what running it reports, the edits of that document, and the rows after one of its steps.
 //!
-//! The node is the engine's claim-timing sample until the graph supplies real
-//! ones. The document and its revision are the host's, kept in [`Documents`]; each command builds
-//! the node it runs on and keeps nothing else between calls. The commands are thin:
-//! the functions beside them answer, so that a host other than Tauri can
-//! serve the same views. The shapes mirror `NodeView`, `DocumentStateView`, `EditAnswerView` and
+//! Each command names the transform by its id. Its document and revision are the core's
+//! session's, held in the host's [`Workspace`]; what its steps run on is what working the graph
+//! out binds to its inputs, and its working rows are the first rows of the table its steps start
+//! from. The commands are thin: the functions beside them answer, so that a host other than
+//! Tauri can serve the same views. The shapes mirror `NodeView`, `DocumentStateView`, `EditAnswerView` and
 //! `RowsView` in `ui/packages/host/src/contract.ts`.
 
-use dageist_engine::claim_timing::ClaimTiming;
+use dageist::{Bindings, Session};
 use dageist_engine::document::{Document, InputKind, Inputs, Origin, RowsError, StepId};
+use dageist_graph::NodeId;
 use serde::Serialize;
 use tauri::State;
 
 use crate::document::{
-    DocumentStateView, Documents, EditAnswerView, EditRequest, document_state_view, edit_view,
+    DocumentStateView, EditAnswerView, EditRequest, document_error, document_state_view, edit_view,
 };
+use crate::graph::{Workspace, known_id};
 use crate::report::{FieldView, RunView, ValuesView};
 use crate::sample_table::{ErrorKind, ErrorView};
 
 /// The most rows a preview may hold. A preview is what a step list shows
 /// beside its steps, so it stays a window.
 const MAX_PREVIEW_ROWS: usize = 1_000;
+
+/// The most rows of the table a transform's steps start from that its steps are counted and
+/// previewed on.
+const WORKING_ROWS: usize = 10_000;
 
 /// What supplies an input to the node.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -49,7 +55,7 @@ fn origin_view(origin: &Origin) -> OriginView {
 /// The table the steps start from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceView {
-    name: &'static str,
+    name: String,
     from: OriginView,
     columns: Vec<FieldView>,
 }
@@ -101,22 +107,49 @@ fn failed(what: &str, error: impl std::fmt::Display) -> ErrorView {
     ErrorView::new(format!("{what}: {error}"))
 }
 
-fn node() -> Result<ClaimTiming, ErrorView> {
-    ClaimTiming::new().map_err(ErrorView::from)
+/// What the transform `node`'s steps run on, as working the graph out binds it.
+///
+/// # Errors
+///
+/// When the graph has no such transform, or the table its steps start from is not connected or
+/// gives nothing.
+pub(crate) fn bindings_of(session: &Session, node: &NodeId) -> Result<Bindings, ErrorView> {
+    if session.document(node).is_none() {
+        return Err(document_error(dageist::DocumentError::NoSuchTransform(
+            node.clone(),
+        )));
+    }
+    let mut workings = session.work_out();
+    let worked = workings.take(node).unwrap_or_default();
+    worked.bindings.ok_or_else(|| {
+        let why = worked
+            .problems
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("; ");
+        ErrorView::new(format!("the steps have no table to start from: {why}"))
+    })
 }
 
-/// What the node is connected to: the table its steps start from, and every
-/// other input with what supplies it and its columns, its value or its first
-/// values.
-pub fn node_view() -> Result<NodeView, ErrorView> {
-    let node = node()?;
+/// What the transform `node` is connected to: the table its steps start from, and every other
+/// input with what supplies it and its columns, its value or its first values.
+///
+/// # Errors
+///
+/// When the graph has no such transform, or its steps have no table to start from.
+pub fn node_view(workspace: &Workspace, node: &str) -> Result<NodeView, ErrorView> {
+    let node = known_id(node)?;
+    let bindings = bindings_of(&workspace.lock(), &node)?;
+    let columns = bindings.start.columns().map_err(ErrorView::from)?;
     Ok(NodeView {
         source: SourceView {
-            name: ClaimTiming::SOURCE_NAME,
-            from: origin_view(node.source_origin()),
-            columns: FieldView::of_columns(&node.source_columns()),
+            // The table the steps start from is called as an input would be.
+            name: dageist_graph::InputName::made_from(&bindings.start_name).to_string(),
+            from: origin_view(&Origin::Node(bindings.start_name.clone())),
+            columns: FieldView::of_columns(&columns),
         },
-        inputs: inputs_view(node.inputs())?,
+        inputs: inputs_view(&bindings.inputs)?,
     })
 }
 
@@ -152,27 +185,31 @@ pub(crate) fn inputs_view(inputs: &Inputs) -> Result<Vec<InputView>, ErrorView> 
         .collect())
 }
 
-/// Runs `document` on the node and reports each step.
+/// Runs `document` on its working rows with `bindings`, and reports each step.
 ///
 /// # Errors
 ///
-/// When the sample node cannot be made or Polars cannot run the document.
-pub fn run_view(document: &Document) -> Result<RunView, ErrorView> {
-    let node = node()?;
-    let report = node
-        .run(document)
+/// When the working rows cannot be read or Polars cannot run the document.
+pub fn run_view(document: &Document, bindings: &Bindings) -> Result<RunView, ErrorView> {
+    let working = bindings
+        .start
+        .working(WORKING_ROWS)
+        .map_err(ErrorView::from)?;
+    let report = document
+        .run_on(&bindings.inputs, &working)
         .map_err(|error| failed("running the document", error))?;
     Ok(RunView::of_report(&report))
 }
 
-/// The rows after the step `step` of the document the host holds at `revision`, at most `limit`
-/// of them.
+/// The rows after the step `step` of the document of the transform `node` at `revision`, at
+/// most `limit` of them.
 ///
 /// A failure says which kind it is: a `limit` over what a preview holds, a document at another
 /// revision that is `stale`, a step the document does not have, a step that was `refused`, a step
 /// that was `notRun` because one before it was refused, or otherwise `failed`.
 pub fn rows_view(
-    documents: &Documents,
+    workspace: &Workspace,
+    node: &str,
     revision: u64,
     step: &str,
     limit: usize,
@@ -183,67 +220,100 @@ pub fn rows_view(
             format!("a preview holds at most {MAX_PREVIEW_ROWS} rows"),
         ));
     }
-    rows_of(&documents.at(revision)?, step, limit)
+    let node = known_id(node)?;
+    let session = workspace.lock();
+    let (document, current) = session
+        .document(&node)
+        .ok_or_else(|| document_error(dageist::DocumentError::NoSuchTransform(node.clone())))?;
+    if current != revision {
+        return Err(document_error(dageist::DocumentError::Stale(
+            dageist::Stale {
+                asked: revision,
+                current,
+            },
+        )));
+    }
+    let bindings = bindings_of(&session, &node)?;
+    rows_of(document, &bindings, step, limit)
 }
 
-/// The rows after the step `step` of `document`, at most `limit` of them.
-fn rows_of(document: &Document, step: &str, limit: usize) -> Result<RowsView, ErrorView> {
+/// The rows after the step `step` of `document` run with `bindings`, at most `limit` of them.
+fn rows_of(
+    document: &Document,
+    bindings: &Bindings,
+    step: &str,
+    limit: usize,
+) -> Result<RowsView, ErrorView> {
     let step = StepId::new(step).map_err(|error| {
         ErrorView::of(ErrorKind::NoSuchStep, format!("naming the step: {error}"))
     })?;
-    let preview = node()?.preview(document, &step, limit).map_err(|error| {
-        let kind = match &error {
-            RowsError::NoSuchStep(_) => ErrorKind::NoSuchStep,
-            RowsError::Refused(refusal) if refusal.place().step_id() == Some(&step) => {
-                ErrorKind::Refused
-            }
-            RowsError::Refused(_) => ErrorKind::NotRun,
-            RowsError::Incomplete(place) if place.step_id() == Some(&step) => ErrorKind::Refused,
-            RowsError::Incomplete(_) => ErrorKind::NotRun,
-            RowsError::Polars(_) => ErrorKind::Failed,
-        };
-        ErrorView::of(kind, format!("previewing the rows: {error}"))
-    })?;
+    let working = bindings
+        .start
+        .working(WORKING_ROWS)
+        .map_err(ErrorView::from)?;
+    let preview = document
+        .preview(&bindings.inputs, &working, &step, limit)
+        .map_err(|error| {
+            let kind = match &error {
+                RowsError::NoSuchStep(_) => ErrorKind::NoSuchStep,
+                RowsError::Refused(refusal) if refusal.place().step_id() == Some(&step) => {
+                    ErrorKind::Refused
+                }
+                RowsError::Refused(_) => ErrorKind::NotRun,
+                RowsError::Incomplete(place) if place.step_id() == Some(&step) => {
+                    ErrorKind::Refused
+                }
+                RowsError::Incomplete(_) => ErrorKind::NotRun,
+                RowsError::Polars(_) => ErrorKind::Failed,
+            };
+            ErrorView::of(kind, format!("previewing the rows: {error}"))
+        })?;
     Ok(RowsView {
         columns: FieldView::of_columns(preview.columns()),
         rows: preview.rows().to_vec(),
     })
 }
 
-/// Reports what the node is connected to.
+/// Reports what the transform `node` is connected to.
 #[tauri::command(async)]
-pub fn node_inputs() -> Result<NodeView, ErrorView> {
-    node_view()
+pub fn node_inputs(workspace: State<'_, Workspace>, node: String) -> Result<NodeView, ErrorView> {
+    node_view(&workspace, &node)
 }
 
-/// Reports the node's document, the revision it is at, and what running it reported.
+/// Reports the document of the transform `node`, the revision it is at, and what running it
+/// reported.
 #[tauri::command(async)]
-pub fn node_document(documents: State<'_, Documents>) -> Result<DocumentStateView, ErrorView> {
-    document_state_view(&documents)
+pub fn node_document(
+    workspace: State<'_, Workspace>,
+    node: String,
+) -> Result<DocumentStateView, ErrorView> {
+    document_state_view(&workspace, &node)
 }
 
-/// Makes the edit `edit` on the node's document, which must be at `revision`, and reports the
-/// edited document with its new revision and what running it reported, or why the engine
-/// refused the edit.
+/// Makes the edit `edit` on the document of the transform `node`, which must be at `revision`,
+/// and reports the edited document with its new revision and what running it reported, or why
+/// the engine refused the edit.
 #[tauri::command(async)]
 pub fn edit_document(
-    documents: State<'_, Documents>,
+    workspace: State<'_, Workspace>,
+    node: String,
     revision: u64,
     edit: EditRequest,
 ) -> Result<EditAnswerView, ErrorView> {
-    edit_view(&documents, revision, &edit)
+    edit_view(&workspace, &node, revision, &edit)
 }
 
-/// Gives the rows after the step `step` of the node's document at `revision`, at most `limit` of
-/// them, which is at most `MAX_PREVIEW_ROWS`.
+/// Gives the rows after the step `step` of the document of the transform `node` at `revision`,
+/// at most `limit` of them, which is at most `MAX_PREVIEW_ROWS`.
 #[tauri::command(async)]
 pub fn rows_after_step(
-    documents: State<'_, Documents>,
+    workspace: State<'_, Workspace>,
+    node: String,
     revision: u64,
     step: String,
     limit: usize,
 ) -> Result<RowsView, ErrorView> {
-    rows_view(&documents, revision, &step, limit)
+    rows_view(&workspace, &node, revision, &step, limit)
 }
 
 #[cfg(test)]

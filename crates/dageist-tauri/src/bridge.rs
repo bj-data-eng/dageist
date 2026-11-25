@@ -30,7 +30,7 @@ mod tests;
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpListener, TcpStream};
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -39,7 +39,11 @@ use serde::de::DeserializeOwned;
 
 use crate::block::CONTENT_TYPE;
 use crate::catalogue::english_catalogue;
-use crate::document::{Documents, EditRequest, document_state_view, edit_view};
+use crate::dialog::{Dialogs, Purpose, serve_dialogs};
+use crate::document::{EditRequest, document_state_view, edit_view};
+use crate::graph::{
+    FrameView, GraphEditRequest, Workspace, edit_graph_view, graph_view, place_view,
+};
 use crate::identity::identity_view;
 use crate::node::{node_view, rows_view};
 use crate::offers::{
@@ -77,17 +81,20 @@ pub struct Session {
     sample: Sample,
     gate: SampleGate,
     open: OpenTable,
-    documents: Documents,
+    workspace: Workspace,
+    dialogs: Dialogs,
 }
 
 impl Session {
-    /// A session with no table open, over the sample table `sample` and the node's `documents`.
-    pub fn new(sample: Sample, documents: Documents) -> Self {
+    /// A session with no table open, over the sample table `sample` and the graph `workspace`,
+    /// whose file dialogs are run by `dialogs`.
+    pub fn new(sample: Sample, workspace: Workspace, dialogs: Dialogs) -> Self {
         Self {
             sample,
             gate: SampleGate::default(),
             open: OpenTable::default(),
-            documents,
+            workspace,
+            dialogs,
         }
     }
 }
@@ -97,9 +104,17 @@ impl Session {
 #[serde(deny_unknown_fields)]
 struct NoArguments {}
 
+/// The arguments of a command on one transform: its id.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeArguments {
+    node: String,
+}
+
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct EditArguments {
+    node: String,
     revision: u64,
     edit: EditRequest,
 }
@@ -107,9 +122,31 @@ struct EditArguments {
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RowsArguments {
+    node: String,
     revision: u64,
     step: String,
     limit: usize,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GraphEditArguments {
+    revision: u64,
+    edit: GraphEditRequest,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PlaceArguments {
+    revision: u64,
+    node: String,
+    frame: FrameView,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChooseArguments {
+    purpose: Purpose,
 }
 
 #[derive(serde::Deserialize)]
@@ -203,6 +240,10 @@ fn json(view: &impl Serialize) -> Result<Answer, Failure> {
 enum Command {
     CoreIdentity,
     OperationCatalogue,
+    Graph,
+    EditGraph,
+    PlaceNode,
+    ChooseFile,
     NodeInputs,
     NodeDocument,
     EditDocument,
@@ -223,6 +264,10 @@ impl Command {
         Some(match name {
             "core_identity" => Self::CoreIdentity,
             "operation_catalogue" => Self::OperationCatalogue,
+            "graph" => Self::Graph,
+            "edit_graph" => Self::EditGraph,
+            "place_node" => Self::PlaceNode,
+            "choose_file" => Self::ChooseFile,
             "node_inputs" => Self::NodeInputs,
             "node_document" => Self::NodeDocument,
             "edit_document" => Self::EditDocument,
@@ -251,25 +296,56 @@ impl Command {
                 arguments::<NoArguments>(body)?;
                 json(&english_catalogue()?)
             }
-            Self::NodeInputs => {
+            Self::Graph => {
                 arguments::<NoArguments>(body)?;
-                json(&node_view()?)
+                json(&graph_view(&session.workspace))
+            }
+            Self::EditGraph => {
+                let GraphEditArguments { revision, edit } = arguments(body)?;
+                json(&edit_graph_view(&session.workspace, revision, &edit)?)
+            }
+            Self::PlaceNode => {
+                let PlaceArguments {
+                    revision,
+                    node,
+                    frame,
+                } = arguments(body)?;
+                json(&place_view(&session.workspace, revision, &node, frame)?)
+            }
+            Self::ChooseFile => {
+                let ChooseArguments { purpose } = arguments(body)?;
+                json(&session.dialogs.choose(purpose))
+            }
+            Self::NodeInputs => {
+                let NodeArguments { node } = arguments(body)?;
+                json(&node_view(&session.workspace, &node)?)
             }
             Self::NodeDocument => {
-                arguments::<NoArguments>(body)?;
-                json(&document_state_view(&session.documents)?)
+                let NodeArguments { node } = arguments(body)?;
+                json(&document_state_view(&session.workspace, &node)?)
             }
             Self::EditDocument => {
-                let EditArguments { revision, edit } = arguments(body)?;
-                json(&edit_view(&session.documents, revision, &edit)?)
+                let EditArguments {
+                    node,
+                    revision,
+                    edit,
+                } = arguments(body)?;
+                json(&edit_view(&session.workspace, &node, revision, &edit)?)
             }
             Self::RowsAfterStep => {
                 let RowsArguments {
+                    node,
                     revision,
                     step,
                     limit,
                 } = arguments(body)?;
-                json(&rows_view(&session.documents, revision, &step, limit)?)
+                json(&rows_view(
+                    &session.workspace,
+                    &node,
+                    revision,
+                    &step,
+                    limit,
+                )?)
             }
             Self::OffersAt => {
                 let OffersArguments { positions, after } = arguments(body)?;
@@ -582,13 +658,16 @@ pub fn serve(listener: &TcpListener, bridge: Bridge) -> io::Result<()> {
 }
 
 /// Runs the bridge for the application whose Tauri identifier is `identifier`, over the sample
-/// table kept in that application's cache, until the process is stopped. Prints the address it
-/// listens on.
+/// table kept in that application's cache and the graph `workspace`, until the process is
+/// stopped. Prints the address it listens on.
+///
+/// The bridge serves its connections from other threads, and this thread runs the file dialogs
+/// they ask for, because the platform runs a dialog on the main thread.
 ///
 /// # Errors
 ///
 /// Returns why the bridge cannot start or stops.
-pub fn run(port: u16, identifier: &str, documents: Documents) -> io::Result<()> {
+pub fn run(port: u16, identifier: &str, workspace: Workspace) -> io::Result<()> {
     let cache = cache::application_cache(identifier).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
@@ -598,6 +677,13 @@ pub fn run(port: u16, identifier: &str, documents: Documents) -> io::Result<()> 
     let listener = bind(port)?;
     let address = listener.local_addr()?;
     println!("dageist bridge listening on http://{address}");
-    let session = Session::new(Sample::in_cache(&cache), documents);
-    serve(&listener, Bridge::new(address.port(), session))
+    let (requests, asked) = mpsc::channel();
+    let session = Session::new(Sample::in_cache(&cache), workspace, Dialogs::to(requests));
+    let server = thread::Builder::new()
+        .name("bridge".to_owned())
+        .spawn(move || serve(&listener, Bridge::new(address.port(), session)))?;
+    serve_dialogs(&asked);
+    server
+        .join()
+        .unwrap_or_else(|_| Err(io::Error::other("the bridge's thread panicked")))
 }

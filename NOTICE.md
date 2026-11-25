@@ -236,6 +236,11 @@ This product depends on recursive 0.1.1, distributed by Orson Peters:
 * License: [MIT License](licenses/recursive/LICENSE)
 * Homepage: [recursive](https://github.com/orlp/recursive)
 
+This product depends on rfd 0.17.2, distributed by Bartłomiej Maryńczak:
+
+* License: [MIT License](licenses/rfd/LICENSE)
+* Homepage: [rfd](https://github.com/PolyMeilex/rfd)
+
 This product's public API audit generator depends on public-api 0.50.0 and
 rustdoc-json 0.9.7, distributed by the contributors to cargo-public-api:
 

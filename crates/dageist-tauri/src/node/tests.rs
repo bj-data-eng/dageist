@@ -12,7 +12,9 @@ use tauri::{WebviewWindow, WebviewWindowBuilder};
 use dageist_engine::document::Document;
 
 use super::{node_view, rows_view, run_view};
-use crate::document::{Documents, document_state_view};
+use crate::document::document_state_view;
+use crate::graph::Workspace;
+use crate::graph::tests::{NODE, sample_bindings, sample_of};
 
 /// Set to rewrite the snapshots instead of checking them.
 const REFRESH: &str = "DAGEIST_REFRESH_STEP_REPORTS";
@@ -20,9 +22,9 @@ const REFRESH: &str = "DAGEIST_REFRESH_STEP_REPORTS";
 /// The command that refreshes the snapshots.
 const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri node::tests::the_snapshots_are_what_the_commands_return";
 
-fn window(documents: Documents) -> WebviewWindow<MockRuntime> {
+fn window(workspace: Workspace) -> WebviewWindow<MockRuntime> {
     let app = mock_builder()
-        .manage(documents)
+        .manage(workspace)
         .invoke_handler(tauri::generate_handler![
             super::node_inputs,
             super::node_document,
@@ -41,9 +43,9 @@ pub(crate) fn read(text: &str) -> Document {
     Document::read(text).expect("a document")
 }
 
-/// The documents of a node whose steps are written as `text`.
-pub(crate) fn documents_of(text: &str) -> Documents {
-    Documents::of(Document::read(text).expect("a document"))
+/// The starting graph, whose transform's steps are written as `text`.
+pub(crate) fn documents_of(text: &str) -> Workspace {
+    sample_of(Document::read(text).expect("a document"))
 }
 
 /// Calls `command` as the view's IPC does on a node whose steps are the sample's, and gives the
@@ -58,12 +60,16 @@ fn run_text(text: impl AsRef<str>) -> Value {
         .clone()
 }
 
-/// Calls `command` on a node that holds `documents`.
+/// Calls `command` on the starting graph's transform in `workspace`: its id is added to
+/// `arguments` when they do not name a node.
 pub(crate) fn invoke_on(
-    documents: Documents,
+    workspace: Workspace,
     command: &str,
-    arguments: Value,
+    mut arguments: Value,
 ) -> Result<Value, Value> {
+    if let Some(fields) = arguments.as_object_mut() {
+        fields.entry("node").or_insert_with(|| json!(NODE));
+    }
     let request = InvokeRequest {
         cmd: command.into(),
         callback: CallbackFn(0),
@@ -73,7 +79,7 @@ pub(crate) fn invoke_on(
         headers: tauri::http::HeaderMap::default(),
         invoke_key: INVOKE_KEY.to_owned(),
     };
-    match tauri::test::get_ipc_response(&window(documents), request)? {
+    match tauri::test::get_ipc_response(&window(workspace), request)? {
         InvokeResponseBody::Json(text) => Ok(serde_json::from_str(&text).expect("JSON")),
         other => panic!("expected JSON, got {other:?}"),
     }
@@ -758,7 +764,7 @@ fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
 
 #[test]
 fn a_run_reports_the_summary_of_each_step() {
-    let run = json(&run_view(&read(steps_text())).expect("a report"));
+    let run = json(&run_view(&read(steps_text()), &sample_bindings()).expect("a report"));
     let steps = run["steps"].as_array().expect("steps");
     let said = |id: &str| {
         steps
@@ -778,7 +784,7 @@ fn a_run_reports_the_summary_of_each_step() {
 
 #[test]
 fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
-    let run = json(&run_view(&read(steps_text())).expect("a report"));
+    let run = json(&run_view(&read(steps_text()), &sample_bindings()).expect("a report"));
     let steps = run["steps"].as_array().expect("steps");
     // The sample gives `shift` its default of 1 as its first argument, which is the only
     // argument of its steps that equals what Polars holds when it is not given.
@@ -804,22 +810,25 @@ fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
 #[test]
 fn the_snapshots_are_what_the_commands_return() {
     let snapshots: [(&str, Value); 8] = [
-        ("node-inputs.json", json(&node_view().expect("the node"))),
+        (
+            "node-inputs.json",
+            json(&node_view(&documents_of(steps_text()), NODE).expect("the node")),
+        ),
         (
             "node-document.json",
-            json(&document_state_view(&documents_of(steps_text())).expect("a state")),
+            json(&document_state_view(&documents_of(steps_text()), NODE).expect("a state")),
         ),
         (
             "step-report.json",
-            json(&run_view(&read(steps_text())).expect("a report")),
+            json(&run_view(&read(steps_text()), &sample_bindings()).expect("a report")),
         ),
         (
             "step-report-refused.json",
-            json(&run_view(&read(&refused_text())).expect("a report")),
+            json(&run_view(&read(&refused_text()), &sample_bindings()).expect("a report")),
         ),
         (
             "step-report-incomplete.json",
-            json(&run_view(&read(&incomplete_text())).expect("a report")),
+            json(&run_view(&read(&incomplete_text()), &sample_bindings()).expect("a report")),
         ),
         (
             "step-report-variants.json",
@@ -828,7 +837,7 @@ fn the_snapshots_are_what_the_commands_return() {
         ("vocabulary.json", vocabulary()),
         (
             "step-rows.json",
-            json(&rows_view(&documents_of(steps_text()), 1, "days_open", 7).expect("rows")),
+            json(&rows_view(&documents_of(steps_text()), NODE, 1, "days_open", 7).expect("rows")),
         ),
     ];
     for (file, returned) in &snapshots {

@@ -1,0 +1,428 @@
+{
+  "revision": 23,
+  "layoutRevision": 0,
+  "nodes": [
+    {
+      "id": "claims",
+      "name": "Claims",
+      "kind": "source",
+      "summary": "claims.parquet",
+      "slots": [],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "dcn",
+          "dtype": "String"
+        },
+        {
+          "name": "timestamp",
+          "dtype": "Datetime(us)"
+        },
+        {
+          "name": "step_to",
+          "dtype": "String"
+        },
+        {
+          "name": "owner",
+          "dtype": "String"
+        },
+        {
+          "name": "row_days",
+          "dtype": "Int64"
+        }
+      ],
+      "parameters": [],
+      "file": {
+        "path": "/sample/claims.parquet",
+        "format": "parquet"
+      },
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "holiday-calendar",
+      "name": "Holiday calendar",
+      "kind": "source",
+      "summary": "holidays.parquet",
+      "slots": [],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "date",
+          "dtype": "Date"
+        }
+      ],
+      "parameters": [],
+      "file": {
+        "path": "/sample/holidays.parquet",
+        "format": "parquet"
+      },
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "parameters",
+      "name": "Parameters",
+      "kind": "parameters",
+      "summary": "2 values",
+      "slots": [],
+      "newInput": null,
+      "columns": null,
+      "parameters": [
+        {
+          "name": "as_of",
+          "dtype": "Date",
+          "text": "2026-03-02"
+        },
+        {
+          "name": "sla_cutoff",
+          "dtype": "Int64",
+          "text": "1"
+        }
+      ],
+      "file": null,
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "sla-by-step",
+      "name": "SLA by step",
+      "kind": "source",
+      "summary": "step_sla.parquet",
+      "slots": [],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "step",
+          "dtype": "String"
+        },
+        {
+          "name": "sla_days",
+          "dtype": "Int64"
+        }
+      ],
+      "parameters": [],
+      "file": {
+        "path": "/sample/step_sla.parquet",
+        "format": "parquet"
+      },
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "step-names",
+      "name": "Step names",
+      "kind": "source",
+      "summary": "step_names.parquet",
+      "slots": [],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "step_to",
+          "dtype": "String"
+        }
+      ],
+      "parameters": [],
+      "file": {
+        "path": "/sample/step_names.parquet",
+        "format": "parquet"
+      },
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "claim-timing",
+      "name": "Claim timing",
+      "kind": "transform",
+      "summary": "12 steps",
+      "slots": [
+        {
+          "slot": {
+            "kind": "start"
+          },
+          "takes": "table",
+          "from": {
+            "kind": "table",
+            "node": "claims"
+          },
+          "fits": [
+            {
+              "kind": "table",
+              "node": "claims"
+            },
+            {
+              "kind": "table",
+              "node": "holiday-calendar"
+            },
+            {
+              "kind": "table",
+              "node": "sla-by-step"
+            },
+            {
+              "kind": "table",
+              "node": "step-names"
+            }
+          ]
+        },
+        {
+          "slot": {
+            "kind": "input",
+            "name": "as_of"
+          },
+          "takes": "value",
+          "from": {
+            "kind": "parameter",
+            "node": "parameters",
+            "name": "as_of"
+          },
+          "fits": [
+            {
+              "kind": "parameter",
+              "node": "parameters",
+              "name": "as_of"
+            },
+            {
+              "kind": "parameter",
+              "node": "parameters",
+              "name": "sla_cutoff"
+            }
+          ]
+        },
+        {
+          "slot": {
+            "kind": "input",
+            "name": "holidays"
+          },
+          "takes": "list",
+          "from": {
+            "kind": "column",
+            "node": "holiday-calendar",
+            "column": "date"
+          },
+          "fits": [
+            {
+              "kind": "table",
+              "node": "claims"
+            },
+            {
+              "kind": "table",
+              "node": "holiday-calendar"
+            },
+            {
+              "kind": "table",
+              "node": "sla-by-step"
+            },
+            {
+              "kind": "table",
+              "node": "step-names"
+            }
+          ]
+        },
+        {
+          "slot": {
+            "kind": "input",
+            "name": "sla_cutoff"
+          },
+          "takes": "value",
+          "from": {
+            "kind": "parameter",
+            "node": "parameters",
+            "name": "sla_cutoff"
+          },
+          "fits": [
+            {
+              "kind": "parameter",
+              "node": "parameters",
+              "name": "as_of"
+            },
+            {
+              "kind": "parameter",
+              "node": "parameters",
+              "name": "sla_cutoff"
+            }
+          ]
+        },
+        {
+          "slot": {
+            "kind": "input",
+            "name": "step_names"
+          },
+          "takes": "table",
+          "from": {
+            "kind": "table",
+            "node": "step-names"
+          },
+          "fits": [
+            {
+              "kind": "table",
+              "node": "claims"
+            },
+            {
+              "kind": "table",
+              "node": "holiday-calendar"
+            },
+            {
+              "kind": "table",
+              "node": "sla-by-step"
+            },
+            {
+              "kind": "table",
+              "node": "step-names"
+            }
+          ]
+        },
+        {
+          "slot": {
+            "kind": "input",
+            "name": "step_sla"
+          },
+          "takes": "table",
+          "from": {
+            "kind": "table",
+            "node": "sla-by-step"
+          },
+          "fits": [
+            {
+              "kind": "table",
+              "node": "claims"
+            },
+            {
+              "kind": "table",
+              "node": "holiday-calendar"
+            },
+            {
+              "kind": "table",
+              "node": "sla-by-step"
+            },
+            {
+              "kind": "table",
+              "node": "step-names"
+            }
+          ]
+        }
+      ],
+      "newInput": [
+        {
+          "kind": "table",
+          "node": "claims"
+        },
+        {
+          "kind": "table",
+          "node": "holiday-calendar"
+        },
+        {
+          "kind": "parameter",
+          "node": "parameters",
+          "name": "as_of"
+        },
+        {
+          "kind": "parameter",
+          "node": "parameters",
+          "name": "sla_cutoff"
+        },
+        {
+          "kind": "table",
+          "node": "sla-by-step"
+        },
+        {
+          "kind": "table",
+          "node": "step-names"
+        }
+      ],
+      "columns": [
+        {
+          "name": "dcn",
+          "dtype": "String"
+        },
+        {
+          "name": "Intake",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Review",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Pending",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Complete",
+          "dtype": "Int64"
+        }
+      ],
+      "parameters": [],
+      "file": null,
+      "problems": [],
+      "frame": null
+    },
+    {
+      "id": "claim-timing-output",
+      "name": "Claim timing output",
+      "kind": "output",
+      "summary": "No file chosen",
+      "slots": [
+        {
+          "slot": {
+            "kind": "written"
+          },
+          "takes": "table",
+          "from": {
+            "kind": "table",
+            "node": "claim-timing"
+          },
+          "fits": [
+            {
+              "kind": "table",
+              "node": "claim-timing"
+            },
+            {
+              "kind": "table",
+              "node": "claims"
+            },
+            {
+              "kind": "table",
+              "node": "holiday-calendar"
+            },
+            {
+              "kind": "table",
+              "node": "sla-by-step"
+            },
+            {
+              "kind": "table",
+              "node": "step-names"
+            }
+          ]
+        }
+      ],
+      "newInput": null,
+      "columns": [
+        {
+          "name": "dcn",
+          "dtype": "String"
+        },
+        {
+          "name": "Intake",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Review",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Pending",
+          "dtype": "Int64"
+        },
+        {
+          "name": "Complete",
+          "dtype": "Int64"
+        }
+      ],
+      "parameters": [],
+      "file": null,
+      "problems": ["no file is chosen"],
+      "frame": null
+    }
+  ],
+  "parameterDtypes": ["Int64", "Float64", "Boolean", "String", "Date"]
+}
