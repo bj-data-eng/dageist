@@ -654,6 +654,74 @@ pub(super) fn context_cases(planner: &Planner<'_>) -> Vec<Case> {
         .collect()
 }
 
+/// How many places a method is tried at in a context before the walk is taken to disagree with
+/// the tables there.
+const TRIED_IN_A_CONTEXT: usize = 12;
+
+/// One chain that holds a method in each context but a select's own, which holds all of them: the
+/// first method that needs nothing given that the engine allows there after a value of a class
+/// and shape that a chain can be brought to, and that the walk of the document allows too. A
+/// context in which the engine allows no method has none.
+pub(super) fn context_method_cases(planner: &mut Planner<'_>) -> Vec<Case> {
+    let grid = planner.grid;
+    let select = grid.context_at(Context::step(Outer::Select));
+    let mut cases = Vec::new();
+    for context in (0..grid.contexts.len()).filter(|context| *context != select) {
+        let found = grid.contexts[context];
+        let mut candidates: Vec<(usize, Representative, Shape)> = Vec::new();
+        for shape in [Shape::Many, Shape::One, Shape::Counted] {
+            for class in Representative::ALL {
+                let after = grid.after_at(After::Value {
+                    dtype: class,
+                    shape,
+                });
+                for (number, entry) in grid.entries.iter().enumerate() {
+                    if entry.applies() == Applies::Expression
+                        && !needs_arguments(entry)
+                        && matches!(grid.cell(context, after, number), Cell::Allowed { .. })
+                        && planner.reach(context).contains_key(&(class, shape))
+                        && candidates.len() < TRIED_IN_A_CONTEXT
+                    {
+                        candidates.push((number, class, shape));
+                    }
+                }
+            }
+        }
+        for (number, class, shape) in candidates {
+            let id = grid.entries[number].id().as_str();
+            let mut plan = planner.reach(context)[&(class, shape)].clone();
+            plan.links.push((
+                id,
+                After::Value {
+                    dtype: class,
+                    shape,
+                },
+            ));
+            let made = Made {
+                context,
+                root: plan.root,
+                links: plan.links,
+            };
+            let (document, _) = made_document(planner, &made);
+            let document = filled(&document);
+            let held = standings(&document, &made);
+            if held.last().is_some_and(|(_, allowed)| *allowed) {
+                cases.push(Case {
+                    name: format!(
+                        "{id} after {} {} in {}",
+                        class.name(),
+                        shape.name(),
+                        found.name()
+                    ),
+                    document,
+                });
+                break;
+            }
+        }
+    }
+    cases
+}
+
 /// The documents that give an entry the parameters no chain has given it: the method after a
 /// value it is allowed after, or the function that starts a chain, with every parameter the
 /// engine offers.

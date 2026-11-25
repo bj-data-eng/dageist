@@ -177,6 +177,40 @@ fn every_context_the_tables_cover_holds_a_chain() {
 }
 
 #[test]
+fn every_context_where_the_engine_allows_a_method_holds_one() {
+    let grid = grid();
+    let held_methods: HashSet<&str> = held()
+        .iter()
+        .filter(|fact| {
+            fact.verdict == Verdict::Allowed
+                && matches!(fact.follows, Follows::Value { .. })
+                && catalog::entry(fact.entry)
+                    .is_some_and(|entry| entry.applies() == Applies::Expression)
+        })
+        .filter_map(|fact| fact.context.as_deref())
+        .collect();
+    for (at, context) in grid.contexts.iter().enumerate() {
+        let allows_one = (0..grid.entries.len()).any(|number| {
+            grid.entries[number].applies() == Applies::Expression
+                && Representative::ALL.iter().any(|class| {
+                    Shape::ALL.iter().any(|shape| {
+                        let after = grid.after_at(After::Value {
+                            dtype: *class,
+                            shape: *shape,
+                        });
+                        matches!(grid.cell(at, after, number), Cell::Allowed { .. })
+                    })
+                })
+        });
+        assert_eq!(
+            held_methods.contains(context.name().as_str()),
+            allows_one,
+            "{context}: the engine allows a method there, or it does not, and the corpus holds one"
+        );
+    }
+}
+
+#[test]
 fn every_step_of_the_catalogue_is_held() {
     let held_steps: HashSet<&str> = documents()
         .iter()
@@ -325,48 +359,29 @@ fn the_corpus_holds_each_outcome_of_a_step_each_state_of_its_rows_and_each_cause
 }
 
 /// The rules that no document of the corpus is refused by, each with why. The offers at a place
-/// give a call three rules and the walk another five that the corpus's documents meet; these are
-/// the rest, each of which judges what the corpus picks no way to reach: what a call is given
-/// beside what it follows (a pattern, a duration, a time zone, replacement values, a range, the
-/// zones of moments), the two keys of a join together, the width of arrays, which the corpus's
-/// tables hold one of, and a window over a value the corpus brings to no such state. The words of
-/// each are held by the census, which the view's census test runs.
+/// give a call three rules and the walk the others the corpus meets, among them those of a pattern,
+/// a duration, a time zone, a range, a join's keys and a window given a count, for each of which a
+/// document is made by editing one that is allowed. These five are the rest.
 const NOT_HELD: &[(&str, &str)] = &[
     (
         "arrays-meet-at-one-width",
-        "the arrays of the corpus's tables are of one width",
+        "the arrays of the corpus's tables are all of the one width the tables measure, 2, so none meets one of another width",
     ),
-    ("duration-is-valid", "a duration is given a valid one"),
     (
         "folded-function-is-no-join-key",
-        "a function of literals is not put in a join key",
+        "a date made of numbers typed in, as a join's key, is refused by Polars as the tables record it before the rule is asked",
     ),
-    (
-        "join-key-names-are-not-repeated",
-        "a join is given one key of each side",
-    ),
-    ("key-is-elementwise", "a join's keys are fields"),
     (
         "moments-share-a-zone",
-        "no two moments are given of different zones",
-    ),
-    ("pattern-is-valid", "a pattern is given a valid one"),
-    (
-        "range-is-valid",
-        "a range is given no bounds that cannot be made",
+        "a comparison of a moment of a zone with one of none is refused by Polars on the rows as the tables record it before the rule is asked",
     ),
     (
         "replacement-values-match-in-number",
-        "replacement values are given in one number",
-    ),
-    ("time-zone-is-valid", "a time zone is given a valid one"),
-    (
-        "window-input-is-not-counted",
-        "a window is put after no count of values",
+        "it needs a list of one length beside a list of another, and the node is connected to one list",
     ),
     (
         "window-input-is-not-widened",
-        "a window is put after no widened value",
+        "it needs a value of one row that a part widens, which no chain the corpus plans reaches",
     ),
 ];
 
@@ -500,7 +515,10 @@ fn what_the_walk_allows_where_the_corpus_puts_a_call_is_what_the_tables_allow_th
 fn the_snapshot_is_what_the_host_reports() {
     // What the node is connected to, which the starts that are inputs name.
     let inputs = serde_json::to_value(
-        crate::node::inputs_view(&super::source::inputs(&BTreeSet::new())).expect("the inputs"),
+        crate::node::inputs_view(&super::source::inputs(
+            &Representative::ALL.into_iter().collect(),
+        ))
+        .expect("the inputs"),
     )
     .expect("a view serializes");
     for part in parts() {

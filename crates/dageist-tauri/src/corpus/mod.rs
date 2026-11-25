@@ -99,13 +99,15 @@ pub(crate) fn corpus() -> Vec<Part> {
     let mut planner = chains::Planner::new(grid::grid());
     let mut coverage = chains::Coverage::default();
     let mut starts = chains::start_cases(&mut planner);
-    let (methods, functions) = chains::entry_cases(&mut planner, None, &mut coverage);
+    let (mut methods, functions) = chains::entry_cases(&mut planner, None, &mut coverage);
+    methods.extend(chains::context_method_cases(&mut planner));
     starts.extend(functions);
     starts.extend(chains::condition_cases(&planner));
     starts.extend(chains::context_cases(&planner));
     let parameters = chains::parameter_cases(&mut planner, &mut coverage);
     let mut refused = refused::cause_cases();
     refused.extend(refused::call_cases(&mut planner));
+    refused.extend(refused::rule_cases(&mut planner));
     let parts = vec![
         Part {
             file: "corpus-starts.json",

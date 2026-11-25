@@ -1,15 +1,19 @@
 //! The documents the engine refuses: each cause a step can be refused for, and each refusal the
 //! tables give a call at a place that a chain can be brought to.
 
-use dageist_engine::allowed::{After, Place as OfferPlace, RefusalSource, Representative, Shape};
+use dageist_engine::allowed::{
+    After, Context, Literal, Outer, Place as OfferPlace, RefusalSource, Representative, Shape,
+};
 use dageist_engine::catalog::Applies;
-use dageist_engine::document::{Document, Start, Value};
+use dageist_engine::document::{Document, Expression, Segment, Start, Value};
 
 use super::Case;
 use super::chains::Planner;
-use super::documents::{StartPlan, field, filled, hole, host_in, one_step, with_link, with_start};
+use super::documents::{
+    StartPlan, call, field, filled, hole, host_in, one_step, with_link, with_start,
+};
 use super::grid::Cell;
-use super::source::{OTHER, column_of};
+use super::source::{OTHER, column_of, right_column_of};
 
 /// The documents of the causes that no call at a place gives: a table that is not connected, an
 /// input that is no value or list, a step with something still to be picked, one that Polars accepts
@@ -235,4 +239,162 @@ fn refused_the_same(document: &Document, index: usize, source: RefusalSource) ->
         .and_then(dageist_engine::document::Standing::verdict)
         .and_then(dageist_engine::allowed::Verdict::refusal)
         .is_some_and(|refusal| refusal.source() == source)
+}
+
+/// A method of a select that the tables allow, given an argument that a rule of the walk, not of the
+/// offers at a place, refuses: the chain brought to a value of `class` and `shape`, then `id`, with
+/// `argument` set on it where there is one.
+fn method_given(
+    planner: &mut Planner<'_>,
+    class: Representative,
+    shape: Shape,
+    id: &str,
+    argument: Option<(&str, Value)>,
+) -> Document {
+    let grid = planner.grid;
+    let context = grid.context_at(Context::step(Outer::Select));
+    let plan = planner.reach(context)[&(class, shape)].clone();
+    let (document, at) = planner.chain(grid.contexts[context], &plan);
+    let document = with_link(
+        &document,
+        &at,
+        plan.links.len(),
+        id,
+        &OfferPlace::new(
+            grid.contexts[context],
+            After::Value {
+                dtype: class,
+                shape,
+            },
+        ),
+        class,
+    );
+    let document = match argument {
+        Some((parameter, value)) => document
+            .set_argument(
+                &at.then(Segment::Link(plan.links.len()))
+                    .then(Segment::Parameter(parameter.to_owned())),
+                value,
+            )
+            .unwrap_or_else(|error| panic!("{id} is not given {parameter}: {error}")),
+        None => document,
+    };
+    filled(&document)
+}
+
+/// The expression of a number or text typed in.
+fn typed(literal: &Literal) -> Value {
+    Value::Expression(Expression::literal(literal).expect("a literal"))
+}
+
+/// The documents refused by a rule that the walk applies to what a call is given or to the keys of a
+/// join, which the offers at a place do not give a call: a pattern, a duration and a time zone that
+/// are not valid, a range that cannot be made, a key that is no elementwise, two pairs of keys
+/// named alike, and a window given a count of values.
+pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
+    let whole = column_of(Representative::Int64);
+    let text = |words: &str| typed(&Literal::String(words.to_owned()));
+    let mut cases = vec![
+        Case {
+            name: "a pattern that is no regular expression".to_owned(),
+            document: method_given(
+                planner,
+                Representative::String,
+                Shape::Many,
+                "Expr.str.contains",
+                Some(("pattern", Value::Pattern("(".to_owned()))),
+            ),
+        },
+        Case {
+            name: "a duration that is no duration".to_owned(),
+            document: method_given(
+                planner,
+                Representative::Datetime,
+                Shape::Many,
+                "Expr.dt.truncate",
+                Some(("every", text("1x"))),
+            ),
+        },
+        Case {
+            name: "a time zone that is no time zone".to_owned(),
+            document: method_given(
+                planner,
+                Representative::Datetime,
+                Shape::Many,
+                "Expr.dt.convert_time_zone",
+                Some(("time_zone", Value::TimeZone(Some("Not/AZone".to_owned())))),
+            ),
+        },
+        Case {
+            name: "a window given a count of values".to_owned(),
+            document: method_given(
+                planner,
+                Representative::Int64,
+                Shape::Counted,
+                "Expr.over",
+                Some((
+                    "partition_by",
+                    Value::Many(vec![field(&column_of(Representative::Int64))]),
+                )),
+            ),
+        },
+    ];
+
+    // A range with a step of nothing cannot be made.
+    let hosted = host_in(Context::step(Outer::Select), Representative::Int64);
+    let range = with_start(
+        &hosted.document,
+        &hosted.at,
+        &StartPlan::Function("polars.int_range"),
+    );
+    let range = range
+        .set_argument(
+            &hosted
+                .at
+                .clone()
+                .then(Segment::Start)
+                .then(Segment::Parameter("step".to_owned())),
+            Value::Integer(0),
+        )
+        .expect("a step is given");
+    cases.push(Case {
+        name: "a range with a step of nothing".to_owned(),
+        document: filled(&range),
+    });
+
+    // A key that holds an aggregate beside a column is not elementwise.
+    let hosted = host_in(Context::step(Outer::JoinLeft), Representative::Int64);
+    let sum = Expression::new(
+        Start::field(whole.clone()).expect("a field"),
+        vec![call("Expr.sum", vec![])],
+    )
+    .expect("a chain");
+    let key = Expression::new(
+        Start::field(whole.clone()).expect("a field"),
+        vec![call("Expr.add", vec![("other", Value::Expression(sum))])],
+    )
+    .expect("a chain");
+    cases.push(Case {
+        name: "a join key that holds an aggregate beside a column".to_owned(),
+        document: hosted
+            .document
+            .set_argument(&hosted.at, Value::Expression(key))
+            .map(|document| filled(&document))
+            .expect("a key is given"),
+    });
+
+    // Two keys of each side that read the same columns pair the same two names twice.
+    let right = right_column_of(Representative::Int64);
+    cases.push(Case {
+        name: "a join with two pairs of keys named alike".to_owned(),
+        document: one_step(
+            "LazyFrame.join",
+            vec![
+                ("other", Value::Table(OTHER.to_owned())),
+                ("left_on", Value::Many(vec![field(&whole), field(&whole)])),
+                ("right_on", Value::Many(vec![field(&right), field(&right)])),
+            ],
+        ),
+    });
+    cases
 }
