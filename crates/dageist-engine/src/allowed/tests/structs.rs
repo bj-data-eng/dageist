@@ -228,3 +228,39 @@ fn a_count_given_a_name_where_the_name_of_the_values_is_not_known_cannot_say_whe
         "{other:?}"
     );
 }
+
+#[test]
+fn names_given_to_an_array_of_no_known_width_are_not_judged_and_fields_are_not_made_of_them() {
+    // Polars counts the names against the width of the array, which the chain may not know.
+    let place = Place::new(
+        Context::step(Outer::Select),
+        After::Value {
+            dtype: Representative::Array(crate::allowed::Inner::Int64),
+            shape: Shape::Many,
+        },
+    );
+    let verdict = offer(
+        entry("Expr.arr.to_struct"),
+        &place,
+        &Chosen::default().with_names(&[("fields", "a")]),
+    );
+    let allowance = allowed(&verdict);
+    assert!(
+        matches!(allowance.can_end(), Ending::NotKnown(_)),
+        "{verdict:?}"
+    );
+    assert!(allowance.fields().is_none(), "{verdict:?}");
+    // Where the width is known and is the number of the names, the fields are the names.
+    let known = offer(
+        entry("Expr.arr.to_struct"),
+        &place,
+        &Chosen::default()
+            .with_names(&[("fields", "a")])
+            .following_width(Some(1)),
+    );
+    assert_eq!(
+        allowed(&known).fields().map(|fields| fields.len()),
+        Some(1),
+        "{known:?}"
+    );
+}

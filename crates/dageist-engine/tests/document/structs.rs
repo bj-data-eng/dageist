@@ -73,6 +73,10 @@ fn frame() -> DataFrame {
         ),
         struct_column("s_xz", vec![whole_numbers("x"), whole_numbers("z")]),
         struct_column("s_nest", vec![inner, whole_numbers("n")]),
+        struct_column(
+            "s_arr",
+            vec![arrays("w", &[[1, 2, 3], [3, 4, 5], [5, 6, 7]]).take_materialized_series()],
+        ),
         Series::new("t".into(), ["a-b-c", "d-e", "f"]).into(),
         ListChunked::from_iter([
             Some(Series::new("".into(), [1_i64, 2, 3])),
@@ -1056,4 +1060,50 @@ fn an_unnest_of_a_struct_with_no_field_is_left_out_by_what_holds_it_and_the_walk
     assert_eq!(beside.polars, Said::Accepts, "Polars refuses the sum");
     assert!(beside.walk_refusal.is_none(), "{:?}", beside.walk_refusal);
     assert!(beside.walk_knows_nothing_of_it.is_some());
+}
+
+#[test]
+fn the_width_of_an_array_a_struct_holds_is_kept_where_the_field_is_read() {
+    // The struct is made of the array, whose width of two the field read gives back, so names of
+    // another number are refused as they are for the column itself.
+    let fewer = a_struct_of(
+        vec![field("raw")],
+        vec![the_field("raw"), array_to_struct(Some(&["a"]))],
+    );
+    assert_refused_by(
+        &fewer,
+        "field-names-fit-the-struct",
+        &["2"],
+        "one name for an array of two read from a struct",
+    );
+    let right = a_struct_of(
+        vec![field("raw")],
+        vec![the_field("raw"), array_to_struct(Some(&["a", "b"]))],
+    );
+    assert_accepted_as_polars_has_it(&right, "two names for an array of two read from a struct");
+}
+
+#[test]
+fn the_width_of_an_array_is_kept_where_a_struct_of_it_is_unnested() {
+    let fewer = a_struct_of(
+        vec![field("raw3")],
+        vec![unnest(), array_to_struct(Some(&["a", "b"]))],
+    );
+    assert_refused_by(
+        &fewer,
+        "field-names-fit-the-struct",
+        &["3"],
+        "two names for an array of three unnested from a struct",
+    );
+}
+
+#[test]
+fn a_struct_column_that_holds_an_array_is_written_with_its_width() {
+    let found = ask("s_arr", vec![the_field("w"), array_to_struct(Some(&["a"]))]);
+    assert_refused_by(
+        &found,
+        "field-names-fit-the-struct",
+        &["3"],
+        "one name for an array of three in a struct column",
+    );
 }
