@@ -1911,3 +1911,97 @@ fn a_refused_call_of_lists_or_arrays_is_not_run_into_a_panic_of_polars() {
             .join("\n")
     );
 }
+
+/// A call that Polars refuses after a list or an array is not run into a panic where both branches
+/// of a condition share it: one that is given nothing is not built, and one that is given an
+/// expression is planned with its error, as a text, a comparison and a sum of a column show. Every
+/// call that needs no argument, the few that take one, and those three are shared so after each
+/// class of a list or an array.
+#[test]
+fn a_refused_call_after_a_list_or_an_array_is_not_run_into_a_panic_of_polars() {
+    let array = column_of(Representative::Array(Inner::String));
+    let mut found = Vec::new();
+    let mut asked = 0;
+    for class in Representative::ALL
+        .into_iter()
+        .filter(|class| class.is_nested())
+    {
+        let column = column_of(class);
+        for (label, link) in followers().into_iter().chain([
+            (
+                "str.len_chars".to_owned(),
+                call("Expr.str.len_chars", json!({})),
+            ),
+            ("dt.year".to_owned(), call("Expr.dt.year", json!({}))),
+            (
+                "le a".to_owned(),
+                call("Expr.le", json!({ "other": field("a") })),
+            ),
+            (
+                "add g".to_owned(),
+                call("Expr.add", json!({ "other": field("g") })),
+            ),
+            (
+                "strip_suffix g".to_owned(),
+                call("Expr.str.strip_suffix", json!({ "suffix": field("g") })),
+            ),
+        ]) {
+            let inner = chain(col_call(&column), vec![link]);
+            let held = a_condition_that_holds_twice(&inner, &array);
+            let value = step(
+                "s",
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![held]) }),
+            );
+            let Ok(read) = Document::read(&document(vec![value])) else {
+                continue;
+            };
+            asked += 1;
+            let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                read.run_on(&inputs(), &frame())
+            }));
+            if ran.is_err() {
+                found.push(format!("{column} then {label}"));
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "{} of {asked} documents reach a panic of Polars':\n{}",
+        found.len(),
+        found.join("\n")
+    );
+}
+
+/// A step that holds a refused method of lists or arrays is not built, and says what the walk says
+/// of it: where the call stands and the words that refuse it, as a step that Polars refused would,
+/// beside the walk's own refusal.
+#[test]
+fn a_refused_method_of_lists_is_reported_where_it_stands_with_the_words_of_the_walk() {
+    let column = column_of(Representative::Array(Inner::Int64));
+    let (value, path) = step_of(
+        Place::Select,
+        &column,
+        vec![call("Expr.list.max", json!({}))],
+    );
+    let read = Document::read(&document(vec![value])).expect("a document");
+    let report = read.run_on(&inputs(), &frame()).expect("a schema");
+    let step = &report.steps()[0];
+    let walked = step.walk().refusal().expect("the walk refuses it");
+    let Outcome::Refused(refusal) = step.outcome() else {
+        panic!("the step is refused: {:?}", step.outcome());
+    };
+    let RunCause::NotAllowed(said) = refusal.cause() else {
+        panic!("the step is refused by the walk: {}", refusal.cause());
+    };
+    let mut at = path;
+    at.push(Segment::Link(0));
+    assert_eq!(refusal.place().path(), at);
+    assert_eq!(walked.place().path(), at);
+    assert_eq!(said.reason(), walked.refusal().reason());
+    assert!(
+        said.reason().contains("expected List data type"),
+        "{}",
+        said.reason()
+    );
+}

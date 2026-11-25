@@ -1375,10 +1375,18 @@ pub fn refuse_a_receiver_not_judged(
     if read_as(id, class).is_none() {
         return Err(not_measured());
     }
-    if (is_of_nested_dtypes(id) || class.is_nested())
-        && let Some(reason) = Tables::committed().recorded_danger(id, class)
-    {
-        return Err(Refusal::polars(&reason));
+    if is_of_nested_dtypes(id) || class.is_nested() {
+        if let Some(reason) = Tables::committed().recorded_danger(id, class) {
+            return Err(Refusal::polars(&reason));
+        }
+        // What Polars refuses of a call that is given nothing, as the walk would have refused it
+        // where it knew the dtype: Polars may plan it nevertheless, and panic on the plan.
+        if required_expressions(entry).next().is_none()
+            && let Err(refusal) = on_receiver(entry, Some(class), &[], &[])
+            && matches!(refusal.source(), RefusalSource::Polars(_))
+        {
+            return Err(refusal);
+        }
     }
     Ok(())
 }

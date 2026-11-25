@@ -264,6 +264,18 @@ fn replay_a_case() {
 /// not evaluate (#103): the probe of the part is refused for the tables' own reason there.
 const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case"];
 
+/// The kept cases that are stricter where Polars does not evaluate the part, or are excused by a
+/// limit, and whose part is a refused method of lists or arrays, or a refused call that is given
+/// nothing after one: such a step is not built, since Polars plans one that both branches of a
+/// condition share and its optimizer then panics, so the document is refused with the words of the
+/// tables and the case agrees, or is refused by both for another reason. The probe of the part,
+/// which the probe tests ask, is unchanged.
+const NOT_BUILT_AS_A_LIST_METHOD_IS_REFUSED: &[&str] = &[
+    "stricter-a-list-max-under-an-outer-window.case",
+    "stricter-a-non-boolean-predicate-in-a-sort-key-of-a-max.case",
+    "uncovered-a-group-aggregate--a-fill-by-a-strategy-of-a-list.case",
+];
+
 /// The kept cases that Polars refuses on more than one thread and allows on one (#103), where the
 /// tables and Polars then agree: a null quantile in a join key.
 const AGREE_ON_ONE_THREAD: [&str; 2] = [
@@ -369,6 +381,16 @@ fn kept_cases_replay_as_settled() {
                 detail_of(outcome)
             );
             by_design += 1;
+        } else if NOT_BUILT_AS_A_LIST_METHOD_IS_REFUSED.contains(&name) {
+            assert!(
+                outcome.kind() == OutcomeKind::Evaluated
+                    || outcome.detail().is_some_and(
+                        |detail| detail.starts_with(target::REFUSED_FOR_ANOTHER_REASON)
+                    ),
+                "{name} is refused before Polars is asked and agrees: {}",
+                detail_of(outcome)
+            );
+            stricter += 1;
         } else if name.starts_with("stricter-") {
             assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
             assert!(
