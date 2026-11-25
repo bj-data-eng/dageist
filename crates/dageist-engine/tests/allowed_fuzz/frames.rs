@@ -15,7 +15,8 @@
 use dageist_engine::allowed::{Inner, Representative};
 use dageist_engine::document::Inputs;
 use polars::prelude::{
-    DataFrame, DataType, IdxCa, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
+    DataFrame, DataType, IdxCa, IntoLazy, IntoSeries, LazyFrame, ListChunked, NamedFrom, Series,
+    StructChunked,
 };
 
 /// The name of the column the join's `index`th key is paired with on the other
@@ -285,18 +286,25 @@ impl Frames {
     /// without, and the values a pivot makes columns for.
     pub fn inputs(&self, empty: bool) -> Inputs {
         let mut inputs = Inputs::new();
-        let other = if empty {
-            &self.other_empty
-        } else {
-            &self.other_rows
-        };
+        for name in [OTHER, ON_COLUMNS] {
+            let (node, table) = (
+                if name == OTHER { "Other" } else { "Columns" },
+                self.table(name, empty).expect("a table the steps name"),
+            );
+            inputs.add_table(name, node, table).expect("an input");
+        }
         inputs
-            .add_table(OTHER, "Other", other.clone().lazy())
-            .expect("a first input");
-        inputs
-            .add_table(ON_COLUMNS, "Columns", self.on_columns.clone().lazy())
-            .expect("a second input");
-        inputs
+    }
+
+    /// The connected table `name`, with rows or without, as [`inputs`](Self::inputs) connects it,
+    /// for a step that is built without the engine.
+    pub fn table(&self, name: &str, empty: bool) -> Option<LazyFrame> {
+        match name {
+            OTHER if empty => Some(self.other_empty.clone().lazy()),
+            OTHER => Some(self.other_rows.clone().lazy()),
+            ON_COLUMNS => Some(self.on_columns.clone().lazy()),
+            _ => None,
+        }
     }
 }
 

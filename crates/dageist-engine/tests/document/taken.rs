@@ -16,9 +16,11 @@ use std::collections::BTreeMap;
 use dageist_engine::allowed::{RefusalSource, Rule};
 use dageist_engine::catalog::{self, Applies, Counting, Dtypes, Entry, Kind, Parameter};
 use dageist_engine::document::{
-    Call, Document, Dtype, Expression, Inputs, Start, Step, StepId, StepRows, Value,
+    Call, Document, Dtype, Expression, Inputs, Start, Step, StepId, Value,
 };
 use polars::prelude::*;
+
+use crate::ask_polars::{self, Connected};
 
 /// The sample: a column for each dtype a method takes, of three rows, and `k` to window by.
 fn sample() -> DataFrame {
@@ -173,32 +175,25 @@ enum Said {
     Other(String),
 }
 
+/// What Polars says of the document, asked apart from the step engine, which does not run a step
+/// the walk refuses.
 fn polars_says(document: &Document, frame: &DataFrame) -> Said {
-    let report = match document.run_on(&Inputs::new(), frame) {
-        Ok(report) => report,
-        Err(error) => return Said::Other(error.to_string()),
-    };
-    let step = &report.steps()[0];
-    match (step.outcome(), step.rows()) {
-        (dageist_engine::document::Outcome::Valid { .. }, StepRows::Counted(_)) => Said::Accepts,
-        (dageist_engine::document::Outcome::Valid { .. }, StepRows::Failed(error)) => {
-            let text = error.to_string();
-            if text.contains("matching group lengths") {
-                Said::RefusesTheWindow
-            } else {
-                Said::Other(text.lines().next().unwrap_or_default().to_owned())
-            }
+    let nothing = |_: &str| None;
+    let connected = Connected::tables(&nothing);
+    let step = &document.steps()[0];
+    ask_polars::guarded(step, || {
+        let Some(planned) = ask_polars::plan(step, 0, frame, connected) else {
+            return Said::Other("not run".to_owned());
+        };
+        if let Err(refused) = planned.schema {
+            return Said::Other(refused.reason);
         }
-        (dageist_engine::document::Outcome::Refused(refusal), _) => Said::Other(
-            refusal
-                .to_string()
-                .lines()
-                .next()
-                .unwrap_or_default()
-                .to_owned(),
-        ),
-        _ => Said::Other("not run".to_owned()),
-    }
+        match ask_polars::collect(step, 0, frame, connected, 100) {
+            Ok(_) => Said::Accepts,
+            Err(text) if text.contains("matching group lengths") => Said::RefusesTheWindow,
+            Err(text) => Said::Other(text),
+        }
+    })
 }
 
 fn walk_says(document: &Document, frame: &DataFrame) -> Said {

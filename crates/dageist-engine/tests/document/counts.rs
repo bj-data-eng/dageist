@@ -353,13 +353,18 @@ fn a_step_polars_refuses_is_not_counted_and_nor_are_the_steps_after_it() {
 
 #[test]
 fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it_are_not_counted() {
-    // The date of text is a date by its schema and fails when rows are read.
+    // A moment moved by a column of text is a moment by its schema, whatever the text is, and
+    // fails when rows are read and a text is no duration. The tables measured durations, so the
+    // walk allows it.
     let report = run_on(&document(vec![
         with_columns(
             "date",
             vec![(
                 "day",
-                field_then("dcn", vec![call("Expr.dt.date", json!({}))]),
+                field_then(
+                    "timestamp",
+                    vec![call("Expr.dt.offset_by", json!({ "by": field("dcn") }))],
+                ),
             )],
         ),
         with_columns("after", vec![("again", field("row_days"))]),

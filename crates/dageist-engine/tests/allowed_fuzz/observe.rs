@@ -1,16 +1,19 @@
 //! What Polars does with a case, through the step document's own runner: the
 //! step built and its schema worked out ([`Document::run`]), then its rows on
 //! three rows with a null in them ([`Document::rows`]), then on a table with no
-//! rows. A case is allowed only when all three succeed, as the tables count it.
+//! rows. A case is allowed only when all three succeed, as the tables count it. A step the walk
+//! refuses is not run by the step document, so [`asked`] asks Polars of it directly, the same
+//! three times.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::document::{
-    Document, Expression, Outcome, Place, Resolution, Segment, Start, Value,
+    Document, Expression, Outcome, Place, Resolution, RunCause, Segment, Start, Value,
 };
 use polars::prelude::{DataType, IntoLazy};
 
+use super::asked::{self, Walked};
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
 
@@ -90,9 +93,13 @@ pub struct Observed {
     /// dtypes. Polars refuses the join for that when no dtype of the column fits them all, which
     /// the tables are not asked about, and joins whole numbers of different widths.
     pub keys_conflict: bool,
+    /// Where the step engine and [`asked`] differ in what they say of a step the walk allows, when
+    /// the case was observed with that check: they must say the same, or what the target takes of a
+    /// step the walk refuses, which only [`asked`] runs, is not what the engine would say.
+    pub drift: Option<String>,
 }
 
-fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
+pub fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
         .map(|text| (*text).to_owned())
@@ -124,7 +131,88 @@ fn seen(resolution: &Resolution) -> Seen {
 
 /// Runs the case's one step on `frames`: the schema, then the rows, then the
 /// empty table.
-fn run_on(document: &Document, frames: &Frames) -> Observed {
+///
+/// The step engine does not run a step whose walk is refused, so Polars is asked of such a step
+/// directly, by [`asked`]: that is how a table that is stricter than Polars is found. Where the
+/// walk allows the step and `check` is set, [`asked`] is asked of it too, and the two answers are
+/// compared, since [`asked`] copies what the engine builds.
+fn run_on(document: &Document, frames: &Frames, check: bool) -> Observed {
+    let walked = asked::walked(document, frames);
+    if walked == Walked::AskPolars
+        && let Some(observed) = asked::ask(document, frames)
+    {
+        return observed;
+    }
+    let (mut observed, guarded) = run_on_engine(document, frames);
+    if check
+        && walked == Walked::Allows
+        && !guarded
+        && let Some(asked) = asked::ask(document, frames)
+    {
+        observed.drift = drift_between(&observed, &asked);
+    }
+    observed
+}
+
+/// How the answer of the step engine and the answer of [`asked`] to a step the walk allows
+/// differ, if they do: in whether and where Polars refuses it, and in the dtypes it gives each
+/// expression, which both report.
+pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
+    // Polars names the values that a row failed on, and which row it meets first is not the same
+    // from run to run: the words of a refusal of the rows are compared by their shape, with what
+    // is between brackets, which is the values, left out, and every digit the same. A refusal of
+    // the schema is compared exactly, for there a dtype or a width that differs by a digit is a
+    // difference.
+    let shaped = |refusal: &Option<Refusal>| {
+        refusal.as_ref().map(|refusal| Refusal {
+            reason: if refusal.stage == Stage::Schema {
+                refusal.reason.clone()
+            } else {
+                shape_of_a_failure_of_rows(&refusal.reason)
+            },
+            ..refusal.clone()
+        })
+    };
+    if shaped(&engine.refusal) != shaped(&asked.refusal) {
+        return Some(format!(
+            "the step engine says {:?} and the asker says {:?}",
+            engine.refusal, asked.refusal
+        ));
+    }
+    if engine.expressions != asked.expressions {
+        return Some(format!(
+            "the step engine gives the expressions {:?} and the asker gives {:?}",
+            engine.expressions, asked.expressions
+        ));
+    }
+    None
+}
+
+/// `reason` with the values of the rows it names, which are between brackets, left out and every
+/// other digit made the same.
+fn shape_of_a_failure_of_rows(reason: &str) -> String {
+    let mut shaped = String::with_capacity(reason.len());
+    let mut depth = 0_usize;
+    for character in reason.chars() {
+        match character {
+            '[' => {
+                depth += 1;
+                if depth == 1 {
+                    shaped.push_str("[#]");
+                }
+            }
+            ']' if depth > 0 => depth -= 1,
+            _ if depth > 0 => {}
+            digit if digit.is_ascii_digit() => shaped.push('#'),
+            other => shaped.push(other),
+        }
+    }
+    shaped
+}
+
+/// What the step engine does with the case's one step on `frames`, and whether it refused the
+/// step by what it holds of its own, which Polars is not asked of.
+fn run_on_engine(document: &Document, frames: &Frames) -> (Observed, bool) {
     let id = document.steps()[0].id().clone();
     let mut observed = Observed::default();
     let rows_inputs = frames.inputs(false);
@@ -139,7 +227,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
                 place: None,
                 reason: panic_text(payload.as_ref()),
             });
-            return observed;
+            return (observed, false);
         }
         Ok(Err(error)) => {
             observed.refusal = Some(Refusal {
@@ -148,7 +236,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
                 place: None,
                 reason: format!("{NO_SCHEMA}: {error}"),
             });
-            return observed;
+            return (observed, false);
         }
         Ok(Ok(report)) => report,
     };
@@ -169,7 +257,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
             place: Some(refusal.place().clone()),
             reason: first_line(&refusal.cause().to_string()),
         });
-        return observed;
+        return (observed, matches!(refusal.cause(), RunCause::NotAllowed(_)));
     }
     for (stage, inputs, working) in [
         (Stage::Rows, rows_inputs, &frames.rows),
@@ -197,15 +285,15 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
             place: None,
             reason,
         });
-        return observed;
+        return (observed, false);
     }
-    observed
+    (observed, false)
 }
 
 /// What the schema says and the rows give, when they are not the same dtypes
 /// of the same columns, as the tables count it: two dtypes are the same when
 /// they are equal or of one class.
-fn schema_disagrees(
+pub fn schema_disagrees(
     schema: &polars::prelude::Schema,
     rows: &polars::prelude::DataFrame,
 ) -> Option<String> {
@@ -413,15 +501,21 @@ impl Tables {
 /// What Polars does with a probe: the case's document, run once on the case's
 /// tables as `tables` changes them.
 pub fn observe_probe(case: &Case, tables: Tables) -> Observed {
-    observe_on(case, tables)
+    observe_on(case, tables, false)
 }
 
 pub fn observe(case: &Case) -> Observed {
-    observe_on(case, Tables::default())
+    observe_on(case, Tables::default(), false)
 }
 
-fn observe_on(case: &Case, tables: Tables) -> Observed {
-    let observed = run_on(&case.document, &tables.of(case, &[DataType::Int64]));
+/// What Polars does with the case, as [`observe`] says, and whether the step engine and [`asked`]
+/// differ in what they say of a step the walk allows, in [`Observed::drift`].
+pub fn observe_checked(case: &Case) -> Observed {
+    observe_on(case, Tables::default(), true)
+}
+
+fn observe_on(case: &Case, tables: Tables, check: bool) -> Observed {
+    let observed = run_on(&case.document, &tables.of(case, &[DataType::Int64]), check);
     let is_join = case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.join";
     if !is_join {
         return observed;
@@ -433,8 +527,316 @@ fn observe_on(case: &Case, tables: Tables) -> Observed {
             ..observed
         };
     }
+    let drift = observed.drift;
+    let second = run_on(&case.document, &tables.of(case, &keys), check);
     Observed {
         keys_conflict: conflict,
-        ..run_on(&case.document, &tables.of(case, &keys))
+        drift: drift.or(second.drift.clone()),
+        ..second
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The answer of [`asked`] to a step is the step engine's where the walk allows the step, and
+    //! it keeps the checks of a pattern, a duration and a time zone that the engine makes before
+    //! it asks Polars, which a step the walk refuses never meets in the engine.
+
+    use dageist_engine::allowed::Representative;
+    use dageist_engine::document::Segment;
+
+    use super::super::predict::{Source, Verdict, predict};
+    use super::*;
+
+    fn refusal(stage: Stage, reason: &str) -> Option<Refusal> {
+        Some(Refusal {
+            stage,
+            at: "the rows".to_owned(),
+            place: None,
+            reason: reason.to_owned(),
+        })
+    }
+
+    #[test]
+    fn two_answers_that_differ_in_what_polars_refuses_or_in_a_dtype_are_a_drift() {
+        let said = Observed {
+            refusal: refusal(Stage::Rows, "conversion of 1 failed"),
+            expressions: vec![SeenExpression {
+                place: Place::of_step(0, None),
+                start: Seen::Unsaid,
+                links: vec![Seen::Dtype(DataType::Int64, "Int64".to_owned(), None)],
+            }],
+            ..Observed::default()
+        };
+        assert_eq!(drift_between(&said, &said.clone()), None);
+        // The value a row failed on is not the same from run to run.
+        let other_row = Observed {
+            refusal: refusal(Stage::Rows, "conversion of 2 failed"),
+            ..said.clone()
+        };
+        assert_eq!(drift_between(&said, &other_row), None);
+        // A refusal of the schema that differs by a digit, as `i32` and `i64` do, is a difference.
+        let of_the_schema = |reason: &str| Observed {
+            refusal: refusal(Stage::Schema, reason),
+            ..said.clone()
+        };
+        assert_eq!(
+            drift_between(&of_the_schema("not `i32`"), &of_the_schema("not `i32`")),
+            None
+        );
+        assert!(drift_between(&of_the_schema("not `i32`"), &of_the_schema("not `i64`")).is_some());
+        // Nor are the values it failed on, whatever they are written as.
+        let other_value = Observed {
+            refusal: refusal(Stage::Rows, "conversion of 1 failed in column 'b': [inf]"),
+            ..said.clone()
+        };
+        let the_nan = Observed {
+            refusal: refusal(Stage::Rows, "conversion of 1 failed in column 'b': [NaN]"),
+            ..said.clone()
+        };
+        assert_eq!(drift_between(&other_value, &the_nan), None);
+        let other_stage = Observed {
+            refusal: refusal(Stage::Empty, "conversion of 1 failed"),
+            ..said.clone()
+        };
+        assert!(drift_between(&said, &other_stage).is_some());
+        let other_words = Observed {
+            refusal: refusal(Stage::Rows, "another failure"),
+            ..said.clone()
+        };
+        assert!(drift_between(&said, &other_words).is_some());
+        let allowed = Observed {
+            refusal: None,
+            ..said.clone()
+        };
+        assert!(drift_between(&said, &allowed).is_some());
+        let other_dtype = Observed {
+            expressions: vec![SeenExpression {
+                place: Place::of_step(0, None),
+                start: Seen::Unsaid,
+                links: vec![Seen::Dtype(DataType::Int32, "Int32".to_owned(), None)],
+            }],
+            ..said.clone()
+        };
+        assert!(drift_between(&said, &other_dtype).is_some());
+        let no_expressions = Observed {
+            expressions: Vec::new(),
+            ..said.clone()
+        };
+        assert!(drift_between(&said, &no_expressions).is_some());
+    }
+
+    #[test]
+    fn the_asker_and_the_engine_say_the_same_of_every_kept_case_the_walk_allows() {
+        let directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/allowed_fuzz/regressions");
+        let mut files: Vec<_> = std::fs::read_dir(directory)
+            .expect("the kept cases")
+            .map(|entry| entry.expect("an entry").path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "case")
+            })
+            .collect();
+        files.sort();
+        let (mut compared, mut refused_by_polars, mut dtypes) = (0, 0, 0);
+        let mut differ = Vec::new();
+        for path in files {
+            let case = Case::decode(&std::fs::read(&path).expect("a kept case")).expect("a case");
+            if predict(&case).verdict != Verdict::Allows {
+                continue;
+            }
+            let observed = observe_checked(&case);
+            compared += 1;
+            refused_by_polars += usize::from(observed.refusal.is_some());
+            dtypes += usize::from(
+                observed
+                    .expressions
+                    .iter()
+                    .any(|expression| !expression.links.is_empty()),
+            );
+            if let Some(drift) = observed.drift {
+                differ.push(format!("{}: {drift}", path.display()));
+            }
+        }
+        assert!(differ.is_empty(), "{}", differ.join("\n"));
+        // The comparison is made of cases that run, that Polars refuses, and that give dtypes.
+        assert!(
+            compared >= 20,
+            "{compared} kept cases are allowed by the walk"
+        );
+        assert!(
+            refused_by_polars > 0 && dtypes > 0,
+            "{refused_by_polars}, {dtypes}"
+        );
+    }
+
+    /// The case of the one step `call` selects on a column `a` of `receiver`.
+    fn selecting(receiver: &str, link: &str) -> Case {
+        let receiver = Representative::from_name(receiver).expect("a class");
+        let text = format!(
+            r#"{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{link}]}}}}]}}}}}}}}]}}"#
+        );
+        Case {
+            receiver,
+            argument: Representative::String,
+            document: Document::read(&text).expect("a document"),
+        }
+    }
+
+    /// What the tables refuse of the case by a rule, which names it, and the place at which the
+    /// asker, which the target asks of Polars apart from the engine, refuses it.
+    fn refused_by(case: &Case) -> (&'static str, Option<Place>) {
+        let Verdict::Refuses(refused) = predict(case).verdict else {
+            panic!("the tables refuse the case");
+        };
+        let Source::Rule(rule) = refused.source else {
+            panic!("a rule refuses the case: {:?}", refused.source);
+        };
+        let observed = observe(case);
+        let asked = observed.refusal.expect("the asker refuses the case");
+        assert_eq!(asked.stage, Stage::Schema, "{}", asked.reason);
+        (rule, asked.place)
+    }
+
+    fn parameter(place: &Option<Place>, name: &str) -> bool {
+        place
+            .as_ref()
+            .and_then(|place| place.path().last())
+            .is_some_and(|last| *last == Segment::Parameter(name.to_owned()))
+    }
+
+    #[test]
+    fn the_asker_refuses_a_pattern_a_duration_and_a_time_zone_that_are_none_at_their_parameter() {
+        // Polars refuses a pattern only when the rows run, and panics on some durations, so the
+        // asker asks them of Polars before it builds the step, as the engine does.
+        let (rule, place) = refused_by(&selecting(
+            "String",
+            r#"{"entry":"Expr.str.contains","arguments":{"pattern":{"pattern":"(Comp"}}}"#,
+        ));
+        assert_eq!(rule, "pattern-is-valid");
+        assert!(parameter(&place, "pattern"), "{place:?}");
+        let (rule, place) = refused_by(&selecting(
+            "String",
+            r#"{"entry":"Expr.str.split","arguments":{"by":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"string":"("}}},"then":[]}},"literal":{"flag":false}}}"#,
+        ));
+        assert_eq!(rule, "pattern-is-valid");
+        assert!(parameter(&place, "by"), "{place:?}");
+        for (entry, name) in [
+            ("Expr.dt.truncate", "every"),
+            ("Expr.dt.round", "every"),
+            ("Expr.dt.offset_by", "by"),
+        ] {
+            let (rule, place) = refused_by(&selecting(
+                "Datetime(us)",
+                &format!(
+                    r#"{{"entry":"{entry}","arguments":{{"{name}":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"string":"1x"}}}}}},"then":[]}}}}}}}}"#
+                ),
+            ));
+            assert_eq!(rule, "duration-is-valid", "{entry}");
+            assert!(parameter(&place, name), "{entry}: {place:?}");
+        }
+        let (rule, place) = refused_by(&selecting(
+            "Datetime(us)",
+            r#"{"entry":"Expr.dt.replace_time_zone","arguments":{"time_zone":{"time_zone":"Not/AZone"}}}"#,
+        ));
+        assert_eq!(rule, "time-zone-is-valid");
+        assert!(parameter(&place, "time_zone"), "{place:?}");
+    }
+
+    fn kept(name: &str) -> Case {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions")
+            .join(name);
+        Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
+    }
+
+    fn splitting_by_a_bracket(literal: &str) -> Case {
+        selecting(
+            "String",
+            &format!(
+                r#"{{"entry":"Expr.str.split","arguments":{{"by":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"string":"("}}}}}},"then":[]}}}}{literal}}}}}"#
+            ),
+        )
+    }
+
+    #[test]
+    fn a_separator_that_is_plain_text_by_the_flag_is_allowed_by_the_engine_and_the_asker() {
+        // `(` is no regular expression, and `literal` makes it text.
+        let case = splitting_by_a_bracket(r#","literal":{"flag":true}"#);
+        assert_eq!(predict(&case).verdict, Verdict::Allows);
+        let observed = observe_checked(&case);
+        assert_eq!((&observed.refusal, &observed.drift), (&None, &None));
+        // Both say so for real: the asker, run apart from the engine, allows it as well.
+        let frames = Frames::with_key(case.receiver, case.argument, Some(&[DataType::Int64]));
+        let asked = asked::ask(&case.document, &frames).expect("a step that can be asked");
+        assert_eq!(asked.refusal, None);
+    }
+
+    #[test]
+    fn a_separator_is_plain_text_by_the_default_of_literal_and_a_pattern_refused_at_it_where_it_is_false()
+     {
+        // The default of `literal` of `split` is plain text, so `(` is a separator like another,
+        // and the engine and the asker allow it.
+        let default = splitting_by_a_bracket("");
+        assert_eq!(predict(&default).verdict, Verdict::Allows);
+        let observed = observe_checked(&default);
+        assert_eq!((&observed.refusal, &observed.drift), (&None, &None));
+        // Where the flag is false it is a pattern, which `(` is not, and both refuse it at `by`.
+        let pattern = splitting_by_a_bracket(r#","literal":{"flag":false}"#);
+        let (rule, place) = refused_by(&pattern);
+        assert_eq!(rule, "pattern-is-valid");
+        assert!(parameter(&place, "by"), "{place:?}");
+    }
+
+    /// The case of `dt.truncate` by the text `every` of a column `a` of `receiver`.
+    fn truncating(receiver: &str, every: &str) -> Case {
+        selecting(
+            receiver,
+            &format!(
+                r#"{{"entry":"Expr.dt.truncate","arguments":{{"every":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"string":"{every}"}}}}}},"then":[]}}}}}}}}"#
+            ),
+        )
+    }
+
+    #[test]
+    fn a_duration_is_asked_for_the_moment_it_is_given_to_by_the_asker_as_by_the_engine() {
+        // Polars cuts a date by whole days only, and a moment in a zone by no length of days and
+        // hours together, where a moment with no zone takes both: what the asker refuses of a
+        // duration depends on the dtype of the value before the call, as the engine's does.
+        let (rule, place) = refused_by(&truncating("Date", "2d12h"));
+        assert_eq!(rule, "duration-is-valid");
+        assert!(parameter(&place, "every"), "{place:?}");
+        // A date in a zone is a moment made of parts, as `polars.datetime` makes one.
+        let (rule, place) = refused_by(&kept(
+            "fixed-a-length-of-days-and-hours-for-a-moment-in-a-zone.case",
+        ));
+        assert_eq!(rule, "duration-is-valid");
+        assert!(parameter(&place, "every"), "{place:?}");
+        // A moment with no zone takes it, so the step is one the walk allows, and the engine and
+        // the asker agree. A moment chosen for the asker by the dtype where the duration is read
+        // could not be told from the engine's by a step the walk allows, but by this one: a date
+        // would refuse it.
+        let plain = truncating("Datetime(us)", "2d12h");
+        assert_eq!(predict(&plain).verdict, Verdict::Allows);
+        let observed = observe_checked(&plain);
+        assert_eq!((&observed.refusal, &observed.drift), (&None, &None));
+    }
+
+    #[test]
+    fn the_asker_takes_a_pattern_that_a_flag_makes_plain_text_and_a_duration_that_is_one() {
+        let plain = selecting(
+            "String",
+            r#"{"entry":"Expr.str.contains","arguments":{"pattern":{"pattern":"("},"literal":{"flag":true}}}"#,
+        );
+        assert_eq!(predict(&plain).verdict, Verdict::Allows);
+        assert_eq!(observe_checked(&plain).drift, None);
+        let hour = selecting(
+            "Datetime(us)",
+            r#"{"entry":"Expr.dt.truncate","arguments":{"every":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"string":"1h"}}},"then":[]}}}}"#,
+        );
+        assert_eq!(predict(&hour).verdict, Verdict::Allows);
+        let observed = observe_checked(&hour);
+        assert_eq!((observed.refusal, observed.drift), (None, None));
     }
 }

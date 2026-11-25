@@ -273,8 +273,13 @@ fn failing_text() -> String {
                 { "columns": ["day"] },
                 { "expression": { "start": {
                     "entry": "polars.col",
-                    "arguments": { "name": { "columns": ["dcn"] } }
-                }, "then": [{ "entry": "Expr.dt.date", "arguments": {} }] } }
+                    "arguments": { "name": { "columns": ["timestamp"] } }
+                }, "then": [{ "entry": "Expr.dt.offset_by", "arguments": {
+                    "by": { "expression": { "start": {
+                        "entry": "polars.col",
+                        "arguments": { "name": { "columns": ["dcn"] } }
+                    }, "then": [] } }
+                } }] } }
             ]] }
         } } },
         { "id": "after", "call": { "entry": "LazyFrame.with_columns", "arguments": {
@@ -405,7 +410,7 @@ fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_n
         steps[0]["count"]["reason"]
             .as_str()
             .expect("a reason")
-            .contains("date"),
+            .contains("duration"),
         "Polars says what it could not do: {}",
         steps[0]["count"]
     );
@@ -500,7 +505,7 @@ fn the_run_command_reports_what_the_tables_say_of_each_call() {
 }
 
 #[test]
-fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
+fn a_step_the_tables_record_polars_refusing_is_reported_at_its_link_and_the_next_is_not_run() {
     let answer = run_text(refused_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["outcome"]["status"], "valid");
@@ -519,9 +524,12 @@ fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
             ]
         })
     );
-    assert_eq!(refused["cause"]["kind"], "polars");
+    // The step is not run: it is refused with the words of the walk, which are Polars' for a call
+    // that the tables record it refusing.
+    assert_eq!(refused["cause"]["kind"], "notAllowed");
+    assert_eq!(refused["cause"]["refusal"]["source"]["by"], "polars");
     assert!(
-        refused["cause"]["reason"]
+        refused["cause"]["refusal"]["reason"]
             .as_str()
             .expect("a reason")
             .contains("sum"),
@@ -531,7 +539,7 @@ fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
         steps[2]["outcome"],
         json!({ "status": "notRun", "blockedBy": "total" })
     );
-    // The tables refuse the same call before Polars is asked.
+    // The refusal is the walk's, at the same place.
     let walk = &steps[1]["walk"];
     assert_eq!(walk["refusal"]["place"], refused["place"]);
     assert_eq!(walk["refusal"]["atEnd"], false);

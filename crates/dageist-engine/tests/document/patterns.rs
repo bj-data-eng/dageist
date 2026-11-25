@@ -63,7 +63,7 @@ fn a_replacement_by_a_pattern_runs_and_previews_what_is_left_of_each_owner() {
 }
 
 #[test]
-fn a_pattern_that_is_no_regular_expression_is_refused_at_the_pattern_in_polars_words() {
+fn a_pattern_that_is_no_regular_expression_is_refused_at_its_method_in_polars_words() {
     let written = selecting(owner_then(
         "Expr.str.contains",
         json!({ "pattern": pattern("(Comp") }),
@@ -74,22 +74,25 @@ fn a_pattern_that_is_no_regular_expression_is_refused_at_the_pattern_in_polars_w
     let Outcome::Refused(refusal) = step.outcome() else {
         panic!("{:?}", step.outcome());
     };
-    // The refusal is at the pattern of the method: the step's expression, its link and its argument.
+    // The step is not built: it is refused where the walk found the refusal, at the method of the
+    // pattern, which is the step's expression and its link, with the walk's words.
     assert_eq!(
         refusal.place().path(),
         [
             Segment::Parameter("named_exprs".to_owned()),
             Segment::Value(0),
             Segment::Link(0),
-            Segment::Parameter("pattern".to_owned()),
         ]
     );
-    assert!(matches!(refusal.cause(), RunCause::Build(_)), "{refusal}");
-    let words = refusal.cause().to_string();
-    assert!(words.contains("not a valid regular expression"), "{words}");
-    assert!(words.contains("unclosed group"), "{words}");
-    // The walk says it before the step is built, by the rule, with Polars' words in its own.
     let walked = step.walk().refusal().expect("the walk refuses it");
+    assert_eq!(refusal.place(), walked.place());
+    assert!(
+        matches!(refusal.cause(), RunCause::NotAllowed(said) if said == walked.refusal()),
+        "{refusal}"
+    );
+    let words = refusal.cause().to_string();
+    assert!(words.contains("valid regular expression"), "{words}");
+    assert!(words.contains("unclosed group"), "{words}");
     assert_eq!(
         walked.refusal().source(),
         RefusalSource::Rule(Rule::PatternIsValid)
@@ -238,7 +241,8 @@ fn a_replacement_of_an_aggregate_by_many_values_is_met_by_each_as_polars_meets_i
 }
 
 #[test]
-fn a_separator_typed_as_a_pattern_is_refused_at_it_where_literal_is_false_and_not_otherwise() {
+fn a_separator_typed_as_a_pattern_is_refused_at_its_method_where_literal_is_false_and_not_otherwise()
+ {
     let split = |by: Value, literal: Option<bool>| {
         let mut arguments = json!({ "by": by });
         if let Some(literal) = literal {
@@ -246,8 +250,8 @@ fn a_separator_typed_as_a_pattern_is_refused_at_it_where_literal_is_false_and_no
         }
         selecting(owner_then("Expr.str.split", arguments))
     };
-    // `(` is no regular expression: as a pattern the step is refused at the separator, with
-    // Polars' words, and the walk says it before.
+    // `(` is no regular expression: as a pattern the step is not built, and is refused where the
+    // walk found the refusal, at the method of the separator, with Polars' words.
     let report = report_of(&split(text("("), Some(false)));
     let step = &report.steps()[0];
     let Outcome::Refused(refusal) = step.outcome() else {
@@ -259,7 +263,6 @@ fn a_separator_typed_as_a_pattern_is_refused_at_it_where_literal_is_false_and_no
             Segment::Parameter("named_exprs".to_owned()),
             Segment::Value(0),
             Segment::Link(0),
-            Segment::Parameter("by".to_owned()),
         ]
     );
     assert!(
@@ -267,6 +270,7 @@ fn a_separator_typed_as_a_pattern_is_refused_at_it_where_literal_is_false_and_no
         "{refusal}"
     );
     let walked = step.walk().refusal().expect("the walk refuses it");
+    assert_eq!(refusal.place(), walked.place());
     assert_eq!(
         walked.refusal().source(),
         RefusalSource::Rule(Rule::PatternIsValid)

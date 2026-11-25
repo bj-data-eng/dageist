@@ -264,10 +264,10 @@ describe('the arguments of a step that are at their default', () => {
   });
 });
 
-describe('the report of a document with a step Polars refuses', () => {
+describe('the report of a document with a step the tables refuse', () => {
   const run = decodeRun(refused);
 
-  it('places the refusal at the link, with Polars own reason', () => {
+  it('places the refusal at the link, with the words the tables recorded of Polars', () => {
     const outcome = stepNamed(run, 'total').outcome;
     if (outcome.status !== 'refused') throw new Error('the step was not refused');
     expect(outcome.place).toEqual({
@@ -279,10 +279,11 @@ describe('the report of a document with a step Polars refuses', () => {
         { kind: 'link', index: 0 },
       ],
     });
-    expect(outcome.cause.kind).toBe('polars');
-    expect(outcome.cause.kind === 'polars' && outcome.cause.reason).toContain(
-      '`sum` operation not supported for dtype `str`',
-    );
+    if (outcome.cause.kind !== 'notAllowed') {
+      throw new Error('the step was not refused by the tables');
+    }
+    expect(outcome.cause.refusal.source).toEqual({ by: 'polars', stage: 'schema' });
+    expect(outcome.cause.refusal.reason).toBe('`sum` operation not supported for dtype `str`');
   });
 
   it('does not run the step after it, and names the one that blocked it', () => {
@@ -425,6 +426,8 @@ describe('the report built by hand for the variants no document gives together',
       kind: 'notAllowed',
       refusal: { source: { by: 'polars', stage: 'rows' }, reason: 'the reason' },
     });
+    // Polars refuses a step that the tables allow, which a step the tables refuse never comes to.
+    expect(refusedCause('polars')).toEqual({ kind: 'polars', reason: 'the reason' });
   });
 
   it('places a refusal at the start of an expression', () => {

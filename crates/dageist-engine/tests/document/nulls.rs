@@ -8,12 +8,11 @@
 use dageist_engine::allowed::{
     After, Context, Outer, Place as OfferPlace, RefusalSource, Representative, Rule, Shape,
 };
-use dageist_engine::document::{
-    Document, Inputs, Outcome, Report, RunCause, Segment, StepRows, Walk,
-};
+use dageist_engine::document::{Document, Inputs, Outcome, Report, Segment, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
+use crate::ask_polars::{self, Connected};
 use crate::support::{call, chain, col_call, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
@@ -38,36 +37,49 @@ fn inputs() -> Inputs {
     inputs
 }
 
-fn report_of(entry: &str, arguments: Value) -> Report {
+/// What the step engine reported of a step, and what Polars said of it when asked apart from the
+/// engine, which does not run a step the walk refuses.
+struct Ran {
+    report: Report,
+    polars: Option<String>,
+}
+
+fn report_of(entry: &str, arguments: Value) -> Ran {
     let mut given = arguments;
     if entry == "LazyFrame.join" {
         given["other"] = json!({ "table": "other" });
     }
-    Document::read(&document(vec![step("s", entry, given)]))
-        .expect("a document")
-        .run_on(&inputs(), &source())
-        .expect("the table has a schema")
+    ran_on(
+        &Document::read(&document(vec![step("s", entry, given)])).expect("a document"),
+        &source(),
+    )
 }
 
-fn walk(report: &Report) -> &Walk {
-    report.steps()[0].walk()
+/// What the step engine reports of `document` run on `working`, and what Polars says of it.
+fn ran_on(document: &Document, working: &DataFrame) -> Ran {
+    let tables = |name: &str| (name == "other").then(|| other().lazy());
+    let step = &document.steps()[0];
+    let polars = ask_polars::guarded(step, || {
+        ask_polars::refusal_of(step, 0, working, Connected::tables(&tables))
+    });
+    let report = document
+        .run_on(&inputs(), working)
+        .expect("the table has a schema");
+    Ran { report, polars }
 }
 
-fn outcome(report: &Report) -> &Outcome {
-    report.steps()[0].outcome()
+fn walk(ran: &Ran) -> &Walk {
+    ran.report.steps()[0].walk()
+}
+
+fn outcome(ran: &Ran) -> &Outcome {
+    ran.report.steps()[0].outcome()
 }
 
 /// What Polars said when it refused the step, whether it worked out the schema or ran the three
 /// rows of the table.
-fn polars_says(report: &Report) -> Option<String> {
-    let step = &report.steps()[0];
-    match (step.outcome(), step.rows()) {
-        (Outcome::Refused(refusal), _) if matches!(refusal.cause(), RunCause::Polars(_)) => {
-            Some(refusal.to_string())
-        }
-        (_, StepRows::Failed(error)) => Some(error.to_string()),
-        _ => None,
-    }
+fn polars_says(ran: &Ran) -> Option<String> {
+    ran.polars.clone()
 }
 
 fn select(items: Vec<Value>) -> Value {
@@ -87,8 +99,8 @@ fn choice(word: &str) -> Value {
 }
 
 /// The Polars dtype of the one column `report` gives, which the step must have run for.
-fn dtype_of_the_column(report: &Report) -> DataType {
-    let step = &report.steps()[0];
+fn dtype_of_the_column(ran: &Ran) -> DataType {
+    let step = &ran.report.steps()[0];
     assert!(
         matches!(step.outcome(), Outcome::Valid { .. }),
         "{:?}",
@@ -500,7 +512,7 @@ fn a_cast_that_polars_refuses_for_the_dtypes_is_refused_at_the_cast() {
     assert!(polars_says(&report).is_none());
 }
 
-fn join_on(key: Value) -> Report {
+fn join_on(key: Value) -> Ran {
     report_of(
         "LazyFrame.join",
         json!({ "left_on": many(vec![key]), "right_on": many(vec![field("rk")]) }),
@@ -838,10 +850,10 @@ fn a_column_of_the_dtype_null_is_no_column_that_a_comparison_with_a_null_replace
     );
     let mut given = json!({ "left_on": many(vec![key]), "right_on": many(vec![field("rk")]) });
     given["other"] = json!({ "table": "other" });
-    let report = Document::read(&document(vec![step("s", "LazyFrame.join", given)]))
-        .expect("a document")
-        .run_on(&inputs(), &table)
-        .expect("the table has a schema");
+    let report = ran_on(
+        &Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document"),
+        &table,
+    );
     assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert_eq!(walk(&report).refusal(), None);
     // Nor is it replaced by a null where it is compared with a column.
@@ -854,10 +866,10 @@ fn a_column_of_the_dtype_null_is_no_column_that_a_comparison_with_a_null_replace
     );
     let mut given = json!({ "left_on": many(vec![compared]), "right_on": many(vec![field("rk")]) });
     given["other"] = json!({ "table": "other" });
-    let report = Document::read(&document(vec![step("s", "LazyFrame.join", given)]))
-        .expect("a document")
-        .run_on(&inputs(), &table)
-        .expect("the table has a schema");
+    let report = ran_on(
+        &Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document"),
+        &table,
+    );
     assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert_eq!(walk(&report).refusal(), None);
 }

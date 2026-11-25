@@ -8,6 +8,7 @@ binary = "allowed-fuzz"
 properties = [
     "dageist-engine::tables-predict-allowance",
     "dageist-engine::tables-predict-dtypes",
+    "dageist-engine::asker-agrees-with-engine",
 ]
 source_references = [
     "docs/explanation.md#which-combinations-polars-allows",

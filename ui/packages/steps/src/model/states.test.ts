@@ -87,8 +87,17 @@ const STATES: readonly State[] = [
     gap: null,
   },
   {
-    name: 'refused by Polars',
+    name: 'refused by the tables, with the words they recorded of Polars',
     steps: alone(refused, 'total'),
+    outcome: 'refused',
+    cause: 'notAllowed',
+    count: 'notCounted',
+    says: 'problem',
+    gap: null,
+  },
+  {
+    name: 'refused by Polars where the tables allowed the step',
+    steps: alone(variants, 'polars'),
     outcome: 'refused',
     cause: 'polars',
     count: 'notCounted',

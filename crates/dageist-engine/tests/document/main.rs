@@ -1,6 +1,8 @@
 //! The step document through its public interface: reading and writing it,
 //! and running it on a small claims table.
 
+#[path = "../ask_polars/mod.rs"]
+mod ask_polars;
 mod claims;
 mod counted;
 mod counts;
@@ -17,6 +19,7 @@ mod lists;
 mod moments;
 mod moments_walked;
 mod nesting;
+mod not_run;
 mod nulls;
 mod order;
 mod patterns;

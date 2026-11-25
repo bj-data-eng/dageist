@@ -89,7 +89,7 @@ fn moments_are_cut_to_the_start_of_their_day_and_rounded_to_the_nearest_hour() {
 }
 
 #[test]
-fn a_duration_typed_as_no_duration_is_refused_at_the_parameter_in_polars_words() {
+fn a_duration_typed_as_no_duration_is_refused_at_its_method_with_polars_words() {
     for (id, parameter) in [
         ("Expr.dt.truncate", "every"),
         ("Expr.dt.round", "every"),
@@ -101,39 +101,33 @@ fn a_duration_typed_as_no_duration_is_refused_at_the_parameter_in_polars_words()
         let Outcome::Refused(refusal) = step.outcome() else {
             panic!("{id}: {:?}", step.outcome());
         };
-        // The refusal is at the duration of the method: the step's expression, its link and its
-        // argument.
+        // The step is not built: it is refused where the walk found the refusal, at the method of
+        // the duration, which is the step's expression and its link, with the walk's words.
         assert_eq!(
             refusal.place().path(),
             [
                 Segment::Parameter("named_exprs".to_owned()),
                 Segment::Value(0),
                 Segment::Link(0),
-                Segment::Parameter(parameter.to_owned()),
             ],
             "{id}"
         );
-        assert!(matches!(refusal.cause(), RunCause::Build(_)), "{refusal}");
+        let walked = step.walk().refusal().expect("the walk refuses it");
+        assert_eq!(refusal.place(), walked.place(), "{id}");
+        assert!(
+            matches!(refusal.cause(), RunCause::NotAllowed(said) if said == walked.refusal()),
+            "{refusal}"
+        );
         let words = refusal.cause().to_string();
-        assert!(words.contains("not a duration"), "{id}: {words}");
         assert!(
             words.contains("unit: 'x' not supported; available units are"),
             "{id}: {words}"
         );
-        // The walk says it before the step is built, by the rule, with Polars' words in its own.
-        let walked = step.walk().refusal().expect("the walk refuses it");
         assert!(
             matches!(walked.refusal().source(), RefusalSource::Rule(rule)
                 if rule.name() == "duration-is-valid"),
             "{id}: {:?}",
             walked.refusal().source()
-        );
-        assert!(
-            walked
-                .refusal()
-                .reason()
-                .contains("unit: 'x' not supported"),
-            "{id}"
         );
     }
 }
@@ -310,7 +304,7 @@ fn a_clock_that_is_read_twice_or_never_is_resolved_as_the_words_say() {
 }
 
 #[test]
-fn a_time_zone_that_is_none_is_refused_at_the_parameter_in_polars_words() {
+fn a_time_zone_that_is_none_is_refused_at_its_method_with_polars_words() {
     for id in ["Expr.dt.replace_time_zone", "Expr.dt.convert_time_zone"] {
         let written = selecting(moments_then_all(vec![in_zone(id, Some("Not/AZone"))]));
         let report = report_of(&written);
@@ -318,17 +312,23 @@ fn a_time_zone_that_is_none_is_refused_at_the_parameter_in_polars_words() {
         let Outcome::Refused(refusal) = step.outcome() else {
             panic!("{id}: {:?}", step.outcome());
         };
+        // The step is not built: it is refused where the walk found the refusal, at the method.
+        let walked = step.walk().refusal().expect("the walk refuses it");
+        assert_eq!(refusal.place(), walked.place(), "{id}");
         assert_eq!(
             refusal.place().path().last(),
-            Some(&Segment::Parameter("time_zone".to_owned())),
+            Some(&Segment::Link(0)),
             "{id}"
+        );
+        assert!(
+            matches!(refusal.cause(), RunCause::NotAllowed(said) if said == walked.refusal()),
+            "{refusal}"
         );
         let words = refusal.cause().to_string();
         assert!(
             words.contains("unable to parse time zone: 'Not/AZone'"),
             "{id}: {words}"
         );
-        let walked = step.walk().refusal().expect("the walk refuses it");
         assert!(
             matches!(walked.refusal().source(), RefusalSource::Rule(rule)
                 if rule.name() == "time-zone-is-valid"),

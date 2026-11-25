@@ -15,7 +15,9 @@ use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
 use super::limits::{excuses, strict};
-use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
+use super::observe::{
+    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked,
+};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
 use super::reduce::candidates;
@@ -53,6 +55,7 @@ pub const REFUSED_FOR_ANOTHER_REASON: &str = "refused by both, for another reaso
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
 pub const DTYPES: &str = "dageist-engine::tables-predict-dtypes";
+pub const ASKER: &str = "dageist-engine::asker-agrees-with-engine";
 
 pub struct AllowedTarget {
     descriptor: TargetDescriptor,
@@ -533,7 +536,12 @@ impl CaseTarget for AllowedTarget {
 
     fn evaluate(&self, case: &Case) -> Result<CaseOutcome> {
         let prediction = predict(case);
-        let observed = observe(case);
+        let observed = observe_checked(case);
+        // What the target asks of Polars for a step the walk refuses must be what the step
+        // engine would give were it asked: where the walk allows the step both are asked.
+        if let Some(drift) = &observed.drift {
+            return failure(ASKER, "asker-differs-from-the-engine", drift.clone());
+        }
         let allowed_by_polars = observed.refusal.is_none();
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");

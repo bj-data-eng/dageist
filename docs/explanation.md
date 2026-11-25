@@ -1503,7 +1503,20 @@ each link of every expression, all without reading data. For each expression it
 also gives the context it stands in and where each link stands, as the
 [walk](#which-combinations-polars-allows) of the tables finds them, so that a
 caller can ask for offers at any link. Steps after a refused one are reported
-as not run. The rows of any step come from running
+as not run.
+
+A step the walk refuses is not run. The tables record what Polars does with a call,
+and Polars plans a part of a step that it never evaluates, and panics, in a thread of
+its own that cannot be recovered from, on some of what the tables refuse. So the step
+is reported refused at the place of the walk's first refusal, with its words, and is
+neither planned nor collected by `run`, `run_on` or `rows`, whether or not Polars would
+accept it. Its report holds no dtype for an expression, as working one out plans the
+expression; the walk's account of the expression stands in the report. A hole is
+reported before a refusal, since a step with one is not built. The words are those of
+the tables: for a call the tables record Polars refusing, Polars' own first line, and
+for a rule, the rule's. The target that checks the tables against Polars asks Polars
+about such a step itself, as [what the tables are checked against](#what-the-tables-are-checked-against)
+says. The rows of any step come from running
 it on an in-memory working window, and a preview gives them as text, every
 cell written as Polars writes it and each dtype by the engine's short name,
 such as `Datetime(us)`, so the view formats no value. Polars' own message is
@@ -1635,13 +1648,13 @@ a method of lists or arrays, is refused after a list or an array of a list, an a
 after a class the tables do not measure it on, and after one whose lines record a panic or rows
 that contradict the schema. A method that depends on the element dtype is refused given an
 expression of such a dtype, or of a class it is not measured on, as an argument, whether it is a
-column, a value taken of one or a connected input, and whether the walk lost the dtype or not. A method of lists or arrays that the tables refuse, as
-`list.max` of an array is, and any call that the tables refuse after a list or an array, whatever
-it is given, is not built either, and the step is refused with the words of the walk and the place
-of the call: Polars may plan one that both branches of a condition share, and its optimizer then
-panics on the plan, as it does of the sum of an array of dates and a boolean. Where the walk lost
-the dtype before the call, the run asks the tables of the dtype Polars gives and of the dtypes of
-what the call is given, and refuses the same calls. A dtype of a class is any member of it: an array of any width
+column, a value taken of one or a connected input, and whether the walk lost the dtype or not. A
+method of lists or arrays that the tables refuse, as `list.max` of an array is, and any call that
+the tables refuse after a list or an array, whatever it is given, is refused like any call the
+tables refuse, and the step is not run: Polars may plan one that both branches of a condition
+share, and its optimizer then panics on the plan, as it does of the sum of an array of dates and a
+boolean. Where the walk lost the dtype before the call, the run asks the tables of the dtype
+Polars gives and of the dtypes of what the call is given, and refuses the same calls. A dtype of a class is any member of it: an array of any width
 is its class, and the tables measure arrays at width 2, which the walk carries as it carries the
 unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which of the
 classes each method is measured on.
@@ -1710,7 +1723,7 @@ and referenced from the lines of the context table they govern:
 | `replacement-values-match-in-number` | A replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one. One value given an operand of many values, or put over a window that does not explode, is as many values, for the window gives each row of its group what it gives the group, while a window that explodes gives one row for each group; what a replacement lists is a table it looks values up in, so it gives as many values as what it follows. A condition whose predicates and values are each one value gives one value, whether or not Polars drops its predicates, so what follows it is counted; where only its values are one, the number depends on what Polars drops, and is not counted. Polars refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of one, when the rows run. The walk finds how many values an expression gives from its shape, and does not judge one that is not walked to its end or whose count Polars's plan decides, as a condition with one expression for all its values. |
 | `parameter-takes-one-value` | A parameter that Polars reads as one value is given one. `shift`'s count of rows and fill and `diff`'s count refuse the rows, a count of values and the one value that a method took of one value, which Polars cannot tell is one before the rows run, with "must be a scalar value", in a select and in a window; a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count, and take that value. A number typed in and an aggregate are one value for all of them. |
 | `values-meet-in-count` | The values a call meets are one value, which is met by each of the others, or as many as one another: the operands of a method, the predicates and values of a condition, and the items of a select. The rows are no count of values that the data or the arguments decide, and two such counts that are fixed and differ are not the same; a step that adds columns meets its items with the rows. Polars refuses them with "zip node received non-equal length inputs" when the rows run, except where the count is by chance the rows. |
-| `element-dtype-is-implemented` | A method of the `list` or the `arr` namespace is run on an element dtype that Polars implements it for. Polars panics where the rows run, on a thread of its own that its streaming executor may not recover from, on `arr.min` and `arr.max` of an array of anything but whole numbers and floats, on `reverse` of one, and on `list.mean` of a list of `Float16`. The tables never run such a combination, a call is refused with what the element lacks before the tables are read, and a document that holds one is refused before Polars is asked, by the dtype that the value before the call has, and by the walk wherever the builder cannot see it, as in a pivot's aggregate. A test runs each combination Polars panics on in a process of its own, and holds the rule to those and no other. The `set_*` methods panic on a list of `Null`, and the rule will name them where they are catalogued. |
+| `element-dtype-is-implemented` | A method of the `list` or the `arr` namespace is run on an element dtype that Polars implements it for. Polars panics where the rows run, on a thread of its own that its streaming executor may not recover from, on `arr.min` and `arr.max` of an array of anything but whole numbers and floats, on `reverse` of one, and on `list.mean` of a list of `Float16`. The tables never run such a combination, a call is refused with what the element lacks before the tables are read, and a document that holds one is refused by the walk, at the call, before Polars is asked: the step is not run, as any step the walk refuses is not, a pivot's aggregate included. A test runs each combination Polars panics on in a process of its own, and holds the rule to those and no other. The `set_*` methods panic on a list of `Null`, and the rule will name them where they are catalogued. |
 | `window-input-is-not-counted` | A window takes a value as long as its group, which a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, as `head(2)` of a sum is. Polars refuses it with "expressions must have matching group lengths", unless the window joins the values of a group into a list or explodes them. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
@@ -1829,7 +1842,8 @@ window follows it. `first` and `last` are the value at the first and the last pl
 which is a null where a list has none, and `n_unique`, `any`, `all`, `reverse` and `unique` are built
 as Python builds them, as an evaluation over the elements of one list. A call that the walk refuses for what the tables recorded of
 a method of lists or arrays or of a method that follows one, that its schema and its rows differ in dtype or that
-Polars panicked, is not run either, for an aggregate or a cut that follows it trusts the schema and panics. A
+Polars panicked, is refused as the other calls the tables refuse are, and the step is not run: an aggregate or a
+cut that follows a call whose schema and rows differ trusts the schema and panics. A
 method gives a value for each
 list, so a column of lists stays as many values as it had rows, and none of them is an aggregate for the
 rules that hold a join's key. An array that a call gives is written at the width the array it follows
@@ -1864,10 +1878,26 @@ each expression a position holds may end there, and `options` of the options a
 step is given. From that it predicts whether Polars allows the case and the dtype
 after each link. A case whose answer is not known, as whether a start may end
 where it was not told its dtype, is not predicted past that point.
-It then runs the case through the step document, as the editor does, on three rows
+It then asks Polars. It runs the case through the step document, as the editor does, on three rows
 with a null and on a table with no rows, and compares: a case is allowed only
 when the schema and both runs succeed, as the tables count it, and the dtype
-after every link that the tables gave is the class Polars gives. The case is the
+after every link that the tables gave is the class Polars gives. The step document does not
+run a step the walk refuses, so Polars is asked about that step apart from it: the target builds
+the step through the catalogue's own build functions, with the same checks of a pattern and
+a duration typed in and of where `element` stands, and runs its schema and its rows the same way,
+under `catch_unwind`. That is how a table that is stricter than Polars is found, as a refusal of
+the step document would otherwise be the tables' own words. It does not ask Polars about a method
+that depends on the element dtype of an element the tables do not measure or Polars has no
+implementation of, which Polars panics on, and which the walk refuses by a rule for that reason.
+
+That asking is a copy of what the step document builds, whose builder is private, so the copy is
+checked against it: a case whose step the walk allows, and which the step document does not refuse
+by what it holds of its own, is asked of both, and the property `asker-agrees-with-engine` holds
+that they say the same. It compares whether Polars refuses the step, at which stage and place and in
+what words, and the dtype of every expression at its start and after each link. The words of a
+refusal of the schema are compared exactly; those of a refusal of the rows are compared with the
+values they name left out and every digit alike, for which row fails first is not the same from run
+to run. A difference is the finding `asker-differs-from-the-engine`. The case is the
 document's own text, so a kept case replays exactly. A campaign draws its methods
 evenly, or focused on chosen methods so that every case holds one of them, which keeps
 a batch of new methods checked against the rest as deeply however many the catalogue
