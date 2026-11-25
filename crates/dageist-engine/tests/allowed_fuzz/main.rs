@@ -389,8 +389,9 @@ impl Settled {
     }
 }
 
-/// The most threads at which Polars still gives the cases of [`settled_on_few_threads`] the
-/// outcome that one gets there; on more it gives the one they are kept under.
+/// The most threads at which Polars still gives some cases another outcome than it gives on more:
+/// those of [`settled_on_few_threads`], and a sort key of one value whose part it evaluates there
+/// and never evaluates on more.
 const FEW_THREADS: usize = 2;
 
 /// What a kept case is settled as where Polars runs on few threads, if that is not what its name

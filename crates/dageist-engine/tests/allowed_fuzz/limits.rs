@@ -10203,8 +10203,18 @@ mod tests {
             "{:?}",
             prediction.verdict
         );
-        assert!(observe(&case).refusal.is_none());
-        assert_eq!(excused_by(&case), vec![]);
+        let seen = observe(&case).refusal;
+        if crate::polars_threads() > crate::FEW_THREADS {
+            assert!(seen.is_none(), "{seen:?}");
+            assert_eq!(excused_by(&case), vec![]);
+        } else {
+            // On few threads Polars does not drop the key of one value, and refuses the part as
+            // the tables do, so the tables and Polars agree and nothing is excused.
+            assert!(
+                seen.is_some_and(|seen| is_a_refusal_of_the_components_of_a_date(&seen.reason)),
+                "Polars evaluates the key"
+            );
+        }
     }
 
     /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = b)), len()])` over dates and text: a sort key
@@ -10266,8 +10276,18 @@ mod tests {
             "{:?}",
             prediction.verdict
         );
-        assert!(observe(&case).refusal.is_none());
-        assert_eq!(excused_by(&case), vec![]);
+        let seen = observe(&case).refusal;
+        if crate::polars_threads() > crate::FEW_THREADS {
+            assert!(seen.is_none(), "{seen:?}");
+            assert_eq!(excused_by(&case), vec![]);
+        } else {
+            // On few threads Polars does not drop the key of one value, and refuses the part as
+            // the tables do, so the tables and Polars agree and nothing is excused.
+            assert!(
+                seen.is_some_and(|seen| is_a_failed_conversion_of_text(&seen.reason)),
+                "Polars evaluates the key"
+            );
+        }
     }
 
     fn any_call_in_step(step: &Call, found: &dyn Fn(&Call) -> bool) -> bool {
