@@ -5875,7 +5875,7 @@
       "applies": "expression",
       "family": "search",
       "name": "str.find",
-      "hint": "where a pattern first matches, in bytes from the start, nothing where it does not",
+      "hint": "where a pattern first matches, in characters from the start, nothing where it does not",
       "head": null,
       "lazy": true,
       "parameters": [

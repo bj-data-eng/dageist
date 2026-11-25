@@ -3669,7 +3669,7 @@
         "refusal": {
           "source": {
             "by": "polars",
-            "stage": "rows"
+            "stage": "schema"
           },
           "reason": "`sum` operation not supported for dtype `datetime[μs]`"
         }
