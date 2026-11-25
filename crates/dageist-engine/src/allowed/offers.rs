@@ -409,7 +409,8 @@ pub enum Unknown {
     /// it gives was not told to [`offer`].
     TheStartsDtype,
     /// A dtype that is needed is not known: the argument that decides what a
-    /// method gives is not chosen.
+    /// method gives is not chosen, or the fields of a struct that the method
+    /// reads, drops or renames are not known.
     TheResultsDtype,
 }
 
@@ -1379,6 +1380,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         decided => {
             (result, fields) = decided.result().unwrap_or((None, None));
         }
+    }
+    // Names read, dropped or given to a struct whose fields the chain does not know are refused or
+    // not by what the fields are, which Polars says and the walk cannot: where the struct is the
+    // values of a pivot's group, or comes of a call that did not say its fields.
+    if struct_gives.is_undecided() {
+        ending = Ending::NotKnown(Unknown::TheResultsDtype);
     }
     // Several columns of a field read with several names are no dtype of one value, and the tables
     // measured one name: where the place is no item of a select or a sort key, they do not say.

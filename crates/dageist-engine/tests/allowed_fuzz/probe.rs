@@ -363,11 +363,20 @@ fn symbol_word(symbol: &str) -> String {
         .collect()
 }
 
+/// What Polars says of a field it did not find, before the name it was asked for.
+const NOT_FOUND: &str = "field not found:";
+
 /// The words of a reason that say what Polars objected to, and to which call:
 /// what is quoted, in parentheses or a dtype is the part's, not the objection's,
 /// but what is quoted in backticks that is no dtype or column, and the symbol of
 /// a comparison or an operation, name the call.
 fn objection(reason: &str) -> String {
+    // The name of a field that was not found is the one the call was given, as a column's is.
+    let reason = reason.split_once(NOT_FOUND).map_or_else(
+        || reason.to_owned(),
+        |(before, _)| format!("{before}{NOT_FOUND}"),
+    );
+    let reason = reason.as_str();
     const DTYPES: [&str; 20] = [
         "str",
         "string",
@@ -502,6 +511,13 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
         Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
+        // A name that is no field is one Polars did not find, and a field named twice or names of
+        // another number are refused in its own words.
+        Source::Rule(rule) if *rule == FIELD_RULE => probe.contains(NOT_FOUND),
+        Source::Rule(rule) if *rule == FIELD_NAMES_RULE => {
+            probe.contains("multiple fields with name")
+                || probe.contains("different number of fields")
+        }
         // A count that values meet, or a window is given, is refused as lengths that do not match.
         Source::Rule(rule) if COUNT_MEETING_RULES.contains(rule) => is_a_refusal_of_lengths(probe),
         // Polars finds no dtype that two zones have in common, and says it of a comparison as it
@@ -643,7 +659,11 @@ fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
         Source::Polars => chain_probe(found),
         Source::Rule(rule)
-            if *rule == COUNT_RULE || *rule == ZONE_RULE || COUNT_MEETING_RULES.contains(rule) =>
+            if *rule == COUNT_RULE
+                || *rule == ZONE_RULE
+                || *rule == FIELD_RULE
+                || *rule == FIELD_NAMES_RULE
+                || COUNT_MEETING_RULES.contains(rule) =>
         {
             chain_probe(found)
         }
@@ -664,6 +684,14 @@ const ZONE_WORDS: [&str; 3] = [
     "failed to determine supertype",
     "is incompatible with expected type",
 ];
+
+/// The rule that a name a call reads or drops be a field of the struct it follows, whose refusal
+/// Polars shows by the field it did not find.
+const FIELD_RULE: &str = "field-is-of-the-struct";
+
+/// The rule that the names given to the fields of a struct be as many as its fields and no two
+/// alike, whose refusal Polars shows by a field named twice or by another number of names.
+const FIELD_NAMES_RULE: &str = "field-names-fit-the-struct";
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.

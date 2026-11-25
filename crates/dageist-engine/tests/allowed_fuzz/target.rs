@@ -1426,21 +1426,15 @@ mod tests {
 
     #[test]
     fn a_name_that_is_no_field_of_the_struct_a_case_names_is_refused_by_both() {
-        // `x` is a field of the struct the tables measured and of no struct here.
+        // `x` is a field of the struct the tables measured and of no struct here: the rule names the
+        // fields, Polars the name it did not find, and they refuse it for the same reason.
         let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "x"));
         assert_eq!(
             outcome.kind(),
-            dageist_fuzz::OutcomeKind::ExpectedRejection,
+            dageist_fuzz::OutcomeKind::Evaluated,
             "{outcome:?}"
         );
-        // Both refuse it, and each in its own words: the rule names the fields, Polars the name.
-        let said = outcome.detail().unwrap_or_default();
-        assert!(
-            said.starts_with(REFUSED_FOR_ANOTHER_REASON)
-                && said.contains("\"x\" is no field of the struct, whose fields are \"k\"")
-                && said.contains("field not found"),
-            "{said}"
-        );
+        assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
         assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
         let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "k"));
         assert_eq!(

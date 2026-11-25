@@ -1037,13 +1037,21 @@ const fn cannot_be_cast_to_a_key(dtype: &DataType) -> bool {
 /// must be matched by.
 fn held_dtype(context: Context, subject: Subject<'_>, probe: &Frames) -> DataType {
     let build = || -> Result<DataType, BuildError> {
-        let mut held = subject(LEFT)?;
+        // The key reads the columns of the table it stands in: the other table's where it is the
+        // right key, which a struct of columns names its fields after.
+        let scope = scope_of(context.outer());
+        let mut held = subject(scope)?;
         if let Some(nested) = context.nested() {
-            held = wrap(nested, held, LEFT)?;
+            held = wrap(nested, held, scope)?;
         }
+        let table = if context.outer() == Outer::JoinRight {
+            probe.other(false)
+        } else {
+            probe.left(false)
+        };
         let mut frame = step(
             "LazyFrame.select",
-            probe.left(false),
+            table,
             vec![("exprs", expressions(vec![held]))],
         )?;
         let schema = frame.collect_schema().map_err(BuildError::Polars)?;

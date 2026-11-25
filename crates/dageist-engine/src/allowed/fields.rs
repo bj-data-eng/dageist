@@ -221,6 +221,10 @@ pub(super) enum Gives {
     /// A struct the call gives, whose dtype the call does not yet say: the pattern that names the
     /// fields of `extract_groups` is not given.
     Unknown,
+    /// A call that reads, drops or renames fields of a struct whose fields the chain does not know:
+    /// whether Polars refuses the names it is given depends on them, so the walk cannot say, and
+    /// neither can it say what the call gives.
+    Undecided,
 }
 
 /// The refusal of a call: the rule and what it says of the case.
@@ -301,10 +305,7 @@ pub(super) fn gives(
                 .chain(given(chosen, "more_names"))
                 .collect();
             let Some(fields) = held else {
-                return Ok(match names.as_slice() {
-                    [_] => Gives::Field(None),
-                    _ => Gives::Columns(None),
-                });
+                return Ok(Gives::Undecided);
             };
             let mut read = Vec::new();
             for name in &names {
@@ -321,7 +322,12 @@ pub(super) fn gives(
         "Expr.struct.drop" if follows_a_struct => {
             let names = given(chosen, "names");
             let Some(fields) = held else {
-                return Ok(Gives::Struct(None));
+                // Names that are no field are left alone where the drop is not strict.
+                return Ok(if word(chosen, "strict") == Some("false") {
+                    Gives::Struct(None)
+                } else {
+                    Gives::Undecided
+                });
             };
             if word(chosen, "strict") != Some("false")
                 && let Some(name) = names.iter().find(|name| fields.get(name).is_none())
@@ -338,7 +344,7 @@ pub(super) fn gives(
         "Expr.struct.rename_fields" if follows_a_struct => {
             let new = given(chosen, "names");
             let Some(fields) = held else {
-                return Ok(Gives::Struct(None));
+                return Ok(Gives::Undecided);
             };
             if new.len() != fields.len() {
                 return Err((
@@ -506,8 +512,14 @@ impl Gives {
                 None,
             ),
             Self::Field(Some(field)) => (Some(ResultDtype::of_field(field)), field.fields.clone()),
-            Self::Field(None) | Self::Columns(_) | Self::Unknown => (None, None),
+            Self::Field(None) | Self::Columns(_) | Self::Unknown | Self::Undecided => (None, None),
         })
+    }
+
+    /// Whether the call reads or renames fields that the chain does not know, so that what Polars
+    /// says of it cannot be said.
+    pub(super) const fn is_undecided(&self) -> bool {
+        matches!(self, Self::Undecided)
     }
 
     /// The columns an unnest gives, where it gives several and they are known.

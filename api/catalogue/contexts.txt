@@ -78,7 +78,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 17220 combinations: 11681 allowed; 3246 refused when Polars resolved the schema, 2293 when it ran the rows, 0 when it ran the empty table.
+# 17220 combinations: 11685 allowed; 3242 refused when Polars resolved the schema, 2293 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -17082,14 +17082,14 @@ polars.struct | join_left | continues | - | - | join-key-names-are-not-repeated,
 polars.struct | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
 polars.struct | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
 polars.struct | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `ra`
-polars.struct | join_right > condition.value | continues | - | - | - | refused schema: datatypes of join keys don't match - `key`: struct {a: i64} on left does not match `ra`: struct {ra: i64} on right (and no other type was available to cast to)
-polars.struct | join_right > condition.value | ends | - | - | - | refused schema: datatypes of join keys don't match - `key`: struct {a: i64} on left does not match `ra`: struct {ra: i64} on right (and no other type was available to cast to)
+polars.struct | join_right > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | join_right > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
 polars.struct | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.struct | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.struct | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.struct | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.struct | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: datatypes of join keys don't match - `key`: struct {a: i64} on left does not match `ra`: struct {ra: i64} on right (and no other type was available to cast to)
-polars.struct | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: datatypes of join keys don't match - `key`: struct {a: i64} on left does not match `ra`: struct {ra: i64} on right (and no other type was available to cast to)
+polars.struct | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
+polars.struct | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
 polars.struct | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
 polars.struct | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
 polars.struct | pivot_aggregate > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
