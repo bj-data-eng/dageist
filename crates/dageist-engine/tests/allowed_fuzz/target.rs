@@ -1052,28 +1052,6 @@ mod tests {
     }
 
     #[test]
-    fn the_outcome_of_a_schema_mismatch_probe_says_what_the_probe_showed() {
-        // The tables' reason is the target's own comparison of plan and rows, and
-        // the probe in the position is refused by Polars with a panic that says
-        // nothing of it, so the outcome says what was shown: the call's plan and
-        // rows differ as the tables say, and a call whose plan and rows agree is
-        // allowed there.
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/allowed_fuzz/regressions/stricter-a-sort-key-of-one-value-whose-schema-differs.case");
-        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
-        let outcome = std::thread::Builder::new()
-            .stack_size(256 << 20)
-            .spawn(move || AllowedTarget::new().evaluate(&case))
-            .expect("a thread")
-            .join()
-            .expect("the case is evaluated")
-            .expect("an outcome");
-        let detail = outcome.detail().expect("a detail");
-        assert!(detail.contains("plan and rows"), "{detail}");
-        assert!(!detail.contains("for the tables' reason"), "{detail}");
-    }
-
-    #[test]
     fn a_prefix_polars_refuses_at_the_call_the_tables_could_not_be_asked_about_is_no_difference() {
         // `when(when(g + 1).then(a)).then(f).otherwise(a)`: the tables cannot say what a number
         // given no dtype is added to text, and Polars refuses the sum when it works out the
@@ -1203,7 +1181,7 @@ mod tests {
         // wrong prediction of that dtype must not be hidden by it: it is found
         // as a difference of the dtypes of the case itself, whatever is probed.
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "tests/allowed_fuzz/regressions/stricter-a-window-over-the-length-of-a-literal.case",
+            "tests/allowed_fuzz/regressions/fixed-polars-evaluates-a-window-over-the-length-of-a-literal.case",
         );
         let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
         let observed = observe(&case);

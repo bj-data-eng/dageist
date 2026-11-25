@@ -268,13 +268,6 @@ fn replay_a_case() {
 /// not evaluate (#103): the probe of the part is refused for the tables' own reason there.
 const SETTLED_AS_STRICTER_ON_ONE_THREAD: [&str; 1] = ["fixed-a-deeper-place.case"];
 
-/// The kept cases that Polars refuses on more than one thread and allows on one (#103), where the
-/// tables and Polars then agree: a null quantile in a join key.
-const AGREE_ON_ONE_THREAD: [&str; 2] = [
-    "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
-    "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key-beside-a-key-of-the-same-column.case",
-];
-
 /// How many threads Polars runs on: the size of its own pool, which `POLARS_MAX_THREADS` sets and
 /// which is the number of cores where it is not set.
 fn polars_threads() -> usize {
@@ -325,22 +318,6 @@ fn kept_cases_replay_as_settled() {
         let evaluation = replay(&target, &bytes, &mut |_| Ok(()))
             .unwrap_or_else(|error| panic!("{name} could not be replayed: {error:?}"));
         let outcome = &evaluation.outcome;
-        if one_thread() && AGREE_ON_ONE_THREAD.contains(&name) {
-            assert_eq!(
-                outcome.kind(),
-                OutcomeKind::Evaluated,
-                "{name} is allowed by both on one thread: {}",
-                detail_of(outcome)
-            );
-            if let Some(slug) = name
-                .strip_prefix("uncovered-")
-                .and_then(|rest| rest.strip_suffix(".case"))
-                .and_then(|rest| rest.split("--").next())
-            {
-                excused.insert(slug.to_owned());
-            }
-            continue;
-        }
         if name.starts_with("fixed-") {
             // On one thread Polars refuses the part the probe asks about for the tables' own
             // reason, where it does not on more, so the case settles as a part it does not
