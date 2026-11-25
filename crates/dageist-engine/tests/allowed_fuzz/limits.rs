@@ -463,12 +463,6 @@ pub enum Limit {
     /// a join that holds `polars.struct`: the key is the struct, or a field read or unnested from
     /// one.
     AStructOfAnUntypedNumberInAJoinKey,
-    /// Polars does arithmetic on a struct field by field where every field is a number, and
-    /// refuses it where one is not. The tables measured a struct of a whole number and text, so
-    /// they refuse every arithmetic on a struct, in Polars' words for the text field they
-    /// measured. The tables refusing with the refusal that a struct has a non-numeric field, which
-    /// names the field `y` of the text dtype that only the measured struct has.
-    ArithmeticOnAStructOfNumbers,
     /// Polars meets two structs, as a fill of nulls by another column does, by casting one to the
     /// dtype of the other, and refuses it where their fields are not the same. The tables measured
     /// a struct met by the struct measured, which has the same fields as itself. Polars refusing
@@ -517,7 +511,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 43] = [
+    pub const ALL: [Self; 42] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -554,7 +548,6 @@ impl Limit {
         Self::APartPolarsFoldsToANull,
         Self::AGatherBeyondTheRows,
         Self::AStructOfAnUntypedNumberInAJoinKey,
-        Self::ArithmeticOnAStructOfNumbers,
         Self::AStructMetByAStructOfOtherFields,
         Self::ACountNoRowsChange,
         Self::AJsonOfANumberInAPivot,
@@ -614,7 +607,6 @@ impl Limit {
             Self::AStructOfAnUntypedNumberInAJoinKey => {
                 "a-struct-of-an-untyped-number-as-a-join-key"
             }
-            Self::ArithmeticOnAStructOfNumbers => "arithmetic-on-a-struct-of-numbers",
             Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
             Self::ACountNoRowsChange => "a-count-no-rows-change",
             Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
@@ -719,9 +711,6 @@ impl Limit {
             }
             Self::ACountNoRowsChange => {
                 "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
-            }
-            Self::ArithmeticOnAStructOfNumbers => {
-                "Polars does arithmetic on a struct field by field, each field by its own dtype and the other value's, where the tables measured a struct of a whole number and text: it refuses a text field, a field that is a list of text, and a struct met by a struct of other fields or of other lengths, which the tables do not say of the fields a struct has"
             }
             Self::AStructMetByAStructOfOtherFields => {
                 "Polars refuses to meet two structs of other fields, which it casts to one another, where the tables measured a struct met by the struct measured"
@@ -3981,58 +3970,6 @@ fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
     })
 }
 
-/// Whether an expression is made, as it is written, of a struct: it starts from one, a column of the
-/// case that is one, or a call that makes one.
-fn is_made_of_a_struct(case: &Case, expression: &Expression) -> bool {
-    const MAKERS: [&str; 6] = [
-        "Expr.value_counts",
-        "Expr.list.to_struct",
-        "Expr.arr.to_struct",
-        "Expr.str.split_exact",
-        "Expr.str.splitn",
-        "Expr.str.extract_groups",
-    ];
-    let start_is_a_struct = match expression.start() {
-        Start::Call(start) if is(start, "polars.struct") => true,
-        Start::Call(start) if is(start, "polars.col") => matches!(
-            start.argument("name"),
-            Some(Value::Columns(names)) if names.first().is_some_and(|name| {
-                (matches!(name.as_str(), "a" | "ra") && case.receiver == Representative::Struct)
-                    || (matches!(name.as_str(), "b" | "rb")
-                        && case.argument == Representative::Struct)
-            })
-        ),
-        _ => false,
-    };
-    start_is_a_struct
-        || expression
-            .links()
-            .iter()
-            .any(|link| MAKERS.contains(&link.entry().id().as_str()))
-}
-
-/// Whether a call of arithmetic meets a struct, in any expression the tables followed: it follows a
-/// value that the tables class as one, or is given an expression made of one.
-fn arithmetic_meets_a_struct(case: &Case, prediction: &Prediction) -> bool {
-    prediction.expressions.iter().any(|traced| {
-        let Some(chain) = locate(case, &traced.place).inside.last().copied() else {
-            return false;
-        };
-        chain.links().iter().enumerate().any(|(at, link)| {
-            let before = if at == 0 {
-                traced.start
-            } else {
-                traced.links.get(at - 1).copied().flatten()
-            };
-            link.entry().family() == catalog::Family::Arithmetic
-                && (before == Some(Representative::Struct)
-                    || operands(link)
-                        .into_iter()
-                        .any(|(_, operand)| is_made_of_a_struct(case, operand)))
-        })
-    })
-}
-
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(
     limit: Limit,
@@ -4556,29 +4493,6 @@ fn applies(
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "Expr.struct.json_encode")))
-        }
-        (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsRefuses(refusal)) => {
-            // Polars adds, subtracts and so on field by field, each by the dtypes of the two fields.
-            unplaced(refusal)
-                && [
-                    "operation not supported for dtypes",
-                    "arithmetic on dtypes",
-                    "multiple fields with name",
-                    "failed to determine supertype",
-                    "cannot add two list columns with non-numeric inner types",
-                    "operation not supported for dtype `struct",
-                    "must specify one field in the struct",
-                    "expected struct fields to have given length",
-                ]
-                .iter()
-                .any(|said| refusal.reason.contains(said))
-                && arithmetic_meets_a_struct(case, prediction)
-        }
-        (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsAllows(refused)) => {
-            matches!(refused.source, Source::Polars)
-                && refused
-                    .reason
-                    .contains("a struct with non-numeric field: (field: y, dtype: str)")
         }
         (Limit::AStructMetByAStructOfOtherFields, Disagreement::PolarsRefuses(refusal)) => {
             // At the plan, as a fill casts one struct to the other's dtype, and at the rows, as a
@@ -11648,31 +11562,6 @@ mod tests {
     }
 
     #[test]
-    fn a_struct_with_the_text_field_the_tables_measured_is_the_cause_of_a_refusal_of_arithmetic() {
-        let case = select(vec![chain(column("a"), &["Expr.sub"])]);
-        let place = at(&[
-            Segment::Parameter("exprs".to_owned()),
-            Segment::Item(0),
-            Segment::Link(0),
-        ]);
-        let measured = "cannot - a struct with non-numeric field: (field: y, dtype: str)";
-        assert_eq!(
-            tables_refuse(&case, place.clone(), Some(TableStage::Schema), measured),
-            vec![Limit::ArithmeticOnAStructOfNumbers]
-        );
-        // A struct whose field of another name is the one that is no number is no measured one.
-        let other = "cannot - a struct with non-numeric field: (field: z, dtype: str)";
-        assert_eq!(
-            tables_refuse(&case, place.clone(), Some(TableStage::Schema), other),
-            vec![]
-        );
-        assert_eq!(
-            tables_refuse(&case, place, Some(TableStage::Schema), "cannot - a date"),
-            vec![]
-        );
-    }
-
-    #[test]
     fn a_cast_between_structs_polars_refuses_is_the_cause_of_its_refusal_of_a_struct_met_by_another()
      {
         let case = select(vec![chain(column("a"), &["Expr.fill_null"])]);
@@ -11792,28 +11681,6 @@ mod tests {
     }
 
     #[test]
-    fn a_struct_field_that_is_a_list_of_text_is_the_cause_of_a_refusal_of_arithmetic_on_it() {
-        let reason = "cannot add two list columns with non-numeric inner types";
-        let structs = chain(
-            call(
-                "polars.struct",
-                vec![("exprs", many(vec![chain(column("k"), &[])]))],
-            ),
-            &["Expr.add"],
-        );
-        let case = select(vec![structs]);
-        let traced = vec![Traced {
-            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
-            start: Some(Representative::Struct),
-            links: vec![Some(Representative::Struct)],
-        }];
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, traced),
-            vec![Limit::ArithmeticOnAStructOfNumbers]
-        );
-    }
-
-    #[test]
     fn names_alike_given_to_a_struct_made_of_a_list_are_excused_and_those_of_a_rename_are_not() {
         let reason = "two fields would be named \"y\"";
         let names = Value::Many(vec![
@@ -11863,87 +11730,6 @@ mod tests {
     }
 
     #[test]
-    fn a_struct_met_by_a_struct_of_other_fields_is_the_cause_of_a_refusal_of_arithmetic_on_it() {
-        // Polars adds two structs field by field, and refuses the rows of a pair that do not have
-        // the fields or the lengths to meet.
-        for reason in [
-            "`add` operation not supported for dtype `struct[1]`",
-            "must specify one field in the struct",
-            "expected struct fields to have given length. given = 1, field length = 3.",
-        ] {
-            let structs = chain(
-                call(
-                    "polars.struct",
-                    vec![("exprs", many(vec![chain(column("k"), &[])]))],
-                ),
-                &["Expr.add"],
-            );
-            let case = select(vec![structs]);
-            let traced = vec![Traced {
-                place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
-                start: Some(Representative::Struct),
-                links: vec![Some(Representative::Struct)],
-            }];
-            assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, reason, traced),
-                vec![Limit::ArithmeticOnAStructOfNumbers],
-                "{reason}"
-            );
-        }
-    }
-
-    #[test]
-    fn the_fields_of_a_struct_that_do_not_meet_are_the_cause_of_a_refusal_of_arithmetic_on_it() {
-        let reason = "add operation not supported for dtypes `i8` and `duration[μs]`";
-        let structs = chain(
-            call(
-                "polars.struct",
-                vec![("exprs", many(vec![chain(column("k"), &[])]))],
-            ),
-            &["Expr.add"],
-        );
-        let case = select(vec![structs]);
-        let traced = |class: Representative| {
-            vec![Traced {
-                place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
-                start: Some(Representative::Struct),
-                links: vec![Some(class)],
-            }]
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Rows,
-                reason,
-                traced(Representative::Struct)
-            ),
-            vec![Limit::ArithmeticOnAStructOfNumbers]
-        );
-        // A sum of what is no struct is no struct's, and nor is a refusal of another kind.
-        let plain = select(vec![chain(column("k"), &["Expr.add"])]);
-        let traced_plain = vec![Traced {
-            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
-            start: Some(Representative::Int64),
-            links: vec![Some(Representative::Int64)],
-        }];
-        assert_eq!(
-            polars_refuses(&plain, None, Stage::Rows, reason, traced_plain),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Rows,
-                "conversion of 1 failed",
-                traced(Representative::Struct)
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
     fn a_number_written_as_json_is_the_cause_of_a_refusal_to_read_text_as_one_in_a_pivot() {
         let reason = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
         let json = chain(
@@ -11975,8 +11761,7 @@ mod tests {
     }
 
     #[test]
-    fn arithmetic_given_a_struct_is_excused_for_the_fields_it_makes_of_two_and_a_replacement_for_its_cast()
-     {
+    fn a_replacement_given_a_struct_is_excused_for_its_cast() {
         let operand = chain(
             call(
                 "polars.struct",
@@ -11994,21 +11779,6 @@ mod tests {
             )
             .expect("a chain"),
         ]);
-        let traced = vec![Traced {
-            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
-            start: Some(Representative::Int64),
-            links: vec![Some(Representative::Struct)],
-        }];
-        for reason in [
-            "duplicate: multiple fields with name 'rk' found",
-            "failed to determine supertype of f64 and struct[2]",
-        ] {
-            assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, reason, traced.clone()),
-                vec![Limit::ArithmeticOnAStructOfNumbers],
-                "{reason}"
-            );
-        }
         let replacement = "cast from `struct[2]` to `struct[1]` failed in column 'a': structs do not have the same number of fields: 2 vs 1";
         assert_eq!(
             polars_refuses(&case, None, Stage::Rows, replacement, Vec::new()),

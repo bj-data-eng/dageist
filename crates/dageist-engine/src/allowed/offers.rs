@@ -1041,6 +1041,31 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         return Err(Refusal::rule(Rule::OneColumnIsNeeded));
     }
+    // Arithmetic on a struct is done field by field, each by its own dtype and that of what meets it,
+    // and differs for each call: a struct of numbers is added to a number, a field of text refuses
+    // it, a list field is added as a list. The tables measured one struct, of a whole number and
+    // text, so they say nothing of the others.
+    if is_method(entry)
+        && entry.family() == catalog::Family::Arithmetic
+        && (receiver_class == Some(Representative::Struct)
+            || chosen
+                .arguments
+                .iter()
+                .any(|(_, class)| *class == Representative::Struct))
+    {
+        let shape = match place.after {
+            After::Value { shape, .. } => shape,
+            _ => Shape::Many,
+        };
+        return Ok(Allowance {
+            result: None,
+            shape,
+            ending: Ending::NotKnown(Unknown::TheResultsDtype),
+            fields: None,
+            columns: None,
+            width: None,
+        });
+    }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
