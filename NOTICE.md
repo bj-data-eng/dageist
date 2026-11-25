@@ -278,6 +278,13 @@ your choice of either license:
 * License: [MIT License](licenses/tauri/LICENSE-MIT)
 * Homepage: [Tauri](https://tauri.app/)
 
+This product depends on tauri-plugin-dialog 2.8.4, distributed by the Tauri
+Programme within The Commons Conservancy, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/tauri-plugins-workspace/LICENSE_APACHE-2.0)
+* License: [MIT License](licenses/tauri-plugins-workspace/LICENSE_MIT)
+* Homepage: [Tauri plugins](https://github.com/tauri-apps/plugins-workspace)
+
 This product depends on tikv-jemalloc-sys 0.7.1, as patched by the Polars
 project at revision `e947a0d1a786e221ac1c14ba1566b55151e61ec9` of
 [pola-rs/jemallocator](https://github.com/pola-rs/jemallocator), distributed by

@@ -46,6 +46,7 @@ use dageist_engine::PolarsSession;
 /// `Builder::run` does: the caller's [`PolarsSession`] is dropped only when this returns.
 fn open_application(context: tauri::Context, workspace: graph::Workspace) -> i32 {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(sample_table::SampleGate::default())
         .manage(sample_table::OpenTable::default())
         .manage(workspace)

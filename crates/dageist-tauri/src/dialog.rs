@@ -1,9 +1,10 @@
 //! The system's file dialog, which picks the file a source reads or an output writes.
 //!
-//! The dialog runs on the process's main thread, as the platform asks. In the application
-//! window the command runs on a worker thread, and the dialog reaches the main thread through
-//! the event loop Tauri runs there. The bridge has no such loop, so its main thread takes the
-//! requests the bridge's threads send it and runs each dialog itself: see [`Dialogs`].
+//! In the application, Tauri's dialog plugin opens it as a sheet of the window that asked. The
+//! bridge has no Tauri, so it opens the same system dialog with rfd, the library the plugin is
+//! built on. A dialog runs on the process's main thread, as the platform asks, and the bridge has
+//! no event loop there to hand it to, so the bridge's main thread takes the requests its
+//! connections send it and runs each dialog itself: see [`Dialogs`].
 
 use std::path::Path;
 use std::sync::mpsc;
@@ -22,12 +23,17 @@ pub enum Purpose {
     Save,
 }
 
-/// Opens the system's dialog and gives the file chosen, with its format worked out from its
-/// extension: `.csv` is CSV and anything else Parquet. Nothing when the dialog was cancelled.
-pub fn choose(purpose: Purpose) -> Option<FileView> {
-    let dialog = rfd::FileDialog::new()
-        .add_filter("Parquet", &["parquet"])
-        .add_filter("CSV", &["csv"]);
+/// The kinds of file a dialog offers, by name and extension.
+const FILTERS: [(&str, &[&str]); 2] = [("Parquet", &["parquet"]), ("CSV", &["csv"])];
+
+/// Opens the system's dialog with rfd and gives the file chosen, with its format worked out from
+/// its extension: `.csv` is CSV and anything else Parquet. Nothing when the dialog was cancelled.
+fn choose(purpose: Purpose) -> Option<FileView> {
+    let dialog = FILTERS
+        .iter()
+        .fold(rfd::FileDialog::new(), |dialog, (name, extensions)| {
+            dialog.add_filter(*name, extensions)
+        });
     let path = match purpose {
         Purpose::Open => dialog.pick_file(),
         Purpose::Save => dialog.save_file(),
@@ -86,8 +92,17 @@ pub fn serve_dialogs(requests: &mpsc::Receiver<Request>) {
     }
 }
 
-/// Opens the system's file dialog and reports the file chosen, or nothing.
+/// Opens the system's file dialog over `window` and reports the file chosen, or nothing.
 #[tauri::command(async)]
-pub fn choose_file(purpose: Purpose) -> Option<FileView> {
-    choose(purpose)
+pub fn choose_file(window: tauri::WebviewWindow, purpose: Purpose) -> Option<FileView> {
+    use tauri_plugin_dialog::DialogExt;
+    let dialog = FILTERS.iter().fold(
+        window.dialog().file().set_parent(&window),
+        |dialog, (name, extensions)| dialog.add_filter(*name, extensions),
+    );
+    let chosen = match purpose {
+        Purpose::Open => dialog.blocking_pick_file(),
+        Purpose::Save => dialog.blocking_save_file(),
+    }?;
+    chosen.into_path().ok().map(|path| FileView::chosen(&path))
 }
