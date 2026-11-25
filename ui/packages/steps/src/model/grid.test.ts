@@ -225,7 +225,7 @@ describe('the grid, run through the functions the components call', () => {
     }
   });
 
-  it('finds the parameters of a field, a typed value and a condition that the editor does not set', () => {
+  it('finds the parameters of a field, a struct, a typed value and a condition that the editor does not set', () => {
     expect(
       sorted(
         [...found.gaps.values()].flatMap((gap) =>
@@ -233,6 +233,8 @@ describe('the grid, run through the functions the components call', () => {
         ),
       ),
     ).toEqual([
+      'Expr.struct.drop names',
+      'Expr.struct.field name',
       'polars.col more_names',
       'polars.lit allow_object',
       'polars.lit dtype',
