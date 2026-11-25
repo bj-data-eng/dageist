@@ -20,7 +20,7 @@ import type { ReportState } from './limits';
 import { prepareRun, rowsFailure, sayingOf } from './report';
 
 // Every outcome and every state of the rows that the host can report of a step, built from the
-// reports the host writes, and what the editor says of each. One state is built by hand, as marked.
+// reports the host writes, and what the editor says of each.
 // A state that leaves a person with nothing to read is a gap, and it is declared or the check fails.
 const refused = decodeRun(refusedFixture);
 const incomplete = decodeRun(incompleteFixture);
@@ -186,17 +186,13 @@ const STATES: readonly State[] = [
     gap: null,
   },
   {
-    // The one state built by hand: the host's reports hold no step after one that failed on the
-    // rows, so this is the failed step of the variants followed by a copy of an accepted step with
-    // its count changed to not counted, which is how the engine reports the step after a failure
-    // (`a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it_are_not_counted`).
-    name: 'accepted and not counted after a step that failed on the rows (built by hand)',
-    steps: [reportOf(variants, 'failed'), uncounted(reportOf(refused, 'sort'), 'after')],
+    name: 'accepted and not run on the rows after a step that failed there',
+    steps: [reportOf(variants, 'failed'), reportOf(variants, 'not_reached')],
     outcome: 'valid',
     cause: null,
-    count: 'notCounted',
-    says: 'nothing',
-    gap: 'notCountedAfterRowsFailure',
+    count: 'notReached',
+    says: 'problem',
+    gap: null,
   },
 ];
 
@@ -214,16 +210,19 @@ function sayingAt(state: State): ReturnType<typeof sayingOf> {
 }
 
 /**
- * Returns the states that say nothing without a declared gap, and the declared gaps of states that
- * say something.
+ * Returns the states of `states` that say nothing without a declared gap, and the declared gaps of
+ * states that say something.
  */
-function compare(declared: readonly string[]): {
+function compare(
+  declared: readonly string[],
+  states: readonly State[] = STATES,
+): {
   readonly undeclared: string[];
   readonly stale: string[];
 } {
-  const silent = STATES.filter((state) => sayingAt(state).says === 'nothing').flatMap((state) =>
-    state.gap === null ? ['a state with no gap named'] : [state.gap],
-  );
+  const silent = states
+    .filter((state) => sayingAt(state).says === 'nothing')
+    .flatMap((state) => (state.gap === null ? ['a state with no gap named'] : [state.gap]));
   return {
     undeclared: silent.filter((state) => !declared.some((gap) => gap === state)),
     stale: declared.filter((gap) => !silent.includes(gap)),
@@ -246,7 +245,7 @@ describe('the states a step can be reported in', () => {
       notAllowed: 0,
       polars: 0,
     } satisfies Record<CauseView['kind'], number>;
-    const counts = { notCounted: 0, counted: 0, failed: 0 } satisfies Record<
+    const counts = { notCounted: 0, notReached: 0, counted: 0, failed: 0 } satisfies Record<
       CountView['kind'],
       number
     >;
@@ -296,32 +295,46 @@ describe('what the editor says of a step in each state', () => {
     }
   });
 
-  it('is nothing only for the states that are declared gaps', () => {
+  it('is nothing only for the states that are declared gaps, and none is', () => {
     const declared = GAPS.flatMap((gap) => (gap.cover.kind === 'report' ? [gap.cover.state] : []));
 
+    expect(declared).toEqual([]);
     expect(compare(declared)).toEqual({ undeclared: [], stale: [] });
-    expect(
-      GAPS.filter((gap) => gap.cover.kind === 'report').map((gap) => coverKey(gap.cover)),
-    ).toEqual(['report notCountedAfterRowsFailure']);
   });
 
   it('fails the check where a state says nothing and no gap is declared for it, or a gap is declared for a state that says something', () => {
-    expect(compare([])).toEqual({ undeclared: ['notCountedAfterRowsFailure'], stale: [] });
+    // A step accepted whose rows were not read says nothing of its rows, and nothing is the matter.
+    const quiet: State = {
+      name: 'accepted and not counted, with no rows read',
+      steps: [uncounted(reportOf(refused, 'sort'), 'quiet')],
+      outcome: 'valid',
+      cause: null,
+      count: 'notCounted',
+      says: 'nothing',
+      gap: null,
+    };
+
+    expect(compare([], [...STATES, quiet])).toEqual({
+      undeclared: ['a state with no gap named'],
+      stale: [],
+    });
     // The refused states say something, so a gap declared for one of them could not be found.
-    expect(compare(['notCountedAfterRowsFailure', 'refusedWithoutWords'])).toEqual({
+    expect(compare(['refusedWithoutWords'])).toEqual({
       undeclared: [],
       stale: ['refusedWithoutWords'],
     });
   });
 
-  it('is said of a step after one that failed on the rows as of any other not counted step: nothing (#171)', () => {
-    const [failed] = STATES.filter((state) => state.gap !== null);
-    expect(failed).toBeDefined();
-    if (failed === undefined) return;
-    // The step before it said what went wrong; the step after it is accepted and says nothing.
-    const run = runOf(failed);
+  it('is said of a step after one that failed on the rows as what the step before it said: a matter, and which step failed', () => {
+    const state = STATES.find((held) => held.count === 'notReached');
+    expect(state).toBeDefined();
+    if (state === undefined) return;
+    const run = runOf(state);
     const prepared = prepareRun(named(run), run);
-    expect(prepared.steps.map((step) => sayingOf(step).says)).toEqual(['problem', 'nothing']);
+    expect(prepared.steps.map((step) => sayingOf(step))).toEqual([
+      { says: 'problem', lines: ['Could not be run on the sample rows: no rows'] },
+      { says: 'problem', lines: ['Not run on the sample rows: step 1 failed on them.'] },
+    ]);
   });
 });
 

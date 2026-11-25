@@ -129,6 +129,43 @@ describe('the rows each step kept and the first values it added', () => {
   });
 });
 
+describe('a step the engine did not run on the rows because an earlier step failed there', () => {
+  const variants = decodeRun(variantsFixture);
+  const failed = variants.steps.find((step) => step.id === 'failed');
+  if (failed === undefined) throw new Error('no failed step');
+  /** The step `failed` followed by a step Polars accepts, which the host says was not reached. */
+  function after(named_: string): PreparedRun {
+    const reached = {
+      ...failed,
+      id: 'later',
+      count: { kind: 'notReached', failed: named_ },
+    } as const;
+    return prepareRun(named('failed', 'later'), { ...variants, steps: [failed, reached] });
+  }
+
+  it('is valid, was not counted, and says which step failed there', () => {
+    expect(stepOf(after('failed'), 'later')).toMatchObject({
+      status: 'valid',
+      rows: null,
+      first: new Map(),
+      rowsProblem: 'Not run on the sample rows: step 1 failed on them.',
+    });
+  });
+
+  it('is said to be after a step before it where the step that failed is not in the document', () => {
+    expect(stepOf(after('gone'), 'later').rowsProblem).toBe(
+      'Not run on the sample rows: a step before it failed on them.',
+    );
+  });
+
+  it('is said as a matter beside its row, as a step that failed there is', () => {
+    expect(sayingOf(stepOf(after('failed'), 'later'))).toEqual({
+      says: 'problem',
+      lines: ['Not run on the sample rows: step 1 failed on them.'],
+    });
+  });
+});
+
 describe('a step the engine could not run on the rows', () => {
   it('is valid, and says what went wrong', () => {
     const variants = decodeRun(variantsFixture);

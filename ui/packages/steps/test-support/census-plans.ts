@@ -41,7 +41,7 @@ import { parameterSegment, pathKey } from '../src/model/doc';
 import type { Handling } from '../src/model/edits';
 import { handlingOf } from '../src/model/edits';
 import { inputDetail, inputLines, originWords } from '../src/model/inputs';
-import type { Cover, Gap, ReportState } from '../src/model/limits';
+import type { Cover, Gap } from '../src/model/limits';
 import { FOUND_BY, coverKey } from '../src/model/limits';
 import { isChanged, prepareRun, sayingOf } from '../src/model/report';
 import { NULL_DASH, cellText, shownOf } from '../src/model/values';
@@ -412,6 +412,8 @@ function countOf(rows: string): unknown {
       return { kind: 'notCounted' };
     case 'counted':
       return { kind: 'counted', received: 2, kept: 1, first: [] };
+    case 'notReached':
+      return { kind: 'notReached', failed: 'before' };
     case 'failed':
       return { kind: 'failed', reason: 'the rows could not be run' };
     default:
@@ -510,13 +512,6 @@ function runOf(state: CensusState): RunView | { readonly problem: string } {
   }
 }
 
-/** The state of the report that says nothing, which a gap is declared for, where the state is one. */
-function reportGapOf(state: CensusState): ReportState | null {
-  return state.outcome === 'valid' && state.rows === 'notCounted' && state.after === 'failed'
-    ? 'notCountedAfterRowsFailure'
-    : null;
-}
-
 /** What the editor says of the last step of `run`. */
 function saidOf(run: RunView): ReturnType<typeof sayingOf> {
   const steps = run.steps.map((step) => ({
@@ -553,19 +548,18 @@ function planReports(census: Census, found: Findings): void {
     if (saying.says === 'problem' && saying.lines.some((line) => line.trim() === '')) {
       found.lacks(`${words}: a line with no words`);
     }
-    const expectedWords = state.outcome !== 'valid' || state.rows === 'failed';
+    const expectedWords =
+      state.outcome !== 'valid' || state.rows === 'failed' || state.rows === 'notReached';
     if (expectedWords && saying.says !== 'problem') {
       found.lacks(`${words}: says nothing of a problem`);
     }
     if (state.rows === 'counted' && saying.says !== 'rows') found.lacks(`${words}: says no rows`);
     if (saying.says === 'nothing') {
-      const gap = reportGapOf(state);
       // A step accepted that was not counted, with no step before it that failed, has nothing to
       // say: the run read no rows.
       const readNoRows =
         state.outcome === 'valid' && state.rows === 'notCounted' && state.after === 'nothing';
-      if (gap !== null) found.gap({ kind: 'report', state: gap });
-      else if (!readNoRows) found.lacks(`${words}: says nothing`);
+      if (!readNoRows) found.lacks(`${words}: says nothing`);
     }
   }
   const refusals: ReadonlyArray<readonly [string, unknown]> = [

@@ -52,7 +52,7 @@ describe('the census the host wrote', () => {
     expect(census.valueShapes).toEqual(['one', 'many', 'counted']);
     expect(census.causes).toHaveLength(5);
     expect(census.outcomes).toEqual(['valid', 'refused', 'incomplete', 'notRun']);
-    expect(census.rowsStates).toEqual(['notCounted', 'counted', 'failed']);
+    expect(census.rowsStates).toEqual(['notCounted', 'notReached', 'counted', 'failed']);
     expect(census.inputKinds).toEqual(['table', 'value', 'list']);
     expect(census.cells).toEqual(['text', 'null']);
   });
@@ -63,9 +63,16 @@ describe('the census the host wrote', () => {
     expect(
       census.states.some(
         (state) =>
-          state.outcome === 'valid' && state.rows === 'notCounted' && state.after === 'failed',
+          state.outcome === 'valid' && state.rows === 'notReached' && state.after === 'failed',
       ),
     ).toBe(true);
+    // A step Polars accepts is not left uncounted after a failure: it is not reached.
+    expect(
+      census.states.some(
+        (state) =>
+          state.outcome === 'valid' && state.rows === 'notCounted' && state.after === 'failed',
+      ),
+    ).toBe(false);
   });
 
   it('has a plan in the editor for every variant it lists', () => {
@@ -81,7 +88,6 @@ describe('the census the host wrote', () => {
     // a number or text, and the literal control shows a number or text. A date, a time, a moment or
     // a length of time is not held by a document.
     expect(sorted([...planned.gaps.keys()])).toEqual([
-      'report notCountedAfterRowsFailure',
       'shown literal flag',
       'shown resolution several',
       'typed flag',

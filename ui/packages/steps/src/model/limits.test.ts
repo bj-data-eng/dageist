@@ -34,7 +34,6 @@ describe('the declared gaps', () => {
         'parameter polars.lit allow_object',
         'parameter polars.lit dtype',
         'parameter polars.when constraints',
-        'report notCountedAfterRowsFailure',
         'shown literal flag',
         'shown resolution several',
         'noContext LazyFrame.filter constraints',

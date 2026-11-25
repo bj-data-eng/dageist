@@ -41,7 +41,7 @@ import {
   valueSegment,
   whenOf,
 } from '../src/model/doc';
-import type { Cover, Gap, ReportState, StartKind } from '../src/model/limits';
+import type { Cover, Gap, StartKind } from '../src/model/limits';
 import { FOUND_BY, coverKey } from '../src/model/limits';
 import { methodFamilies, startOffers } from '../src/model/offers';
 import type { PreparedOffer } from '../src/model/offers';
@@ -243,32 +243,17 @@ class Rebuild {
         this.fail(held.name, `no report of step ${step.id}`);
         continue;
       }
-      this.step(held.name, step.call, result, report, held.run, index);
+      this.step(held.name, step.call, result, report);
     }
   }
 
   /** What the editor says of a step, and the step's own piece and parameters. */
-  private step(
-    name: string,
-    call: CallView,
-    result: PreparedStep,
-    report: StepReportView,
-    run: RunView,
-    index: number,
-  ): void {
+  private step(name: string, call: CallView, result: PreparedStep, report: StepReportView): void {
     const piece = `${name} › step ${report.id}`;
     this.stepEntry = call.entry;
     this.pieces += 1;
     if (sayingOf(result).says === 'nothing') {
-      const afterFailure = run.steps
-        .slice(0, index)
-        .some((before) => before.count.kind === 'failed');
-      if (afterFailure) {
-        const state: ReportState = 'notCountedAfterRowsFailure';
-        this.gap({ kind: 'report', state }, piece);
-      } else {
-        this.fail(piece, 'the editor says nothing of the step');
-      }
+      this.fail(piece, 'the editor says nothing of the step');
     }
     const entry = this.using.entries.get(call.entry);
     if (entry === undefined) {
