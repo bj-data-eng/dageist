@@ -1340,10 +1340,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
     let boolean_needed = Rule::boolean_needed(place.context);
-    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
+    // A field that is read is a value of its own dtype, which the tables measured as a number: it
+    // ends where a value of that dtype does, as a start of it does, which the rules judge.
+    let read = matches!(struct_gives, Gives::Field(Some(_)))
+        .then(|| struct_gives.result())
+        .flatten()
+        .and_then(|(read, _)| read);
+    let judged = read.as_ref().or(result.as_ref());
+    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, judged, shape) {
         Ending::Refused(Refusal::rule(rule))
     } else if let Some(refusal) = Refusal::count(place.context, shape) {
         Ending::Refused(refusal)
+    } else if let Some(read) = &read {
+        if read.class().is_none() && boolean_needed {
+            Ending::NotKnown(Unknown::TheResultsDtype)
+        } else {
+            Ending::Allowed
+        }
     } else if entry.applies() == Applies::Function {
         // The table measured a start with one argument, and what its arguments
         // decide is the dtype of the value: a column's own, a literal's. Told

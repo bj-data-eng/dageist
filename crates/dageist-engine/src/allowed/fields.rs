@@ -455,7 +455,13 @@ pub(super) fn gives(
         }
         "Expr.value_counts" => {
             let Some(name) = chosen.output_name else {
-                return Ok(Gives::Struct(None));
+                // A count given a name may be named as the values are, which a pivot's group does
+                // not say, and Polars refuses two fields of one name.
+                return Ok(if given(chosen, "name").is_empty() {
+                    Gives::Struct(None)
+                } else {
+                    Gives::Undecided
+                });
             };
             let counted = given(chosen, "name").first().copied().unwrap_or(
                 if word(chosen, "normalize") == Some("true") {

@@ -302,6 +302,41 @@ impl Frames {
         }
     }
 
+    /// The same tables with a null in the middle row of every column that holds none: the columns the
+    /// chains read for a test, a comparison or a length, which then give more than one value where
+    /// the sample's rows leave them one.
+    pub fn with_nulls(self) -> Self {
+        let mask = polars::prelude::BooleanChunked::new("".into(), [true, false, true]);
+        let nulled = |frame: &DataFrame| {
+            let columns: Vec<polars::prelude::Column> = frame
+                .columns()
+                .iter()
+                .map(|column| {
+                    if column.null_count() > 0 {
+                        return column.clone();
+                    }
+                    let series = column.as_materialized_series();
+                    let nulls =
+                        Series::full_null(series.name().clone(), series.len(), series.dtype());
+                    series
+                        .zip_with(&mask, &nulls)
+                        .expect("a column and its nulls are of one dtype")
+                        .into()
+                })
+                .collect();
+            DataFrame::new(frame.height(), columns).expect("columns of the rows they had")
+        };
+        let rows = nulled(&self.rows);
+        let other_rows = nulled(&self.other_rows);
+        Self {
+            empty: rows.clear(),
+            other_empty: other_rows.clear(),
+            rows,
+            other_rows,
+            ..self
+        }
+    }
+
     /// The same tables with the other table as the one a step starts from, for
     /// an expression that a join's `right_on` holds, which reads that table's
     /// columns.
@@ -457,6 +492,28 @@ mod tests {
             measured.dtype_of("a"),
             Some(&Representative::Struct.dtype())
         );
+    }
+
+    #[test]
+    fn tables_with_nulls_hold_one_in_every_column_and_keep_their_dtypes() {
+        let frames = Frames::new(
+            Representative::String,
+            Representative::Boolean,
+            &Structs::default(),
+            &[DataType::Int64],
+        )
+        .with_nulls();
+        for table in [&frames.rows, &frames.other_rows] {
+            assert_eq!(table.height(), 3);
+            for column in table.columns() {
+                assert!(column.null_count() >= 1, "{}", column.name());
+            }
+        }
+        let h = frames.rows.column("h").expect("a column");
+        assert_eq!(h.null_count(), 1);
+        assert_eq!(h.dtype(), &DataType::String);
+        assert_eq!(frames.empty.height(), 0);
+        assert_eq!(frames.empty.width(), frames.rows.width());
     }
 
     #[test]

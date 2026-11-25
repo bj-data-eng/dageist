@@ -454,11 +454,30 @@ pub enum Limit {
     /// the case run again with each gather told to is no longer refused for them: the places the
     /// rows leave it are why.
     AGatherBeyondTheRows,
+    /// A number typed without a dtype stays open inside a struct, as `dyn float` or `dyn int`, and
+    /// Polars matches a join's key with the other table's by the dtype of the key it gives, which
+    /// does not agree with the dtype that the struct has once it is resolved. The tables measured
+    /// a struct of columns, which have dtypes of their own. Polars refusing the join at the step
+    /// with the refusal that the dtypes of the keys do not match, naming a struct with a field of
+    /// a dtype that is `dyn`, in a case that joins on a key.
+    AStructOfAnUntypedNumberInAJoinKey,
+    /// Polars does arithmetic on a struct field by field where every field is a number, and
+    /// refuses it where one is not. The tables measured a struct of a whole number and text, so
+    /// they refuse every arithmetic on a struct, in Polars' words for the text field they
+    /// measured. The tables refusing with the refusal that a struct has a non-numeric field, which
+    /// names the field `y` of the text dtype that only the measured struct has.
+    ArithmeticOnAStructOfNumbers,
+    /// Polars meets two structs, as a fill of nulls by another column does, by casting one to the
+    /// dtype of the other, and refuses it where their fields are not the same. The tables measured
+    /// a struct met by the struct measured, which has the same fields as itself. Polars refusing
+    /// the plan with the refusal that it cannot cast a struct to another, naming both, which only
+    /// structs of other fields meet.
+    AStructMetByAStructOfOtherFields,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 38] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -494,6 +513,9 @@ impl Limit {
         Self::AMomentOfOneValueFilledInAnotherZone,
         Self::APartPolarsFoldsToANull,
         Self::AGatherBeyondTheRows,
+        Self::AStructOfAnUntypedNumberInAJoinKey,
+        Self::ArithmeticOnAStructOfNumbers,
+        Self::AStructMetByAStructOfOtherFields,
     ];
 
     /// The name a kept case is filed under.
@@ -544,6 +566,11 @@ impl Limit {
             }
             Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
             Self::AGatherBeyondTheRows => "a-gather-beyond-the-rows",
+            Self::AStructOfAnUntypedNumberInAJoinKey => {
+                "a-struct-of-an-untyped-number-as-a-join-key"
+            }
+            Self::ArithmeticOnAStructOfNumbers => "arithmetic-on-a-struct-of-numbers",
+            Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
         }
     }
 
@@ -624,6 +651,15 @@ impl Limit {
             }
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
+            }
+            Self::AStructOfAnUntypedNumberInAJoinKey => {
+                "a number typed without a dtype stays open in a struct that is a join's key, which Polars does not match with the key of the other table, where the tables measured a struct of columns"
+            }
+            Self::ArithmeticOnAStructOfNumbers => {
+                "Polars does arithmetic on a struct field by field where every field is a number, where the tables measured a struct with a text field, which it refuses"
+            }
+            Self::AStructMetByAStructOfOtherFields => {
+                "Polars refuses to meet two structs of other fields, which it casts to one another, where the tables measured a struct met by the struct measured"
             }
             Self::AGatherBeyondTheRows => {
                 "a gather refuses a place beyond the rows it follows when they run, and every place where the table has none, where the tables measured a gather that gives a null for it"
@@ -4315,6 +4351,25 @@ fn applies(
                 && !refusal.reason.contains("with overflow")
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
+        (Limit::AStructOfAnUntypedNumberInAJoinKey, Disagreement::PolarsRefuses(refusal)) => {
+            is(step, "LazyFrame.join")
+                && unplaced(refusal)
+                && refusal.reason.contains("datatypes of join keys")
+                && refusal.reason.contains("struct {")
+                && refusal.reason.contains("dyn ")
+        }
+        (Limit::ArithmeticOnAStructOfNumbers, Disagreement::PolarsAllows(refused)) => {
+            matches!(refused.source, Source::Polars)
+                && refused
+                    .reason
+                    .contains("a struct with non-numeric field: (field: y, dtype: str)")
+        }
+        (Limit::AStructMetByAStructOfOtherFields, Disagreement::PolarsRefuses(refusal)) => {
+            refusal.stage == Stage::Schema
+                && refusal.reason.starts_with("casting from Struct(")
+                && refusal.reason.contains(") to Struct(")
+                && refusal.reason.contains("not supported")
+        }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
@@ -11270,6 +11325,101 @@ mod tests {
                 Vec::new()
             ),
             Vec::<Limit>::new()
+        );
+    }
+
+    // ----- Structs
+
+    #[test]
+    fn a_struct_that_holds_an_open_number_is_the_refusal_of_a_join_that_names_it() {
+        let reason = "datatypes of join keys don't match - `_POLARS_0`: struct {literal: dyn float} on left does not match `key`: struct {literal: f64} on right (and no other type was available to cast to)";
+        let case = join(chain(column("a"), &[]), chain(column("key"), &[]));
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            vec![Limit::AStructOfAnUntypedNumberInAJoinKey]
+        );
+        // Two structs of fields that are no open number, and a key that is no struct, are no cause.
+        for not_open in [
+            "datatypes of join keys don't match - `a`: struct {literal: i64} on left does not match `key`: struct {literal: f64} on right",
+            "datatypes of join keys don't match - `a`: dyn float on left does not match `key`: f64 on right",
+        ] {
+            assert_eq!(
+                polars_refuses(
+                    &case,
+                    Some(step_place()),
+                    Stage::Schema,
+                    not_open,
+                    Vec::new()
+                ),
+                vec![],
+                "{not_open}"
+            );
+        }
+        // Nor is the refusal of anything but a join.
+        let select = select(vec![chain(column("a"), &[])]);
+        assert_eq!(
+            polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_struct_with_the_text_field_the_tables_measured_is_the_cause_of_a_refusal_of_arithmetic() {
+        let case = select(vec![chain(column("a"), &["Expr.sub"])]);
+        let place = at(&[
+            Segment::Parameter("exprs".to_owned()),
+            Segment::Item(0),
+            Segment::Link(0),
+        ]);
+        let measured = "cannot - a struct with non-numeric field: (field: y, dtype: str)";
+        assert_eq!(
+            tables_refuse(&case, place.clone(), Some(TableStage::Schema), measured),
+            vec![Limit::ArithmeticOnAStructOfNumbers]
+        );
+        // A struct whose field of another name is the one that is no number is no measured one.
+        let other = "cannot - a struct with non-numeric field: (field: z, dtype: str)";
+        assert_eq!(
+            tables_refuse(&case, place.clone(), Some(TableStage::Schema), other),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&case, place, Some(TableStage::Schema), "cannot - a date"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_cast_between_structs_polars_refuses_is_the_cause_of_its_refusal_of_a_struct_met_by_another()
+     {
+        let case = select(vec![chain(column("a"), &["Expr.fill_null"])]);
+        let reason = "casting from Struct({'field_0': String}) to Struct({'field_0': String, 'x': Int64}) not supported";
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(at(&[
+                    Segment::Parameter("exprs".to_owned()),
+                    Segment::Item(0)
+                ])),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![Limit::AStructMetByAStructOfOtherFields]
+        );
+        // The rows' refusal and the cast of a struct that is no struct are no cause.
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Schema,
+                "casting from String to Int64 not supported",
+                Vec::new()
+            ),
+            vec![]
         );
     }
 }

@@ -1009,6 +1009,11 @@ impl Gen<'_> {
             })
             // A fill takes a strategy in place of a value, which `method_call` decides.
             .filter(|parameter| parameter.in_place_of().is_none())
+            // A step is always lazy, so it refuses the series that `eager` makes before it asks
+            // Polars, which says nothing of the tables: a struct is made with the flag unset.
+            .filter(|parameter| {
+                !(entry.id().as_str() == "polars.struct" && parameter.name() == "eager")
+            })
             .collect();
         if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
             && !function_starts()
@@ -2586,7 +2591,8 @@ impl Gen<'_> {
         }
     }
 
-    /// `count` names for fields: new ones or those that a field has, one name twice now and then.
+    /// `count` names for fields: new ones or those that a field has, no two alike, unless `repeats`
+    /// in a hundred times one is given twice, as Polars refuses.
     fn field_names(
         &mut self,
         count: usize,
@@ -2596,16 +2602,27 @@ impl Gen<'_> {
         let own: Vec<&str> = fields
             .map(|fields| fields.names().collect())
             .unwrap_or_default();
+        let mut pool: Vec<&str> = FIELD_NAMES.to_vec();
         let mut names: Vec<String> = Vec::new();
         for _ in 0..count {
+            let taken = |name: &&str| !names.iter().any(|before| before == name);
             let name = if !own.is_empty() && self.draw.chance(25) {
-                (*self.draw.pick(&own)).to_owned()
+                let available: Vec<&str> = own.iter().copied().filter(taken).collect();
+                (!available.is_empty()).then(|| self.draw.pick(&available))
             } else {
-                (*self.draw.pick(&FIELD_NAMES)).to_owned()
+                None
             };
-            names.push(name);
+            let name = name.unwrap_or_else(|| {
+                if pool.is_empty() {
+                    "extra"
+                } else {
+                    pool.remove(self.draw.below(pool.len()))
+                }
+            });
+            pool.retain(|left| *left != name);
+            names.push(name.to_owned());
         }
-        if names.len() >= 2 && self.draw.chance(repeats) {
+        if repeats > 0 && names.len() >= 2 && self.draw.chance(repeats) {
             let from = self.draw.below(names.len());
             let to = self.draw.below(names.len());
             names[to] = names[from].clone();
@@ -2737,7 +2754,9 @@ impl Gen<'_> {
                 let count = self
                     .draw
                     .weighted(&[(4, 0_usize), (25, 1), (35, 2), (25, 3), (11, 4)]);
-                let names = self.field_names(count, None, 18);
+                // A name given twice is never drawn: Polars' plan makes one field of it and its rows
+                // make two of one name, which no column can hold, where the editor refuses it.
+                let names = self.field_names(count, None, 0);
                 vec![(
                     "fields",
                     Value::Many(names.into_iter().map(Value::String).collect()),
@@ -2748,7 +2767,7 @@ impl Gen<'_> {
                 let count = self
                     .draw
                     .weighted(&[(20, 1_usize), (45, 2), (25, 3), (10, 4)]);
-                let names = self.field_names(count, None, 12);
+                let names = self.field_names(count, None, 0);
                 vec![(
                     "fields",
                     Value::Many(names.into_iter().map(Value::String).collect()),
@@ -4106,6 +4125,9 @@ mod tests {
                 match listed(&arguments, "fields") {
                     Some(given) => {
                         arrays.insert(given.len());
+                        repeated += usize::from(
+                            (1..given.len()).any(|at| given[..at].contains(&given[at])),
+                        );
                     }
                     None => unnamed += 1,
                 }
@@ -4121,7 +4143,9 @@ mod tests {
             "{arrays:?}"
         );
         assert!(unnamed > 20, "{unnamed} arrays are named by their places");
-        assert!(repeated > 5, "{repeated} lists are given a name twice");
+        // Polars' plan makes one field of a name given twice and its rows two of one name, which
+        // no column can hold: the editor refuses it, and a campaign does not draw it.
+        assert_eq!(repeated, 0, "{repeated} conversions are given a name twice");
     }
 
     #[test]
