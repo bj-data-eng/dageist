@@ -2,8 +2,11 @@
   "outer": ["select", "filter", "sort", "join_left", "join_right", "pivot_aggregate"],
   "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
   "rules": [
+    "arrays-meet-at-one-width",
     "condition-predicate-is-boolean",
     "duration-is-valid",
+    "element-dtype-is-implemented",
+    "element-dtype-is-measured",
     "element-only-in-pivot-aggregate",
     "filter-predicate-is-boolean",
     "folded-function-is-no-join-key",

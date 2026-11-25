@@ -7,8 +7,8 @@
 //! rules, not read from a run.
 
 use dageist_engine::allowed::{
-    After, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace, RefusalSource,
-    Representative, Rule, Shape, Unknown,
+    After, ConditionState, Context, Ending, Inner, Nested, Outer, Place as OfferPlace,
+    RefusalSource, Representative, Rule, Shape, Unknown,
 };
 use dageist_engine::document::{
     Document, Inputs, ListOrigin, Resolution, Segment, Walk, WalkedExpression,
@@ -199,7 +199,7 @@ fn a_window_that_joins_gives_a_list() {
         item.places()[1],
         at(
             Context::step(Outer::Select),
-            after(Representative::ListOfInteger, Shape::Many)
+            after(Representative::List(Inner::Int64), Shape::Many)
         )
     );
 }
@@ -246,7 +246,7 @@ fn a_window_ordered_without_a_partition_gives_the_walk_its_dtype() {
         ),
         (
             json!({ "order_by": ordered(), "mapping_strategy": { "choice": "join" } }),
-            Representative::ListOfInteger,
+            Representative::List(Inner::Int64),
         ),
         (
             json!({
@@ -254,7 +254,7 @@ fn a_window_ordered_without_a_partition_gives_the_walk_its_dtype() {
                 "nulls_last": { "flag": true },
                 "mapping_strategy": { "choice": "join" },
             }),
-            Representative::ListOfInteger,
+            Representative::List(Inner::Int64),
         ),
     ];
     for (arguments, dtype) in cases {

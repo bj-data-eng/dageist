@@ -11,7 +11,8 @@
 //! one with a duration. It refuses a receiver only when it refuses every column.
 
 use polars::prelude::{
-    DataType, Expr, LazyFrame, NonExistent, PolarsError, PolarsResult, TimeZone, col, lit,
+    DataType, Expr, LazyFrame, NonExistent, PolarsError, PolarsResult, TimeZone, col, concat_list,
+    lit,
 };
 
 use crate::catalog::{
@@ -21,10 +22,26 @@ use crate::catalog::{
 
 use super::build::{expression_arg, many, sample};
 
-/// The sample table with a column of `Time`, and one of a `Datetime` in a time zone, which it
-/// lacks.
+/// The group of dtypes the catalogue names `key`, which a list or an array is one of.
+fn group(key: &str) -> Dtypes {
+    Dtypes::ALL
+        .into_iter()
+        .find(|group| group.key() == key)
+        .unwrap_or_else(|| panic!("the catalogue has no group of dtypes called {key}"))
+}
+
+/// The sample table with a column of `Time`, one of a `Datetime` in a time zone, a column of lists
+/// of two whole numbers and one of arrays of two, which it lacks.
 fn typed_sample() -> LazyFrame {
     sample().with_columns([
+        concat_list([col("i"), col("i") * lit(10)])
+            .expect("a list of two")
+            .alias("l"),
+        concat_list([col("i"), col("i") * lit(10)])
+            .expect("a list of two")
+            .list()
+            .to_array(2)
+            .alias("ar"),
         col("ts").dt().time().alias("tm"),
         col("ts")
             .dt()
@@ -48,17 +65,21 @@ fn dtype_of(name: &str) -> DataType {
 }
 
 /// Each column of the table, and the groups of dtypes its dtype belongs to.
-const COLUMNS: &[(&str, &[Dtypes])] = &[
-    ("i", &[Dtypes::Numeric, Dtypes::Integer]),
-    ("f", &[Dtypes::Numeric]),
-    ("ts", &[Dtypes::Temporal, Dtypes::Datetime]),
-    ("tz", &[Dtypes::Temporal, Dtypes::Datetime]),
-    ("d", &[Dtypes::Temporal, Dtypes::Date]),
-    ("tm", &[Dtypes::Temporal, Dtypes::Time]),
-    ("dur", &[Dtypes::Temporal, Dtypes::Duration]),
-    ("s", &[Dtypes::String]),
-    ("b", &[Dtypes::Boolean]),
-];
+fn columns() -> Vec<(&'static str, Vec<Dtypes>)> {
+    vec![
+        ("i", vec![Dtypes::Numeric, Dtypes::Integer]),
+        ("f", vec![Dtypes::Numeric]),
+        ("ts", vec![Dtypes::Temporal, Dtypes::Datetime]),
+        ("tz", vec![Dtypes::Temporal, Dtypes::Datetime]),
+        ("d", vec![Dtypes::Temporal, Dtypes::Date]),
+        ("tm", vec![Dtypes::Temporal, Dtypes::Time]),
+        ("dur", vec![Dtypes::Temporal, Dtypes::Duration]),
+        ("s", vec![Dtypes::String]),
+        ("b", vec![Dtypes::Boolean]),
+        ("l", vec![group("List")]),
+        ("ar", vec![group("Array")]),
+    ]
+}
 
 /// The methods that read a time zone a `Datetime` has: Polars refuses the sample's `ts`, which has
 /// none, and the sample's `tz` is the column of the group they take.
@@ -173,18 +194,18 @@ fn built(entry: &Entry, column: &str, operand: &str) -> Expr {
 /// where it takes one, and otherwise `column`, which is no operand.
 fn operands(entry: &Entry, column: &str) -> Vec<&'static str> {
     if takes_an_operand(entry) {
-        COLUMNS
-            .iter()
-            .map(|(name, _)| *name)
+        columns()
+            .into_iter()
+            .map(|(name, _)| name)
             // Polars drops the test for NaN that `fill_nan` is made of where the value is the
             // expression it follows, as it drops the predicate of a condition whose two values
             // are one expression, so a column beside itself says nothing of what it accepts.
             .filter(|name| entry.id().as_str() != "Expr.fill_nan" || *name != column)
             .collect()
     } else {
-        COLUMNS
-            .iter()
-            .map(|(name, _)| *name)
+        columns()
+            .into_iter()
+            .map(|(name, _)| name)
             .filter(|name| *name == column)
             .collect()
     }
@@ -215,11 +236,12 @@ fn polars_resolves(expr: Expr) -> PolarsResult<DataType> {
 #[test]
 fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
     let mut checked = 0;
+    let mut refused = Vec::new();
     for entry in entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
     {
-        for (column, groups) in COLUMNS {
+        for (column, groups) in &columns() {
             if *column == "ts" && ONLY_WITH_A_ZONE.contains(&entry.id().as_str()) {
                 continue;
             }
@@ -228,18 +250,35 @@ fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
                     .into_iter()
                     .map(|operand| polars_resolves(built(entry, column, operand)))
                     .collect();
-                assert!(
-                    results.iter().any(Result::is_ok),
-                    "{} claims {:?} but Polars refuses it on {column}: {}",
-                    entry.id().as_str(),
-                    entry.accepts(),
-                    results[0].as_ref().unwrap_err()
-                );
+                if !results.iter().any(Result::is_ok) {
+                    refused.push(format!(
+                        "{} claims {:?} but Polars refuses it on {column}: {}",
+                        entry.id().as_str(),
+                        entry.accepts(),
+                        first_line(results[0].as_ref().unwrap_err())
+                    ));
+                }
                 checked += 1;
             }
         }
     }
+    assert!(
+        refused.is_empty(),
+        "{} methods claim a dtype Polars refuses:\n{}",
+        refused.len(),
+        refused.join("\n")
+    );
     assert!(checked > 100, "{checked} method and dtype pairs were built");
+}
+
+/// The first line of what Polars says.
+fn first_line(error: &PolarsError) -> String {
+    error
+        .to_string()
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .to_owned()
 }
 
 #[test]
@@ -250,8 +289,8 @@ fn polars_refuses_each_method_on_a_dtype_it_does_not_accept() {
         .filter(|entry| entry.applies() == Applies::Expression)
     {
         // One dtype the entry does not claim, where there is one in the table.
-        let Some((column, _)) = COLUMNS
-            .iter()
+        let Some((column, _)) = columns()
+            .into_iter()
             .find(|(_, groups)| !accepted(entry.accepts(), groups))
         else {
             continue;

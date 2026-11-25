@@ -13,7 +13,9 @@
 use std::fmt;
 
 use super::context::{Context, Nested, Outer};
-use super::dtype::{Representative, ResultDtype};
+use polars::prelude::DataType;
+
+use super::dtype::{Representative, ResultDtype, dtype_name};
 use super::table::Shape;
 
 /// A rule that holds wherever it applies, whatever Polars does.
@@ -38,6 +40,15 @@ pub enum Rule {
     JoinKeyNamesAreNotRepeated,
     /// A duration typed in, where a method reads a text as one, is a duration string Polars reads.
     DurationIsValid,
+    /// A method of the `list` or the `arr` namespace is run on an element dtype that Polars has
+    /// an implementation of it for: for the others it panics where the rows run.
+    ElementDtypeIsImplemented,
+    /// A method whose answer depends on the element dtype of a list or an array is run on one the
+    /// tables are measured for: for another Polars is not asked, and may panic.
+    ElementDtypeIsMeasured,
+    /// Arrays that meet and give an array are of one width, which is known: Polars refuses to add
+    /// arrays of two widths and gives a list where it fills one with the other.
+    ArraysMeetAtOneWidth,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
@@ -76,9 +87,12 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 20] = [
+        Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
+        Self::ElementDtypeIsImplemented,
+        Self::ElementDtypeIsMeasured,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
@@ -103,6 +117,9 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => "pivot-aggregate-gives-one-value",
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::DurationIsValid => "duration-is-valid",
+            Self::ElementDtypeIsImplemented => "element-dtype-is-implemented",
+            Self::ElementDtypeIsMeasured => "element-dtype-is-measured",
+            Self::ArraysMeetAtOneWidth => "arrays-meet-at-one-width",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
@@ -134,6 +151,12 @@ impl Rule {
                 "a pivot's aggregate must give one value for each group"
             }
             Self::ConditionPredicateIsBoolean => "a condition's predicate must be Boolean",
+            Self::ArraysMeetAtOneWidth => {
+                "arrays that meet, as the operands of a method or the values of a condition, and give an array, or that one is looked up in, must be of one width, which must be known: Polars refuses to add arrays of two widths or to look one up in the other, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another"
+            }
+            Self::ElementDtypeIsMeasured => {
+                "a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on"
+            }
             Self::ElementOnlyInPivotAggregate => {
                 "`polars.element` stands only in a pivot's aggregate"
             }
@@ -148,6 +171,9 @@ impl Rule {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
+            Self::ElementDtypeIsImplemented => {
+                "a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from"
+            }
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
             Self::ValuesMeetInCount => {
                 "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
@@ -190,6 +216,9 @@ impl Rule {
             }
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
+            | Self::ElementDtypeIsImplemented
+            | Self::ElementDtypeIsMeasured
+            | Self::ArraysMeetAtOneWidth
             | Self::MomentsShareAZone
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -221,6 +250,39 @@ impl Rule {
     pub(super) fn forbids(entry: &str, context: Context) -> Option<Self> {
         (entry == "polars.element" && context.outer() != Outer::PivotAggregate)
             .then_some(Self::ElementOnlyInPivotAggregate)
+    }
+
+    /// The rule that forbids `entry` to follow a value of the dtype `receiver`, with what the
+    /// element lacks, if one does: Polars panics where the rows run on the smallest and the largest
+    /// of an array of anything but whole numbers and floats, on its values reversed, and on the
+    /// mean of a list of `Float16`.
+    ///
+    /// The tables never run what a rule refuses, and a document is refused before Polars is asked.
+    #[must_use]
+    pub(super) fn forbids_receiver(entry: &str, receiver: &DataType) -> Option<(Self, String)> {
+        let said = match (entry, receiver) {
+            ("Expr.arr.min" | "Expr.arr.max" | "Expr.reverse", DataType::Array(element, _))
+                if !(element.is_integer() || element.is_float()) =>
+            {
+                let what = match entry {
+                    "Expr.arr.min" => "has no smallest value for",
+                    "Expr.arr.max" => "has no largest value for",
+                    _ => "cannot reverse",
+                };
+                format!(
+                    "Polars {what} an array of {}, which it implements for whole numbers and floats only, and panics",
+                    dtype_name(element)
+                )
+            }
+            ("Expr.list.mean", DataType::List(element)) if **element == DataType::Float16 => {
+                format!(
+                    "Polars has no mean for a list of {}, and panics",
+                    dtype_name(element)
+                )
+            }
+            _ => return None,
+        };
+        Some((Self::ElementDtypeIsImplemented, said))
     }
 
     /// The rule that forbids a key that holds an aggregate beside a column, or a
@@ -304,6 +366,9 @@ impl Rule {
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
             | Self::DurationIsValid
+            | Self::ElementDtypeIsImplemented
+            | Self::ElementDtypeIsMeasured
+            | Self::ArraysMeetAtOneWidth
             | Self::PatternIsValid
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber

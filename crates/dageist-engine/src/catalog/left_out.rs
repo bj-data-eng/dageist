@@ -149,6 +149,29 @@ pub fn left_out() -> &'static [LeftOut] {
 //   dtype, and a dtype alone for every column. What Polars takes depends on the dtype of each
 //   column and the one it is cast to, which the tables say of `Expr.cast` for one column; a step
 //   is judged by it for each pair, which is the shape `fill_null` waits for as well.
+// - The methods of `Expr.list` and `Expr.arr` that are left take more than the list or the array
+//   they follow, and wait for what each takes. The methods that take no expression argument are
+//   catalogued, on a column of every element dtype:
+//   - `list.concat`, `contains`, `count_matches`, `diff`, `gather`, `gather_every`, `get`, `head`,
+//     `join`, `shift`, `slice`, `tail`, `to_array` and the four `set_*` methods, and `arr.contains`,
+//     `count_matches`, `dot`, `get`, `head`, `join`, `shift`, `slice` and `tail`, take a value, a
+//     place, a count or another list, which is a typed list of literals or a column of the lists'
+//     own element dtype, and a list of literals typed in is a kind that does not exist yet.
+//     `list.__getitem__` is Python's subscript for `get`. The `set_*` methods also panic on a list
+//     of `Null`;
+//   - `arr.reverse`, which Python builds as an evaluation of `element().reverse()` over each array,
+//     makes an array that Polars panics on where an aggregate, a cut or a window follows it, with
+//     "not all elements have the specified width", for every element dtype, so it is left out until
+//     Polars evaluates it; `Expr.reverse` of an array reverses it as it does a list;
+//   - `list.explode` and `arr.explode` give a value for each element, so how many values there
+//     are is no longer what the table has, nor what the receiver has, which no count of the walk
+//     says yet;
+//   - `list.agg`, `eval` and `filter` and `arr.agg` and `eval` take a body whose `element()` is
+//     one list's elements, a position that no table is measured in and that gives what its body
+//     gives; `list.item` is the body `element().item()`;
+//   - `list.sample` draws at random, which two runs do not repeat, `list.to_map` gives a dtype
+//     that is not a class, and `list.to_struct` and `arr.to_struct` give a struct whose fields a
+//     step reads with `Expr.struct.field`, which is not catalogued either.
 // - `LazyFrame.explode` takes the columns of lists and arrays and refuses any other dtype, which
 //   no table measures, for `Expr.explode` is not catalogued either.
 // - `polars.concat` takes several tables, which are no receiver of a step: a step is a method
@@ -189,37 +212,19 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.append", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_true", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.agg", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.all", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.any", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.arg_max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.arg_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.contains", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.count_matches", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.dot", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.eval", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.explode", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.first", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.get", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.head", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.join", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.last", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.len", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.mean", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.median", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.min", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.n_unique", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.reverse", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.shift", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.slice", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.sort", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.std", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.sum", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.tail", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.to_list", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.to_struct", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.unique", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.var", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.contains", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.decode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.encode", Reason::NotYetCatalogued),
@@ -272,33 +277,19 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.item", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.__getitem__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.agg", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.all", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.any", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.arg_max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.arg_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.concat", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.contains", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.count_matches", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.diff", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.drop_nulls", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.eval", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.explode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.filter", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.first", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.gather", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.gather_every", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.get", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.head", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.item", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.join", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.last", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.len", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.mean", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.median", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.min", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.n_unique", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.reverse", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.sample", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.set_difference", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.set_intersection", Reason::NotYetCatalogued),
@@ -309,15 +300,10 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.list.set_union", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.shift", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.slice", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.sort", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.std", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.sum", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.tail", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.to_array", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.to_map", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.to_struct", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.unique", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.var", Reason::NotYetCatalogued),
     LeftOut::new("Expr.log10", Reason::NotYetCatalogued),
     LeftOut::new("Expr.lower_bound", Reason::NotYetCatalogued),
     LeftOut::new("Expr.map.contains_key", Reason::NotYetCatalogued),

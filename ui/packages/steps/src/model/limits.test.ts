@@ -29,13 +29,28 @@ describe('the places the engine was asked about', () => {
   it('are every context, and for each of them nothing, each dtype in three shapes, and each state of a condition', () => {
     // Six positions of a step, alone and with each of four positions inside an expression.
     expect(grid.contexts).toHaveLength(30);
-    // Nothing; twenty-six dtypes, each of one value, of many and of a count; four states of a condition.
-    expect(grid.afters).toHaveLength(1 + 26 * 3 + 4);
-    expect(cells()).toHaveLength(30 * 83);
+    // Nothing; sixty-seven classes of dtypes, each of one value, of many and of a count; four states of a condition.
+    expect(grid.afters).toHaveLength(1 + 67 * 3 + 4);
+    expect(cells()).toHaveLength(30 * 206);
+    // The classes are the 26 the tables hold lines for, and the lists and arrays of each of 22 scalar
+    // dtypes besides, which the view reads by the names the engine writes them with.
+    const classes = new Set(
+      grid.afters.flatMap((after) => (after.kind === 'value' ? [after.dtype] : [])),
+    );
+    expect(classes.size).toBe(67);
+    for (const name of [
+      'List(Int64)',
+      'List(Float64)',
+      'List(Datetime(us, UTC))',
+      'Array(Int64, 2)',
+      'Array(Decimal(10, 2), 2)',
+    ]) {
+      expect(classes).toContain(name);
+    }
   });
 
   it('hold every entry that stands in an expression, and no step', () => {
-    expect(grid.entries).toHaveLength(231);
+    expect(grid.entries).toHaveLength(268);
     expect(grid.entries.filter((id) => id.startsWith('LazyFrame.'))).toEqual([]);
     for (const id of grid.entries) {
       expect(catalogue.entries.has(id), id).toBe(true);

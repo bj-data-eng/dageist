@@ -12,8 +12,8 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{
-    LIST_FORM, OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject,
-    is_a_list, is_method, subject_of,
+    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
+    has_a_subject, is_a_list, is_method, is_of_nested_dtypes, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -89,6 +89,7 @@ pub struct Chosen<'a> {
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
+    width: Option<usize>,
     zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
@@ -170,6 +171,14 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following(mut self, unit: Option<TimeUnit>) -> Self {
         self.unit = unit;
+        self
+    }
+
+    /// The width of the array the method follows, where the chain knows it. The tables measured
+    /// arrays at one width, so an array the call gives is written at this one.
+    #[must_use]
+    pub const fn following_width(mut self, width: Option<usize>) -> Self {
+        self.width = width;
         self
     }
 
@@ -515,6 +524,15 @@ fn required_expressions(entry: &Entry) -> impl Iterator<Item = &'static str> {
         .map(catalog::Parameter::name)
 }
 
+/// The class whose lines of the tables are read for `class` in the entry `id`: none for a call
+/// that follows no value, and the outer none where the tables do not judge the class.
+fn read_as_of(id: &str, class: Option<Representative>) -> Option<Option<Representative>> {
+    match class {
+        None => Some(None),
+        Some(class) => read_as(id, class).map(Some),
+    }
+}
+
 /// What a method gives on the receiver it follows.
 struct Fit {
     result: Option<ResultDtype>,
@@ -543,6 +561,16 @@ fn on_receiver(
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    // A method that depends on the element is refused after a class it is not measured on, whether
+    // it is given an expression or an option in place of one, which no line of the dtype table says.
+    if let Some(class) = receiver
+        && read_as(id, class).is_none()
+    {
+        return Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {class}"),
+        ));
+    }
     let stood_in_for = stood_in_for(entry, options);
     let missing = || match receiver {
         Some(receiver) => {
@@ -550,13 +578,26 @@ fn on_receiver(
         }
         None => Refusal::structure(format!("the tables hold nothing for {id}")),
     };
-    let line = |parameter: Option<&'static str>, argument: Option<Representative>| match tables
-        .dtypes
-        .get(&(id, parameter, receiver, argument))
-    {
-        None => Err(missing()),
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        Some(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
+    let line = |parameter: Option<&'static str>, argument: Option<Representative>| {
+        // The line of the class that stands for one the tables hold none for. A method whose
+        // answer depends on the element is refused after a class it is not measured on: Polars is
+        // not asked of it, and may panic.
+        match tables.dtype(id, parameter, receiver, argument) {
+            Looked::NotJudged => {
+                let unmeasured = [receiver, argument]
+                    .into_iter()
+                    .flatten()
+                    .find(|class| read_as(id, *class).is_none())
+                    .map_or_else(String::new, |class| class.to_string());
+                Err(Refusal::rule_because(
+                    Rule::ElementDtypeIsMeasured,
+                    &format!("{id} is not measured on {unmeasured}"),
+                ))
+            }
+            Looked::Missing => Err(missing()),
+            Looked::Line(Outcome::Refused(reason)) => Err(Refusal::polars(&reason)),
+            Looked::Line(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
+        }
     };
     let mut fit = None;
     // What a chosen option is given in place of is not given, so the lines of the dtype table
@@ -602,7 +643,7 @@ fn on_receiver(
         }
         let mut refusal = None;
         let mut fitting: Vec<Fit> = Vec::new();
-        for argument in Representative::ALL {
+        for argument in Representative::MEASURED {
             match line(Some(parameter), Some(argument)) {
                 Ok(found) => fitting.push(found),
                 Err(error) => {
@@ -727,7 +768,15 @@ fn read_options(
             .iter()
             .any(|(chosen_name, chosen_word)| chosen_name == name && chosen_word == word)
     };
-    let mut gives: Vec<&Produces> = Vec::new();
+    let Some(read_receiver) = read_as_of(id, receiver) else {
+        return OptionsGive::Nothing;
+    };
+    // A call given the dtype it gives, as a cast is, gives that dtype whatever it follows, so what
+    // it gives is not the class the line was read for that it merely equals.
+    let by_a_word = changed
+        .iter()
+        .any(|(name, _)| parameter(name).is_some_and(|found| found.kind() == Kind::Dtype));
+    let mut gives: Vec<Produces> = Vec::new();
     for ((line_id, line_receiver, line), outcome) in &tables.options {
         let bears = match changed.as_slice() {
             [] => false,
@@ -740,18 +789,22 @@ fn read_options(
             _ => line.len() > 1 && line.iter().all(is_chosen),
         };
         if *line_id == id
-            && *line_receiver == receiver
+            && *line_receiver == read_receiver
             && bears
-            && let Outcome::Allowed(Some(produces)) = outcome
+            && let Outcome::Allowed(Some(produces)) = if by_a_word {
+                outcome.clone()
+            } else {
+                restored(outcome, &[receiver], &[read_receiver])
+            }
         {
             gives.push(produces);
         }
     }
-    let Some(first) = gives.first().copied() else {
+    let Some(first) = gives.first().cloned() else {
         return OptionsGive::Nothing;
     };
     if gives.iter().all(|produces| *produces == first) {
-        OptionsGive::Gives(first.clone())
+        OptionsGive::Gives(first)
     } else {
         OptionsGive::Unknown
     }
@@ -885,6 +938,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Polars' reason may be a panic.
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
+    }
+    // What Polars panics on is refused before it is asked, in words that say what the element lacks.
+    if let After::Value { dtype, .. } = place.after
+        && let Some((rule, said)) = Rule::forbids_receiver(id, &dtype.dtype())
+    {
+        return Err(Refusal::rule_because(rule, &said));
     }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
@@ -1223,6 +1282,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             Outcome::Allowed(_) => Ending::Allowed,
         }
     };
+    // An array is written at the width it has, where the chain knows it.
+    if let (Some(width), Some(found)) = (chosen.width, &result)
+        && matches!(found.class(), Some(Representative::Array(_)))
+    {
+        result = Some(found.of_width(width));
+    }
     Ok(Allowance {
         result,
         shape,
@@ -1251,6 +1316,135 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
             Shape::One => chosen,
         },
     )
+}
+
+/// The refusal of the rule that arrays that meet and give an array, or that one is looked up in,
+/// are of one width, which is known, where they are not.
+///
+/// # Errors
+/// Always: the caller asks it where it found arrays of other widths or of a width it does not know.
+pub fn rule_forbids_arrays_of_other_widths() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::ArraysMeetAtOneWidth))
+}
+
+/// The refusal of a rule that forbids the method `entry` to follow a value of the dtype
+/// `receiver`, if one does, without the tables: Polars panics on it where the rows run, so a
+/// document that holds it is refused before Polars is asked.
+///
+/// # Errors
+/// The rule that forbids it, with what the element lacks.
+pub fn rule_forbids_a_receiver(entry: &Entry, receiver: &DataType) -> Result<(), Refusal> {
+    match Rule::forbids_receiver(entry.id().as_str(), receiver) {
+        Some((rule, said)) => Err(Refusal::rule_because(rule, &said)),
+        None => Ok(()),
+    }
+}
+
+/// The refusal of a call that follows a value of the dtype `receiver`, where the tables are not
+/// asked of the call another way: the dtype of the value was not known before Polars built it, as
+/// where it follows a value of lists of lists, and the call is one that Polars panics on or that
+/// the tables do not measure. A method that depends on the element dtype is refused after a
+/// list, an array or a value of a dtype with no class that it is not measured on, and a method of
+/// lists or arrays, or one that follows a list or an array, is refused after one where the tables
+/// record that its schema and its rows differ or that Polars panicked, whatever the call is given.
+///
+/// # Errors
+/// The rule or the recorded refusal, said as the tables would say it of the call.
+pub fn refuse_a_receiver_not_judged(
+    entry: &'static Entry,
+    receiver: &DataType,
+) -> Result<(), Refusal> {
+    let id = entry.id().as_str();
+    let depends_on_the_element = SENSITIVE.contains(&id) || is_of_nested_dtypes(id);
+    let not_measured = || {
+        Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {}", dtype_name(receiver)),
+        )
+    };
+    let Some(class) = Representative::of(receiver) else {
+        // A list or an array of what has no class: of lists, of arrays, of structs.
+        return if depends_on_the_element
+            && matches!(receiver, DataType::List(_) | DataType::Array(..))
+        {
+            Err(not_measured())
+        } else {
+            Ok(())
+        };
+    };
+    if read_as(id, class).is_none() {
+        return Err(not_measured());
+    }
+    Ok(())
+}
+
+/// The refusal of a call after a list or an array, or of a method of lists or arrays, that the
+/// tables refuse of the dtype `receiver` given `arguments`, the dtypes of the expressions it is
+/// given by the names of its parameters: Polars plans such a call nevertheless where it does not
+/// work it out, as where both branches of a condition share it, and panics on the plan. The walk
+/// refuses the same call where it knows the dtypes, whatever it is given; this is asked where it
+/// lost them. An argument of no class is left to [`refuse_an_argument_not_judged`], and the
+/// options the call is given are not asked.
+///
+/// # Errors
+/// The refusal of the tables, as the walk would have given it.
+pub fn refuse_a_call_the_tables_refuse_after_lists(
+    entry: &'static Entry,
+    receiver: &DataType,
+    arguments: &[(&str, DataType)],
+) -> Result<(), Refusal> {
+    let Some(class) = Representative::of(receiver) else {
+        return Ok(());
+    };
+    if !(is_of_nested_dtypes(entry.id().as_str()) || class.is_nested()) {
+        return Ok(());
+    }
+    let classes: Vec<(&str, Representative)> = arguments
+        .iter()
+        .filter_map(|(name, dtype)| Some((*name, Representative::of(dtype)?)))
+        .collect();
+    match on_receiver(entry, Some(class), &classes, &[]) {
+        Err(refusal)
+            if matches!(
+                refusal.source(),
+                RefusalSource::Polars(_) | RefusalSource::Rule(_)
+            ) =>
+        {
+            Err(refusal)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// The refusal of a method that depends on the element dtype of a list or an array, given an
+/// expression of the dtype `argument` that the tables do not judge: a list or an array of a list,
+/// an array or a struct has no class, and a class the method is not measured on is not judged.
+/// Polars panics on some of what it is given, as it does of a receiver of such a dtype. It does not
+/// matter whether the tables could follow the chain before the call: they say nothing of an
+/// argument of no class either way.
+///
+/// # Errors
+/// The rule `element-dtype-is-measured`, with the dtype the method is not measured on.
+pub fn refuse_an_argument_not_judged(
+    entry: &'static Entry,
+    argument: &DataType,
+) -> Result<(), Refusal> {
+    let id = entry.id().as_str();
+    if !SENSITIVE.contains(&id) {
+        return Ok(());
+    }
+    let unjudged = match Representative::of(argument) {
+        None => matches!(argument, DataType::List(_) | DataType::Array(..)),
+        Some(class) => read_as(id, class).is_none(),
+    };
+    if unjudged {
+        Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {}", dtype_name(argument)),
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /// The refusal of a rule that forbids `entry` to start or continue a chain in
@@ -1423,10 +1617,10 @@ pub fn argument_dtypes(
     Representative::ALL
         .into_iter()
         .filter_map(|argument| {
-            tables
-                .dtypes
-                .get(&(id, Some(parameter), Some(receiver), Some(argument)))
-                .map(|outcome| (argument, outcome.clone()))
+            match tables.dtype(id, Some(parameter), Some(receiver), Some(argument)) {
+                Looked::Line(outcome) => Some((argument, outcome)),
+                Looked::NotJudged | Looked::Missing => None,
+            }
         })
         .collect()
 }
@@ -1498,7 +1692,10 @@ fn check_conversions(entry: &Entry, chosen: &Chosen<'_>) -> Result<(), Refusal> 
             if lenient {
                 options.push(("strict", "false".to_owned()));
             }
-            let key = ("Expr.cast", Some(*class), options);
+            let Some(read_class) = read_as("Expr.cast", *class) else {
+                continue;
+            };
+            let key = ("Expr.cast", Some(read_class), options);
             if let Some(Outcome::Refused(reason)) = tables.options.get(&key) {
                 return Err(Refusal::polars(reason));
             }
@@ -1518,6 +1715,9 @@ fn alone_in_a_pair(
 ) -> Result<(), Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    let Some(receiver) = read_as_of(id, receiver) else {
+        return Ok(());
+    };
     let at_default = |(other, set): &(&str, String)| {
         entry
             .parameters()
@@ -1571,6 +1771,9 @@ fn check_options(
 ) -> Result<(), Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    let Some(receiver) = read_as_of(id, receiver) else {
+        return Ok(());
+    };
     let named: Vec<(&'static str, String)> = {
         let mut named = Vec::with_capacity(chosen.len());
         for (name, value) in chosen {

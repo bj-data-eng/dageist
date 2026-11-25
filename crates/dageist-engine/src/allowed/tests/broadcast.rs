@@ -124,8 +124,8 @@ fn gives(
 /// The first receiver and operand dtypes with which Polars allows the method with the parameter
 /// `name` a column beside a literal receiver, and what it gives.
 fn found(entry: &'static Entry, name: &str) -> Option<(Representative, Representative, Shape)> {
-    Representative::ALL.into_iter().find_map(|receiver| {
-        Representative::ALL.into_iter().find_map(|operand| {
+    Representative::MEASURED.into_iter().find_map(|receiver| {
+        Representative::MEASURED.into_iter().find_map(|operand| {
             gives(entry, name, (receiver, true), operand).map(|shape| (receiver, operand, shape))
         })
     })

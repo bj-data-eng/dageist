@@ -18,7 +18,7 @@ use polars::prelude::{
     StructChunked,
 };
 
-use super::super::dtype::Representative;
+use super::super::dtype::{Inner, Representative};
 
 /// How many rows the sample's tables have.
 pub(super) const SAMPLE_ROWS: usize = 3;
@@ -58,10 +58,10 @@ fn made(dtype: Representative, name: &str) -> Series {
         Representative::String => Series::new(name.into(), [Some("1d"), None, Some("2d")]),
         Representative::Boolean => Series::new(name.into(), [Some(true), None, Some(false)]),
         Representative::Null => Series::new_null(name.into(), 3),
-        Representative::ListOfInteger => {
+        Representative::List(Inner::Int64) => {
             integer_list([Some(&[1, 2][..]), None, Some(&[3][..])], name)
         }
-        Representative::ListOfString => ListChunked::from_iter([
+        Representative::List(Inner::String) => ListChunked::from_iter([
             Some(Series::new("".into(), ["a", "b"])),
             None,
             Some(Series::new("".into(), ["c"])),
@@ -79,13 +79,38 @@ fn made(dtype: Representative, name: &str) -> Series {
         )
         .expect("two columns of three rows make a struct")
         .into_series(),
-        Representative::Array => integer_list([Some(&[1, 2][..]), None, Some(&[3, 4][..])], name)
+        Representative::Array(Inner::Int64) => {
+            integer_list([Some(&[1, 2][..]), None, Some(&[3, 4][..])], name)
+                .cast(&dtype.dtype())
+                .expect("lists of two cast to an array of two")
+        }
+        Representative::List(inner) => list_of(inner, name, false),
+        Representative::Array(inner) => list_of(inner, name, true)
             .cast(&dtype.dtype())
-            .expect("lists of two cast to an array of two"),
+            .unwrap_or_else(|error| panic!("lists of two cast to {dtype}: {error}")),
         other => ints(name)
             .cast(&other.dtype())
             .unwrap_or_else(|error| panic!("whole numbers cast to {other}: {error}")),
     }
+}
+
+/// A column of lists of the dtype `inner`: of the two values that its own sample holds in the
+/// first row, a null, and of the second value in the last, which is joined by the first where the
+/// lists must be as long as one another, as an array's are.
+fn list_of(inner: Inner, name: &str, equal_lengths: bool) -> Series {
+    let values = made(inner.class(), "");
+    let (first, second) = (values.slice(0, 1), values.slice(2, 1));
+    let mut both = first.clone();
+    both.append(&second)
+        .expect("two values of one dtype are appended");
+    let mut last = second.clone();
+    if equal_lengths {
+        last.append(&first)
+            .expect("two values of one dtype are appended");
+    }
+    ListChunked::from_iter([Some(both), None, Some(last)])
+        .into_series()
+        .with_name(name.into())
 }
 
 fn values_of(name: &str) -> DataFrame {

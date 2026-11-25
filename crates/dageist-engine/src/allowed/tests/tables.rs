@@ -9,6 +9,7 @@ use crate::allowed::dtype::{Representative, dtype_name};
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
     self, ContextLine, DtypeLine, OptionLine, Outcome, Shape, Stage, Tables, lines,
+    measured_classes,
 };
 use crate::catalog::{self, Applies, Kind, ParameterDefault};
 
@@ -165,7 +166,7 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
             .parameters()
             .iter()
             .any(|p| p.is_needed() && matches!(p.kind(), Kind::Expression(_)));
-        let n = Representative::ALL.len();
+        let n = measured_classes(entry.id().as_str()).len();
         let receivers = if entry.applies() == Applies::Expression {
             n
         } else {
@@ -221,7 +222,7 @@ fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_cont
 /// the call needs it, as a cast needs the dtype it gives. A dtype is one word for each class a
 /// document can hold.
 fn option_values(entry: &catalog::Entry) -> Vec<(usize, bool, bool)> {
-    let classes = Representative::ALL
+    let classes = Representative::MEASURED
         .into_iter()
         .filter(|class| crate::document::Dtype::new(class.dtype()).is_ok())
         .count();
@@ -285,7 +286,7 @@ fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on
         // step on none.
         let receivers =
             if entry.applies() == Applies::Expression || entry.applies() == Applies::Function {
-                Representative::ALL.len()
+                measured_classes(entry.id().as_str()).len()
             } else {
                 1
             };
@@ -416,7 +417,7 @@ fn an_end_rule_about_a_dtype_does_not_refuse_what_it_does_not_know() {
     let number = ResultDtype::from_name("Int64");
     // A dtype that is known to be something else breaks the rule, even one
     // that has no representative class.
-    let list = ResultDtype::from_name("List(Float64)");
+    let list = ResultDtype::from_name("List(List(Float64))");
     assert_eq!(list.class(), None);
     for context in [
         predicate,

@@ -3,7 +3,7 @@
 
 use polars::prelude::{DataType, JoinType, col, lit};
 
-use crate::allowed::dtype::Representative;
+use crate::allowed::dtype::{Inner, Representative};
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
     After, ArgumentSlot, Candidate, Chosen, Context, Literal, Outer, Place, Shape, Slot, Stage,
@@ -56,7 +56,7 @@ fn a_method_of_text_is_offered_after_text_and_refused_after_what_is_not() {
             Representative::Boolean,
             Representative::Date,
             Representative::Null,
-            Representative::ListOfString,
+            Representative::List(Inner::String),
         ] {
             let refused = offer(entry(id), &select_after(receiver), &Chosen::default());
             let Some(refusal) = refused.refusal() else {
@@ -176,7 +176,7 @@ fn what_is_trimmed_or_tested_for_must_be_text_or_something_polars_casts_to_it() 
     let list = offer(
         entry("Expr.str.starts_with"),
         &place,
-        &Chosen::default().with_arguments(&[("prefix", Representative::ListOfInteger)]),
+        &Chosen::default().with_arguments(&[("prefix", Representative::List(Inner::Int64))]),
     );
     assert!(list.refusal().is_some(), "{list:?}");
 }
@@ -199,7 +199,7 @@ fn a_count_of_characters_is_cast_to_a_whole_number_so_a_float_is_taken_and_text_
             (Representative::Boolean, true),
             // Polars reads the offset of a slice from text, where it converts the other counts.
             (Representative::String, id == "Expr.str.slice"),
-            (Representative::ListOfInteger, false),
+            (Representative::List(Inner::Int64), false),
         ] {
             let verdict = offer(
                 entry(id),
@@ -273,8 +273,8 @@ fn a_join_casts_what_it_joins_to_text_and_refuses_what_cannot_be_cast() {
         (Representative::Date, true),
         (Representative::String, true),
         (Representative::Duration, false),
-        (Representative::ListOfInteger, false),
-        (Representative::Array, false),
+        (Representative::List(Inner::Int64), false),
+        (Representative::Array(Inner::Int64), false),
     ] {
         let verdict = offer(
             entry("Expr.str.join"),

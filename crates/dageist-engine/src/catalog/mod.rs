@@ -20,6 +20,7 @@ mod defaults;
 mod duration;
 mod entries;
 mod left_out;
+mod nested;
 mod pattern;
 mod starting;
 #[cfg(test)]
@@ -219,11 +220,15 @@ pub enum Dtypes {
     String,
     /// `Boolean`.
     Boolean,
+    /// `List`, of any element dtype.
+    List,
+    /// `Array`, of any element dtype and any width.
+    Array,
 }
 
 impl Dtypes {
     /// Every group, in the order they are listed.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::Any,
         Self::Numeric,
         Self::Integer,
@@ -234,6 +239,8 @@ impl Dtypes {
         Self::Duration,
         Self::String,
         Self::Boolean,
+        Self::List,
+        Self::Array,
     ];
 
     /// The key the language files give the group's words under.
@@ -250,6 +257,8 @@ impl Dtypes {
             Self::Duration => "Duration",
             Self::String => "String",
             Self::Boolean => "Boolean",
+            Self::List => "List",
+            Self::Array => "Array",
         }
     }
 }

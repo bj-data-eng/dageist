@@ -469,6 +469,8 @@ export const RULE_NAMES = [
   'pivot-aggregate-gives-one-value',
   'condition-predicate-is-boolean',
   'duration-is-valid',
+  'element-dtype-is-implemented',
+  'element-dtype-is-measured',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
   'folded-function-is-no-join-key',
@@ -483,6 +485,7 @@ export const RULE_NAMES = [
   'values-meet-in-count',
   'window-input-is-not-counted',
   'window-input-is-not-widened',
+  'arrays-meet-at-one-width',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */

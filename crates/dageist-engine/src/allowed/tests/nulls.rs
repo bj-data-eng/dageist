@@ -3,7 +3,7 @@
 
 use polars::prelude::{DataType, Expr, FillNullStrategy, JoinType, LazyFrame, col};
 
-use crate::allowed::dtype::{Representative, dtype_name};
+use crate::allowed::dtype::{Inner, Representative, dtype_name};
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
     After, Chosen, Context, Ending, Outer, Place, Shape, Stage, Verdict, offer, options,
@@ -80,8 +80,8 @@ fn a_fill_by_a_strategy_is_offered_for_the_dtypes_polars_runs_it_on_and_gives_wh
         (Representative::Boolean, "mean"),
         (Representative::Null, "forward"),
         (Representative::Null, "zero"),
-        (Representative::ListOfInteger, "forward"),
-        (Representative::ListOfInteger, "min"),
+        (Representative::List(Inner::Int64), "forward"),
+        (Representative::List(Inner::Int64), "min"),
     ];
     for (receiver, word) in cases {
         let seen = selected(
@@ -402,23 +402,23 @@ fn an_array_may_be_replaced_by_an_array_given_what_replaces_it_that_polars_meets
     // which ask each dtype apart, say so.
     assert_eq!(
         selected(
-            Representative::Array,
-            Representative::Array,
+            Representative::Array(Inner::Int64),
+            Representative::Array(Inner::Int64),
             col("a").replace_strict(col("b"), col("k"), Some(col("k")), None::<DataType>),
         ),
         Seen::Ran(DataType::Int64)
     );
     let verdict = offer(
         entry("Expr.replace_strict"),
-        &select_after(Representative::Array),
-        &Chosen::default().with_arguments(&[("old", Representative::Array)]),
+        &select_after(Representative::Array(Inner::Int64)),
+        &Chosen::default().with_arguments(&[("old", Representative::Array(Inner::Int64))]),
     );
     assert!(verdict.allowance().is_some(), "{verdict:?}");
     // Beside a default of arrays, what replaces them is refused as Polars refuses it.
     assert_eq!(
         selected(
-            Representative::Array,
-            Representative::Array,
+            Representative::Array(Inner::Int64),
+            Representative::Array(Inner::Int64),
             col("a").replace_strict(col("a"), col("b"), Some(col("b")), None::<DataType>),
         ),
         Seen::Refused(Stage::Schema)

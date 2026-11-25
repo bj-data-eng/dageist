@@ -22,10 +22,24 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
-    "pivot-aggregate-gives-one-value",
-    "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
-)];
+const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
+    (
+        "pivot-aggregate-gives-one-value",
+        "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
+    ),
+    (
+        "arrays-meet-at-one-width",
+        "arrays that meet are of one width that is known, though Polars may not evaluate the branch that holds them",
+    ),
+    (
+        "element-dtype-is-measured",
+        "a method that depends on the element is not run on one the tables do not measure, which Polars may panic on",
+    ),
+    (
+        "element-dtype-is-implemented",
+        "a method that Polars panics on for an element is not run on it, though Polars may not evaluate it",
+    ),
+];
 
 /// What the outcome of a case says where the tables refuse a part that Polars
 /// does not evaluate, and a probe of the part shows the tables right.

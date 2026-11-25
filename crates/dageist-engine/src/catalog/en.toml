@@ -108,6 +108,14 @@ hint = "text"
 name = "Boolean"
 hint = "true or false"
 
+[dtypes.List]
+name = "List"
+hint = "a list of values of one dtype, of any length"
+
+[dtypes.Array]
+name = "Array"
+hint = "an array of values of one dtype, of one length"
+
 [entries."ChainedThen.otherwise"]
 name = "otherwise"
 hint = "the value where no condition holds"
@@ -2573,3 +2581,207 @@ hint = "number of set bits after the last one that is not"
 [entries."Expr.bitwise_trailing_zeros"]
 name = "bitwise_trailing_zeros"
 hint = "number of unset bits after the last one that is set"
+
+[entries."Expr.arr.all"]
+name = "arr.all"
+hint = "true if every value of each array is true"
+
+[entries."Expr.arr.all".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.arr.any"]
+name = "arr.any"
+hint = "true if some value of each array is true"
+
+[entries."Expr.arr.any".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.arr.arg_max"]
+name = "arr.arg_max"
+hint = "place of the largest value of each array"
+
+[entries."Expr.arr.arg_min"]
+name = "arr.arg_min"
+hint = "place of the smallest value of each array"
+
+[entries."Expr.arr.first"]
+name = "arr.first"
+hint = "first value of each array"
+
+[entries."Expr.arr.last"]
+name = "arr.last"
+hint = "last value of each array"
+
+[entries."Expr.arr.len"]
+name = "arr.len"
+hint = "number of values in each array"
+
+[entries."Expr.arr.max"]
+name = "arr.max"
+hint = "largest value of each array"
+
+[entries."Expr.arr.mean"]
+name = "arr.mean"
+hint = "average of the values of each array"
+
+[entries."Expr.arr.median"]
+name = "arr.median"
+hint = "middle value of each array"
+
+[entries."Expr.arr.min"]
+name = "arr.min"
+hint = "smallest value of each array"
+
+[entries."Expr.arr.n_unique"]
+name = "arr.n_unique"
+hint = "number of different values in each array"
+
+[entries."Expr.arr.sort"]
+name = "arr.sort"
+hint = "the values of each array in order"
+
+[entries."Expr.arr.sort".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.arr.sort".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.arr.std"]
+name = "arr.std"
+hint = "how far the values of each array spread from their average"
+
+[entries."Expr.arr.std".parameters.ddof]
+name = "ddof"
+label = "count less"
+
+[entries."Expr.arr.sum"]
+name = "arr.sum"
+hint = "sum of the values of each array"
+
+[entries."Expr.arr.to_list"]
+name = "arr.to_list"
+hint = "each array as a list"
+
+[entries."Expr.arr.unique"]
+name = "arr.unique"
+hint = "each different value of each array once"
+
+[entries."Expr.arr.unique".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
+[entries."Expr.arr.var"]
+name = "arr.var"
+hint = "square of how far the values of each array spread from their average"
+
+[entries."Expr.arr.var".parameters.ddof]
+name = "ddof"
+label = "count less"
+
+[entries."Expr.list.all"]
+name = "list.all"
+hint = "true if every value of each list is true"
+
+[entries."Expr.list.all".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.list.any"]
+name = "list.any"
+hint = "true if some value of each list is true"
+
+[entries."Expr.list.any".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.list.arg_max"]
+name = "list.arg_max"
+hint = "place of the largest value of each list"
+
+[entries."Expr.list.arg_min"]
+name = "list.arg_min"
+hint = "place of the smallest value of each list"
+
+[entries."Expr.list.drop_nulls"]
+name = "list.drop_nulls"
+hint = "each list without its empty values"
+
+[entries."Expr.list.first"]
+name = "list.first"
+hint = "first value of each list"
+
+[entries."Expr.list.last"]
+name = "list.last"
+hint = "last value of each list"
+
+[entries."Expr.list.len"]
+name = "list.len"
+hint = "number of values in each list"
+
+[entries."Expr.list.max"]
+name = "list.max"
+hint = "largest value of each list"
+
+[entries."Expr.list.mean"]
+name = "list.mean"
+hint = "average of the values of each list"
+
+[entries."Expr.list.median"]
+name = "list.median"
+hint = "middle value of each list"
+
+[entries."Expr.list.min"]
+name = "list.min"
+hint = "smallest value of each list"
+
+[entries."Expr.list.n_unique"]
+name = "list.n_unique"
+hint = "number of different values in each list"
+
+[entries."Expr.list.reverse"]
+name = "list.reverse"
+hint = "the values of each list in reverse order"
+
+[entries."Expr.list.sort"]
+name = "list.sort"
+hint = "the values of each list in order"
+
+[entries."Expr.list.sort".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.list.sort".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.list.std"]
+name = "list.std"
+hint = "how far the values of each list spread from their average"
+
+[entries."Expr.list.std".parameters.ddof]
+name = "ddof"
+label = "count less"
+
+[entries."Expr.list.sum"]
+name = "list.sum"
+hint = "sum of the values of each list"
+
+[entries."Expr.list.unique"]
+name = "list.unique"
+hint = "each different value of each list once"
+
+[entries."Expr.list.unique".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
+[entries."Expr.list.var"]
+name = "list.var"
+hint = "square of how far the values of each list spread from their average"
+
+[entries."Expr.list.var".parameters.ddof]
+name = "ddof"
+label = "count less"

@@ -22,7 +22,8 @@ use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
-    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
+    Place as OfferPlace, Position as Slot, Refusal, RefusalSource, Representative, Rule, Shape,
+    Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -178,6 +179,7 @@ impl WalkRefusal {
 pub struct Walk {
     expressions: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
+    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
 }
 
@@ -194,6 +196,13 @@ impl Walk {
     #[must_use]
     pub const fn refusal(&self) -> Option<&WalkRefusal> {
         self.refusal.as_ref()
+    }
+
+    /// The first call that Polars panics on, which no document may run: refused by a rule
+    /// before Polars is asked. It is the first thing refused only where nothing came before it.
+    #[must_use]
+    pub const fn unsafe_to_run(&self) -> Option<&WalkRefusal> {
+        self.unsafe_to_run.as_ref()
     }
 
     /// Why the tables could not be asked past a point, where they could not.
@@ -230,6 +239,7 @@ impl Step {
             slots: Vec::new(),
             walked: Vec::new(),
             refusal: None,
+            unsafe_to_run: None,
             not_known: None,
         };
         walker.arguments(self.call(), false);
@@ -240,6 +250,7 @@ impl Step {
         Walk {
             expressions: walker.walked,
             refusal: walker.refusal,
+            unsafe_to_run: walker.unsafe_to_run,
             not_known: walker.not_known,
         }
     }
@@ -306,6 +317,8 @@ struct Operand {
     reliable: bool,
     /// The time zone it is a moment in, where the chain knows it.
     zone: Option<Zone>,
+    /// The width of the array it is, where the chain knows it.
+    width: Option<usize>,
 }
 
 /// The time zone of a moment: none, or a name that the walk holds once, by its place in the list.
@@ -331,6 +344,8 @@ struct Around {
     receiver_loose: Option<Loose>,
     /// The unit the moment or the length of time the link follows is counted in, where it is known.
     unit: Option<TimeUnit>,
+    /// The width of the array the link follows, where it is known.
+    width: Option<usize>,
     /// Whether the value the link follows is one that a part widened: a value of one row that a method
     /// met with each of the many values of a part, which a window refuses.
     widened: bool,
@@ -366,6 +381,8 @@ enum Cur {
         taken: Taken,
         /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
         zones: Vec<Option<Zone>>,
+        /// The width of each value, where it is an array whose width is known, in the order of `values`.
+        widths: Vec<Option<usize>>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -390,6 +407,8 @@ struct Walker<'a> {
     slots: Vec<Slot>,
     walked: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
+    /// The first call that Polars panics on, whether or not another was refused before it.
+    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
     /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
     zones: Vec<String>,
@@ -880,6 +899,16 @@ fn unit_after(link: &Call, before: Option<TimeUnit>, standing: &Standing) -> Opt
     before
 }
 
+/// The width of the array the chain gives after a call that follows one of the width `before`: the
+/// same where the call gives an array, as sorting and reversing one does, and none where it gives
+/// anything else.
+fn width_after(before: Option<usize>, standing: &Standing) -> Option<usize> {
+    let result = standing.verdict()?.allowance()?.result()?;
+    matches!(result.class(), Some(Representative::Array(_)))
+        .then_some(before)
+        .flatten()
+}
+
 /// The class a literal has, when its dtype is known without another operand:
 /// one it was given, or text, a flag, or a null, which have one.
 fn literal_class(call: &Call) -> Option<Representative> {
@@ -917,6 +946,33 @@ fn takes_an_operand(entry: &Entry) -> bool {
         && entry.parameters().iter().any(|parameter| {
             matches!(parameter.kind(), Kind::Expression(_)) && !parameter.role().is_a_count()
         })
+}
+
+/// Whether the argument `name` of `entry` meets the value the method follows, as an operand, a value
+/// that fills it or the collection it is looked up in does, and not as a key that groups or orders
+/// it.
+fn meets_the_receiver(entry: &Entry, name: &str) -> bool {
+    entry.id().as_str() == "Expr.is_in"
+        || entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == name)
+            .is_some_and(|parameter| parameter.role() != Role::Plain)
+}
+
+/// Whether the values of a condition that are arrays are not all of one width that is known: Polars
+/// gives a list for them, where the tables, which write one width, give an array.
+fn arrays_of_other_widths(values: &[Valued], widths: &[Option<usize>]) -> bool {
+    let arrays: Vec<Option<usize>> = values
+        .iter()
+        .zip(widths)
+        .filter(|((class, _), _)| matches!(class, Some(Representative::Array(_))))
+        .map(|(_, width)| *width)
+        .collect();
+    arrays.len() > 1
+        && !arrays
+            .iter()
+            .all(|width| width.is_some() && *width == arrays[0])
 }
 
 /// The class every value of a condition has, when they have the same one. A
@@ -963,12 +1019,45 @@ impl Walker<'_> {
     }
 
     fn refuse_given(&mut self, refusal: &Refusal, at_end: bool, argument_unknown: bool) {
+        let found = WalkRefusal {
+            place: self.here(),
+            refusal: refusal.clone(),
+            at_end,
+            argument_unknown,
+        };
+        if matches!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::ElementDtypeIsImplemented | Rule::ElementDtypeIsMeasured)
+        ) && self.unsafe_to_run.is_none()
+        {
+            self.unsafe_to_run = Some(found.clone());
+        }
         if self.refusal.is_none() {
-            self.refusal = Some(WalkRefusal {
+            self.refusal = Some(found);
+        }
+    }
+
+    /// Notes a call that is not to be run in Polars: a method of lists or arrays, or a call that
+    /// follows a list or an array, that is refused, whatever it is given.
+    ///
+    /// What Polars refuses when it works out the schema it may plan nevertheless where the call is
+    /// not worked out, as where both branches of a condition share it, and its optimizer then
+    /// panics on the plan, as it does of a `list` method given an array, of a sum of an array of
+    /// dates and a boolean, and of the combination of a list with a time. A call after one whose
+    /// schema and whose rows differ, or on which Polars panicked, that trusts the schema, as an
+    /// aggregate or a cut does, panics too. A panic on a thread of Polars' own may not be recovered
+    /// from, so the step is refused with the words of the walk and the place of the call, and is
+    /// not built.
+    fn note_danger(&mut self, entry: &Entry, after: After, refusal: &Refusal) {
+        let in_lists = entry.id().as_str().starts_with("Expr.list.")
+            || entry.id().as_str().starts_with("Expr.arr.")
+            || matches!(after, After::Value { dtype, .. } if dtype.is_nested());
+        if in_lists && self.unsafe_to_run.is_none() {
+            self.unsafe_to_run = Some(WalkRefusal {
                 place: self.here(),
                 refusal: refusal.clone(),
-                at_end,
-                argument_unknown,
+                at_end: false,
+                argument_unknown: false,
             });
         }
     }
@@ -1478,6 +1567,14 @@ impl Walker<'_> {
         unit_of(&self.start_dtype(start)?)
     }
 
+    /// The width of the array a start gives, where its arguments decide it.
+    fn start_width(&self, start: &Call) -> Option<usize> {
+        match self.start_dtype(start)? {
+            DataType::Array(_, width) => Some(width),
+            _ => None,
+        }
+    }
+
     /// The class a start gives, where its arguments decide it.
     fn start_class(&self, start: &Call) -> Option<Representative> {
         match start.entry().id().as_str() {
@@ -1510,6 +1607,7 @@ impl Walker<'_> {
             known: false,
             reliable: false,
             zone: None,
+            width: None,
         };
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
@@ -1598,7 +1696,8 @@ impl Walker<'_> {
                                 .as_ref()
                                 .map(|(first, second)| (first.as_str(), second.as_str())),
                         )
-                        .following(self.start_unit(start));
+                        .following(self.start_unit(start))
+                        .following_width(self.start_width(start));
                     if counted_by_arguments {
                         // A range or a repeat gives as many values as its arguments fix, which is
                         // neither one value nor as many as the table has rows.
@@ -1681,6 +1780,7 @@ impl Walker<'_> {
                                         all.or(operand.taken)
                                     }),
                                 zones: Vec::new(),
+                                widths: Vec::new(),
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
@@ -1757,6 +1857,10 @@ impl Walker<'_> {
             Start::Call(start) => self.start_unit(start),
             _ => None,
         };
+        let mut width = match expression.start() {
+            Start::Call(start) => self.start_width(start),
+            _ => None,
+        };
         let mut zone = match expression.start() {
             Start::Call(start) => self.start_zone(start),
             _ => None,
@@ -1801,12 +1905,14 @@ impl Walker<'_> {
                     branches_are_one,
                     receiver_loose,
                     unit,
+                    width,
                     widened,
                     zone,
                     made_of_literals: literal_prefix,
                 },
             );
             unit = unit_after(link, unit, &standing);
+            width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
             literal_prefix = literal_prefix && call_is_made_of_literals(link);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
@@ -1918,11 +2024,13 @@ impl Walker<'_> {
                 known: dtype.is_some(),
                 reliable: dtype.is_some() && !branches_are_one,
                 zone,
+                width,
             },
             Cur::Condition {
                 values,
                 meeting,
                 taken,
+                widths,
                 ..
             } => Operand {
                 dtype: unify(&values),
@@ -1937,6 +2045,14 @@ impl Walker<'_> {
                 known: true,
                 reliable: !branches_are_one,
                 zone: None,
+                // The width the arrays among the values share, where they are of one.
+                width: widths
+                    .iter()
+                    .zip(&values)
+                    .filter(|(_, (class, _))| matches!(class, Some(Representative::Array(_))))
+                    .map(|(width, _)| *width)
+                    .reduce(|first, other| if first == other { first } else { None })
+                    .flatten(),
             },
             Cur::Dead => unsaid,
         };
@@ -2013,6 +2129,7 @@ impl Walker<'_> {
             branches_are_one,
             receiver_loose,
             unit,
+            width,
             widened,
             zone,
             made_of_literals,
@@ -2306,6 +2423,7 @@ impl Walker<'_> {
                     .with_durations(&durations)
                     .with_time_zones(&time_zones)
                     .following(unit)
+                    .following_width(width)
                     .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
@@ -2314,6 +2432,7 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
+                self.note_danger(entry, after, refusal);
                 self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
@@ -2410,6 +2529,7 @@ impl Walker<'_> {
             .with_durations(&durations)
             .with_time_zones(&time_zones)
             .following(unit)
+            .following_width(width)
             .in_zone(zone_name.as_deref())
             .with_zone_clash(clash_of_zones);
         let chosen = match gives {
@@ -2423,11 +2543,50 @@ impl Walker<'_> {
         };
         let allowance = match &verdict {
             Verdict::Refused(refusal) => {
+                self.note_danger(entry, after, refusal);
                 self.refuse(refusal, false);
                 return (Cur::Dead, standing);
             }
             Verdict::Allowed(allowance) => allowance,
         };
+        // Arrays that meet and give an array, or that one is looked up in, are of one width, which
+        // is known: Polars refuses a sum of arrays of two widths or to look one up in the other,
+        // and gives a list where it fills one with the other. What an array is partitioned or
+        // sorted by does not meet it.
+        if (matches!(
+            allowance.result().and_then(allowed::ResultDtype::class),
+            Some(Representative::Array(_))
+        ) || entry.id().as_str() == "Expr.is_in")
+            && matches!(
+                &cur,
+                Cur::Value {
+                    dtype: Some(Representative::Array(_)),
+                    ..
+                }
+            )
+        {
+            let met: Vec<Option<usize>> = arguments
+                .iter()
+                .filter(|(name, operand)| {
+                    matches!(operand.dtype, Some(Representative::Array(_)))
+                        && meets_the_receiver(entry, name)
+                })
+                .map(|(_, operand)| operand.width)
+                .collect();
+            if !met.is_empty()
+                && !(width.is_some() && met.iter().all(|other| *other == width))
+                && let Err(refusal) = allowed::rule_forbids_arrays_of_other_widths()
+            {
+                self.refuse(&refusal, false);
+                return (
+                    Cur::Dead,
+                    Standing {
+                        follows: standing.follows,
+                        verdict: Some(Verdict::Refused(refusal)),
+                    },
+                );
+            }
+        }
         // Polars refuses the rows of a replacement given values of other numbers than it takes,
         // which the shapes of the arguments say.
         if let Cur::Value { shape, .. } = &cur
@@ -2523,6 +2682,7 @@ impl Walker<'_> {
                 Cur::Condition {
                     mut values,
                     mut zones,
+                    mut widths,
                     single,
                     values_single,
                     known,
@@ -2574,16 +2734,33 @@ impl Walker<'_> {
                     "When.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
+                        widths.push(statement.and_then(|operand| operand.width));
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
+                        widths.push(statement.and_then(|operand| operand.width));
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
                         values.push(statement_class);
+                        widths.push(statement.and_then(|operand| operand.width));
+                        // Arrays that are the values of a condition are an array where they are
+                        // of one width, which is known, and a list where they are not.
+                        if arrays_of_other_widths(&values, &widths)
+                            && let Err(refusal) = allowed::rule_forbids_arrays_of_other_widths()
+                        {
+                            self.refuse(&refusal, false);
+                            return (
+                                Cur::Dead,
+                                Standing {
+                                    follows: standing.follows,
+                                    verdict: Some(Verdict::Refused(refusal)),
+                                },
+                            );
+                        }
                         let dtype = if known { unify(&values) } else { None };
                         let (shape, count) = if meeting.0 == Shape::Counted {
                             meeting
@@ -2628,6 +2805,7 @@ impl Walker<'_> {
                     meeting,
                     taken,
                     zones,
+                    widths,
                     single,
                     values_single,
                     known,
@@ -2844,14 +3022,7 @@ fn meets_receiver(entry: &Entry, name: &str, operand: &Operand) -> bool {
 /// set, whole, so that it gives as many values as they.
 fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     if entry.id().as_str() == "Expr.is_in" && name == "other" {
-        return matches!(
-            operand.dtype,
-            Some(
-                Representative::ListOfInteger
-                    | Representative::ListOfString
-                    | Representative::Array
-            )
-        );
+        return operand.dtype.is_some_and(Representative::is_nested);
     }
     broadcasts(entry, name)
 }

@@ -40,6 +40,34 @@ pub dageist_engine::allowed::Ending::Refused(dageist_engine::allowed::Refusal)
 impl dageist_engine::allowed::Ending
 pub const fn dageist_engine::allowed::Ending::is_allowed(&self) -> bool
 pub const fn dageist_engine::allowed::Ending::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
+pub enum dageist_engine::allowed::Inner
+pub dageist_engine::allowed::Inner::Boolean
+pub dageist_engine::allowed::Inner::Date
+pub dageist_engine::allowed::Inner::Datetime
+pub dageist_engine::allowed::Inner::DatetimeZoned
+pub dageist_engine::allowed::Inner::Decimal
+pub dageist_engine::allowed::Inner::Duration
+pub dageist_engine::allowed::Inner::Float16
+pub dageist_engine::allowed::Inner::Float32
+pub dageist_engine::allowed::Inner::Float64
+pub dageist_engine::allowed::Inner::Int128
+pub dageist_engine::allowed::Inner::Int16
+pub dageist_engine::allowed::Inner::Int32
+pub dageist_engine::allowed::Inner::Int64
+pub dageist_engine::allowed::Inner::Int8
+pub dageist_engine::allowed::Inner::Null
+pub dageist_engine::allowed::Inner::String
+pub dageist_engine::allowed::Inner::Time
+pub dageist_engine::allowed::Inner::UInt128
+pub dageist_engine::allowed::Inner::UInt16
+pub dageist_engine::allowed::Inner::UInt32
+pub dageist_engine::allowed::Inner::UInt64
+pub dageist_engine::allowed::Inner::UInt8
+impl dageist_engine::allowed::Inner
+pub const dageist_engine::allowed::Inner::ALL: [Self; 22]
+pub const fn dageist_engine::allowed::Inner::class(self) -> dageist_engine::allowed::Representative
+pub fn dageist_engine::allowed::Inner::of(dtype: &polars_core::datatypes::dtype::DataType) -> core::option::Option<Self>
+pub fn dageist_engine::allowed::Inner::of_class(class: dageist_engine::allowed::Representative) -> core::option::Option<Self>
 pub enum dageist_engine::allowed::Literal
 pub dageist_engine::allowed::Literal::Float(f64)
 pub dageist_engine::allowed::Literal::Integer(i64)
@@ -83,7 +111,7 @@ pub dageist_engine::allowed::RefusalSource::Polars(dageist_engine::allowed::Stag
 pub dageist_engine::allowed::RefusalSource::Rule(dageist_engine::allowed::Rule)
 pub dageist_engine::allowed::RefusalSource::Structure
 pub enum dageist_engine::allowed::Representative
-pub dageist_engine::allowed::Representative::Array
+pub dageist_engine::allowed::Representative::Array(dageist_engine::allowed::Inner)
 pub dageist_engine::allowed::Representative::Boolean
 pub dageist_engine::allowed::Representative::Date
 pub dageist_engine::allowed::Representative::Datetime
@@ -98,8 +126,7 @@ pub dageist_engine::allowed::Representative::Int16
 pub dageist_engine::allowed::Representative::Int32
 pub dageist_engine::allowed::Representative::Int64
 pub dageist_engine::allowed::Representative::Int8
-pub dageist_engine::allowed::Representative::ListOfInteger
-pub dageist_engine::allowed::Representative::ListOfString
+pub dageist_engine::allowed::Representative::List(dageist_engine::allowed::Inner)
 pub dageist_engine::allowed::Representative::Null
 pub dageist_engine::allowed::Representative::String
 pub dageist_engine::allowed::Representative::Struct
@@ -110,17 +137,24 @@ pub dageist_engine::allowed::Representative::UInt32
 pub dageist_engine::allowed::Representative::UInt64
 pub dageist_engine::allowed::Representative::UInt8
 impl dageist_engine::allowed::Representative
-pub const dageist_engine::allowed::Representative::ALL: [Self; 26]
+pub const dageist_engine::allowed::Representative::ALL: [Self; 67]
+pub const dageist_engine::allowed::Representative::MEASURED: [Self; 26]
 pub fn dageist_engine::allowed::Representative::dtype(self) -> polars_core::datatypes::dtype::DataType
+pub const fn dageist_engine::allowed::Representative::element(self) -> core::option::Option<dageist_engine::allowed::Inner>
 pub fn dageist_engine::allowed::Representative::from_name(name: &str) -> core::option::Option<Self>
+pub const fn dageist_engine::allowed::Representative::is_nested(self) -> bool
 pub const fn dageist_engine::allowed::Representative::name(self) -> &'static str
 pub fn dageist_engine::allowed::Representative::of(dtype: &polars_core::datatypes::dtype::DataType) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::Representative::of_name(name: &str) -> core::option::Option<Self>
+pub const fn dageist_engine::allowed::Representative::sibling(self) -> Self
 impl core::fmt::Display for dageist_engine::allowed::Representative
 pub fn dageist_engine::allowed::Representative::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Rule
+pub dageist_engine::allowed::Rule::ArraysMeetAtOneWidth
 pub dageist_engine::allowed::Rule::ConditionPredicateIsBoolean
 pub dageist_engine::allowed::Rule::DurationIsValid
+pub dageist_engine::allowed::Rule::ElementDtypeIsImplemented
+pub dageist_engine::allowed::Rule::ElementDtypeIsMeasured
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
@@ -137,7 +171,7 @@ pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 17]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 20]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -199,6 +233,7 @@ pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dage
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
 pub const fn dageist_engine::allowed::Chosen<'a>::following(self, unit: core::option::Option<polars_core::datatypes::temporal::time_unit::TimeUnit>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::following_width(self, width: core::option::Option<usize>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_one(self) -> Self
@@ -290,15 +325,20 @@ pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -
 pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> alloc::vec::Vec<dageist_engine::allowed::OptionOffer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::read_typed(text: &str, typed: dageist_engine::allowed::Typed) -> alloc::vec::Vec<core::result::Result<dageist_engine::allowed::Read, dageist_engine::allowed::Unread>>
+pub fn dageist_engine::allowed::refuse_a_call_the_tables_refuse_after_lists(entry: &'static dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType, arguments: &[(&str, polars_core::datatypes::dtype::DataType)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::refuse_a_count_that_may_not_end(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::refuse_a_receiver_not_judged(entry: &'static dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::refuse_an_argument_not_judged(entry: &'static dageist_engine::catalog::Entry, argument: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_range_that_cannot_be_made(said: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_receiver(entry: &dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_count() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_widened_value() -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_arrays_of_other_widths() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_replacement_values_of_other_numbers() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_values_of_other_counts() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::slots_at_start(entry: &'static dageist_engine::catalog::Entry) -> alloc::vec::Vec<&'static str>
@@ -419,17 +459,19 @@ impl dageist_engine::catalog::DefaultValue
 pub fn dageist_engine::catalog::DefaultValue::from_python(text: &str) -> Self
 pub enum dageist_engine::catalog::Dtypes
 pub dageist_engine::catalog::Dtypes::Any
+pub dageist_engine::catalog::Dtypes::Array
 pub dageist_engine::catalog::Dtypes::Boolean
 pub dageist_engine::catalog::Dtypes::Date
 pub dageist_engine::catalog::Dtypes::Datetime
 pub dageist_engine::catalog::Dtypes::Duration
 pub dageist_engine::catalog::Dtypes::Integer
+pub dageist_engine::catalog::Dtypes::List
 pub dageist_engine::catalog::Dtypes::Numeric
 pub dageist_engine::catalog::Dtypes::String
 pub dageist_engine::catalog::Dtypes::Temporal
 pub dageist_engine::catalog::Dtypes::Time
 impl dageist_engine::catalog::Dtypes
-pub const dageist_engine::catalog::Dtypes::ALL: [Self; 10]
+pub const dageist_engine::catalog::Dtypes::ALL: [Self; 12]
 pub const fn dageist_engine::catalog::Dtypes::key(self) -> &'static str
 pub enum dageist_engine::catalog::DurationUse
 pub dageist_engine::catalog::DurationUse::Cut
@@ -1194,6 +1236,7 @@ impl dageist_engine::document::Walk
 pub fn dageist_engine::document::Walk::expressions(&self) -> &[dageist_engine::document::WalkedExpression]
 pub fn dageist_engine::document::Walk::not_known(&self) -> core::option::Option<&str>
 pub const fn dageist_engine::document::Walk::refusal(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
+pub const fn dageist_engine::document::Walk::unsafe_to_run(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
 pub struct dageist_engine::document::WalkRefusal
 impl dageist_engine::document::WalkRefusal
 pub const fn dageist_engine::document::WalkRefusal::argument_unknown(&self) -> bool

@@ -1065,8 +1065,8 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
     let contexts = grid["contexts"].as_array().expect("contexts").len();
     let afters = grid["afters"].as_array().expect("afters").len();
     // Six positions of a step, each alone and with each of four positions inside an expression;
-    // nothing, twenty-six dtypes in three shapes, and four states of a condition.
-    assert_eq!((contexts, afters), (30, 83));
+    // nothing, sixty-seven classes of dtypes in three shapes, and four states of a condition.
+    assert_eq!((contexts, afters), (30, 206));
     let rows = grid["allowed"].as_array().expect("rows");
     assert_eq!(rows.len(), contexts);
     assert!(

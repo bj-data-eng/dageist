@@ -18,13 +18,13 @@ fn smaller(smaller: &Case, larger: &[u8]) -> bool {
 pub fn candidates(case: &Case) -> Vec<Case> {
     let encoded = case.encode();
     let mut found = Vec::new();
-    for receiver in Representative::ALL {
+    for receiver in Representative::MEASURED {
         found.push(Case {
             receiver,
             ..case.clone()
         });
     }
-    for argument in Representative::ALL {
+    for argument in Representative::MEASURED {
         found.push(Case {
             argument,
             ..case.clone()

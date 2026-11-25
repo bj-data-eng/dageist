@@ -10,7 +10,8 @@
 use std::fmt;
 
 use polars::prelude::{
-    DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
+    DataFrame, DataType, Expr, Field, IdxSize, IntoLazy, LazyFrame, PolarsError, Schema, SchemaRef,
+    col,
 };
 
 use crate::allowed::{self, Context, Position, Refusal};
@@ -462,7 +463,8 @@ impl Document {
         let mut frame = working.clone().lazy();
         let mut schema = working.schema().clone();
         for (index, step) in self.steps()[..=last].iter().enumerate() {
-            let (next, next_schema) = run_step(index, step, inputs, frame, &schema, false)
+            // Traced, so that what Polars panics on is refused before it is asked.
+            let (next, next_schema) = run_step(index, step, inputs, frame, &schema, true)
                 .result
                 .map_err(|halt| match halt {
                     Halt::Refused(refusal) => RowsError::Refused(refusal),
@@ -505,25 +507,41 @@ fn run_step(
     trace: bool,
 ) -> StepRun {
     let base = Place::of_step(index, Some(step.id().clone()));
-    let mut builder = Builder {
-        inputs,
-        probe: trace.then(|| DataFrame::empty_with_schema(schema).lazy()),
-        base: base.clone(),
-        path: Vec::new(),
-        positions: Vec::new(),
-        traces: Vec::new(),
-        written: Vec::new(),
-    };
     // What the tables say of the step does not depend on Polars building it.
     let walk = if trace {
         step.walk(index, schema, inputs)
     } else {
         Walk::default()
     };
+    let mut builder = Builder {
+        inputs,
+        probe: trace.then(|| DataFrame::empty_with_schema(schema).lazy()),
+        blind: walk.not_known().is_some(),
+        elements: Vec::new(),
+        given: Vec::new(),
+        base: base.clone(),
+        path: Vec::new(),
+        positions: Vec::new(),
+        traces: Vec::new(),
+        written: Vec::new(),
+    };
     // A step with a hole is not built: it is walked, and says where it is incomplete.
     if let Some(path) = step.first_hole() {
         return StepRun {
             result: Err(Halt::Incomplete(path.into_iter().fold(base, Place::then))),
+            expressions: Vec::new(),
+            walk,
+            written: Vec::new(),
+        };
+    }
+    // What Polars panics on is not run, wherever the probe of the builder could not see it: a pivot's
+    // aggregate starts from the values of a group, whose dtype it has no column for.
+    if let Some(found) = walk.unsafe_to_run() {
+        return StepRun {
+            result: Err(Halt::Refused(StepRefusal {
+                place: found.place().clone(),
+                cause: Box::new(RunCause::NotAllowed(found.refusal().clone())),
+            })),
             expressions: Vec::new(),
             walk,
             written: Vec::new(),
@@ -602,6 +620,14 @@ struct Builder<'a> {
     /// An empty table of the schema the step starts from, when the dtypes of
     /// expressions are wanted.
     probe: Option<LazyFrame>,
+    /// Whether the tables could not follow the dtype of the step's expressions to their ends, so
+    /// that what the dtypes Polars gives say of a call that Polars panics on, the tables did not.
+    blind: bool,
+    /// The dtypes of the values a pivot aggregates, which an expression that starts from `element`
+    /// is evaluated against.
+    elements: Vec<DataType>,
+    /// The dtypes of the expressions the call built last was given, by the names of its parameters.
+    given: Vec<(String, DataType)>,
     base: Place,
     path: Vec<Segment>,
     /// The named positions, of a step and of the expressions inside it, that
@@ -673,6 +699,7 @@ impl Builder<'_> {
     }
 
     fn step(&mut self, call: &Call, input: LazyFrame) -> Result<LazyFrame, Stop> {
+        self.elements = self.values_of_a_pivot(call);
         let arguments = self.arguments(call)?;
         match call.entry().build() {
             Build::Frame(build) => {
@@ -707,6 +734,7 @@ impl Builder<'_> {
     fn arguments(&mut self, call: &Call) -> Result<Arguments, Stop> {
         let entry = call.entry().id().as_str();
         let mut given: Vec<(&str, Argument)> = Vec::new();
+        let mut dtypes_given: Vec<(String, DataType)> = Vec::new();
         for argument in call.arguments() {
             self.path
                 .push(Segment::Parameter(argument.parameter().to_owned()));
@@ -724,6 +752,7 @@ impl Builder<'_> {
                     }),
                 _ => None,
             };
+            let from_another_table = from_table.is_some();
             let built = if let Some(table) = from_table {
                 let own = self.probe.take();
                 self.probe = own.as_ref().and_then(|_| probe_of(table));
@@ -733,6 +762,21 @@ impl Builder<'_> {
             } else {
                 self.argument(argument.value())?
             };
+            // What Polars panics on is not run: a value of a dtype the tables do not judge, given to
+            // a method that depends on the element dtype, as a list of lists is.
+            if !from_another_table {
+                let dtypes = self.argument_dtypes(&built);
+                for dtype in &dtypes {
+                    if let Err(refusal) =
+                        allowed::refuse_an_argument_not_judged(call.entry(), dtype)
+                    {
+                        return self.stop(RunCause::NotAllowed(refusal));
+                    }
+                }
+                if let [dtype] = dtypes.as_slice() {
+                    dtypes_given.push((argument.parameter().to_owned(), dtype.clone()));
+                }
+            }
             given.push((argument.parameter(), built));
             if position.is_some() {
                 self.positions.pop();
@@ -749,6 +793,7 @@ impl Builder<'_> {
                 return self.built(Err(BuildError::NotAPattern { parameter, error }));
             }
         }
+        self.given = dtypes_given;
         self.built(call.entry().arguments(given))
     }
 
@@ -854,7 +899,45 @@ impl Builder<'_> {
                     }
                 }
             }
+            // What Polars panics on is refused before it is asked, as the rule says, by the dtype
+            // the value before the call has: a panic of its own may not be recovered from. Where
+            // the tables lost the dtype, as after a list of lists, they said nothing of the call,
+            // so what they record of the dtype Polars gives is asked of it here.
+            let receivers = if self.probe.is_some() {
+                self.receivers(&state, from_element)
+            } else {
+                Vec::new()
+            };
+            for receiver in &receivers {
+                let refused =
+                    allowed::rule_forbids_a_receiver(link.entry(), receiver).and_then(|()| {
+                        if self.blind {
+                            allowed::refuse_a_receiver_not_judged(link.entry(), receiver)
+                        } else {
+                            Ok(())
+                        }
+                    });
+                if let Err(refusal) = refused {
+                    return self.stop(RunCause::NotAllowed(refusal));
+                }
+            }
             let arguments = self.arguments(link)?;
+            if self.blind {
+                let given: Vec<(&str, DataType)> = self
+                    .given
+                    .iter()
+                    .map(|(name, dtype)| (name.as_str(), dtype.clone()))
+                    .collect();
+                for receiver in &receivers {
+                    if let Err(refusal) = allowed::refuse_a_call_the_tables_refuse_after_lists(
+                        link.entry(),
+                        receiver,
+                        &given,
+                    ) {
+                        return self.stop(RunCause::NotAllowed(refusal));
+                    }
+                }
+            }
             state = match (link.entry().build(), state) {
                 (Build::Expression(build), Built::Expr(receiver)) => {
                     Built::Expr(self.built(build(receiver, &arguments))?)
@@ -885,6 +968,98 @@ impl Builder<'_> {
             Built::Expr(expr) => Ok(expr),
             Built::Condition(condition) => self.built(condition.into_expr()),
         }
+    }
+
+    /// The dtypes of the value `state` is, which a call that follows it is given: the one dtype it
+    /// has, or one for each of the values a pivot aggregates where it starts from `element`.
+    fn receivers(&self, state: &Built, from_element: bool) -> Vec<DataType> {
+        if !from_element {
+            return match self.resolve(state, false) {
+                Some(Resolution::Dtype(dtype)) => vec![dtype],
+                _ => Vec::new(),
+            };
+        }
+        let (true, Built::Expr(expr)) = (self.probe.is_some(), state) else {
+            return Vec::new();
+        };
+        // A pivot evaluates the aggregate against the values of a group, as a list of them is
+        // evaluated: what it gives is a list of the dtype it has.
+        self.elements
+            .iter()
+            .filter_map(|dtype| {
+                let schema: Schema = [Field::new("values".into(), dtype.clone())]
+                    .into_iter()
+                    .collect();
+                let mut frame =
+                    DataFrame::empty_with_schema(&schema)
+                        .lazy()
+                        .select([col("values")
+                            .implode(true)
+                            .list()
+                            .eval(expr.clone())
+                            .alias("given")]);
+                match frame.collect_schema().ok()?.get("given")? {
+                    DataType::List(inner) => Some((**inner).clone()),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// The dtypes of the expressions `argument` holds, when the dtypes are wanted and Polars can
+    /// work them out here.
+    fn argument_dtypes(&self, argument: &Argument) -> Vec<DataType> {
+        let Some(probe) = &self.probe else {
+            return Vec::new();
+        };
+        match argument {
+            Argument::Expression(expr) => {
+                let mut frame = probe.clone().select([expr.clone()]);
+                match frame.collect_schema() {
+                    Ok(schema) => schema.iter().map(|(_, dtype)| dtype.clone()).collect(),
+                    Err(_) => Vec::new(),
+                }
+            }
+            Argument::Many(items) => items
+                .iter()
+                .flat_map(|item| self.argument_dtypes(item))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// The dtypes of the values a pivot aggregates, from the table the probe stands for.
+    fn values_of_a_pivot(&self, call: &Call) -> Vec<DataType> {
+        let Some(probe) = &self.probe else {
+            return Vec::new();
+        };
+        if call.entry().id().as_str() != "LazyFrame.pivot" {
+            return Vec::new();
+        }
+        let Ok(schema) = probe.clone().collect_schema() else {
+            return Vec::new();
+        };
+        let named = |parameter: &str| match call.argument(parameter) {
+            Some(Value::Columns(names)) => Some(names.clone()),
+            _ => None,
+        };
+        let (on, index, values) = (named("on"), named("index"), named("values"));
+        schema
+            .iter()
+            .filter(|(name, _)| match &values {
+                Some(values) => values.iter().any(|value| value.as_str() == name.as_str()),
+                None => {
+                    let held = |names: &Option<Vec<String>>| {
+                        names
+                            .iter()
+                            .flatten()
+                            .any(|held| held.as_str() == name.as_str())
+                    };
+                    !held(&on) && !held(&index)
+                }
+            })
+            .map(|(_, dtype)| dtype.clone())
+            .collect()
     }
 
     /// The dtype `state` has, when the dtypes are wanted.

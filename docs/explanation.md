@@ -277,6 +277,15 @@ identifier that saved steps keep. An entry records:
 - whether it works on a lazy frame;
 - the function that builds it in Polars from filled-in arguments.
 
+The dtypes an entry accepts are named by groups of them, in the order the language file lists them:
+every dtype, the numeric and the integer dtypes, the temporal ones and each of `Datetime`, `Date`,
+`Time` and `Duration`, `String`, `Boolean`, and `List` and `Array` of any element dtype. A group says
+what Polars takes of some dtype in it, and a test that runs the method on a column of each group
+holds an entry to it, with a column of lists and one of arrays: a method that claims every dtype
+must take a list and an array, and the ordering comparisons, `pct_change`, `replace` and
+`replace_strict`, which Polars refuses lists for, name the groups they take instead. Which members
+of a group, and which element dtypes, a call takes is the tables' to say.
+
 Those build functions are the start of the path from a saved document of steps
 to a Polars plan. The arguments for an entry are checked against its
 parameters, their kinds, shapes and choice words before it is built. Result
@@ -1533,7 +1542,26 @@ for the three rows, `many` or `counted`.
 
 The representative dtypes are every integer and float width, `String`,
 `Boolean`, `Date`, `Time`, `Datetime` with and without a zone, `Duration`,
-`Null`, `List` of an integer and of `String`, `Struct`, `Array` and `Decimal`.
+`Null`, `Decimal` and `Struct`, and a `List` and an `Array` of each of those that is not a
+`Struct`: 22 scalar dtypes, so 67 classes. A list or an array of a list, an array or a
+struct is no class, and the walk says nothing of what follows one, as it says nothing of a dtype
+the tables do not cover. Where the walk loses a dtype so, the run asks the tables of the dtype Polars resolves
+for each call that follows, as the walk would have: a method that depends on the element dtype, or
+a method of lists or arrays, is refused after a list or an array of a list, an array or a struct,
+after a class the tables do not measure it on, and after one whose lines record a panic or rows
+that contradict the schema. A method that depends on the element dtype is refused given an
+expression of such a dtype, or of a class it is not measured on, as an argument, whether it is a
+column, a value taken of one or a connected input, and whether the walk lost the dtype or not. A method of lists or arrays that the tables refuse, as
+`list.max` of an array is, and any call that the tables refuse after a list or an array, whatever
+it is given, is not built either, and the step is refused with the words of the walk and the place
+of the call: Polars may plan one that both branches of a condition share, and its optimizer then
+panics on the plan, as it does of the sum of an array of dates and a boolean. Where the walk lost
+the dtype before the call, the run asks the tables of the dtype Polars gives and of the dtypes of
+what the call is given, and refuses the same calls. A dtype of a class is any member of it: an array of any width
+is its class, and the tables measure arrays at width 2, which the walk carries as it carries the
+unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which of the
+classes each method is measured on.
+
 The contexts are a `select` item, a filter's predicate, a sort key, a join key
 on each side, and a pivot's aggregate, each also with, inside the expression
 that stands there, `over`'s `partition_by` or `order_by` or a condition's
@@ -1588,6 +1616,8 @@ and referenced from the lines of the context table they govern:
 | `pivot-aggregate-gives-one-value` | A pivot's aggregate gives one value for each group. Polars lets a running sum stand there. |
 | `condition-predicate-is-boolean` | A condition's predicate is a `Boolean`. Polars finds a whole number there only when rows run. |
 | `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
+| `arrays-meet-at-one-width` | Arrays that meet, as the operands of a method or the values of a condition, and give an array, or that one is looked up in, are of one width, which is known. Polars refuses to add an array of two to one of three or to look one up in the other, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another, where the tables, which write one width, give an array. The walk carries the width of each array. |
+| `element-dtype-is-measured` | A method whose answer depends on the element dtype of a list or an array, which `SENSITIVE` names, is given one the tables measure it on: whole numbers, floats, text, booleans, dates and datetimes. For another list or array Polars is not asked, since it panics on some, as on `diff` of an array of `Null` and on arithmetic of a list of `Null` with a null. A document that holds such a call is refused before it runs. |
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
 | `join-key-names-are-not-repeated` | A join pairs no two output column names twice. Polars names a key by the column its chain starts from, whatever methods follow it, `literal` for a literal and by its first value for a condition, and refuses a join in which the key of one side and the key it is paired with repeat the names of an earlier pair: `left_on=[k, k.sum()]` with `right_on=[rk, rk.sum()]` is refused, and with `right_on=[rk, ra]` is not, for the pairs differ. A name repeated on one side only is allowed. `on` pairs each key with itself. An alias is refused in a join's key by Polars, and the catalogue holds none. The rule is asked by the walk, which finds the names of the whole join and places the refusal at the later left key that makes the pair again. Polars pairs the keys after expanding each side, so a key that may expand to several columns (a `col` of several names or a pattern), a key that starts from an input or is not picked yet (a hole), and an item that is no expression shift every pair after them. The rule judges only the pairs before the first such key on either side, and none after it. |
 | `key-is-elementwise` | A join's own key holds no aggregate beside a column, no method that takes some of the values, as `head` and `filter` do, unless it goes on to an aggregate, which makes the key one value; such a method is not elementwise even of a literal, so a key that holds one of a literal is refused, and no column compared with a null literal, `is_between` being two comparisons of its value with each bound, so a bound that is a null literal with no dtype is one and a null it follows, or a bound of a dtype, is not. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A key holds no replacement whose old or new values read a column, which Polars calls elementwise only where they are literals, except where a fold drops it as it drops an aggregate: `a.replace_strict(old=b, new=1).sum() < null` in a condition's predicate is taken, for Polars never evaluates the replacement, and the same replacement given a number to compare with is refused. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, a column compared with a null inside the one value that a comparison of a null is given (`null != (f != null).min()` is a null whatever it is given, and `null != f` leaves a null where a column was), a column compared with a null that a later comparison with a null drops with the one value it follows (`(null > h).last() >= null` drops `null > h`, which `(null > h) >= null` does not), and in the key of a window in a select, a filter or a sort an aggregate beside a column. `and_` and `or_` given no operand are the expression they follow, so a null followed by one is still the null a comparison is given, and a comparison that follows it is the first Polars meets. A comparison of missing values, `eq_missing` or `ne_missing`, with a whole number that some dtype cannot hold, below zero or above 127, is one Polars decides at once where the dtype of what it compares cannot hold the number, as an unsigned count cannot hold one below zero, so what it follows is a literal and an aggregate in it is not met: `len() ne_missing -1` less a column is taken, and a number from zero to 127, or any other comparison, is not decided, so the key is refused; which dtype it is the document does not decide, so a limit covers it. A column of the dtype Null holds a null in every row, so comparing it with a null or a column leaves no value of it to replace, though it is a column to an aggregate beside it. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it, and so does an interval with a null bound of a dtype or a whole number below zero as a bound. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
@@ -1596,6 +1626,7 @@ and referenced from the lines of the context table they govern:
 | `replacement-values-match-in-number` | A replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one. One value given an operand of many values, or put over a window that does not explode, is as many values, for the window gives each row of its group what it gives the group, while a window that explodes gives one row for each group; what a replacement lists is a table it looks values up in, so it gives as many values as what it follows. A condition whose predicates and values are each one value gives one value, whether or not Polars drops its predicates, so what follows it is counted; where only its values are one, the number depends on what Polars drops, and is not counted. Polars refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of one, when the rows run. The walk finds how many values an expression gives from its shape, and does not judge one that is not walked to its end or whose count Polars's plan decides, as a condition with one expression for all its values. |
 | `parameter-takes-one-value` | A parameter that Polars reads as one value is given one. `shift`'s count of rows and fill and `diff`'s count refuse the rows, a count of values and the one value that a method took of one value, which Polars cannot tell is one before the rows run, with "must be a scalar value", in a select and in a window; a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count, and take that value. A number typed in and an aggregate are one value for all of them. |
 | `values-meet-in-count` | The values a call meets are one value, which is met by each of the others, or as many as one another: the operands of a method, the predicates and values of a condition, and the items of a select. The rows are no count of values that the data or the arguments decide, and two such counts that are fixed and differ are not the same; a step that adds columns meets its items with the rows. Polars refuses them with "zip node received non-equal length inputs" when the rows run, except where the count is by chance the rows. |
+| `element-dtype-is-implemented` | A method of the `list` or the `arr` namespace is run on an element dtype that Polars implements it for. Polars panics where the rows run, on a thread of its own that its streaming executor may not recover from, on `arr.min` and `arr.max` of an array of anything but whole numbers and floats, on `reverse` of one, and on `list.mean` of a list of `Float16`. The tables never run such a combination, a call is refused with what the element lacks before the tables are read, and a document that holds one is refused before Polars is asked, by the dtype that the value before the call has, and by the walk wherever the builder cannot see it, as in a pivot's aggregate. A test runs each combination Polars panics on in a process of its own, and holds the rule to those and no other. The `set_*` methods panic on a list of `Null`, and the rule will name them where they are catalogued. |
 | `window-input-is-not-counted` | A window takes a value as long as its group, which a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, as `head(2)` of a sum is. Polars refuses it with "expressions must have matching group lengths", unless the window joins the values of a group into a list or explodes them. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
@@ -1668,14 +1699,62 @@ the receiver that fits it best, so a table cannot say that a predicate must be
 varied one parameter at a time, so a method with two expression parameters has
 each judged apart, and what the arguments given decide is what the method gives:
 a `fill_value` of text makes a `shift` give text, and where two arguments give
-different results the result is not known. A `Struct` is two fields, an `Array`
-of two, and a `Decimal` of ten digits: the tables say nothing of other sizes.
+different results the result is not known. A `Struct` is two fields and a `Decimal` of ten digits: the tables say nothing of other sizes
+of them, and an array is of two, though the walk writes the width of the one it follows.
 
 Where a method is given an argument, the line of the call that has it says what Polars does of the call, and
 that is the refusal told when the argument is refused, before the line of the method with none of its
 arguments, which is told when none is given. The two can refuse for different reasons: `dt.replace`
 converts a part it is given before it meets the value it follows, so text given text as the month is
 refused for the failed conversion, and the call with no part is refused for the text being no moment.
+
+### Lists And Arrays
+
+A list and an array are classes of their own for each scalar element dtype, so a step can follow
+a column of lists of dates as it follows a column of dates, and every call carries the element
+dtype through: what `first` gives of a list of `Date` is a `Date`. The tables do not hold a line
+for each of the 67 classes of every method, which would be 67 receivers by 67 arguments for a
+method that takes an operand. They hold lines for the 26 classes of
+`Representative::MEASURED`, which are the scalar dtypes, `Struct`, the list of `Int64`, the list of
+`String` and the array of `Int64`, and read the others by the class that stands for them:
+
+| A call follows or is given | The tables read | Because |
+| --- | --- | --- |
+| a list of text | the list of `String` | Polars judges every method that is not named below alike for two element dtypes. |
+| any other list | the list of `Int64` | The same. |
+| any array | the array of `Int64` | The same. |
+| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders, replaces and converts by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `is_in`, `diff`, `replace`, `replace_strict`, `search_sorted`, `cast` and `reverse`, which `SENSITIVE` names. |
+| any other list or array, of those | none | The call is refused by the rule `element-dtype-is-measured` and a document that holds it is not run: Polars is not asked of what the tables do not measure, and panics on some of it. |
+
+A method that is not named is held to the claim by a test that runs every combination of every
+class that is read as another, in Polars, on one thread, in the dtype table and in the option table: it finds the methods Polars judges
+differently for the element dtype than for the class that stands for it, and fails unless they
+are the ones `SENSITIVE` names, which are measured on the lists and the arrays of a whole number,
+a float, text, a `Boolean`, a `Date` and a `Datetime` as well. A result that is the class that was
+read is written for the class that was asked: the first of a list of `Float64` is a list of
+`Float64` where the table says it is a list of `Int64`.
+
+A method of the `list` or the `arr` namespace is measured on every class, for what it gives is
+the element's: the sum of a list of `Int8` is an `Int64`, of a list of `Boolean` a `UInt32`, the
+mean of a list of `Date` a `Datetime`, and a list of text has no sum. The catalogue holds the 37 of them
+that take no expression argument, as Python Polars 2.1.0 builds them, with the groups `List` and
+`Array` for what they accept: `len`, `sum`, `mean`, `median`, `std`, `var`, `min`, `max`, `first`,
+`last`, `n_unique`, `arg_max`, `arg_min`, `any`, `all`, `sort` and `unique` of each, `list.reverse`, and
+`list.drop_nulls` and `arr.to_list`. `arr.reverse` is left out: Polars panics where an aggregate, a cut or a
+window follows it. `first` and `last` are the value at the first and the last place,
+which is a null where a list has none, and `n_unique`, `any`, `all`, `reverse` and `unique` are built
+as Python builds them, as an evaluation over the elements of one list. A call that the walk refuses for what the tables recorded of
+a method of lists or arrays or of a method that follows one, that its schema and its rows differ in dtype or that
+Polars panicked, is not run either, for an aggregate or a cut that follows it trusts the schema and panics. A
+method gives a value for each
+list, so a column of lists stays as many values as it had rows, and none of them is an aggregate for the
+rules that hold a join's key. An array that a call gives is written at the width the array it follows
+has: `sort` of an array of three is an array of three, which the tables, measured at two, write only as
+the class.
+
+A window that joins the values of a group into a list gives a list of what it follows for every scalar
+element dtype, and a method that follows a list of one dtype gives lists of that dtype, so what comes of
+a column of lists is carried through each call, in each place that holds an expression.
 
 ### What The Tables Are Checked Against
 
@@ -1989,6 +2068,8 @@ gives where the tables and Polars both refuse, and a case in which Polars panics
 not at others moves a case between them. The test
 asserts none of those.
 
+The methods of the `list` and the `arr` namespace are drawn only where `DAGEIST_FUZZ_FOCUS` names one of them,
+and the column under test is then a list or an array of any element dtype.
 The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
 drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
 two kinds that a focused campaign found are now settled: a count that is the table's rows, or one value, by chance
