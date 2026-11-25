@@ -648,6 +648,24 @@ mod tests {
     }
 
     #[test]
+    fn the_two_wordings_of_a_refusal_of_a_replacement_of_more_than_the_first_match_are_no_drift() {
+        // Polars 2.2.0 words the refusal of `str.replace` with `n` above 1 as a regex replacement
+        // or as a multivalue one, by how it splits the work, which is not the same from run to run
+        // on two threads: it is the same refusal.
+        let said = |reason: &str| Observed {
+            refusal: refusal(Stage::Rows, reason),
+            ..Observed::default()
+        };
+        let regex = said("regex replacement with 'n > 1' not yet supported");
+        let multivalue = said("multivalue replacement with 'n > 1' not yet supported");
+        assert_eq!(drift_between(&regex, &multivalue), None);
+        assert_eq!(drift_between(&multivalue, &regex), None);
+        // Another refusal is a difference.
+        let other_words = said("replacement with 'n > 1' is not wanted");
+        assert!(drift_between(&regex, &other_words).is_some());
+    }
+
+    #[test]
     fn the_asker_and_the_engine_say_the_same_of_every_kept_case_the_walk_allows() {
         let directory =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/allowed_fuzz/regressions");
