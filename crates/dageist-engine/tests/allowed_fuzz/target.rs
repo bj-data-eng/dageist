@@ -832,7 +832,22 @@ impl CaseTarget for AllowedTarget {
 mod tests {
 
     use super::super::observe::refused_in_memory;
-    use super::is_a_refusal_of_the_lengths_of_a_replacement;
+    use super::{is_a_refusal_of_the_lengths_of_a_replacement, one_line};
+
+    #[test]
+    fn a_detail_cut_short_is_a_line_that_is_trimmed() {
+        // The contract admits a detail that is trimmed, with no control character and no more than
+        // 4096 bytes. A detail cut at the 3000th character that is a space ends with it, which
+        // ended a campaign on a probe whose reason ran past it.
+        let cut_at_a_space = format!("{} {}", "a".repeat(2999), "b".repeat(10));
+        let line = one_line(&cut_at_a_space);
+        assert_eq!(line, "a".repeat(2999));
+        // Characters of more than a byte do not make it longer than the contract admits.
+        let line = one_line(&"é".repeat(4000));
+        assert!(line.len() <= 4096, "{}", line.len());
+        assert_eq!(line.trim(), line);
+        assert_eq!(one_line("  one\ttwo \n three  "), "one two three");
+    }
 
     #[test]
     fn a_case_that_both_engines_run_is_not_refused_by_the_control() {
