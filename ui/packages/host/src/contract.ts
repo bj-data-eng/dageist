@@ -1368,6 +1368,13 @@ export interface Host {
   readonly placeNode: (revision: number, node: string, frame: FrameView) => Promise<PlacedView>;
   /** Opens the system's file dialog and reports the file chosen, or `null`. */
   readonly chooseFile: (purpose: FilePurpose) => Promise<FileView | null>;
+  /** Opens the system's folder dialog and reports the folder chosen, or `null`. */
+  readonly chooseFolder: () => Promise<string | null>;
+  /**
+   * Opens the workspace in `folder` in place of the one the host holds, and reports its graph.
+   * Every view of the workspace let go is stale after it.
+   */
+  readonly openWorkspace: (folder: string) => Promise<GraphView>;
   /**
    * Reports what the transform `node` is connected to: the table its steps start from and every
    * other input.

@@ -212,3 +212,12 @@ export function decodePlaced(value: unknown): PlacedView {
 export function decodeChosenFile(value: unknown): FileView | null {
   return readNullable(readFile)(value, ROOT);
 }
+
+/**
+ * Reads what the host's `choose_folder` command sent: the folder chosen, or `null`.
+ *
+ * @throws {DecodeError} When it is neither, saying where and why.
+ */
+export function decodeChosenFolder(value: unknown): string | null {
+  return readNullable(readString)(value, ROOT);
+}

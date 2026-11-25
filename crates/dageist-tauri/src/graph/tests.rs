@@ -390,3 +390,125 @@ fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_
     let _ = std::fs::remove_dir_all(&folder);
     assert_eq!(saved, held);
 }
+
+/// Makes a workspace on disk in `folder` holding one source, `Elsewhere`.
+pub(crate) fn other_workspace(folder: &std::path::Path) -> dageist_graph::NodeId {
+    let mut session = dageist::Session::new(0);
+    let id = dageist_graph::NodeId::mint();
+    session
+        .edit_graph(
+            0,
+            &dageist_graph::Edit::Add {
+                id: id.clone(),
+                kind: dageist_graph::Kind::Source,
+                follows: None,
+                name: Some(dageist_graph::Name::new("Elsewhere").expect("a name")),
+            },
+        )
+        .expect("at its revision")
+        .expect("added");
+    dageist::workspace::Workspace::create(
+        folder,
+        &session.saved(),
+        dageist::unsigned_author(),
+        dageist::workspace::Options::default(),
+    )
+    .expect("made")
+    .close()
+    .expect("closed");
+    id
+}
+
+#[test]
+fn opening_a_workspace_holds_its_graph_saves_edits_to_it_and_packs_the_one_let_go() {
+    let folder = folder();
+    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let first = folder.join("workspace");
+    let other = folder.join("other");
+    let elsewhere = other_workspace(&other);
+    let before = graph_view(&workspace);
+
+    let opened =
+        super::open_workspace_view(&workspace, other.to_str().expect("a path")).expect("opened");
+    let nodes: Vec<(String, String)> = serde_json::to_value(&opened).expect("a view")["nodes"]
+        .as_array()
+        .expect("nodes")
+        .iter()
+        .map(|node| {
+            (
+                node["id"].as_str().expect("an id").to_owned(),
+                node["name"].as_str().expect("a name").to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(nodes, [(elsewhere.to_string(), "Elsewhere".to_owned())]);
+    // A view of the workspace let go is stale against the one opened.
+    assert_ne!(opened.revision, before.revision);
+    let stale: super::GraphEditRequest =
+        serde_json::from_value(json!({ "edit": "remove", "node": NODE })).expect("a request");
+    let refused = super::edit_graph_view(&workspace, before.revision, &stale).expect_err("stale");
+    assert_eq!(
+        serde_json::to_value(&refused).expect("a view")["kind"],
+        "stale"
+    );
+
+    let rename: super::GraphEditRequest = serde_json::from_value(
+        json!({ "edit": "rename", "node": elsewhere.to_string(), "name": "Here" }),
+    )
+    .expect("a request");
+    super::edit_graph_view(&workspace, opened.revision, &rename).expect("renamed");
+    assert_eq!(
+        git(&other, &["log", "--format=%s"]),
+        "Rename Elsewhere to Here\nMake the workspace\n"
+    );
+    // The workspace let go took no edit, and was packed whole as it was closed.
+    assert_eq!(git(&first, &["log", "--format=%s"]), "Make the workspace\n");
+    let counted = git(&first, &["count-objects", "-v"]);
+    assert!(counted.contains("count: 0\n"), "{counted}");
+    assert!(counted.contains("packs: 1\n"), "{counted}");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn no_workspace_is_opened_once_the_one_held_is_closed() {
+    let folder = folder();
+    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let other = folder.join("other");
+    other_workspace(&other);
+    workspace.close().expect("closed");
+    let refused = super::open_workspace_view(&workspace, other.to_str().expect("a path"))
+        .expect_err("closing");
+    assert!(
+        serde_json::to_value(&refused).expect("a view")["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("closing")),
+        "{refused:?}"
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_folder_that_holds_no_workspace_is_not_opened_and_leaves_the_one_held() {
+    let folder = folder();
+    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let empty = folder.join("empty");
+    std::fs::create_dir_all(&empty).expect("a folder");
+    let before = serde_json::to_value(graph_view(&workspace)).expect("a view");
+    super::open_workspace_view(&workspace, empty.to_str().expect("a path"))
+        .expect_err("no workspace");
+    assert_eq!(
+        serde_json::to_value(graph_view(&workspace)).expect("a view"),
+        before
+    );
+    // The workspace held still takes edits.
+    let rename: super::GraphEditRequest =
+        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Still here" }))
+            .expect("a request");
+    let revision = graph_view(&workspace).revision;
+    super::edit_graph_view(&workspace, revision, &rename).expect("renamed");
+    assert_eq!(
+        git(&folder.join("workspace"), &["log", "-1", "--format=%s"]).trim(),
+        "Rename Claim timing to Still here"
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

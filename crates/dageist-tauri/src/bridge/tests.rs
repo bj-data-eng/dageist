@@ -1132,3 +1132,30 @@ fn a_client_that_trickles_its_request_is_answered_408_when_the_deadline_passes()
         .expect("the connection is served");
     trickler.join().expect("the trickle ends");
 }
+
+#[test]
+fn a_workspace_is_opened_and_a_folder_chosen_through_the_bridge() {
+    let folder = SampleFolder::new("open");
+    let bridge = bridge(&folder, PORT);
+    let other = folder.path.join("other");
+    let node = crate::graph::tests::other_workspace(&other);
+
+    let reply = call(&bridge, "open_workspace", &json!({ "folder": other }));
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json()["nodes"][0]["id"], json!(node.to_string()));
+    let reply = call(&bridge, "graph", &json!({}));
+    assert_eq!(reply.json()["nodes"][0]["name"], "Elsewhere");
+
+    let reply = call(
+        &bridge,
+        "open_workspace",
+        &json!({ "folder": folder.path.join("nothing here") }),
+    );
+    assert_eq!(reply.status, 422);
+    assert_eq!(reply.json()["kind"], "failed");
+
+    // No main thread runs the bridge's dialogs in a test, so none is chosen.
+    let reply = call(&bridge, "choose_folder", &json!({}));
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), Value::Null);
+}

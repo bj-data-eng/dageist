@@ -42,7 +42,8 @@ use crate::catalogue::english_catalogue;
 use crate::dialog::{Dialogs, Purpose, serve_dialogs};
 use crate::document::{EditRequest, document_state_view, edit_view};
 use crate::graph::{
-    FrameView, GraphEditRequest, Workspace, edit_graph_view, graph_view, place_view,
+    FrameView, GraphEditRequest, Workspace, edit_graph_view, graph_view, open_workspace_view,
+    place_view,
 };
 use crate::identity::identity_view;
 use crate::node::{node_view, rows_view};
@@ -151,6 +152,12 @@ struct ChooseArguments {
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+struct FolderArguments {
+    folder: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct OffersArguments {
     positions: Vec<PositionRequest>,
     after: AfterRequest,
@@ -243,7 +250,9 @@ enum Command {
     Graph,
     EditGraph,
     PlaceNode,
+    OpenWorkspace,
     ChooseFile,
+    ChooseFolder,
     NodeInputs,
     NodeDocument,
     EditDocument,
@@ -267,7 +276,9 @@ impl Command {
             "graph" => Self::Graph,
             "edit_graph" => Self::EditGraph,
             "place_node" => Self::PlaceNode,
+            "open_workspace" => Self::OpenWorkspace,
             "choose_file" => Self::ChooseFile,
+            "choose_folder" => Self::ChooseFolder,
             "node_inputs" => Self::NodeInputs,
             "node_document" => Self::NodeDocument,
             "edit_document" => Self::EditDocument,
@@ -312,9 +323,17 @@ impl Command {
                 } = arguments(body)?;
                 json(&place_view(&session.workspace, revision, &node, frame)?)
             }
+            Self::OpenWorkspace => {
+                let FolderArguments { folder } = arguments(body)?;
+                json(&open_workspace_view(&session.workspace, &folder)?)
+            }
             Self::ChooseFile => {
                 let ChooseArguments { purpose } = arguments(body)?;
                 json(&session.dialogs.choose(purpose))
+            }
+            Self::ChooseFolder => {
+                arguments::<NoArguments>(body)?;
+                json(&session.dialogs.choose_folder())
             }
             Self::NodeInputs => {
                 let NodeArguments { node } = arguments(body)?;

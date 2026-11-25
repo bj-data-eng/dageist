@@ -15,7 +15,13 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeDocumentState, decodeEditAnswer } from './decode-document';
-import { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
+import {
+  decodeChosenFile,
+  decodeChosenFolder,
+  decodeGraph,
+  decodeGraphEditAnswer,
+  decodePlaced,
+} from './decode-graph';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
@@ -60,6 +66,8 @@ export function tauriHost(): Host | null {
     placeNode: async (revision, node, frame) =>
       invokeDecoded('place_node', decodePlaced, { revision, node, frame }),
     chooseFile: async (purpose) => invokeDecoded('choose_file', decodeChosenFile, { purpose }),
+    chooseFolder: async () => invokeDecoded('choose_folder', decodeChosenFolder),
+    openWorkspace: async (folder) => invokeDecoded('open_workspace', decodeGraph, { folder }),
     nodeInputs: async (node) => invokeDecoded('node_inputs', decodeNode, { node }),
     nodeDocument: async (node) => invokeDecoded('node_document', decodeDocumentState, { node }),
     editDocument: async (node, revision, edit) =>

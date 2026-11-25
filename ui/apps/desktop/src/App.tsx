@@ -135,6 +135,12 @@ export function App(): React.JSX.Element {
   // The graph the canvas last drew, and the transform chosen on it, in the main window.
   const [graphView, setGraphView] = useState<GraphView | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  // How many workspaces were opened, which draws the canvas anew for each, and why the last one
+  // asked for was not.
+  const [opened, setOpened] = useState(0);
+  const [openProblem, setOpenProblem] = useState<string | null>(null);
+  // Whether a folder is being chosen or a workspace opened, during which the action waits.
+  const [opening, setOpening] = useState(false);
   // What the main window said is edited, in the steps window.
   const [heard, setHeard] = useState<Editing | null>(null);
   // The same transform at the same revision is the same value, so a box moved on the canvas,
@@ -205,6 +211,31 @@ export function App(): React.JSX.Element {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Asks for a folder and opens the workspace in it. The canvas is drawn anew from its graph, and
+  // the steps follow the graph's first transform, as they do when the application starts.
+  const openWorkspace = (): void => {
+    if (host === null || opening) return;
+    setOpening(true);
+    setOpenProblem(null);
+    const open = async (): Promise<void> => {
+      const folder = await host.chooseFolder();
+      if (folder === null) return;
+      await host.openWorkspace(folder);
+      // The graph of the workspace let go names nodes the one opened may not have, so nothing is
+      // edited until the canvas draws the opened graph.
+      setGraphView(null);
+      setChosen(null);
+      setOpened((count) => count + 1);
+    };
+    open()
+      .catch((error: unknown) => {
+        setOpenProblem(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        setOpening(false);
+      });
+  };
+
   const show = (next: Workspace): void => {
     setWorkspace(next);
     window.history.replaceState(null, '', `#${next}`);
@@ -267,7 +298,14 @@ export function App(): React.JSX.Element {
       onOpenChange={setSidebarOpen}
       className="h-full min-h-0 overflow-hidden bg-canvas"
     >
-      <AppSidebar workspaces={WORKSPACES} current={workspace} onShow={show} status={statusLine} />
+      <AppSidebar
+        workspaces={WORKSPACES}
+        current={workspace}
+        onShow={show}
+        status={statusLine}
+        onOpenWorkspace={host === null || opening ? null : openWorkspace}
+        openProblem={openProblem}
+      />
       {/*
        * The toggle has one place, fixed beside the window's controls and drawn
        * above the side panel, so it stays still while the panel slides in or
@@ -292,6 +330,7 @@ export function App(): React.JSX.Element {
         <div className="absolute inset-0" inert={workspace !== 'flow'}>
           {host !== null && (
             <FlowCanvas
+              key={opened}
               host={host}
               onEditSteps={(node) => {
                 setChosen(node);

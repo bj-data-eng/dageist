@@ -19,7 +19,13 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeDocumentState, decodeEditAnswer } from './decode-document';
-import { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
+import {
+  decodeChosenFile,
+  decodeChosenFolder,
+  decodeGraph,
+  decodeGraphEditAnswer,
+  decodePlaced,
+} from './decode-graph';
 import { decodeBlock } from './decode-block';
 import { decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
@@ -108,6 +114,8 @@ export function bridgeHost(): Host {
     placeNode: async (revision, node, frame) =>
       call('place_node', decodePlaced, { revision, node, frame }),
     chooseFile: async (purpose) => call('choose_file', decodeChosenFile, { purpose }),
+    chooseFolder: async () => call('choose_folder', decodeChosenFolder),
+    openWorkspace: async (folder) => call('open_workspace', decodeGraph, { folder }),
     nodeInputs: async (node) => call('node_inputs', decodeNode, { node }),
     nodeDocument: async (node) => call('node_document', decodeDocumentState, { node }),
     editDocument: async (node, revision, edit) =>

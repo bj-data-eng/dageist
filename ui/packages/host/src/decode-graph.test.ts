@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { DecodeError } from './decode';
-import { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
+import {
+  decodeChosenFile,
+  decodeChosenFolder,
+  decodeGraph,
+  decodeGraphEditAnswer,
+  decodePlaced,
+} from './decode-graph';
 import graphFixture from '../fixtures/graph.json';
 import { replaced, without } from '../test-support/tamper';
 
@@ -150,5 +156,11 @@ describe('the layout revision and the file chosen', () => {
       format: 'csv',
     });
     expect(() => decodeChosenFile({ path: '/data/a.xlsx', format: 'excel' })).toThrow(DecodeError);
+  });
+
+  it('reads a chosen folder, or nothing chosen', () => {
+    expect(decodeChosenFolder(null)).toBeNull();
+    expect(decodeChosenFolder('/work/claims')).toBe('/work/claims');
+    expect(() => decodeChosenFolder({ path: '/work/claims' })).toThrow(DecodeError);
   });
 });
