@@ -401,9 +401,15 @@ const FOCUS_PERCENT: usize = 25;
 /// How often, in a hundred, a campaign focused on steps draws one of them for the case.
 const FOCUS_STEP_PERCENT: usize = 60;
 
-/// The steps a case may be drawn for, which a focus names by their identifiers.
-fn plain_steps() -> Vec<&'static Entry> {
-    Plain::ALL.iter().map(|plain| entry(plain.id())).collect()
+/// The steps a case may be drawn for, which a focus names by their identifiers: the steps that
+/// hold no chain, which `LazyFrame.` names together, and the pivot, whose aggregate starts from the
+/// values of a group and which only its own identifier names.
+fn focus_steps() -> Vec<&'static Entry> {
+    Plain::ALL
+        .iter()
+        .map(|plain| entry(plain.id()))
+        .chain([entry(Host::Pivot.step())])
+        .collect()
 }
 
 /// The methods of an expression and the functions that start a chain a campaign focuses on. Where
@@ -414,7 +420,8 @@ fn plain_steps() -> Vec<&'static Entry> {
 pub struct Focus {
     /// In the catalogue's order, each once.
     methods: Vec<&'static Entry>,
-    /// The steps that are drawn for themselves, in the catalogue's order, each once.
+    /// The steps that are drawn for themselves and the pivot, in the order of [`focus_steps`], each
+    /// once.
     steps: Vec<&'static Entry>,
     /// The functions that start a chain, in the catalogue's order, each once.
     starts: Vec<&'static Entry>,
@@ -426,7 +433,8 @@ impl Focus {
     /// `Expr.dt.replace` or `polars.date_range`; a name that ends in a dot, `dt.`, names every
     /// method whose name it begins. A step that is drawn for itself is named by its identifier,
     /// `LazyFrame.head`, or by `LazyFrame.` for all of them, as a method of a table has the name of
-    /// a method of an expression. Text that names nothing is no focus.
+    /// a method of an expression; the pivot, whose aggregate starts from the values of a group, is
+    /// named by `LazyFrame.pivot` alone. Text that names nothing is no focus.
     ///
     /// # Errors
     ///
@@ -435,7 +443,7 @@ impl Focus {
     pub fn parse(text: &str) -> Result<Option<Self>, String> {
         let methods = methods();
         let starts = function_starts();
-        let steps = plain_steps();
+        let steps = focus_steps();
         let mut chosen: Vec<&'static Entry> = Vec::new();
         for name in text
             .split(',')
@@ -464,7 +472,7 @@ impl Focus {
             named.extend(steps.iter().copied().filter(|entry| {
                 let id = entry.id().as_str();
                 if name == "LazyFrame." {
-                    true
+                    id != Host::Pivot.step()
                 } else {
                     id == name
                 }
@@ -562,10 +570,14 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
     let host = match focus.filter(|focus| !focus.steps.is_empty()) {
         Some(focus) if draw.chance(FOCUS_STEP_PERCENT) => {
             let step = draw.pick(&focus.steps);
-            Plain::ALL
-                .into_iter()
-                .find(|plain| plain.id() == step.id().as_str())
-                .map_or(host, Host::Plain)
+            if step.id().as_str() == Host::Pivot.step() {
+                Host::Pivot
+            } else {
+                Plain::ALL
+                    .into_iter()
+                    .find(|plain| plain.id() == step.id().as_str())
+                    .map_or(host, Host::Plain)
+            }
         }
         _ => host,
     };
@@ -2906,6 +2918,38 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_focus_on_a_pivot_draws_a_pivot_for_most_cases_and_the_group_as_its_start() {
+        let focus = Focus::parse("LazyFrame.pivot").unwrap().unwrap();
+        assert_eq!(focus.names(), "LazyFrame.pivot");
+        // The owner and a dot name the steps that hold no chain, as they did.
+        let all = Focus::parse("LazyFrame.").unwrap().unwrap();
+        assert_eq!(all.names().split(", ").collect::<Vec<_>>(), STEPS);
+        let (mut cases, mut pivots, mut from_the_group) = (0, 0, 0);
+        for offset in 0..2000_u64 {
+            let Some(case) = generate(&entropy(offset), Some(&focus)) else {
+                continue;
+            };
+            let written = case.document.write();
+            cases += 1;
+            if written.contains("\"entry\":\"LazyFrame.pivot\"") {
+                pivots += 1;
+                from_the_group += usize::from(written.contains("\"entry\":\"polars.element\""));
+                // A case that holds the step is judged to hold the focus.
+                assert!(focus.is_held_by(&case.document), "offset {offset}");
+            }
+        }
+        assert!(cases > 1500, "{cases} cases");
+        assert!(
+            pivots * 100 > cases * 55,
+            "{pivots} pivots of {cases} cases"
+        );
+        assert!(
+            from_the_group * 100 > pivots * 60,
+            "{from_the_group} aggregates start from the group of {pivots} pivots"
+        );
     }
 
     #[test]

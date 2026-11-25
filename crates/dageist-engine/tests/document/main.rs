@@ -23,6 +23,7 @@ mod not_run;
 mod nulls;
 mod order;
 mod patterns;
+mod pivot_groups;
 mod preview;
 mod ranges;
 mod reading;
