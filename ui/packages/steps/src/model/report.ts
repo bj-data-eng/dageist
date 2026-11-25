@@ -147,6 +147,20 @@ function chainsOf(report: StepReportView): ReadonlyMap<string, ChainDtypes> {
   return found;
 }
 
+/**
+ * Returns what the hint of the method at `index` of a chain says of what it is handed: the dtype in
+ * and the dtype out where the engine built them, and otherwise, for a step the walk refused, which
+ * is not planned, the class of the value the walk says the method follows. `null` where the engine
+ * gives neither.
+ */
+export function linkHint(dtypes: ChainDtypes | undefined, index: number): string | null {
+  if (dtypes === undefined) return null;
+  const input = index === 0 ? dtypes.source : (dtypes.links[index - 1] ?? null);
+  if (input !== null) return `${input} → ${dtypes.links[index] ?? 'does not fit'}`;
+  const after = dtypes.places[index]?.after;
+  return after?.kind === 'value' ? `after a value of the class ${after.dtype}` : null;
+}
+
 /** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
 function firstParagraph(reason: string): string {
   return (reason.split('\n\n')[0] ?? reason).trim();

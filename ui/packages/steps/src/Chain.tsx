@@ -79,6 +79,7 @@ import type { PreparedOffer } from './model/offers';
 import { chosenOptions } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import type { ChainDtypes } from './model/report';
+import { linkHint } from './model/report';
 import { fieldArgument, inputArgument, listArgument, literalExpression } from './model/requests';
 import { OFFERED_INPUTS, actionsOf, chainBodyOf } from './model/words';
 
@@ -278,12 +279,6 @@ function ArgumentSlot({
   );
 }
 
-/** Returns the dtype a method of a chain is handed: what stands before the method at `index`, or the start for the first. */
-function dtypeBefore(dtypes: ChainDtypes | undefined, index: number): string | null {
-  if (dtypes === undefined) return null;
-  return index === 0 ? dtypes.source : (dtypes.links[index - 1] ?? null);
-}
-
 interface MethodLinkProps {
   /** The way to the call of the method in the step. */
   readonly path: Path;
@@ -317,8 +312,7 @@ function MethodLink({
   const rule = argumentRule(entry);
   // What the catalogue calls the method; a method it lacks keeps its Polars name.
   const shown = entry?.name ?? methodNameOf(call.entry) ?? call.entry;
-  const input = dtypeBefore(dtypes, index);
-  const output = dtypes?.links[index] ?? null;
+  const dtypeHint = linkHint(dtypes, index);
   // Where the method stands, as the engine reported it: what may follow what comes before it.
   const place = dtypes?.places[index] ?? null;
   const wrong = wrongAt(path);
@@ -366,7 +360,7 @@ function MethodLink({
         <Hint
           lines={[
             `${shown} · ${entry?.hint ?? 'not in the catalogue'}`,
-            ...(input === null ? [] : [`${input} → ${output ?? 'does not fit'}`]),
+            ...(dtypeHint === null ? [] : [dtypeHint]),
           ]}
           code={false}
         >
