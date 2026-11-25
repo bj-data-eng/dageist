@@ -23,6 +23,7 @@ import { freshKey } from './Parameters';
 import { STEP_GROUP, StepRow, frameRequest, stepOffers } from './StepRow';
 import { PreparedStepProvider } from './engine';
 import type { Frame } from './model/frame';
+import { HEAD } from './model/catalogue';
 import { parameterSegment, itemSegment } from './model/doc';
 import { tablesOf } from './model/inputs';
 import type { PreparedStep } from './model/report';
@@ -82,7 +83,7 @@ export function StepList({
       // What is gone to first: the field of a new filter's comparison, or the step itself.
       setFreshId(
         entry === 'LazyFrame.filter'
-          ? freshKey(added.id, [parameterSegment('predicates'), itemSegment(0)])
+          ? freshKey(added.id, [parameterSegment(HEAD.filter.predicates), itemSegment(0)])
           : added.id,
       );
     });

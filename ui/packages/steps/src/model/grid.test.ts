@@ -17,10 +17,11 @@ import {
   findGaps,
   grid,
 } from '../../test-support/grid-gaps';
+import { isDrawn } from '../../test-support/places';
 import { sorted } from '../../test-support/sorted';
 import { stepOptionParameters } from './catalogue';
 import type { Catalogue } from './catalogue';
-import { isDrawn, settingOf } from './controls';
+import { settingOf } from './controls';
 import type { Gap } from './limits';
 import { GAPS } from './limits';
 

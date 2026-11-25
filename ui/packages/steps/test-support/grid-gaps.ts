@@ -21,14 +21,14 @@ import { allowedAt, decodeGrid } from '../../host/test-support/grid';
 import type { Grid } from '../../host/test-support/grid';
 import { indexCatalogue } from '../src/model/catalogue';
 import type { Catalogue } from '../src/model/catalogue';
-import { isDrawn, settingOf } from '../src/model/controls';
+import { settingOf } from '../src/model/controls';
 import type { ExpressionView } from '../src/model/doc';
 import type { Cover, Gap, StartKind } from '../src/model/limits';
 import { coverKey } from '../src/model/limits';
 import { methodFamilies, startOffers } from '../src/model/offers';
-import { isContextDrawn } from '../src/model/place';
-import { actionsOfValue, canPick, routeOf, valueDrawing } from '../src/model/words';
+import { valueDrawing } from '../src/model/words';
 import { bare, calls, chain, col, input, lit } from './expressions';
+import { actionsOfSlot, canPick, isDrawn, routeOf, wordsAt } from './places';
 import { sorted } from './sorted';
 
 export const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
@@ -182,7 +182,7 @@ export function findGaps(
 
   // A place no word of the editor stands at.
   for (const context of contexts) {
-    if (!isContextDrawn(using, context)) {
+    if (wordsAt(using, context, 'start').length === 0) {
       note({ kind: 'place', outer: context.outer, nested: context.nested });
     }
   }
@@ -209,7 +209,7 @@ export function findGaps(
       // Every start that leads here must have a way to add what the engine allows after it.
       const leading = after.kind === 'start' ? [] : starts.filter((start) => start.leads(after));
       for (const start of leading) {
-        if (!actionsOfValue(valueDrawing(start.expression, true), false).add) {
+        if (!actionsOfSlot(valueDrawing(start.expression, true), false).add) {
           note({ kind: 'start', start: start.kind });
         }
       }
@@ -224,7 +224,7 @@ export function findGaps(
           continue;
         }
         const route = routeOf(entry);
-        let reached = canPick(entry, after.kind);
+        let reached = canPick(using, entry, place);
         if (reached && route.route === 'group' && route.group === 'methods') {
           reached = methods.has(id);
         }

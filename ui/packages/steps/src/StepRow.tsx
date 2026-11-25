@@ -32,7 +32,14 @@ import { useOptions, useStepStarts } from './ask';
 import { useListState } from './positions';
 import { stepColour, stepHead, stepNote } from './verbs';
 import type { Catalogue } from './model/catalogue';
-import { VERBS, positionOfParameter, stepOptionParameters, verbId } from './model/catalogue';
+import {
+  HEAD,
+  VERBS,
+  positionOfParameter,
+  stepOptionParameters,
+  verbId,
+  verbOf,
+} from './model/catalogue';
 import {
   NO_PATH,
   expressionOf,
@@ -179,8 +186,11 @@ function NamedColumn({
   const edits = useStepEdits();
   const name = alias?.kind === 'columns' ? (alias.names[0] ?? '') : '';
   // What the new column holds is an item of what the step selects.
-  const holds = positionOfParameter(catalogue.entries.get(call.entry) ?? null, 'named_exprs');
-  const valuePath = [parameterSegment('named_exprs'), valueSegment(at)];
+  const holds = positionOfParameter(
+    catalogue.entries.get(call.entry) ?? null,
+    HEAD.with_columns.named,
+  );
+  const valuePath = [parameterSegment(HEAD.with_columns.named), valueSegment(at)];
   return (
     <>
       <TypedBlock
@@ -191,7 +201,7 @@ function NamedColumn({
         focusNow={fresh}
         accepts={(typed) => typed.trim() !== ''}
         onCommit={(typed) => {
-          void edits.setArgument([parameterSegment('named_exprs'), keySegment(at)], {
+          void edits.setArgument([parameterSegment(HEAD.with_columns.named), keySegment(at)], {
             kind: 'columns',
             names: [typed.trim()],
           });
@@ -216,14 +226,14 @@ function NamedColumn({
 function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
   const step = useStepAt().id;
-  const named = givenOf(call, 'named_exprs');
+  const named = givenOf(call, HEAD.with_columns.named);
   const entries = named?.kind === 'pairs' ? named.entries : [];
   const [first, ...more] = entries;
   return (
     <>
       {first === undefined ? (
         // No new column is in the document: the list of them is drawn with what adds one.
-        <StepParameter call={call} name="named_exprs" frame={frame} />
+        <StepParameter call={call} name={HEAD.with_columns.named} frame={frame} />
       ) : (
         <NamedColumn
           call={call}
@@ -246,8 +256,8 @@ function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
           />
         </span>
       ))}
-      {givenOf(call, 'exprs') !== undefined && (
-        <StepParameter call={call} name="exprs" frame={frame} />
+      {givenOf(call, HEAD.with_columns.exprs) !== undefined && (
+        <StepParameter call={call} name={HEAD.with_columns.exprs} frame={frame} />
       )}
     </>
   );
@@ -257,7 +267,7 @@ function SortHead({ call, frame }: HeadProps): React.JSX.Element {
   return (
     <>
       <Word>by</Word>
-      <StepParameter call={call} name="by" frame={frame} />
+      <StepParameter call={call} name={HEAD.sort.by} frame={frame} />
     </>
   );
 }
@@ -266,12 +276,12 @@ function FilterHead({ call, frame }: HeadProps): React.JSX.Element {
   const catalogue = useCatalogue();
   return (
     <ConditionBlocks
-      path={[parameterSegment('predicates')]}
-      argument={givenOf(call, 'predicates')}
+      path={[parameterSegment(HEAD.filter.predicates)]}
+      argument={givenOf(call, HEAD.filter.predicates)}
       frame={frame}
       positions={within(
         NO_POSITIONS,
-        positionOfParameter(catalogue.entries.get(call.entry) ?? null, 'predicates'),
+        positionOfParameter(catalogue.entries.get(call.entry) ?? null, HEAD.filter.predicates),
       )}
       tone="verb"
     />
@@ -281,7 +291,7 @@ function FilterHead({ call, frame }: HeadProps): React.JSX.Element {
 function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
   const node = useNode();
   const edits = useStepEdits();
-  const other = givenOf(call, 'other');
+  const other = givenOf(call, HEAD.join.other);
   const name = other?.kind === 'table' ? other.name : null;
   const table = name === null ? null : findTable(node, name);
   return (
@@ -295,7 +305,7 @@ function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
           // The keys belonged to the old table, so start from the new table's first field: two
           // edits, the second made only if the first was.
           void edits.together((make) => {
-            const picking = make.setArgument([parameterSegment('other')], {
+            const picking = make.setArgument([parameterSegment(HEAD.join.other)], {
               kind: 'table',
               name: picked,
             });
@@ -304,7 +314,7 @@ function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
               : [
                   picking,
                   make.setArgument(
-                    [parameterSegment('right_on')],
+                    [parameterSegment(HEAD.join.rightOn)],
                     listArgument([fieldArgument(first)]),
                   ),
                 ];
@@ -312,11 +322,11 @@ function JoinHead({ call, frame }: HeadProps): React.JSX.Element {
         }}
       />
       <Word>on</Word>
-      <StepParameter call={call} name="left_on" frame={frame} />
+      <StepParameter call={call} name={HEAD.join.leftOn} frame={frame} />
       <span data-tone="compare" data-look="compare" className="dg-block dg-fixed">
         ==
       </span>
-      <StepParameter call={call} name="right_on" frame={table?.columns ?? []} />
+      <StepParameter call={call} name={HEAD.join.rightOn} frame={table?.columns ?? []} />
     </>
   );
 }
@@ -325,36 +335,39 @@ function PivotHead({ call, frame }: HeadProps): React.JSX.Element {
   return (
     <>
       <Word>on</Word>
-      <StepParameter call={call} name="on" frame={frame} />
+      <StepParameter call={call} name={HEAD.pivot.on} frame={frame} />
       <Word>index</Word>
-      <StepParameter call={call} name="index" frame={frame} />
+      <StepParameter call={call} name={HEAD.pivot.index} frame={frame} />
       <Word>values</Word>
-      <StepParameter call={call} name="values" frame={frame} />
+      <StepParameter call={call} name={HEAD.pivot.values} frame={frame} />
       <Word>aggregate_function</Word>
-      <StepParameter call={call} name="aggregate_function" frame={frame} />
+      <StepParameter call={call} name={HEAD.pivot.aggregate} frame={frame} />
     </>
   );
 }
 
 /** Draws what a step takes, by the step it is. */
 function Head({ call, frame }: HeadProps): React.JSX.Element | null {
-  switch (call.entry) {
-    case 'LazyFrame.with_columns':
+  const verb = verbOf(call.entry);
+  switch (verb) {
+    case 'with_columns':
       return <AddColumnHead call={call} frame={frame} />;
-    case 'LazyFrame.filter':
+    case 'filter':
       return <FilterHead call={call} frame={frame} />;
-    case 'LazyFrame.sort':
+    case 'sort':
       return <SortHead call={call} frame={frame} />;
-    case 'LazyFrame.select':
-      return <StepParameter call={call} name="exprs" frame={frame} />;
-    case 'LazyFrame.rename':
-      return <StepParameter call={call} name="mapping" frame={frame} />;
-    case 'LazyFrame.join':
+    case 'select':
+      return <StepParameter call={call} name={HEAD.select.exprs} frame={frame} />;
+    case 'rename':
+      return <StepParameter call={call} name={HEAD.rename.mapping} frame={frame} />;
+    case 'join':
       return <JoinHead call={call} frame={frame} />;
-    case 'LazyFrame.pivot':
+    case 'pivot':
       return <PivotHead call={call} frame={frame} />;
-    default:
+    case null:
       return null;
+    default:
+      return verb satisfies never;
   }
 }
 

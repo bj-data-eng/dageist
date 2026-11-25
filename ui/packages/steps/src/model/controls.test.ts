@@ -6,7 +6,6 @@ import { decodeCatalogue } from '@dageist/host';
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import {
   controlOf,
-  isDrawn,
   methodOptionParameters,
   oneControlOf,
   settingOf,
@@ -119,30 +118,6 @@ describe('how a parameter is drawn', () => {
       each: 'none',
       why: 'every is not drawn here',
     });
-  });
-
-  it('is not drawn where a pair holds pairs, by the control of either side', () => {
-    const inner = { kind: 'pairs', key: { kind: 'column' }, value: { kind: 'flag' } } as const;
-    const nested: ParameterView = {
-      ...parameterOf('Expr.filter', 'constraints'),
-      kind: { kind: 'pairs', key: { kind: 'column' }, value: inner },
-    };
-
-    expect(isDrawn(controlOf(nested))).toBe(false);
-    expect(isDrawn(controlOf(parameterOf('Expr.filter', 'constraints')))).toBe(true);
-  });
-});
-
-describe('whether a parameter has a drawing', () => {
-  it('is so unless one of its arguments is of a kind with none', () => {
-    const none = { control: 'none', why: 'no' } as const;
-    expect(isDrawn({ shape: 'columns' })).toBe(true);
-    expect(isDrawn({ shape: 'one', one: { control: 'flag' } })).toBe(true);
-    expect(isDrawn({ shape: 'one', one: none })).toBe(false);
-    expect(isDrawn({ shape: 'many', each: none })).toBe(false);
-    expect(isDrawn({ shape: 'pairs', key: { control: 'column' }, value: none })).toBe(false);
-    expect(isDrawn({ shape: 'perItem', each: 'choose' })).toBe(true);
-    expect(isDrawn({ shape: 'perItem', each: 'none', why: 'no' })).toBe(false);
   });
 });
 

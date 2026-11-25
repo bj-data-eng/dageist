@@ -1,33 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EntryView } from '@dageist/host';
 import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import { HOLE_START, bare, calls, chain, col, input, lit } from '../../test-support/expressions';
 import { indexCatalogue } from './catalogue';
+import type { PieceKind } from './words';
 import {
+  GROUPS_OF_WORD,
   actionsOf,
-  canPick,
   chainBodyOf,
   lineDrawing,
   listsChainRow,
   listsOf,
-  routeOf,
+  noAddition,
   valueDrawing,
-  wordsAt,
 } from './words';
+
+/** `true` for a kind of piece the model says nothing can be added after, so that `noAddition` takes its actions. */
+type TakesNoAddition<Kind extends PieceKind> =
+  ReturnType<typeof actionsOf<Kind>> extends Parameters<typeof noAddition>[0] ? true : false;
 
 // What the editor does with each piece, written from what the editor draws: no earlier version of
 // these functions existed to fail first, because the components decided all of this inline.
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
-
-/** The entry of the catalogue called `id`. */
-function entryOf(id: string): EntryView {
-  const found = catalogue.entries.get(id);
-  if (found === undefined) throw new Error(`no entry ${id}`);
-  return found;
-}
 
 describe('the groups a word lists', () => {
   it('are the functions, inputs and fields for the word a chain starts from', () => {
@@ -75,74 +71,43 @@ describe('the groups a word lists', () => {
   });
 });
 
-describe('the words that stand at a place', () => {
-  it('are a value slot, the start of a chain and an argument where an expression starts', () => {
-    expect(wordsAt('start')).toEqual([
-      { word: 'value', fromPath: true },
+describe('the groups a kind of word may list', () => {
+  it('hold every group the list of a word of that kind lists', () => {
+    const words = [
       { word: 'chainStart' },
+      { word: 'method', options: true },
+      { word: 'method', options: false },
+      { word: 'insertion' },
+      { word: 'value', fromPath: true },
+      { word: 'value', fromPath: false },
       { word: 'argument' },
-    ]);
-  });
-
-  it('are the list that adds a method and the name of a method after a value', () => {
-    expect(wordsAt('value')).toEqual([{ word: 'insertion' }, { word: 'method', options: false }]);
-  });
-
-  it('are none inside a condition, which the editor draws as a `when` with its `then` and `otherwise`', () => {
-    expect(wordsAt('condition')).toEqual([]);
-  });
-});
-
-describe('how an entry is picked', () => {
-  it('is from the methods for a method of an expression', () => {
-    expect(routeOf(entryOf('Expr.abs'))).toEqual({ route: 'group', group: 'methods' });
-  });
-
-  it('is from the fields for `col` and from the typed values for `lit`', () => {
-    expect(routeOf(entryOf('polars.col'))).toEqual({ route: 'group', group: 'fields' });
-    expect(routeOf(entryOf('polars.lit'))).toEqual({ route: 'group', group: 'values' });
-  });
-
-  it('is from the functions for `when` and `element`, the functions a chain starts from', () => {
-    expect(routeOf(entryOf('polars.when'))).toEqual({ route: 'group', group: 'functions' });
-    expect(routeOf(entryOf('polars.element'))).toEqual({ route: 'group', group: 'functions' });
-  });
-
-  it('is with `when` for the `then` and the `otherwise` of the one case', () => {
-    expect(routeOf(entryOf('When.then'))).toEqual({ route: 'with', group: 'functions' });
-    expect(routeOf(entryOf('Then.otherwise'))).toEqual({ route: 'with', group: 'functions' });
-  });
-
-  it('is from the steps for a step the editor offers, and none for a step it does not', () => {
-    expect(routeOf(entryOf('LazyFrame.sort'))).toEqual({ route: 'group', group: 'steps' });
-    expect(routeOf(entryOf('LazyFrame.head'))).toEqual({ route: 'none' });
-  });
-
-  it('is none for a function a chain does not start from, and for a further case of a condition', () => {
-    expect(routeOf(entryOf('polars.int_range'))).toEqual({ route: 'none' });
-    expect(routeOf(entryOf('Then.when'))).toEqual({ route: 'none' });
-    expect(routeOf(entryOf('ChainedThen.otherwise'))).toEqual({ route: 'none' });
-  });
-});
-
-describe('whether an entry can be picked at a place', () => {
-  it('is so for a method after a value, and not at the start of an expression', () => {
-    expect(canPick(entryOf('Expr.abs'), 'value')).toBe(true);
-    expect(canPick(entryOf('Expr.abs'), 'start')).toBe(false);
-  });
-
-  it('is so for a field, a typed value and `when` at the start of an expression', () => {
-    for (const id of ['polars.col', 'polars.lit', 'polars.when']) {
-      expect(canPick(entryOf(id), 'start'), id).toBe(true);
+      { word: 'step', options: true },
+      { word: 'step', options: false },
+      { word: 'newStep' },
+    ] as const;
+    for (const word of words) {
+      const may: readonly string[] = GROUPS_OF_WORD[word.word];
+      for (const group of listsOf(word)) {
+        expect(may, `${word.word} ${group}`).toContain(group);
+      }
     }
-    expect(canPick(entryOf('polars.col'), 'value')).toBe(false);
+  });
+});
+
+describe('the adding of a piece that has none', () => {
+  it('is none for a word and an entry of pairs, which nothing can be added after', () => {
+    expect(noAddition(actionsOf('word'))).toBeNull();
+    expect(noAddition(actionsOf('entry'))).toBeNull();
   });
 
-  it('is so for `then` after `when`, which comes with it, and for nothing else inside a condition', () => {
-    expect(canPick(entryOf('When.then'), 'condition')).toBe(true);
-    expect(canPick(entryOf('When.then'), 'start')).toBe(false);
-    expect(canPick(entryOf('Then.when'), 'condition')).toBe(false);
-    expect(canPick(entryOf('polars.int_range'), 'start')).toBe(false);
+  it('is accepted by the type of its actions for those kinds and refused for a piece that has some', () => {
+    // The assignments below do not compile where the model says otherwise.
+    const word: TakesNoAddition<'word'> = true;
+    const entry: TakesNoAddition<'entry'> = true;
+    const method: TakesNoAddition<'method'> = false;
+    const chainStart: TakesNoAddition<'chainStart'> = false;
+    const step: TakesNoAddition<'step'> = false;
+    expect([word, entry, method, chainStart, step]).toEqual([true, true, false, false, false]);
   });
 });
 

@@ -23,6 +23,7 @@ import type {
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
+import { HEAD } from './catalogue';
 import type { Path } from './doc';
 import { givenOf, pathKey } from './doc';
 import type { Frame } from './frame';
@@ -329,7 +330,7 @@ export type RowEnd =
 
 /** Returns the name of the column an `Add column` step adds. */
 function addedAlias(call: CallView): string | null {
-  const named = givenOf(call, 'named_exprs');
+  const named = givenOf(call, HEAD.with_columns.named);
   const key = named?.kind === 'pairs' ? named.entries[0]?.key : undefined;
   return key?.kind === 'columns' ? (key.names[0] ?? null) : null;
 }

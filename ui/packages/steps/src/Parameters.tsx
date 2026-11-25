@@ -54,7 +54,7 @@ import type { Dtype, Frame } from './model/frame';
 import { findInput } from './model/inputs';
 import type { PreparedOption, PreparedReading } from './model/offers';
 import { placeRequest, within } from './model/place';
-import { actionsOf } from './model/words';
+import { actionsOf, noAddition } from './model/words';
 import {
   HOLE,
   canBeLeftUnpicked,
@@ -872,7 +872,7 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
                   }
                 : null
             }
-            add={null}
+            add={noAddition(entryActions)}
           >
             <OneDrawing
               kind={kind.key}
@@ -915,7 +915,7 @@ function PairsDrawing({ parameter, argument, path, around }: ListProps): React.J
                 }
               : null
           }
-          add={null}
+          add={noAddition(entryActions)}
         >
           <OneDrawing
             kind={kind.key}

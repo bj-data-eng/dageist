@@ -15,7 +15,7 @@ import { methodNameOf } from './model/catalogue';
 import type { Frame } from './model/frame';
 import type { PreparedFamily, PreparedOffer, PreparedReading } from './model/offers';
 import { candidateKey, methodFamilies, refusalWords, startOffers } from './model/offers';
-import type { Group, ListedWord } from './model/words';
+import type { Group, GroupOfWord, ListedWord } from './model/words';
 import { listsOf } from './model/words';
 
 /** What a list says while the engine has not answered. */
@@ -287,20 +287,22 @@ export function refusalOf(asked: Asked<OffersView>, id: string): string | null {
   return found?.verdict.kind === 'refused' ? refusalWords(found.verdict.refusal) : null;
 }
 
+/** Makes the rows of one group of a list. */
+export type Maker = () => OfferGroup[];
+
+/** The functions a drawing gives for the list of a word of `Kind`: one for every group a word of that kind may list. */
+export type Makers<Kind extends ListedWord['word']> = Readonly<Record<GroupOfWord<Kind>, Maker>>;
+
 /**
  * Returns the groups the list of `word` holds, in the order the model says, each made by the
- * function of `makers` for its group. A group the model lists and `makers` lacks is a mistake in
- * the drawing, not something to leave out.
+ * function of `makers` for its group. `makers` must hold one for every group a word of that kind
+ * may list, so a group the drawing does not make is a compile error and not a failure while it
+ * draws; a group the word does not list, as a method with no options lists no options, is not made.
  */
-export function listedGroups(
-  word: ListedWord,
-  makers: Readonly<Partial<Record<Group, () => OfferGroup[]>>>,
+export function listedGroups<Kind extends ListedWord['word']>(
+  word: Extract<ListedWord, { readonly word: Kind }>,
+  makers: Makers<Kind>,
 ): OfferGroup[] {
-  return listsOf(word).flatMap((group) => {
-    const make = makers[group];
-    if (make === undefined) {
-      throw new Error(`the list of ${word.word} holds ${group}, which is not drawn`);
-    }
-    return make();
-  });
+  const made: Readonly<Partial<Record<Group, Maker>>> = makers;
+  return listsOf(word).flatMap((group) => made[group]?.() ?? []);
 }

@@ -59,7 +59,14 @@ import {
   literalExpression,
 } from './model/requests';
 import type { WordShape } from './model/words';
-import { OFFERED_INPUTS, actionsOf, lineDrawing, listsChainRow, valueDrawing } from './model/words';
+import {
+  OFFERED_INPUTS,
+  actionsOf,
+  lineDrawing,
+  listsChainRow,
+  noAddition,
+  valueDrawing,
+} from './model/words';
 
 /** Returns whether the engine's report puts what is wrong with the step in or at `path`. */
 export function useIsWrongAt(): (path: Path) => boolean {
@@ -236,8 +243,7 @@ export function ValueSlot({
             }
           : null
       }
-      // The model says nothing can be added after a word of one value: a declared gap.
-      add={null}
+      add={noAddition(actions)}
     >
       <Hint lines={shown.lines} code={false}>
         <Slot

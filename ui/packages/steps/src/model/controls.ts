@@ -114,24 +114,6 @@ export function controlOf(parameter: ParameterView): ParameterControl {
   return { shape: 'one', one: oneControlOf(kind) };
 }
 
-/** Returns whether every argument a parameter holds has a drawing: none of its controls is `none`. */
-export function isDrawn(control: ParameterControl): boolean {
-  switch (control.shape) {
-    case 'one':
-      return control.one.control !== 'none';
-    case 'columns':
-      return true;
-    case 'many':
-      return control.each.control !== 'none';
-    case 'pairs':
-      return control.key.control !== 'none' && control.value.control !== 'none';
-    case 'perItem':
-      return control.each !== 'none';
-    default:
-      return control satisfies never;
-  }
-}
-
 /**
  * Returns why a parameter of `kind` that is added as an option has to wait for the engine to say
  * what it starts with: a flag and a choice start with the word the engine's table of options gives,
