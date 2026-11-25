@@ -318,6 +318,8 @@ function ParameterEditor({ box }: { readonly box: CanvasBox }): React.JSX.Elemen
         <div key={value.name} className="flex items-center gap-2">
           <span className="w-24 truncate font-mono text-input-ink">{value.name}</span>
           <input
+            // A text the host changed is drawn afresh.
+            key={value.text}
             aria-label={`The text of ${value.name}`}
             defaultValue={value.text}
             className="min-w-0 flex-1 rounded border border-line bg-canvas px-1 font-mono text-value outline-none"

@@ -4,11 +4,11 @@
  * they meet only here.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { FlowCanvas } from '@dageist/canvas';
 import { Panel, SidebarProvider, SidebarTrigger, cx } from '@dageist/design';
-import type { Host } from '@dageist/host';
+import type { GraphView, Host } from '@dageist/host';
 import { bridgeHost, tauriHost } from '@dageist/host';
 import { StepsWindow, StepsWorkspace } from '@dageist/steps';
 import { TableViewer } from '@dageist/table';
@@ -82,10 +82,22 @@ const IS_STEPS_WINDOW = new URLSearchParams(window.location.search).get('window'
  */
 const IN_APPLICATION_WINDOW = tauriHost() !== null;
 
-/** The transform whose steps are edited: its id and the name it shows. */
+/** The transform whose steps are edited: its id, the name it shows, and the graph's revision. */
 interface Editing {
   readonly node: string;
   readonly name: string;
+  readonly graph: number;
+}
+
+/**
+ * Returns the transform of `view` whose steps are edited: the one chosen, while the graph has
+ * it, and otherwise the graph's first transform. Its name and the revision are the graph's.
+ */
+function editingOf(view: GraphView | null, chosen: string | null): Editing | null {
+  if (view === null) return null;
+  const transforms = view.nodes.filter((node) => node.kind === 'transform');
+  const edited = transforms.find((node) => node.id === chosen) ?? transforms[0];
+  return edited === undefined ? null : { node: edited.id, name: edited.name, graph: view.revision };
 }
 
 /** The topic on which the main window says which transform's steps are edited. */
@@ -96,9 +108,11 @@ const EDITING_ASKED_TOPIC = 'editing-asked';
 /** Reads what the main window said on `EDITING_TOPIC`, or `null` when it is not that. */
 function readEditing(message: unknown): Editing | null {
   if (typeof message !== 'object' || message === null) return null;
-  if (!('node' in message) || !('name' in message)) return null;
-  const { node, name } = message;
-  return typeof node === 'string' && typeof name === 'string' ? { node, name } : null;
+  if (!('node' in message) || !('name' in message) || !('graph' in message)) return null;
+  const { node, name, graph } = message;
+  return typeof node === 'string' && typeof name === 'string' && typeof graph === 'number'
+    ? { node, name, graph }
+    : null;
 }
 
 /** Draws the application window. */
@@ -112,7 +126,13 @@ export function App(): React.JSX.Element {
   // A workspace is mounted when it is first shown and then stays mounted, so
   // switching away and back keeps what was being done in it.
   const [visited, setVisited] = useState<readonly Workspace[]>(() => [startingWorkspace()]);
-  const [editing, setEditing] = useState<Editing | null>(null);
+  // The graph the canvas last drew, and the transform chosen on it, in the main window.
+  const [graphView, setGraphView] = useState<GraphView | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  // What the main window said is edited, in the steps window.
+  const [heard, setHeard] = useState<Editing | null>(null);
+  const shown = useMemo(() => editingOf(graphView, chosen), [graphView, chosen]);
+  const editing = IS_STEPS_WINDOW ? heard : shown;
 
   useEffect(() => {
     if (IS_STEPS_WINDOW) document.title = 'dageist · steps';
@@ -145,35 +165,21 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
-  // The main window edits the steps of the graph's first transform until another is chosen, and
-  // tells the steps window which transform that is.
+  // The main window tells the steps window which transform is edited, each time it changes and
+  // when the steps window asks.
   useEffect(() => {
-    if (host === null || IS_STEPS_WINDOW || editing !== null) return undefined;
-    let live = true;
-    host.graph().then(
-      (graph) => {
-        const first = graph.nodes.find((node) => node.kind === 'transform');
-        if (live && first !== undefined) setEditing({ node: first.id, name: first.name });
-      },
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, [host, editing]);
-  useEffect(() => {
-    if (host === null || IS_STEPS_WINDOW || editing === null) return undefined;
-    host.broadcast(EDITING_TOPIC, editing);
+    if (host === null || IS_STEPS_WINDOW || shown === null) return undefined;
+    host.broadcast(EDITING_TOPIC, shown);
     return host.listen(EDITING_ASKED_TOPIC, () => {
-      host.broadcast(EDITING_TOPIC, editing);
+      host.broadcast(EDITING_TOPIC, shown);
     });
-  }, [host, editing]);
+  }, [host, shown]);
   // The steps window edits what the main window says, and asks it once it can hear the answer.
   useEffect(() => {
     if (host === null || !IS_STEPS_WINDOW) return undefined;
     const stop = host.listen(EDITING_TOPIC, (message) => {
       const said = readEditing(message);
-      if (said !== null) setEditing(said);
+      if (said !== null) setHeard(said);
     });
     host.broadcast(EDITING_ASKED_TOPIC, {});
     return stop;
@@ -210,6 +216,7 @@ export function App(): React.JSX.Element {
             host={host}
             node={editing.node}
             name={editing.name}
+            graph={editing.graph}
             styleNonce={STYLE_NONCE}
           />
         )}
@@ -268,10 +275,11 @@ export function App(): React.JSX.Element {
           {host !== null && (
             <FlowCanvas
               host={host}
-              onEditSteps={(node, name) => {
-                setEditing({ node, name });
+              onEditSteps={(node) => {
+                setChosen(node);
                 show('steps');
               }}
+              onGraph={setGraphView}
             />
           )}
         </div>
@@ -296,6 +304,7 @@ export function App(): React.JSX.Element {
                   host={host}
                   node={editing.node}
                   name={editing.name}
+                  graph={editing.graph}
                   styleNonce={STYLE_NONCE}
                 />
               )}

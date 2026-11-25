@@ -60,7 +60,7 @@ export interface Editor {
  * Holds the node's document for one window: asks the host for it, asks again when another window
  * says it changed it, and sends the person's actions in order.
  */
-export function useEditor(host: Host, node: string): Editor {
+export function useEditor(host: Host, node: string, graph: number): Editor {
   const [state, setState] = useState<DocumentStateView | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -105,6 +105,15 @@ export function useEditor(host: Host, node: string): Editor {
       stop();
     };
   }, [host, node]);
+
+  // What the steps run on is what the graph binds to them, so a changed graph is a changed report:
+  // the document is asked for again at each revision of the graph after the one it was loaded at.
+  const loadedAt = useRef(graph);
+  useEffect(() => {
+    if (loadedAt.current === graph) return;
+    loadedAt.current = graph;
+    void session.current?.load();
+  }, [graph]);
 
   const act = useCallback(async (drawn: number | null, edits: Action): Promise<Sent> => {
     const open = session.current;

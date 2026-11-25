@@ -40,6 +40,8 @@ function wordsOf(error: unknown): string {
 
 /** What the rows after the chosen step are asked for. */
 interface RowsRequest {
+  /** The graph's revision, since what the steps run on is what the graph binds to them. */
+  readonly graph: number;
   readonly revision: number;
   readonly step: string;
 }
@@ -59,7 +61,7 @@ export interface RowsState {
 }
 
 function keyOfRows(request: RowsRequest): string {
-  return JSON.stringify([request.step, request.revision]);
+  return JSON.stringify([request.step, request.revision, request.graph]);
 }
 
 /**
@@ -70,6 +72,7 @@ function keyOfRows(request: RowsRequest): string {
 export function useRows(
   host: Host,
   node: string,
+  graph: number,
   revision: number | null,
   selectedId: string | null,
   step: PreparedStep | null,
@@ -81,9 +84,9 @@ export function useRows(
   const wanted = useRef<RowsRequest | null>(null);
 
   useEffect(() => {
-    wanted.current = askable ? { revision, step: selectedId } : null;
+    wanted.current = askable ? { graph, revision, step: selectedId } : null;
     if (wanted.current !== null) scheduler.current?.submit(wanted.current);
-  }, [askable, revision, selectedId]);
+  }, [askable, graph, revision, selectedId]);
 
   useEffect(() => {
     const made = new Latest<RowsRequest, RowsView>({

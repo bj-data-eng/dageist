@@ -26,6 +26,8 @@ export interface StepsWindowProps {
   readonly node: string;
   /** The transform's name, which the panel's title shows. */
   readonly name: string;
+  /** The graph's revision, which the editor asks again with when it changes. */
+  readonly graph: number;
   /**
    * The nonce the page's content security policy accepts for injected styles,
    * or `null` when there is no policy. Dragging injects a few style rules.
@@ -37,16 +39,22 @@ export interface StepsWindowProps {
  * Draws every step of the transform so that it can be edited, once the catalogue is there.
  * Another transform is drawn afresh, with nothing carried over.
  */
-export function StepsWindow({ host, node, name, styleNonce }: StepsWindowProps): React.JSX.Element {
+export function StepsWindow({
+  host,
+  node,
+  name,
+  graph,
+  styleNonce,
+}: StepsWindowProps): React.JSX.Element {
   return (
-    <EngineProvider key={node} host={host} node={node} title={`Steps · ${name}`}>
-      <Editor host={host} node={node} name={name} styleNonce={styleNonce} />
+    <EngineProvider key={node} host={host} node={node} graph={graph} title={`Steps · ${name}`}>
+      <Editor host={host} node={node} name={name} graph={graph} styleNonce={styleNonce} />
     </EngineProvider>
   );
 }
 
-function Editor({ host, node, name, styleNonce }: StepsWindowProps): React.JSX.Element {
-  const window = useEditorWindow(host, node, 'steps');
+function Editor({ host, node, name, graph, styleNonce }: StepsWindowProps): React.JSX.Element {
+  const window = useEditorWindow(host, node, graph, 'steps');
   return (
     <EditorProvider value={window.editor}>
       <DraftsProvider value={window.drafts}>

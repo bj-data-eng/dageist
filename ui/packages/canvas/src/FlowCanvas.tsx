@@ -26,11 +26,13 @@ import {
 import type { Connection, EdgeTypes, NodeChangeset, NodeTypes } from '@xyflow/react';
 
 import { Skeleton } from '@dageist/design';
+import { HostError } from '@dageist/host';
 import type { FrameView, GraphEdit, GraphView, Host, NodeKind, SlotView } from '@dageist/host';
 
 import { ActionsProvider } from './actions';
 import type { GraphActions } from './actions';
 import { GraphBox } from './Boxes';
+import { GraphEdits } from './edits';
 import type { GraphBoxNode } from './Boxes';
 import { canvasGraph, connectEdit, guessedHeight, placesOf } from './graph';
 import type { CanvasGraph, Place } from './graph';
@@ -130,11 +132,28 @@ function Flow({ host, view, onView, onStale, onEditSteps }: FlowProps): React.JS
   const latest = useRef(boxes);
   const [settled, setSettled] = useState<readonly RouteBox[]>([]);
   const stacked = useRef(false);
-  // Where a box added after another is to stand, until the graph that has it arrives.
+  // Where a box an edit added stands, until the graph that keeps it there is drawn.
   const pending = useRef(new Map<string, Place>());
   const [notice, setNotice] = useState<string | null>(null);
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
   const wires = useMemo(() => wiresOf(graph), [graph]);
+  // The edits, sent one at a time, each against the revisions the host last answered with.
+  const [edits] = useState(
+    () =>
+      new GraphEdits(host, view, {
+        view: onView,
+        refused: setNotice,
+        failed: (error) => {
+          setNotice(error instanceof Error ? error.message : String(error));
+          // An edit made against an old graph asks for the graph as it is now.
+          if (error instanceof HostError && error.kind === 'stale') onStale();
+        },
+      }),
+  );
+  // A graph asked for again is the one the next edit is made against.
+  useEffect(() => {
+    edits.seen(view);
+  }, [edits, view]);
 
   const show = useCallback((next: GraphBoxNode[]): void => {
     latest.current = next;
@@ -147,64 +166,37 @@ function Flow({ host, view, onView, onStale, onEditSteps }: FlowProps): React.JS
     const height = (id: string): number =>
       latest.current.find((box) => box.id === id)?.measured?.height ?? guess(graph, id);
     const places = new Map(placesOf(graph, height));
-    for (const [id, place] of pending.current) places.set(id, place);
+    for (const [id, place] of pending.current) {
+      if (graph.placed.has(id)) pending.current.delete(id);
+      else places.set(id, place);
+    }
     show(boxesOf(graph, places, latest.current));
   }, [graph, show]);
 
-  /** Sends `edit` and draws what the host answers, or says why it was refused. */
+  /** Sends `edit` after the edits before it. A box it adds stands where `place` says. */
   const send = useCallback(
-    (edit: GraphEdit, place?: (added: string) => Place): void => {
-      host.editGraph(view.revision, edit).then(
-        (answer) => {
-          if (answer.kind === 'refused') {
-            setNotice(answer.message);
-            return;
-          }
-          setNotice(null);
-          const { added } = answer;
-          if (added === null || place === undefined) {
-            onView(answer.graph);
-            return;
-          }
-          // The added box stands where it was asked to, and the host keeps that in its layout.
-          const at = place(added);
-          pending.current.set(added, at);
-          onView(answer.graph);
-          host
-            .placeNode(answer.graph.layoutRevision, added, { ...at, width: null, height: null })
-            .then(
-              (placed) => {
-                pending.current.delete(added);
-                onView({ ...answer.graph, layoutRevision: placed.layoutRevision });
-              },
-              () => {
-                onStale();
-              },
-            );
-        },
-        (error: unknown) => {
-          setNotice(error instanceof Error ? error.message : String(error));
-          onStale();
-        },
+    (edit: GraphEdit, place?: () => Place): void => {
+      setNotice(null);
+      void edits.edit(
+        edit,
+        place === undefined
+          ? undefined
+          : (added) => {
+              const at = place();
+              pending.current.set(added, at);
+              return at;
+            },
       );
     },
-    [host, view.revision, onView, onStale],
+    [edits],
   );
 
-  /** Keeps where a box stands, and its size, in the host's layout. */
+  /** Keeps where a box stands, and its size, in the host's layout, after the edits before it. */
   const keep = useCallback(
     (node: string, frame: FrameView): void => {
-      host.placeNode(view.layoutRevision, node, frame).then(
-        (placed) => {
-          pending.current.delete(node);
-          onView({ ...view, layoutRevision: placed.layoutRevision });
-        },
-        () => {
-          onStale();
-        },
-      );
+      void edits.place(node, frame);
     },
-    [host, view, onView, onStale],
+    [edits],
   );
 
   const actions = useMemo(
@@ -305,6 +297,7 @@ function Flow({ host, view, onView, onStale, onEditSteps }: FlowProps): React.JS
             if (edit !== null) send(edit);
           }}
           onNodeDragStop={(_event, _box, moved) => {
+            // Each moved box is kept, one after another.
             for (const box of moved) {
               keep(box.id, {
                 x: Math.round(box.position.x),
@@ -314,15 +307,16 @@ function Flow({ host, view, onView, onStale, onEditSteps }: FlowProps): React.JS
               });
             }
           }}
-          // A deleted wire empties its slot, and a deleted box is removed; the host decides both.
-          onEdgesDelete={(deleted) => {
-            for (const wire of deleted) {
+          // A deleted wire empties its slot, and a deleted box is removed with the references to it,
+          // so a wire of a box that goes is not disconnected first. The host decides each edit.
+          onDelete={({ nodes: gone, edges: cut }) => {
+            const removed = new Set(gone.map((box) => box.id));
+            for (const wire of cut) {
+              if (removed.has(wire.source) || removed.has(wire.target)) continue;
               const slot = slotOfWire(graph, wire);
               if (slot !== null) send({ edit: 'disconnect', node: wire.target, slot });
             }
-          }}
-          onNodesDelete={(deleted) => {
-            for (const box of deleted) send({ edit: 'remove', node: box.id });
+            for (const box of gone) send({ edit: 'remove', node: box.id });
           }}
           fitView
           fitViewOptions={{ padding: FIT_PADDING }}
@@ -338,7 +332,14 @@ function Flow({ host, view, onView, onStale, onEditSteps }: FlowProps): React.JS
                 type="button"
                 className="cursor-pointer rounded-md border border-line-strong bg-panel px-2.5 py-1 text-[12px] text-muted hover:bg-hover hover:text-ink"
                 onClick={() => {
-                  send({ edit: 'add', kind, follows: null, name: null });
+                  // A box added on its own stands in the middle of what is on screen.
+                  send({ edit: 'add', kind, follows: null, name: null }, () => {
+                    const at = screenToFlowPosition({
+                      x: window.innerWidth / 2,
+                      y: window.innerHeight / 2,
+                    });
+                    return { x: Math.round(at.x), y: Math.round(at.y) };
+                  });
                 }}
               >
                 + {label}
@@ -403,13 +404,15 @@ export interface FlowCanvasProps {
   readonly host: Host;
   /** Opens the steps of the transform `node`, called `name`. */
   readonly onEditSteps: (node: string, name: string) => void;
+  /** Hears each graph the canvas draws, as the host reported it. */
+  readonly onGraph: (view: GraphView) => void;
 }
 
 /**
  * Asks the host for the graph and draws it, filling the box it is given. The
  * shell gives it the whole window, as the window's background.
  */
-export function FlowCanvas({ host, onEditSteps }: FlowCanvasProps): React.JSX.Element {
+export function FlowCanvas({ host, onEditSteps, onGraph }: FlowCanvasProps): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
   // Whether the canvas is still shown, so that an answer that comes after it is gone is dropped.
   const live = useRef(true);
@@ -435,6 +438,9 @@ export function FlowCanvas({ host, onEditSteps }: FlowCanvasProps): React.JSX.El
   const onView = useCallback((view: GraphView) => {
     setLoaded({ kind: 'ready', view });
   }, []);
+  useEffect(() => {
+    if (loaded.kind === 'ready') onGraph(loaded.view);
+  }, [loaded, onGraph]);
 
   if (loaded.kind === 'ready') {
     return (

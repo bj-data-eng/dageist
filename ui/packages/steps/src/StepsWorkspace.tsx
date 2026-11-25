@@ -24,6 +24,8 @@ export interface StepsWorkspaceProps {
   readonly node: string;
   /** The transform's name, which the panel's title shows. */
   readonly name: string;
+  /** The graph's revision, which the editor asks again with when it changes. */
+  readonly graph: number;
   /**
    * The nonce the page's content security policy accepts for injected styles,
    * or `null` when there is no policy. Dragging injects a few style rules.
@@ -39,17 +41,24 @@ export function StepsWorkspace({
   host,
   node,
   name,
+  graph,
   styleNonce,
 }: StepsWorkspaceProps): React.JSX.Element {
   return (
-    <EngineProvider key={node} host={host} node={node} title={`Transform · ${name}`}>
-      <Transform host={host} node={node} name={name} styleNonce={styleNonce} />
+    <EngineProvider key={node} host={host} node={node} graph={graph} title={`Transform · ${name}`}>
+      <Transform host={host} node={node} name={name} graph={graph} styleNonce={styleNonce} />
     </EngineProvider>
   );
 }
 
-function Transform({ host, node, name, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const window = useEditorWindow(host, node, 'main');
+function Transform({
+  host,
+  node,
+  name,
+  graph,
+  styleNonce,
+}: StepsWorkspaceProps): React.JSX.Element {
+  const window = useEditorWindow(host, node, graph, 'main');
   const { editor, drafts, selection, steps, run, selectedIndex, rows } = window;
   return (
     <EditorProvider value={editor}>
@@ -58,6 +67,7 @@ function Transform({ host, node, name, styleNonce }: StepsWorkspaceProps): React
           host={host}
           node={node}
           name={name}
+          graph={graph}
           styleNonce={styleNonce}
           window={window}
           steps={steps}
