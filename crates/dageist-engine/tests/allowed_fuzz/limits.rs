@@ -11635,6 +11635,28 @@ mod tests {
     }
 
     #[test]
+    fn a_struct_field_that_is_a_list_of_text_is_the_cause_of_a_refusal_of_arithmetic_on_it() {
+        let reason = "cannot add two list columns with non-numeric inner types";
+        let structs = chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("k"), &[])]))],
+            ),
+            &["Expr.add"],
+        );
+        let case = select(vec![structs]);
+        let traced = vec![Traced {
+            place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
+            start: Some(Representative::Struct),
+            links: vec![Some(Representative::Struct)],
+        }];
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, traced),
+            vec![Limit::ArithmeticOnAStructOfNumbers]
+        );
+    }
+
+    #[test]
     fn the_fields_of_a_struct_that_do_not_meet_are_the_cause_of_a_refusal_of_arithmetic_on_it() {
         let reason = "add operation not supported for dtypes `i8` and `duration[μs]`";
         let structs = chain(
