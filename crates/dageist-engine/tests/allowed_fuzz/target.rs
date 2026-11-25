@@ -368,7 +368,16 @@ fn one_line(text: &str) -> String {
         })
         .collect();
     let line = line.split_whitespace().collect::<Vec<_>>().join(" ");
-    line.chars().take(3000).collect()
+    // The contract admits a trimmed line of no more than 4096 bytes: the cut is where either is
+    // reached, and a space the cut ends on is no part of it.
+    let mut cut = String::new();
+    for character in line.chars().take(3000) {
+        if cut.len() + character.len_utf8() > 4096 {
+            break;
+        }
+        cut.push(character);
+    }
+    cut.trim_end().to_owned()
 }
 
 /// Whether Polars refused at a call that comes after the one the tables could not be asked of, in
