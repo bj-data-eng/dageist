@@ -169,7 +169,7 @@ pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
             reason: if refusal.stage == Stage::Schema {
                 refusal.reason.clone()
             } else {
-                shape_of_a_failure_of_rows(&refusal.reason)
+                one_wording_of_a_replacement(&shape_of_a_failure_of_rows(&refusal.reason))
             },
             ..refusal.clone()
         })
@@ -187,6 +187,18 @@ pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
         ));
     }
     None
+}
+
+/// `reason` with the refusal of a text replacement of more than the first match worded as a regex
+/// replacement, which Polars words as a multivalue replacement where it splits its work another
+/// way, so that the two wordings of the one refusal compare as the same.
+fn one_wording_of_a_replacement(reason: &str) -> String {
+    reason
+        .strip_prefix("multivalue replacement with 'n > ")
+        .map_or_else(
+            || reason.to_owned(),
+            |rest| format!("regex replacement with 'n > {rest}"),
+        )
 }
 
 /// `reason` with the values of the rows it names, which are between brackets, left out and every
