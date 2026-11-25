@@ -27,8 +27,8 @@ independent integration review.
 ## Repository Identity And Ownership
 
 This repository owns the host-independent `dageist` core in `src/`, the
-graph model, the dataframe engine, the fuzz framework and the host adapters
-under `crates/`,
+graph model, the dataframe engine, the delta packs, the fuzz framework and the
+host adapters under `crates/`,
 the React view in `ui/`, their contracts, manifests, tests, documentation and
 shared tooling. Root owns workspace wiring and the core. The Tauri host owns
 its window, webview configuration, IPC commands, the bridge that serves the
@@ -62,6 +62,7 @@ and current source establishes behavior.
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
 | The graph's nodes, references, layout, edits and structural checks, without Polars | [crates/dageist-graph/src/](crates/dageist-graph/src/lib.rs) |
+| Git packs whose objects are stored as deltas against bases the caller names, written through gix-pack | [crates/dageist-pack/src/](crates/dageist-pack/src/lib.rs), [delta.rs](crates/dageist-pack/src/delta.rs) |
 | The session (graph, layout, each transform's document and their revisions) and working the graph out | [src/](src/lib.rs), [session.rs](src/session.rs), [walk.rs](src/walk.rs); its tests' files in [tests/corpus/](tests/corpus/) |
 | IPC commands and their serialized views; the graph view and its edits, the file dialog, and the commands on a transform's document by its id | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs), [graph.rs](crates/dageist-tauri/src/graph.rs), [document.rs](crates/dageist-tauri/src/document.rs) |
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
@@ -188,6 +189,14 @@ Graph checks from the repository root. The crate does not depend on Polars:
 ```sh
 cargo test --offline --locked -p dageist-graph
 cargo clippy --offline --locked -p dageist-graph --all-targets --no-deps -- -F unsafe-code -D warnings
+```
+
+Pack checks from the repository root. The crate does not depend on Polars; its
+tests run `git` to verify the packs it writes:
+
+```sh
+cargo test --offline --locked -p dageist-pack
+cargo clippy --offline --locked -p dageist-pack --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 Engine checks from the repository root:

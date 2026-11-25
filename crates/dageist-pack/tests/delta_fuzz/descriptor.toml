@@ -1,0 +1,21 @@
+schema = 1
+fixtures = []
+
+[[targets]]
+id = "dageist-pack::delta"
+owner = "dageist-pack"
+binary = "delta-fuzz"
+properties = [
+    "dageist-pack::delta-makes-the-target",
+    "dageist-pack::delta-is-bounded",
+]
+source_references = [
+    "crates/dageist-pack/src/delta.rs",
+]
+format = { identity = "dageist-pack::delta-case", revision = 1 }
+generator_identity = { identity = "dageist-pack::edited-base", revision = 1 }
+encoding = "structured"
+limits = { bytes = 70000, nodes = 0, depth = 0, text_units = 0, operations = 0 }
+requirements = { features = [], capabilities = ["property"] }
+min_evaluated = 1
+max_generation_rejections = 0
