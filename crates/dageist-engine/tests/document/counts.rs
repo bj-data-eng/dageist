@@ -368,10 +368,22 @@ fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it
             )],
         ),
         with_columns("after", vec![("again", field("row_days"))]),
+        with_columns("later", vec![("once_more", field("row_days"))]),
     ]));
     let rows: Vec<&StepRows> = report.steps().iter().map(|step| step.rows()).collect();
     assert!(matches!(rows[0], StepRows::Failed(_)), "{:?}", rows[0]);
-    assert!(matches!(rows[1], StepRows::NotCounted), "{:?}", rows[1]);
+    // Each step after it was not run on the rows, and says which step failed there: the first one,
+    // not the step before it.
+    for (at, reported) in rows.iter().enumerate().skip(1) {
+        assert!(
+            !matches!(reported, StepRows::NotCounted),
+            "{at}: {reported:?}"
+        );
+        assert!(
+            format!("{reported:?}").contains("\"date\""),
+            "{at}: {reported:?}"
+        );
+    }
     // The schema still holds: the report says it is valid.
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
 }
