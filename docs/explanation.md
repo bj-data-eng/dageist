@@ -65,6 +65,101 @@ As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
 needs to reach that behavior.
 
+## The Graph
+
+A pipeline is a graph of nodes, held by the core and drawn by the canvas.
+Three crates share it:
+
+- **`dageist-graph`** holds its structure: the nodes, the references between
+  them, the layout of their boxes, the edits that change them and the checks
+  those edits pass. It knows names and kinds, not dtypes or data, and does not
+  depend on Polars, so its rules build and test in seconds.
+- **`dageist-engine`** works out what each node gives, as a lazy Polars plan
+  that reads no rows until rows are asked for.
+- **`dageist`**, the core, holds the session: the graph, its layout, and each
+  transform's step document. It works the graph out through the engine.
+
+### Nodes And References
+
+A node has an id, a name it shows, and one of four kinds:
+
+| Kind | Holds | Reads | Gives |
+| --- | --- | --- | --- |
+| Source | a file and its format, Parquet or CSV | nothing | its table |
+| Transform | a step document | the table its steps start from, and named inputs | the table its last step gives |
+| Output | a file and its format | one table | nothing |
+| Parameters | named values, each a dtype and its text | nothing | each value |
+
+A node reads other nodes through references it holds itself. A transform names
+the table its steps start from and, for each of its named inputs, what feeds it:
+another node's table, the values of one column of a table as a list, or one
+value of a Parameters node. An output names the table it writes. There is no
+separate list of connections. A wire on the canvas draws a reference, and
+dragging one is an edit that sets it. The names a transform's inputs have are
+the names its steps already use, as `{ "input": "holidays" }` or
+`{ "table": "step_sla" }`, so a step document is unchanged by being put in a
+graph.
+
+A node's id is made from its name when it is added, such as `claim-timing` for
+Claim timing. It stays the same when the node is renamed, and the graph does not
+give it to another node after the node is removed.
+
+### Edits And Checks
+
+The graph changes only by edits, and the core counts each one with a revision.
+An edit names the revision it was made against and is refused as stale when the
+graph has moved on, as step document edits are. An edit is checked as it is
+made. It is refused when it:
+
+- names a node, a slot or a value the graph lacks;
+- fills a slot from an output of another kind, such as a value into a table
+  input;
+- would make a node read itself, directly or through other nodes;
+- gives a node a name another node has, in any case.
+
+A refused edit leaves the graph as it was. Removing a node clears the references
+to it, and the nodes that read it then show an unconnected slot.
+
+The layout, where each box stands and its size, is kept apart from the graph,
+at a revision of its own. Moving a box changes nothing the pipeline does, so it
+never makes an open edit of the graph or of a step document stale.
+
+### Working The Graph Out
+
+The core works the graph out node by node, each after the nodes it reads:
+
+- A source scans its file, and Polars reads the file's schema.
+- A Parameters node reads each value's text as its dtype: `Int64`, `Float64`,
+  `Boolean`, `String` or `Date`.
+- A transform binds the table its steps start from and each named input to
+  what feeds them, and its steps are run as a plan, as the step editor runs
+  them. The table its last step gives is what it gives.
+- An output takes the columns of the table it would write.
+
+No rows are read, with two exceptions: the column a list input takes, which is
+read whole, and what a step that needs a collect reads. What keeps a node from
+being worked out is a problem reported on it, not a refusal:
+
+- an unconnected slot or a missing file;
+- a file that cannot be read;
+- a value that is not its dtype;
+- a column a list reads that its table lacks;
+- a step that is refused or still to be completed.
+
+A node that reads a node with a problem says that the other gives nothing yet.
+
+The host reports the worked-out graph as one view. For each node it gives:
+
+- its slots and outputs, and what fills each slot;
+- which outputs could fill each slot without closing a cycle, so the canvas
+  checks a wire while it is dragged;
+- the columns the node gives;
+- its problems;
+- where its box stands.
+
+The step editor edits the transform the canvas chose, by its id, and its
+working rows are the first rows of the table that transform starts from.
+
 ## Polars Is Set Up As The Release Sets It Up
 
 The Python Polars release in `vendor/polars` runs a start-up function when its
@@ -1846,9 +1941,11 @@ different results, so the blocks, the summaries and the previews are what say wh
 a step does.
 
 The claim-timing steps the step editor opens with, the seven claim rows they run
-on and the inputs connected to them are one sample node in the engine,
-`dageist_engine::claim_timing`. The host serves it to the view and the engine's
-tests run it, so there is one copy.
+on and the inputs connected to them are one sample in the engine,
+`dageist_engine::claim_timing`. The engine's and the host's tests run it, so there
+is one copy. The application opens on it as a graph: its tables are written as
+Parquet files for the run and read by sources, its two values are a Parameters
+node, and its steps are a transform's.
 
 ## Which Combinations Polars Allows
 
@@ -2611,24 +2708,33 @@ The application opens its window on the flow canvas, which fills the window
 behind everything else. A side panel at the left, which slides away, lists
 the workspaces, and the one chosen is drawn over the canvas.
 
-The canvas draws the engine's claim-timing sample node and what supplies its
-inputs, as the host reports them: a box for each supplier with the fields of
-its table or its values, a box for the node with a pin for each input, and a
-wire from each output to the input it feeds. The wires run at right angles,
-each on a lane of its own, around the boxes, and are routed again once a box
-is dropped or a resize ends. Boxes can be moved, and the node's box resized.
-What the host does not report yet, such as a supplier's kind, the node's name
-and its steps, is drawn as stand-ins of the size it will take. The places of
-the boxes are the view's own and are not kept, and the buttons for adding a
-trigger or a following node do nothing yet.
+The canvas draws the graph the host holds: a box for each node with its slots,
+its outputs, the columns it gives and its problems, and a wire for each
+reference. The wires run at right angles, each on a lane of its own, around
+the boxes, and are routed again once a box is dropped or a resize ends.
 
-The steps of a transform are edited on the same sample node, offering the
-operations of the engine's catalogue; its two windows keep the steps the same
-by telling each other of every change, where the core will later own them.
-The step editor runs its steps on the engine through the host and shows the
-engine's columns, dtypes, refusals and rows. The table viewer shows a
-generated sample through the engine. The graph model, node types and pipeline
-execution are not implemented yet.
+Every change on the canvas is an edit of the graph. You can:
+
+- drag a wire between two pins, or drop one on a transform's "+ input" pin to
+  add an input;
+- delete a wire;
+- read a list from a column;
+- add a node, on its own or after another;
+- rename a node, choose its file, set its values, or remove it.
+
+Where a box stands and its size are kept in the host's layout.
+
+The graph is held in memory for as long as the application or the bridge runs,
+and is not saved to files yet. An output does not write its file, and the graph
+does not run as a whole: only a transform's steps run, on the working rows of
+the table they start from. Nothing undoes an edit.
+
+The steps of a transform are edited in the Transform workspace and the steps
+window, offering the operations of the engine's catalogue. Choosing "Edit steps"
+on a transform's box opens them, and the two windows keep the steps the same by
+telling each other of every change. The step editor runs its steps on the
+engine through the host and shows the engine's columns, dtypes, refusals and
+rows. The table viewer shows a generated sample through the engine.
 
 The side panel also lists the Pieces page. It is a design prototype, not a
 feature: a static page in plain HTML, CSS and JavaScript where the way the step

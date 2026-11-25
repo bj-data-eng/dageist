@@ -27,7 +27,8 @@ independent integration review.
 ## Repository Identity And Ownership
 
 This repository owns the host-independent `dageist` core in `src/`, the
-dataframe engine, the fuzz framework and the host adapters under `crates/`,
+graph model, the dataframe engine, the fuzz framework and the host adapters
+under `crates/`,
 the React view in `ui/`, their contracts, manifests, tests, documentation and
 shared tooling. Root owns workspace wiring and the core. The Tauri host owns
 its window, webview configuration, IPC commands, the bridge that serves the
@@ -60,7 +61,9 @@ and current source establishes behavior.
 | Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
-| IPC commands and their serialized views; the node's document, its revision and its edits | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs), [document.rs](crates/dageist-tauri/src/document.rs) |
+| The graph's nodes, references, layout, edits and structural checks, without Polars | [crates/dageist-graph/src/](crates/dageist-graph/src/lib.rs) |
+| The session (graph, layout, each transform's document and their revisions) and working the graph out | [src/](src/lib.rs), [session.rs](src/session.rs), [walk.rs](src/walk.rs); its tests' files in [tests/corpus/](tests/corpus/) |
+| IPC commands and their serialized views; the graph view and its edits, the file dialog, and the commands on a transform's document by its id | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs), [graph.rs](crates/dageist-tauri/src/graph.rs), [document.rs](crates/dageist-tauri/src/document.rs) |
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
@@ -137,6 +140,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
 | `ui/packages/host/fixtures/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
 | `ui/packages/host/fixtures/{node-inputs,node-document,step-report,step-report-refused,step-report-incomplete,step-report-variants,step-rows,vocabulary}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
+| `ui/packages/host/fixtures/graph.json` | the host's graph view of the starting graph, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-graph-snapshot) |
 | `ui/packages/host/fixtures/{edit-edited,edit-refused}.json` | the host's answers to an edit that was made and one the engine refused, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-edit-snapshots) |
 | `ui/packages/host/fixtures/{offers-start,offers-value,offers-condition,fits-start,fits-argument,options,offers-grid}.json` | the host's offers commands' views, and the grid of every call at every place from which the view lists what it cannot offer, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-offers-snapshots) |
 | `ui/packages/host/fixtures/census.json` | the host's census of every variant the step editor has to handle, written from the Rust types by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-census-snapshot) |
@@ -169,13 +173,21 @@ pressure guidance. Use separate targets for concurrent worktrees changing the
 same packages; reuse an existing target when source/context permit. Keep default
 test parallelism unless host status recommends a limit.
 
-Core checks from the repository root:
+Core checks from the repository root. The core depends on the engine, so they
+build Polars:
 
 ```sh
 cargo check --offline --locked -p dageist
-cargo test --offline --locked -p dageist --lib
+cargo test --offline --locked -p dageist
 cargo clippy --offline --locked -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
 cargo fmt --all -- --check
+```
+
+Graph checks from the repository root. The crate does not depend on Polars:
+
+```sh
+cargo test --offline --locked -p dageist-graph
+cargo clippy --offline --locked -p dageist-graph --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 Engine checks from the repository root:
