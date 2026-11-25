@@ -290,7 +290,7 @@ pub fn dageist_engine::allowed::Fields::iter(&self) -> core::slice::iter::Iter<'
 pub const fn dageist_engine::allowed::Fields::len(&self) -> usize
 pub fn dageist_engine::allowed::Fields::listed(&self) -> alloc::string::String
 pub fn dageist_engine::allowed::Fields::names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
-pub fn dageist_engine::allowed::Fields::new(fields: alloc::vec::Vec<dageist_engine::allowed::Field>) -> core::result::Result<Self, alloc::string::String>
+pub fn dageist_engine::allowed::Fields::new(fields: alloc::vec::Vec<dageist_engine::allowed::Field>) -> core::result::Result<Self, dageist_engine::allowed::RepeatedName>
 pub fn dageist_engine::allowed::Fields::of_dtype(dtype: &polars_core::datatypes::dtype::DataType) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::Fields::written(&self) -> alloc::string::String
 impl<'a> core::iter::traits::collect::IntoIterator for &'a dageist_engine::allowed::Fields
@@ -303,6 +303,7 @@ pub const fn dageist_engine::allowed::Fit::dtype(&self) -> dageist_engine::allow
 pub const fn dageist_engine::allowed::Fit::verdict(&self) -> &dageist_engine::allowed::Verdict
 pub struct dageist_engine::allowed::Input<'a>
 impl<'a> dageist_engine::allowed::Input<'a>
+pub const fn dageist_engine::allowed::Input<'a>::loose_if(self, loose: bool) -> Self
 pub const fn dageist_engine::allowed::Input<'a>::new(name: core::option::Option<&'a str>, class: core::option::Option<dageist_engine::allowed::Representative>, fields: core::option::Option<&'a dageist_engine::allowed::Fields>) -> Self
 pub struct dageist_engine::allowed::Offer
 impl dageist_engine::allowed::Offer
@@ -341,6 +342,12 @@ pub const fn dageist_engine::allowed::Refusal::source(&self) -> dageist_engine::
 impl core::error::Error for dageist_engine::allowed::Refusal
 impl core::fmt::Display for dageist_engine::allowed::Refusal
 pub fn dageist_engine::allowed::Refusal::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::allowed::RepeatedName(_)
+impl dageist_engine::allowed::RepeatedName
+pub fn dageist_engine::allowed::RepeatedName::name(&self) -> &str
+impl core::error::Error for dageist_engine::allowed::RepeatedName
+impl core::fmt::Display for dageist_engine::allowed::RepeatedName
+pub fn dageist_engine::allowed::RepeatedName::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::allowed::ResultDtype
 impl dageist_engine::allowed::ResultDtype
 pub const fn dageist_engine::allowed::ResultDtype::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
