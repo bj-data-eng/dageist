@@ -128,7 +128,7 @@ pub(crate) enum CountView {
 
 fn count_view(rows: &StepRows) -> CountView {
     match rows {
-        StepRows::NotCounted => CountView::NotCounted,
+        StepRows::NotCounted | StepRows::NotReached { .. } => CountView::NotCounted,
         StepRows::Counted(count) => CountView::Counted {
             received: count.received(),
             kept: count.kept(),

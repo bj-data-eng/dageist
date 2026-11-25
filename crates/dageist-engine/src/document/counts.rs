@@ -4,6 +4,7 @@
 use polars::prelude::{DataFrame, PolarsError};
 
 use super::changes::ColumnChange;
+use super::model::StepId;
 use super::values::FirstValues;
 
 /// The first values of one column.
@@ -81,8 +82,14 @@ impl Counted {
 #[derive(Debug, Clone)]
 pub enum StepRows {
     /// The step was not run on rows: the run read no data, or a step before it
-    /// was refused, incomplete, or failed on the rows.
+    /// was refused or incomplete, or the step was itself refused or incomplete.
     NotCounted,
+    /// Polars accepts the step, and it was not run on the rows because the step `failed` before
+    /// it, which Polars accepted and could not collect on them, as [`StepRows::Failed`] says.
+    NotReached {
+        /// The first step that failed on the rows.
+        failed: StepId,
+    },
     /// The step ran on the rows.
     Counted(Counted),
     /// Polars accepted the step, and could not collect its rows.

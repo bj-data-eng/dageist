@@ -410,7 +410,8 @@ impl Document {
     /// window held in memory, which is the only table this takes. A step is
     /// counted only when the run accepts it and every step before it ran: a
     /// step Polars accepts but cannot collect on these rows is
-    /// [`StepRows::Failed`], and the steps after it are not counted.
+    /// [`StepRows::Failed`], and each step after it that Polars accepts is
+    /// [`StepRows::NotReached`], which names the step that failed.
     ///
     /// # Errors
     ///
@@ -418,10 +419,21 @@ impl Document {
     pub fn run_on(&self, inputs: &Inputs, working: &DataFrame) -> Result<Report, PolarsError> {
         let mut report = self.run(inputs, working.clone().lazy())?;
         let mut frame = working.clone();
+        let mut failed: Option<StepId> = None;
         for (index, (step, reported)) in self.steps().iter().zip(&mut report.steps).enumerate() {
             let Outcome::Valid { changes, .. } = &reported.outcome else {
+                if failed.is_some() {
+                    // Refused or incomplete after a failure: the outcome says what is the matter.
+                    continue;
+                }
                 break;
             };
+            if let Some(failed) = &failed {
+                reported.rows = StepRows::NotReached {
+                    failed: failed.clone(),
+                };
+                continue;
+            }
             let schema = frame.schema().clone();
             let Ok((next, _)) =
                 run_step(index, step, inputs, frame.clone().lazy(), &schema, false).result
@@ -439,7 +451,7 @@ impl Document {
                 }
                 Err(error) => {
                     reported.rows = StepRows::Failed(error);
-                    break;
+                    failed = Some(step.id().clone());
                 }
             }
         }

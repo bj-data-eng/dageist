@@ -352,7 +352,7 @@ fn a_step_polars_refuses_is_not_counted_and_nor_are_the_steps_after_it() {
 }
 
 #[test]
-fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it_are_not_counted() {
+fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it_name_it() {
     // A moment moved by a column of text is a moment by its schema, whatever the text is, and
     // fails when rows are read and a text is no duration. The tables measured durations, so the
     // walk allows it.
@@ -376,16 +376,38 @@ fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it
     // not the step before it.
     for (at, reported) in rows.iter().enumerate().skip(1) {
         assert!(
-            !matches!(reported, StepRows::NotCounted),
-            "{at}: {reported:?}"
-        );
-        assert!(
-            format!("{reported:?}").contains("\"date\""),
+            matches!(reported, StepRows::NotReached { failed } if failed.as_str() == "date"),
             "{at}: {reported:?}"
         );
     }
     // The schema still holds: the report says it is valid.
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
+}
+
+#[test]
+fn a_step_after_a_failure_that_is_refused_says_why_it_is_refused_and_is_not_counted() {
+    let report = run_on(&document(vec![
+        with_columns(
+            "date",
+            vec![(
+                "day",
+                field_then(
+                    "timestamp",
+                    vec![call("Expr.dt.offset_by", json!({ "by": field("dcn") }))],
+                ),
+            )],
+        ),
+        with_columns(
+            "total",
+            vec![(
+                "total",
+                field_then("dcn", vec![call("Expr.sum", json!({}))]),
+            )],
+        ),
+    ]));
+    assert!(matches!(report.steps()[0].rows(), StepRows::Failed(_)));
+    assert!(matches!(report.steps()[1].outcome(), Outcome::Refused(_)));
+    assert!(matches!(report.steps()[1].rows(), StepRows::NotCounted));
 }
 
 /// A step of `entry` that writes the columns `named` and gives the unnamed expressions `bare`.
