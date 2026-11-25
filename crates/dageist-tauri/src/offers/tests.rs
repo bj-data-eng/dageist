@@ -458,9 +458,9 @@ fn a_field_and_an_input_start_a_predicate_by_their_dtype() {
         answer["fits"][1]["verdict"]["ending"]["refusal"]["source"],
         json!({ "by": "rule", "rule": "filter-predicate-is-boolean" })
     );
-    // A connected value gives one value, a list many.
+    // A connected value gives one value, a list a count of values of its own.
     assert_eq!(answer["fits"][2]["verdict"]["shape"], "one");
-    assert_eq!(answer["fits"][3]["verdict"]["shape"], "many");
+    assert_eq!(answer["fits"][3]["verdict"]["shape"], "counted");
 }
 
 #[test]

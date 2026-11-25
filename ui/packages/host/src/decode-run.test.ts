@@ -190,14 +190,14 @@ describe('the report of running the claim-timing steps', () => {
   });
 
   it('asks the tables about a chain that starts from a connected list, as a literal of its dtype', () => {
-    // `holidays` is a list of dates: many values of a date, and its length is one count.
+    // `holidays` is a list of dates: a count of values of a date of its own, and its length is one value.
     const walked = stepNamed(run, 'holiday_count').walk.expressions[0];
     expect(stepNamed(run, 'holiday_count').walk.notKnown).toBeNull();
     expect(walked?.calls[0]).toEqual({
       follows: { kind: 'start' },
-      verdict: { kind: 'allowed', result: 'Date', shape: 'many', ending: { kind: 'allowed' } },
+      verdict: { kind: 'allowed', result: 'Date', shape: 'counted', ending: { kind: 'allowed' } },
     });
-    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'many' });
+    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'counted' });
     expect(walked?.calls[1]?.verdict).toEqual({
       kind: 'allowed',
       result: 'UInt32',
@@ -207,7 +207,7 @@ describe('the report of running the claim-timing steps', () => {
     expect(walked?.places).toEqual([
       {
         context: { outer: 'select', nested: null },
-        after: { kind: 'value', dtype: 'Date', shape: 'many' },
+        after: { kind: 'value', dtype: 'Date', shape: 'counted' },
       },
       {
         context: { outer: 'select', nested: null },

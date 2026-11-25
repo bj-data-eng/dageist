@@ -33,7 +33,7 @@ function named(...ids: string[]): DocumentStepView[] {
 const COLUMN: Path = [parameterSegment('named_exprs'), valueSegment(0)];
 
 /** The place a link stands in, in a select, after a value of `dtype`. */
-function selectAfter(dtype: string, shape: 'one' | 'many') {
+function selectAfter(dtype: string, shape: 'one' | 'many' | 'counted') {
   return {
     context: { outer: 'select', nested: null },
     after: { kind: 'value', dtype, shape },
@@ -175,8 +175,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'holiday_count').chains.get(pathKey(COLUMN))).toEqual({
       source: 'Date',
       links: ['UInt32'],
-      // A list of dates gives many; its length is one count.
-      places: [selectAfter('Date', 'many'), selectAfter('UInt32', 'one')],
+      // A list of dates is a count of values of its own; its length is one value.
+      places: [selectAfter('Date', 'counted'), selectAfter('UInt32', 'one')],
     });
   });
 
