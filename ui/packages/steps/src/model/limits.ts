@@ -1,14 +1,17 @@
 /**
  * @file The one list of what the step editor does not yet express of what the engine allows. Each
- * declared gap names what it covers, an entry, a place, a start, a parameter, a state of a report,
- * a kind of value typed in, or something a document or a report holds that the editor does not
- * show, and says why. Three tests find the gaps, each of the kinds that
+ * declared gap names what it covers, an entry, a place, a start, a parameter, a step, a parameter of
+ * a step, a state of a report, a kind of value typed in, or something a document or a report holds
+ * that the editor does not show, and says why. Four tests find the gaps, each of the kinds that
  * `FOUND_BY` names for it, and fail on a gap that is found and not declared, and on a gap that is
  * declared and not found. The grid test runs the model's functions for every place the engine was
- * asked about; the test of states does the same for every state of a step's report; and the census
- * test holds every variant the host lists against what the editor can draw. A change of the engine
- * or of the catalogue that adds something the editor cannot draw, or a change of the editor that
- * draws it, changes this list.
+ * asked about; the test of states does the same for every state of a step's report; the census
+ * test holds every variant the host lists against what the editor can draw; and the corpus test
+ * rebuilds every piece of every document the engine made, and finds the steps and the parameters of
+ * steps that the grid does not reach. The corpus test accepts any gap declared of a kind another test
+ * finds, for a piece it cannot build: it only names the piece. A change of the engine or of the
+ * catalogue that adds something the editor cannot draw, or a change of the editor that draws it,
+ * changes this list.
  *
  * A list shows an entry that is declared here as disabled, with the reason, where it lists the
  * entry at all.
@@ -52,6 +55,10 @@ export type Cover =
   | { readonly kind: 'parameter'; readonly entry: string; readonly parameter: string }
   /** A kind of parameter that has no drawing, by the shape and kind that make it up. */
   | { readonly kind: 'parameterKind'; readonly of: string }
+  /** A step of the catalogue that no list adds, though a document may hold it. */
+  | { readonly kind: 'step'; readonly entry: string }
+  /** A parameter of a step that the editor draws neither in the step's head nor as an option. */
+  | { readonly kind: 'stepParameter'; readonly entry: string; readonly parameter: string }
   /** A state of a step's report that says nothing. */
   | { readonly kind: 'report'; readonly state: ReportState }
   /** A kind of number, text or flag a document holds typed in, which the editor has no way to type. */
@@ -59,17 +66,22 @@ export type Cover =
   /** What a document or a report holds that the editor does not show, by what it is. */
   | { readonly kind: 'shown'; readonly what: string };
 
-/** What finds the gaps of each kind of cover: the grid test, the test of states, or the census test. */
+/**
+ * What finds the gaps of each kind of cover: the grid test, the test of states, the census test, or
+ * the corpus test.
+ */
 export const FOUND_BY = {
   entry: 'grid',
   place: 'grid',
   start: 'grid',
   parameter: 'grid',
   parameterKind: 'grid',
+  step: 'corpus',
+  stepParameter: 'corpus',
   report: 'states',
   typed: 'census',
   shown: 'census',
-} as const satisfies Readonly<Record<Cover['kind'], 'grid' | 'states' | 'census'>>;
+} as const satisfies Readonly<Record<Cover['kind'], 'grid' | 'states' | 'census' | 'corpus'>>;
 
 /** One declared gap: what it covers and why. */
 export interface Gap {
@@ -90,6 +102,10 @@ export function coverKey(cover: Cover): string {
       return `parameter ${cover.entry} ${cover.parameter}`;
     case 'parameterKind':
       return `parameterKind ${cover.of}`;
+    case 'step':
+      return `step ${cover.entry}`;
+    case 'stepParameter':
+      return `stepParameter ${cover.entry} ${cover.parameter}`;
     case 'report':
       return `report ${cover.state}`;
     case 'typed':
@@ -123,6 +139,15 @@ const FLAG_NOT_SHOWN =
 /** Why the dtypes of an expression that gives several columns are not shown. */
 const SEVERAL_NOT_SHOWN =
   'the editor shows the dtype after a chain only where it gives one column; the dtypes of a chain that gives several are not shown (#177)';
+
+/** Why a step the editor draws by its parameters alone is not added from the list of steps. */
+const NOT_A_STEP_OF_THE_LIST =
+  'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it';
+
+/** Declares the step `entry`, which no list adds. */
+function stepGap(entry: string): Gap {
+  return { cover: { kind: 'step', entry }, reason: NOT_A_STEP_OF_THE_LIST };
+}
 
 /** Declares the entry `entry`, which the editor cannot pick or make, for `reason`. */
 function entryGap(entry: string, reason: string): Gap {
@@ -158,6 +183,30 @@ export const GAPS: readonly Gap[] = [
   entryGap('polars.repeat', NOT_A_START),
   entryGap('polars.time', NOT_A_START),
   entryGap('polars.time_range', NOT_A_START),
+  // The steps no list adds: the editor adds the seven it has heads for.
+  stepGap('LazyFrame.drop'),
+  stepGap('LazyFrame.drop_nans'),
+  stepGap('LazyFrame.drop_nulls'),
+  stepGap('LazyFrame.fill_nan'),
+  stepGap('LazyFrame.first'),
+  stepGap('LazyFrame.gather_every'),
+  stepGap('LazyFrame.head'),
+  stepGap('LazyFrame.last'),
+  stepGap('LazyFrame.limit'),
+  stepGap('LazyFrame.reverse'),
+  stepGap('LazyFrame.slice'),
+  stepGap('LazyFrame.tail'),
+  stepGap('LazyFrame.with_row_index'),
+  // The parameters of a step that its head does not draw and its options do not offer.
+  {
+    cover: { kind: 'stepParameter', entry: 'LazyFrame.sort', parameter: 'more_by' },
+    reason: 'the fields to order by are one list, so a second list of more fields is not offered',
+  },
+  {
+    cover: { kind: 'stepParameter', entry: 'LazyFrame.join', parameter: 'on' },
+    reason:
+      'the keys of the two tables are one list each, so `on`, one list of keys both tables share, is not offered',
+  },
   // The parameters of the entries the editor draws as a word of their own, which it does not set.
   parameterGap(
     'polars.col',

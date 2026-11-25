@@ -63,7 +63,7 @@ const readSource: Decode<SourceView> = readRecord(['name', 'from', 'columns'], (
   columns: readField(fields, path, 'columns', readList(readFieldView)),
 }));
 
-const readInput: Decode<InputView> = readTagged<InputView>('kind', {
+export const readInput: Decode<InputView> = readTagged<InputView>('kind', {
   table: {
     fields: ['name', 'from', 'columns'],
     read: (fields, path) => ({

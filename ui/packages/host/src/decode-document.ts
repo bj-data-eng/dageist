@@ -185,7 +185,7 @@ const readDocumentStep: Decode<DocumentStepView> = readRecord(['id', 'call'], (f
   call: readField(fields, path, 'call', readCall),
 }));
 
-const readDocument: Decode<DocumentView> = readRecord(['steps'], (fields, path) => ({
+export const readDocument: Decode<DocumentView> = readRecord(['steps'], (fields, path) => ({
   steps: readField(fields, path, 'steps', readList(readDocumentStep)),
 }));
 

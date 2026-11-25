@@ -12,7 +12,7 @@ import { GAPS, coverKey, editorLimit } from './limits';
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 
 describe('the declared gaps', () => {
-  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, a report that says nothing, a flag that cannot be typed and a flag and several dtypes that are not shown', () => {
+  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, the steps no list adds and the parameters of a step that are not offered, a report that says nothing, a flag that cannot be typed and a flag and several dtypes that are not shown', () => {
     expect(sorted(GAPS.map((gap) => coverKey(gap.cover)))).toEqual(
       sorted([
         'entry ChainedThen.otherwise',
@@ -42,6 +42,21 @@ describe('the declared gaps', () => {
         'start typedFloat',
         'start typedInteger',
         'start typedText',
+        'step LazyFrame.drop',
+        'step LazyFrame.drop_nans',
+        'step LazyFrame.drop_nulls',
+        'step LazyFrame.fill_nan',
+        'step LazyFrame.first',
+        'step LazyFrame.gather_every',
+        'step LazyFrame.head',
+        'step LazyFrame.last',
+        'step LazyFrame.limit',
+        'step LazyFrame.reverse',
+        'step LazyFrame.slice',
+        'step LazyFrame.tail',
+        'step LazyFrame.with_row_index',
+        'stepParameter LazyFrame.join on',
+        'stepParameter LazyFrame.sort more_by',
         'typed flag',
       ]),
     );
