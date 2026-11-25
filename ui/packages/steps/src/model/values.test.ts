@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { valuesLine } from './values';
+import { NULL_DASH, cellText, valuesLine } from './values';
 
 describe('the values of a column as a line', () => {
   it('are the values the engine wrote, apart by commas', () => {
@@ -19,5 +19,16 @@ describe('the values of a column as a line', () => {
 
   it('are nothing where there are none', () => {
     expect(valuesLine({ shown: [], more: 0 })).toBe('');
+  });
+});
+
+describe('a cell of the rows as text', () => {
+  it('is the text the engine wrote, whatever it holds', () => {
+    expect(cellText('2026-03-03')).toBe('2026-03-03');
+    expect(cellText('')).toBe('');
+  });
+
+  it('is a dash for a null, since the engine writes no text for it', () => {
+    expect(cellText(null)).toBe(NULL_DASH);
   });
 });

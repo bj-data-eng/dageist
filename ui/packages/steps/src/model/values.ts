@@ -13,3 +13,8 @@ export function valuesLine(values: ValuesView): string {
   const shown = values.shown.map((value) => value ?? NULL_DASH).join(', ');
   return values.more > 0 ? `${shown}, …` : shown;
 }
+
+/** Returns the text of a cell of the rows: as the engine wrote it, or a dash for a null, which it writes no text for. */
+export function cellText(cell: string | null): string {
+  return cell ?? NULL_DASH;
+}

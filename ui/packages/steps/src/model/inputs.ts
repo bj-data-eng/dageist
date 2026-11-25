@@ -47,6 +47,20 @@ export function originWords(origin: OriginView): string {
   }
 }
 
+/** Returns the short description shown beside an input's name: how many columns a table has, a value's dtype, a list's element dtype. */
+export function inputDetail(input: InputView): string {
+  switch (input.kind) {
+    case 'table':
+      return `${String(input.columns.length)} columns`;
+    case 'value':
+      return input.dtype;
+    case 'list':
+      return `list of ${input.dtype}`;
+    default:
+      return input satisfies never;
+  }
+}
+
 /** Returns the lines that describe an input: what it is, where it comes from and what it holds. */
 export function inputLines(input: InputView): string[] {
   const from = `from ${originWords(input.from)}`;

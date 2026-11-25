@@ -5,24 +5,9 @@
  */
 
 import { Peek } from '@dageist/design';
-import type { InputView } from '@dageist/host';
 
 import { useNode } from './EngineProvider';
-import { inputLines, sourceLines } from './model/inputs';
-
-/** Returns the short description shown beside an input's name. */
-function detail(input: InputView): string {
-  switch (input.kind) {
-    case 'table':
-      return `${String(input.columns.length)} columns`;
-    case 'value':
-      return input.dtype;
-    case 'list':
-      return `list of ${input.dtype}`;
-    default:
-      return '';
-  }
-}
+import { inputDetail, inputLines, sourceLines } from './model/inputs';
 
 /** Lists the node's inputs, each with its kind and dtype. */
 export function InputsStrip(): React.JSX.Element {
@@ -50,7 +35,7 @@ export function InputsStrip(): React.JSX.Element {
           <span data-tone={input.kind === 'table' ? 'table' : 'input'} className="text-(--tone)">
             {input.name}
           </span>{' '}
-          <span className="text-[11px] text-muted">{detail(input)}</span>
+          <span className="text-[11px] text-muted">{inputDetail(input)}</span>
         </Peek>
       ))}
     </div>
