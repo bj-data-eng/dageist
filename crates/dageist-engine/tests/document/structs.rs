@@ -904,3 +904,25 @@ fn the_class_a_struct_has_is_one_whatever_its_fields() {
         );
     }
 }
+
+#[test]
+fn an_unnest_as_a_join_key_is_one_the_walk_cannot_tell_to_stand() {
+    // Polars takes the keys of one side as many columns as the other side's, and writes them by the
+    // names of the fields, so what the tables measured of one column cannot judge it.
+    let held = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![chain(col_call("s_xy"), vec![unnest()])]),
+            "right_on": many(vec![field("rk"), field("rk")]),
+        }),
+    );
+    let found = ask_step(held);
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses an unnest as a join key: {:?}",
+        found.walk_refusal
+    );
+    assert!(found.walk_knows_nothing_of_it.is_some());
+}
