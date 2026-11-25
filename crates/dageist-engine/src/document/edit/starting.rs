@@ -47,6 +47,7 @@ fn value_of(
             &allowed::Literal::String(text.clone()),
         )?),
         Setting::Text(text) if kind == Kind::Column => Value::Columns(vec![text.clone()]),
+        Setting::Text(text) if kind == Kind::Field => Value::Field(text.clone()),
         Setting::Text(text) => Value::from_literal(&allowed::Literal::String(text.clone()), kind),
         Setting::Word(word) => match kind {
             Kind::Dtype => Value::Dtype(
@@ -54,6 +55,7 @@ fn value_of(
                     .map_err(|error| Refusal::new(Cause::Dtype(error)))?,
             ),
             Kind::Column => Value::Columns(vec![word.clone()]),
+            Kind::Field => Value::Field(word.clone()),
             Kind::Table => Value::Table(word.clone()),
             Kind::Choice(_) => Value::Choice(word.clone()),
             Kind::TimeZone => Value::TimeZone(None),

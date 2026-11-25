@@ -7,13 +7,11 @@
 //! field, so a struct is written with the fields it holds.
 
 use dageist_engine::allowed::{RefusalSource, Representative, dtype_name};
-use dageist_engine::document::{Document, Inputs, Outcome, Report, Resolution, StepRows};
+use dageist_engine::document::{Document, Inputs, Outcome, Report, Resolution, Segment, StepRows};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{
-    call, chain, col_call, document, field, many, step, text, text_call, whole,
-};
+use crate::support::{call, chain, col_call, document, field, many, step, text, text_call, whole};
 
 // ---------------------------------------------------------------------------
 // The table
@@ -140,7 +138,7 @@ fn polars_says(report: &Report) -> Said {
 struct Found {
     polars: Said,
     walk_refusal: Option<(Option<&'static str>, String)>,
-    walk_knows_nothing_of_it: bool,
+    walk_knows_nothing_of_it: Option<String>,
     polars_dtype: Option<DataType>,
     walked_name: Option<String>,
 }
@@ -180,20 +178,32 @@ fn ask_step(step: Value) -> Found {
         };
         (rule, refusal.refusal().reason().to_owned())
     });
-    let expression = report.steps()[0].expressions().first();
-    let polars_dtype = expression.and_then(|expression| match expression.links().last()? {
-        Resolution::Dtype(dtype) => Some(dtype.clone()),
-        _ => None,
+    // The first item of the step: the expressions inside its arguments are listed before it.
+    let item = [Segment::Parameter("exprs".to_owned()), Segment::Item(0)];
+    let expression = report.steps()[0]
+        .expressions()
+        .iter()
+        .find(|expression| expression.place().path() == item);
+    let polars_dtype = expression.and_then(|expression| {
+        match expression
+            .links()
+            .last()
+            .unwrap_or_else(|| expression.start())
+        {
+            Resolution::Dtype(dtype) => Some(dtype.clone()),
+            _ => None,
+        }
     });
     let walked_name = walk
         .expressions()
-        .first()
+        .iter()
+        .find(|expression| expression.place().path() == item)
         .and_then(|expression| expression.calls().last()?.verdict()?.allowance())
         .and_then(|allowance| allowance.result().map(|result| result.name().to_owned()));
     Found {
         polars,
         walk_refusal,
-        walk_knows_nothing_of_it: walk.not_known().is_some(),
+        walk_knows_nothing_of_it: walk.not_known().map(str::to_owned),
         polars_dtype,
         walked_name,
     }
@@ -247,8 +257,9 @@ fn assert_accepted_as_polars_has_it(found: &Found, what: &str) {
         found.walk_refusal
     );
     assert!(
-        !found.walk_knows_nothing_of_it,
-        "the walk cannot tell {what}"
+        found.walk_knows_nothing_of_it.is_none(),
+        "the walk cannot tell {what}: {:?}",
+        found.walk_knows_nothing_of_it
     );
     let polars = found
         .polars_dtype

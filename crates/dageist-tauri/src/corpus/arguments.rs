@@ -14,6 +14,7 @@ pub(super) fn sample(kind: Kind, outer: Outer) -> Value {
     match kind {
         Kind::Expression(_) => field(&field_name(outer, Representative::Int64)),
         Kind::Column => Value::Columns(vec![column_of(Representative::Int64)]),
+        Kind::Field => Value::Field("x".to_owned()),
         Kind::Value(ValueType::Integer | ValueType::Any) => Value::Integer(1),
         Kind::Value(ValueType::Float) => Value::Float(1.5),
         Kind::Value(ValueType::String) => Value::String("a".to_owned()),
@@ -34,6 +35,16 @@ pub(super) fn sample(kind: Kind, outer: Outer) -> Value {
 
 /// The argument for `parameter`, one of its kind, in the shape it holds them.
 pub(super) fn sample_for(parameter: &Parameter, outer: Outer) -> Value {
+    // The new names of the two fields of the struct the tables measure, or of its first two places.
+    if parameter.kind() == Kind::Value(ValueType::String)
+        && parameter.shape() == Shape::Many
+        && matches!(parameter.name(), "names" | "fields")
+    {
+        return Value::Many(vec![
+            Value::String("a".to_owned()),
+            Value::String("b".to_owned()),
+        ]);
+    }
     let one = sample(parameter.kind(), outer);
     match parameter.shape() {
         Shape::One => one,

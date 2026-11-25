@@ -8,8 +8,9 @@ use polars::prelude::{DataType, TimeUnit, TimeZone};
 use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
-use super::context::Context;
+use super::context::{Context, Outer};
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
+use super::fields::{self, Fields, Gives, Input};
 use super::rules::Rule;
 use super::table::{
     LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
@@ -83,17 +84,28 @@ impl ConditionState {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
-    options: &'a [(&'a str, &'a str)],
+    pub(super) options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
-    patterns: &'a [(&'a str, &'a str)],
+    pub(super) patterns: &'a [(&'a str, &'a str)],
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
-    width: Option<usize>,
+    pub(super) width: Option<usize>,
     zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
     shape: Option<Shape>,
+    /// The fields of the struct the call follows, where the chain knows them.
+    pub(super) fields: Option<&'a Fields>,
+    /// The names the call is given, each by the parameter that holds it: the name of a field to read
+    /// or drop, the new names of the fields, the name of a count.
+    pub(super) names: &'a [(&'a str, &'a str)],
+    /// The whole numbers the call is given, each by the parameter that holds it.
+    pub(super) numbers: &'a [(&'a str, i64)],
+    /// The name the value the call follows is written under, where the chain knows it.
+    pub(super) output_name: Option<&'a str>,
+    /// What a call that makes a struct of what it is given is given, one for each.
+    pub(super) inputs: &'a [Input<'a>],
 }
 
 impl<'a> Chosen<'a> {
@@ -179,6 +191,47 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
+        self
+    }
+
+    /// The fields of the struct the method follows, where the chain knows them: what a call that
+    /// reads, drops or renames a field says depends on them, and a struct the call keeps is written
+    /// with them.
+    #[must_use]
+    pub const fn following_fields(mut self, fields: Option<&'a Fields>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    /// The names the call is given, each as `(parameter, name)`, in order: the fields it reads or
+    /// drops, the names it gives the fields, the name it gives a count.
+    #[must_use]
+    pub const fn with_names(mut self, names: &'a [(&'a str, &'a str)]) -> Self {
+        self.names = names;
+        self
+    }
+
+    /// The whole numbers the call is given, each as `(parameter, number)`: how many pieces a text
+    /// is split into.
+    #[must_use]
+    pub const fn with_numbers(mut self, numbers: &'a [(&'a str, i64)]) -> Self {
+        self.numbers = numbers;
+        self
+    }
+
+    /// The name the value the call follows is written under, where the chain knows it: the column a
+    /// count of values names its values by.
+    #[must_use]
+    pub const fn named(mut self, name: Option<&'a str>) -> Self {
+        self.output_name = name;
+        self
+    }
+
+    /// What a function that makes a struct is given, one for each field it makes: the name that
+    /// each is written under and the dtype it has, as far as they are known.
+    #[must_use]
+    pub const fn with_inputs(mut self, inputs: &'a [Input<'a>]) -> Self {
+        self.inputs = inputs;
         self
     }
 
@@ -403,6 +456,8 @@ pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
     ending: Ending,
+    fields: Option<Fields>,
+    columns: Option<Fields>,
 }
 
 impl Allowance {
@@ -435,6 +490,20 @@ impl Allowance {
     #[must_use]
     pub const fn result(&self) -> Option<&ResultDtype> {
         self.result.as_ref()
+    }
+
+    /// The fields of the struct the chain has after the entry, where it is one whose fields are
+    /// known: the struct a call makes, the one it keeps, or the one a field read holds.
+    #[must_use]
+    pub const fn fields(&self) -> Option<&Fields> {
+        self.fields.as_ref()
+    }
+
+    /// The columns the entry writes where it writes several, one for each field of a struct it
+    /// unnests, and the fields are known: the chain has no dtype of one value then.
+    #[must_use]
+    pub const fn columns(&self) -> Option<&Fields> {
+        self.columns.as_ref()
     }
 
     /// Whether the chain gives one value after the entry.
@@ -945,6 +1014,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         return Err(Refusal::rule_because(rule, &said));
     }
+    // What the call says of a struct: a field that is none, names that do not fit, or fields made.
+    let receiver_class = match place.after {
+        After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    };
+    let struct_gives = fields::gives(entry, receiver_class, chosen)
+        .map_err(|(rule, said)| Refusal::rule_because(rule, &said))?;
+    // A filter's predicate is one column. The tables measured an unnest on a struct of two fields, so
+    // a struct of one, which is one column, is judged as the field it is.
+    if struct_gives
+        .columns()
+        .is_some_and(|columns| columns.len() >= 2)
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+    {
+        return Err(Refusal::rule(Rule::OneColumnIsNeeded));
+    }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
@@ -1115,21 +1201,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         if needs_a_dtype {
             result = None;
         }
-        // A call whose pattern names the fields of what it gives, as `extract_groups` does, gives
-        // nothing until it is told the pattern, and then the struct Polars works out of it: the
-        // dtype table measured it with one pattern, whose groups are not the call's.
-        if let Some(parameter) = entry
-            .parameters()
-            .iter()
-            .find(|parameter| parameter.names_the_fields_of_the_result())
-        {
-            result = chosen
-                .patterns
-                .iter()
-                .find(|(name, _)| *name == parameter.name())
-                .and_then(|(_, text)| catalog::groups_dtype(text).ok())
-                .map(|dtype| ResultDtype::from_name(&dtype_name(&dtype)));
-        }
         // A call that is given a time zone gives a moment in it, and one given none a moment of no
         // zone, where the tables, measured with the zone UTC, say only that a moment is given: it
         // gives nothing until it is told the zone, where a call may be given none.
@@ -1209,10 +1280,21 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // An option given in place of a parameter makes the method another form, which the table
     // measured apart where it differs: a fill by a strategy is not a fill by a value.
     let form = form_of(entry, chosen);
+    // A struct of one field that is unnested is the field read, where the tables measured an unnest
+    // of a struct of two.
+    let measured_as = if id == "Expr.struct.unnest" && matches!(struct_gives, Gives::Field(_)) {
+        "Expr.struct.field"
+    } else {
+        id
+    };
     let cell = tables
         .contexts
-        .get(&(id, form, place.context))
-        .or_else(|| tables.contexts.get(&(id, Vec::new(), place.context)));
+        .get(&(measured_as, form, place.context))
+        .or_else(|| {
+            tables
+                .contexts
+                .get(&(measured_as, Vec::new(), place.context))
+        });
     if let Some(cell) = cell {
         match &cell.continues {
             Outcome::Refused(reason) => return Err(Refusal::polars(reason)),
@@ -1257,7 +1339,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
     let boolean_needed = Rule::boolean_needed(place.context);
-    let ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
+    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
         Ending::Refused(Refusal::rule(rule))
     } else if let Some(refusal) = Refusal::count(place.context, shape) {
         Ending::Refused(refusal)
@@ -1282,6 +1364,31 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             Outcome::Allowed(_) => Ending::Allowed,
         }
     };
+    // A struct is written with the fields the chain carries, and the call that reads, names or makes
+    // fields gives what it says of them: not what the tables measured on a struct of two.
+    let mut fields = None;
+    match &struct_gives {
+        Gives::Nothing => {
+            if result.as_ref().and_then(ResultDtype::class) == Some(Representative::Struct) {
+                let keeps = receiver_class == Some(Representative::Struct);
+                let (written, held) = fields::kept(chosen.fields.filter(|_| keeps));
+                result = Some(written);
+                fields = held;
+            }
+        }
+        decided => {
+            (result, fields) = decided.result().unwrap_or((None, None));
+        }
+    }
+    // Several columns of a field read with several names are no dtype of one value, and the tables
+    // measured one name: where the place is no item of a select or a sort key, they do not say.
+    let columns = struct_gives.columns().cloned();
+    if id == "Expr.struct.field"
+        && columns.as_ref().is_some_and(|columns| columns.len() >= 2)
+        && !matches!(place.context.outer(), Outer::Select | Outer::Sort)
+    {
+        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+    }
     // An array is written at the width it has, where the chain knows it.
     if let (Some(width), Some(found)) = (chosen.width, &result)
         && matches!(found.class(), Some(Representative::Array(_)))
@@ -1292,6 +1399,8 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         result,
         shape,
         ending,
+        fields,
+        columns,
     })
 }
 
@@ -1613,6 +1722,21 @@ pub fn refuse_a_count_that_may_not_end(context: Context) -> Result<(), Refusal> 
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_a_repeated_pair_of_key_names(context: Context) -> Result<(), Refusal> {
     Rule::forbids_repeated_key_names(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
+/// The refusal of the rule that the columns that the items of a select, or of the columns a step
+/// adds, write are named differently, where two of them write the name `name`. What each item
+/// writes, an unnest and a field read writing the names of fields, is a matter of the whole step,
+/// which the caller finds.
+///
+/// # Errors
+///
+/// Always: the caller asks it where it found a name written twice.
+pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::WrittenNamesAreDistinct,
+        &format!("two items write the name {name:?}"),
+    ))
 }
 
 /// Every entry that stands in an expression, offered or refused at `place`.

@@ -24,7 +24,7 @@ use crate::catalog::{
 
 use super::build::{
     column, condition_with, element, entry, expression, expressions, flag, function, integer,
-    method, null_of, one_of, patterns, required_choices, step,
+    method, null_of, one_of, patterns, required_choices, required_values, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -361,6 +361,11 @@ fn companions(
     if let Some(entry) = catalog::entry(entry) {
         given.extend(patterns(entry));
         given.extend(required_choices(entry));
+        let missing: Vec<(&'static str, Argument)> = required_values(entry)
+            .into_iter()
+            .filter(|(name, _)| !given.iter().any(|(given, _)| given == name))
+            .collect();
+        given.extend(missing);
     }
     given
 }
@@ -821,7 +826,7 @@ fn function_on(
     } else {
         scope.start()
     };
-    given.push((subject, expression(held)));
+    given.push((subject, argument_for(entry, subject, held)));
     function(id, given)
 }
 
@@ -1324,6 +1329,8 @@ fn context_line(
                 "polars.time" => function(id, vec![("hour", expression(scope.start()))]),
                 "polars.duration" => function(id, vec![("days", expression(scope.start()))]),
                 "polars.from_epoch" => function(id, vec![("column", expression(scope.start()))]),
+                // A struct of the column, or of the values of a group, which names its one field.
+                "polars.struct" => function(id, vec![("exprs", expressions(vec![scope.start()]))]),
                 // A range or a repeat gives a count, which a place takes where what it goes on
                 // to, one value, may: it is measured with arguments typed in, and one value of the
                 // dtype of a bound where the dtype is one of the bounds.

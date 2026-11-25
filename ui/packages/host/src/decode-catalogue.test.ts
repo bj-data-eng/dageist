@@ -61,6 +61,7 @@ describe('the catalogue the host sends', () => {
       'rounding',
       'aggregate',
       'temporal',
+      'structs',
       'text',
       'pieces',
       'search',
@@ -248,7 +249,7 @@ describe('the catalogue the host sends', () => {
     );
     expect(refused.path).toBe(`$.entries[${String(shift)}].parameters[0].kind.kind`);
     expect(refused.problem).toBe(
-      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "pattern", "timeZone", "table", "path", "pairs", not "map"',
+      'must be one of "expression", "column", "field", "value", "flag", "choice", "dtype", "duration", "pattern", "timeZone", "table", "path", "pairs", not "map"',
     );
   });
 

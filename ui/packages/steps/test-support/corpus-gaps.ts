@@ -91,6 +91,8 @@ function oneFits(control: OneControl, value: ArgumentView): string | null {
             return ['timeZone'];
           case 'path':
             return ['path'];
+          case 'field':
+            return ['field'];
           default:
             return control.type satisfies never;
         }
@@ -343,6 +345,7 @@ class Rebuild {
         }
         return;
       case 'columns':
+      case 'field':
       case 'integer':
       case 'float':
       case 'string':

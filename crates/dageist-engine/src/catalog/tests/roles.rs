@@ -117,8 +117,8 @@ fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_give
     // without one. `fill_null` is refused without a value or a strategy, which is given in place
     // of it, a replacement without what it replaces by: Python's `new` is `NO_DEFAULT` only
     // for a mapping, which the catalogue does not hold, and the `filter` of an expression, which
-    // Python refuses without a predicate or a constraint. The mark means nothing on any other
-    // parameter.
+    // Python refuses without a predicate or a constraint, and `polars.struct`, which Python
+    // refuses without a field. The mark means nothing on any other parameter.
     let mut marked = Vec::new();
     for entry in catalog::entries() {
         for parameter in entry.parameters() {
@@ -138,7 +138,8 @@ fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_give
             ("Expr.filter", "predicates"),
             ("Expr.or_", "others"),
             ("Expr.replace", "new"),
-            ("Expr.replace_strict", "new")
+            ("Expr.replace_strict", "new"),
+            ("polars.struct", "exprs")
         ]
     );
 }

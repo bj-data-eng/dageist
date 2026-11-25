@@ -651,8 +651,13 @@ const SCALAR_EXCEPTIONS: [&str; 5] = [
 
 /// The calls that cannot be asked as the fill of a `shift` beside themselves, which Polars refuses
 /// for the dtype it gives, with why.
-const UNBUILDABLE_AS_A_FILL: [&str; 1] = [
+const UNBUILDABLE_AS_A_FILL: [&str; 4] = [
     // A list: Polars fills a list with a list, where the tables measure a fill by the number 1 of
     // the dtype it fills, which a list is not, so they refuse it.
     "Expr.str.split by",
+    // A struct: Polars fills a struct with a struct of the fields it has, which the number 1 of the
+    // dtype it fills is not, and refuses it where it makes the fields of the fill.
+    "Expr.str.split_exact by",
+    "Expr.str.splitn by",
+    "polars.struct exprs",
 ];

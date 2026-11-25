@@ -106,6 +106,7 @@ function kindFrom(kind: CensusKind): KindView | null {
   switch (kind.kind) {
     case 'expression':
     case 'column':
+    case 'field':
     case 'flag':
     case 'dtype':
     case 'duration':

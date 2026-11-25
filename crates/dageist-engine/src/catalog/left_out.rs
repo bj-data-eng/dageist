@@ -122,9 +122,13 @@ pub fn left_out() -> &'static [LeftOut] {
 //   no shape of the walk: the editor, which is strict where the data decide, would refuse it there,
 //   so what it would accept is a call that gives back the value it is given. It waits for a way to
 //   say how many rows a table has; `allow_empty` only admits a table of no rows.
-// - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
-//   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
-//   is catalogued, for its fields are named by the pattern and Polars says them.
+// - `Expr.struct.with_fields`, `Expr.struct.eval` and `polars.field` take a body whose `field(...)`
+//   reads the fields of the one struct it is a body of, the shape that `list.eval` is of lists: a
+//   position that no table is measured in and that gives what its body gives. They wait for the body
+//   shape, which the walk does not have, though it now carries the fields of a struct for the body to
+//   read. `polars.struct_with_fields` builds a dtype expression, which is no expression of a step,
+//   and `Expr.struct.__getitem__` is Python's subscript for `field` that also takes a place, which
+//   `Expr.struct.field` does not: a field by its place waits for a way to say which place.
 // - `LazyFrame.unique` keeps one of the rows that repeat, and its `keep` is `any` unless it is told
 //   another, which is whichever of them Polars meets first; without `maintain_order` the rows are
 //   in no order Polars promises either. What the step gives is not a table the engine can state
@@ -169,9 +173,8 @@ pub fn left_out() -> &'static [LeftOut] {
 //   - `list.agg`, `eval` and `filter` and `arr.agg` and `eval` take a body whose `element()` is
 //     one list's elements, a position that no table is measured in and that gives what its body
 //     gives; `list.item` is the body `element().item()`;
-//   - `list.sample` draws at random, which two runs do not repeat, `list.to_map` gives a dtype
-//     that is not a class, and `list.to_struct` and `arr.to_struct` give a struct whose fields a
-//     step reads with `Expr.struct.field`, which is not catalogued either.
+//   - `list.sample` draws at random, which two runs do not repeat, and `list.to_map` gives a dtype
+//     that is not a class.
 // - `LazyFrame.explode` takes the columns of lists and arrays and refuses any other dtype, which
 //   no table measures, for `Expr.explode` is not catalogued either.
 // - `polars.concat` takes several tables, which are no receiver of a step: a step is a method
@@ -224,7 +227,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.arr.shift", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.slice", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.tail", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arr.to_struct", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.contains", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.decode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin.encode", Reason::NotYetCatalogued),
@@ -305,7 +307,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.list.tail", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.to_array", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.to_map", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.list.to_struct", Reason::NotYetCatalogued),
     LeftOut::new("Expr.log10", Reason::NotYetCatalogued),
     LeftOut::new("Expr.lower_bound", Reason::NotYetCatalogued),
     LeftOut::new("Expr.map.contains_key", Reason::NotYetCatalogued),
@@ -396,8 +397,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.str.json_path_match", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.normalize", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.replace_many", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.split_exact", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.splitn", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.strptime", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.to_date", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.to_datetime", Reason::NotYetCatalogued),
@@ -405,18 +404,12 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.str.to_integer", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.to_time", Reason::NotYetCatalogued),
     LeftOut::new("Expr.struct.__getitem__", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.struct.drop", Reason::NotYetCatalogued),
     LeftOut::new("Expr.struct.eval", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.struct.field", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.struct.json_encode", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.struct.rename_fields", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.struct.unnest", Reason::NotYetCatalogued),
     LeftOut::new("Expr.struct.with_fields", Reason::NotYetCatalogued),
     LeftOut::new("Expr.to_physical", Reason::NotYetCatalogued),
     LeftOut::new("Expr.top_k_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.truncdiv", Reason::NotYetCatalogued),
     LeftOut::new("Expr.upper_bound", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.value_counts", Reason::NotYetCatalogued),
     LeftOut::new("Expr.x_log_y", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.__contains__", Reason::NeverOffered),
     LeftOut::new("LazyFrame.__eq__", Reason::NeverOffered),
@@ -588,7 +581,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.set_random_seed", Reason::NotYetCatalogued),
     LeftOut::new("polars.sql_expr", Reason::NotYetCatalogued),
     LeftOut::new("polars.std", Reason::NotYetCatalogued),
-    LeftOut::new("polars.struct", Reason::NotYetCatalogued),
     LeftOut::new("polars.struct_with_fields", Reason::NotYetCatalogued),
     LeftOut::new("polars.sum", Reason::NotYetCatalogued),
     LeftOut::new("polars.sum_horizontal", Reason::NotYetCatalogued),

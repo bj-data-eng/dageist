@@ -341,6 +341,20 @@ fn is_held_back(entry: &Entry) -> bool {
     catalog::Counting::of(entry, &[]).is_some()
         || entry.id().as_str() == "Expr.is_in"
         || is_of_nested_dtypes(entry)
+        || makes_or_reads_structs(entry)
+}
+
+/// Whether a call reads, names or makes a struct: the methods of the `struct` namespace, the calls
+/// that give a struct of what they are given and `value_counts`. A campaign draws them only where a
+/// focus names them: what they say depends on the fields of a struct, which the walk carries, and
+/// the campaigns that check them are those that focus on them.
+fn makes_or_reads_structs(entry: &Entry) -> bool {
+    let id = entry.id().as_str();
+    id.starts_with("Expr.struct.")
+        || matches!(
+            id,
+            "Expr.value_counts" | "Expr.str.split_exact" | "Expr.str.splitn" | "polars.struct"
+        )
 }
 
 /// Whether a method is one of the `list` or the `arr` namespace, which a campaign draws only where a

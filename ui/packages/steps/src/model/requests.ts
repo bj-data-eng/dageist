@@ -95,6 +95,8 @@ export function literalArgument(kind: KindView, literal: LiteralView): ValueRequ
       return { kind: 'timeZone', zone: textOf(literal) };
     case 'path':
       return { kind: 'path', text: textOf(literal) };
+    case 'field':
+      return { kind: 'field', name: textOf(literal) };
     default:
       return { kind: 'string', value: textOf(literal) };
   }
@@ -112,6 +114,8 @@ export function wordArgument(kind: KindView, word: string): ValueRequest {
       return { kind: 'dtype', name: word };
     case 'column':
       return { kind: 'columns', names: [word] };
+    case 'field':
+      return { kind: 'field', name: word };
     case 'table':
       return { kind: 'table', name: word };
     case 'timeZone':

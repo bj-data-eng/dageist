@@ -1,0 +1,541 @@
+//! What a struct holds, and what the calls that read, name and make structs say of it.
+//!
+//! The tables hold one class for every struct, [`Representative::Struct`], measured on a struct of
+//! two fields, so what depends on the fields is not the tables': it is worked out here from the
+//! fields the walk carries, the way an array's width and a moment's zone are carried beside the
+//! class. A struct's fields are the names in order and the dtype of each, as far as they are
+//! known; a field whose dtype no class of the tables covers has no class. Where the walk lost the
+//! fields it carries none, and says so, as it does for any dtype it does not know.
+
+use polars::prelude::DataType;
+
+use crate::catalog::Entry;
+
+use super::dtype::{Representative, ResultDtype, dtype_name};
+use super::offers::Chosen;
+use super::rules::Rule;
+
+/// How many fields a struct the walk makes holds at most: a call that makes more, as `splitn`
+/// does of a number far beyond any text, gives a struct whose fields are not carried.
+const MOST_FIELDS: usize = 4096;
+
+/// One field of a struct: its name, and its dtype as far as it is known.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Field {
+    name: String,
+    /// The dtype as the tables write it, or `?` where it is not known.
+    written: String,
+    /// The class of the dtype, none where the tables cover none.
+    class: Option<Representative>,
+    /// What a field that is a struct holds, where that is known.
+    fields: Option<Fields>,
+}
+
+impl Field {
+    /// The field `name` of the dtype `dtype`, which Polars gave: written as Polars names it.
+    #[must_use]
+    pub fn of_dtype(name: impl Into<String>, dtype: &DataType) -> Self {
+        Self {
+            name: name.into(),
+            written: dtype_name(dtype),
+            class: Representative::of(dtype),
+            fields: Fields::of_dtype(dtype),
+        }
+    }
+
+    /// The field `name` of a class the walk knows, or of none where it does not: written as the
+    /// tables write the class.
+    #[must_use]
+    pub fn of_class(name: impl Into<String>, class: Option<Representative>) -> Self {
+        Self {
+            name: name.into(),
+            written: class.map_or_else(|| "?".to_owned(), |class| class.name().to_owned()),
+            class,
+            fields: None,
+        }
+    }
+
+    /// The field's name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The class of the field's dtype, none where the tables cover none.
+    #[must_use]
+    pub const fn class(&self) -> Option<Representative> {
+        self.class
+    }
+
+    /// The dtype as the tables write it, `?` where it is not known.
+    #[must_use]
+    pub fn written(&self) -> &str {
+        &self.written
+    }
+
+    /// What the field holds where it is a struct and that is known.
+    #[must_use]
+    pub const fn fields(&self) -> Option<&Fields> {
+        self.fields.as_ref()
+    }
+
+    /// The same field under another name.
+    fn named(&self, name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            ..self.clone()
+        }
+    }
+}
+
+/// The fields of a struct, in order. No two of them have one name, which Polars refuses.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Fields(Vec<Field>);
+
+impl Fields {
+    /// The fields of `dtype`, if it is a struct.
+    #[must_use]
+    pub fn of_dtype(dtype: &DataType) -> Option<Self> {
+        let DataType::Struct(fields) = dtype else {
+            return None;
+        };
+        let fields = fields
+            .iter()
+            .map(|field| Field::of_dtype(field.name().as_str(), field.dtype()))
+            .collect();
+        Self::new(fields).ok()
+    }
+
+    /// The fields `fields`, in order.
+    ///
+    /// # Errors
+    ///
+    /// The first name that two of them share, which Polars refuses.
+    pub fn new(fields: Vec<Field>) -> Result<Self, String> {
+        for (at, field) in fields.iter().enumerate() {
+            if fields[..at].iter().any(|before| before.name == field.name) {
+                return Err(field.name.clone());
+            }
+        }
+        Ok(Self(fields))
+    }
+
+    /// The fields, in order.
+    pub fn iter(&self) -> std::slice::Iter<'_, Field> {
+        self.0.iter()
+    }
+
+    /// How many fields there are.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether there is none.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The field called `name`.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<&Field> {
+        self.0.iter().find(|field| field.name == name)
+    }
+
+    /// The names of the fields, in order.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(Field::name)
+    }
+
+    /// The struct as the tables write the dtype of it: `Struct(x: Int64, y: String)`.
+    #[must_use]
+    pub fn written(&self) -> String {
+        let fields: Vec<String> = self
+            .0
+            .iter()
+            .map(|field| format!("{}: {}", field.name, field.written))
+            .collect();
+        format!("Struct({})", fields.join(", "))
+    }
+
+    /// The names of the fields as a sentence says them: `x and y`, or `none`.
+    #[must_use]
+    pub fn listed(&self) -> String {
+        let names: Vec<String> = self.names().map(|name| format!("{name:?}")).collect();
+        match names.as_slice() {
+            [] => "none".to_owned(),
+            [only] => only.clone(),
+            [first @ .., last] => format!("{} and {last}", first.join(", ")),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Fields {
+    type Item = &'a Field;
+    type IntoIter = std::slice::Iter<'a, Field>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+/// One input of a call that makes a struct of what it is given, as `polars.struct` does: the name it
+/// writes, where that is known, and the dtype it has, where that is.
+#[derive(Debug, Clone, Copy)]
+pub struct Input<'a> {
+    name: Option<&'a str>,
+    class: Option<Representative>,
+    fields: Option<&'a Fields>,
+}
+
+impl<'a> Input<'a> {
+    /// An input that writes the name `name`, if it is known, and is of the class `class`, with the
+    /// fields `fields` where it is a struct whose fields are known.
+    #[must_use]
+    pub const fn new(
+        name: Option<&'a str>,
+        class: Option<Representative>,
+        fields: Option<&'a Fields>,
+    ) -> Self {
+        Self {
+            name,
+            class,
+            fields,
+        }
+    }
+}
+
+/// What a call gives of a struct.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Gives {
+    /// The call decides nothing of fields: it gives what the tables say, and keeps the fields of the
+    /// struct it follows where it gives one.
+    Nothing,
+    /// A struct, whose fields are known or not.
+    Struct(Option<Fields>),
+    /// One value, the field of a struct that was read, or none where the walk does not know it.
+    Field(Option<Field>),
+    /// One column for each field, which an unnest writes.
+    Columns(Option<Fields>),
+    /// A struct the call gives, whose dtype the call does not yet say: the pattern that names the
+    /// fields of `extract_groups` is not given.
+    Unknown,
+}
+
+/// The refusal of a call: the rule and what it says of the case.
+pub(super) type Said = (Rule, String);
+
+/// The names an option names, as the walk gives them: the texts the call is given for the parameter.
+fn given<'a>(chosen: &Chosen<'a>, parameter: &str) -> Vec<&'a str> {
+    chosen
+        .names
+        .iter()
+        .filter(|(name, _)| *name == parameter)
+        .map(|(_, text)| *text)
+        .collect()
+}
+
+/// The word a flag is set to, if it is set.
+fn word<'a>(chosen: &Chosen<'a>, parameter: &str) -> Option<&'a str> {
+    chosen
+        .options
+        .iter()
+        .find(|(name, _)| *name == parameter)
+        .map(|(_, word)| *word)
+}
+
+/// The whole number a call is given for `parameter`.
+fn number(chosen: &Chosen<'_>, parameter: &str) -> Option<i64> {
+    chosen
+        .numbers
+        .iter()
+        .find(|(name, _)| *name == parameter)
+        .map(|(_, number)| *number)
+}
+
+/// Fields `field_0` and on, each of text, `count` of them.
+fn text_fields(count: i64) -> Option<Fields> {
+    let count = usize::try_from(count)
+        .ok()
+        .filter(|count| *count <= MOST_FIELDS)?;
+    let fields = (0..count)
+        .map(|at| Field::of_class(format!("field_{at}"), Some(Representative::String)))
+        .collect();
+    Fields::new(fields).ok()
+}
+
+/// Fields named `names`, each of the class `class`.
+fn named_fields(names: &[&str], class: Option<Representative>) -> Result<Fields, Said> {
+    let fields = names
+        .iter()
+        .map(|name| Field::of_class(*name, class))
+        .collect();
+    Fields::new(fields).map_err(|name| repeated(&name))
+}
+
+fn repeated(name: &str) -> Said {
+    (
+        Rule::FieldNamesFitTheStruct,
+        format!("two fields would be named {name:?}"),
+    )
+}
+
+/// What the call of `entry` gives of a struct, after a value of the class `receiver`, from what it
+/// was chosen to follow and be given, or why a rule refuses it.
+///
+/// # Errors
+///
+/// The rule that refuses the call, with what it says of the case.
+pub(super) fn gives(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    chosen: &Chosen<'_>,
+) -> Result<Gives, Said> {
+    let held = chosen.fields;
+    let follows_a_struct = receiver == Some(Representative::Struct);
+    match entry.id().as_str() {
+        "Expr.struct.field" if follows_a_struct => {
+            let names: Vec<&str> = given(chosen, "name")
+                .into_iter()
+                .chain(given(chosen, "more_names"))
+                .collect();
+            let Some(fields) = held else {
+                return Ok(match names.as_slice() {
+                    [_] => Gives::Field(None),
+                    _ => Gives::Columns(None),
+                });
+            };
+            let mut read = Vec::new();
+            for name in &names {
+                let Some(field) = fields.get(name) else {
+                    return Err(not_a_field(name, fields));
+                };
+                read.push(field.clone());
+            }
+            Ok(match read.as_slice() {
+                [only] => Gives::Field(Some(only.clone())),
+                _ => Gives::Columns(Fields::new(read).ok()),
+            })
+        }
+        "Expr.struct.drop" if follows_a_struct => {
+            let names = given(chosen, "names");
+            let Some(fields) = held else {
+                return Ok(Gives::Struct(None));
+            };
+            if word(chosen, "strict") != Some("false")
+                && let Some(name) = names.iter().find(|name| fields.get(name).is_none())
+            {
+                return Err(not_a_field(name, fields));
+            }
+            let kept = fields
+                .iter()
+                .filter(|field| !names.contains(&field.name()))
+                .cloned()
+                .collect();
+            Ok(Gives::Struct(Fields::new(kept).ok()))
+        }
+        "Expr.struct.rename_fields" if follows_a_struct => {
+            let new = given(chosen, "names");
+            let Some(fields) = held else {
+                return Ok(Gives::Struct(None));
+            };
+            if new.len() != fields.len() {
+                return Err((
+                    Rule::FieldNamesFitTheStruct,
+                    format!(
+                        "{} names are given to a struct of {} fields, {}",
+                        new.len(),
+                        fields.len(),
+                        fields.listed()
+                    ),
+                ));
+            }
+            let renamed = fields
+                .iter()
+                .zip(&new)
+                .map(|(field, name)| field.named(name))
+                .collect();
+            Fields::new(renamed)
+                .map(|fields| Gives::Struct(Some(fields)))
+                .map_err(|name| repeated(&name))
+        }
+        "Expr.struct.unnest" if follows_a_struct => Ok(match held {
+            // A struct of one field is one column, as the field it holds is read.
+            Some(fields) => match fields.0.as_slice() {
+                [only] => Gives::Field(Some(only.clone())),
+                _ => Gives::Columns(Some(fields.clone())),
+            },
+            None => Gives::Columns(None),
+        }),
+        "polars.struct" => {
+            let made: Option<Vec<Field>> = chosen
+                .inputs
+                .iter()
+                .map(|input| {
+                    input.name.map(|name| {
+                        let mut field = Field::of_class(name, input.class);
+                        if let (Some(fields), Some(Representative::Struct)) =
+                            (input.fields, input.class)
+                        {
+                            field.written = fields.written();
+                            field.fields = Some(fields.clone());
+                        }
+                        field
+                    })
+                })
+                .collect();
+            match made.map(Fields::new) {
+                Some(Ok(fields)) => Ok(Gives::Struct(Some(fields))),
+                Some(Err(name)) => Err(repeated(&name)),
+                None => Ok(Gives::Struct(None)),
+            }
+        }
+        "Expr.str.extract_groups" => {
+            let pattern = chosen
+                .patterns
+                .iter()
+                .find(|(name, _)| *name == "pattern")
+                .map(|(_, text)| *text);
+            Ok(match pattern {
+                // The groups of a pattern are fields of text, named as the groups are.
+                Some(text) => Gives::Struct(
+                    crate::catalog::groups_dtype(text)
+                        .ok()
+                        .and_then(|dtype| Fields::of_dtype(&dtype)),
+                ),
+                None => Gives::Unknown,
+            })
+        }
+        "Expr.str.split_exact" => {
+            let fields = number(chosen, "n").and_then(|parts| text_fields(parts.saturating_add(1)));
+            Ok(Gives::Struct(fields))
+        }
+        "Expr.str.splitn" => Ok(Gives::Struct(number(chosen, "n").and_then(text_fields))),
+        "Expr.list.to_struct" => {
+            let names = given(chosen, "fields");
+            let element = receiver
+                .and_then(Representative::element)
+                .map(|inner| inner.class());
+            named_fields(&names, element).map(|fields| Gives::Struct(Some(fields)))
+        }
+        "Expr.arr.to_struct" => {
+            let element = receiver
+                .and_then(Representative::element)
+                .map(|inner| inner.class());
+            let names = given(chosen, "fields");
+            if names.is_empty() {
+                // Named after their places, which the width of the array says.
+                let Some(width) = chosen.width.filter(|width| *width <= MOST_FIELDS) else {
+                    return Ok(Gives::Struct(None));
+                };
+                let fields = (0..width)
+                    .map(|at| Field::of_class(format!("field_{at}"), element))
+                    .collect();
+                return Ok(Gives::Struct(Fields::new(fields).ok()));
+            }
+            if let Some(width) = chosen.width
+                && width != names.len()
+            {
+                return Err((
+                    Rule::FieldNamesFitTheStruct,
+                    format!(
+                        "{} names are given to an array of {width} places",
+                        names.len()
+                    ),
+                ));
+            }
+            named_fields(&names, element).map(|fields| Gives::Struct(Some(fields)))
+        }
+        "Expr.value_counts" => {
+            let Some(name) = chosen.output_name else {
+                return Ok(Gives::Struct(None));
+            };
+            let counted = given(chosen, "name").first().copied().unwrap_or(
+                if word(chosen, "normalize") == Some("true") {
+                    "proportion"
+                } else {
+                    "count"
+                },
+            );
+            let values = Field::of_class(name, receiver);
+            let counts = Field::of_class(
+                counted,
+                Some(if word(chosen, "normalize") == Some("true") {
+                    Representative::Float64
+                } else {
+                    Representative::UInt32
+                }),
+            );
+            Fields::new(vec![values, counts])
+                .map(|fields| Gives::Struct(Some(fields)))
+                .map_err(|name| repeated(&name))
+        }
+        _ => Ok(Gives::Nothing),
+    }
+}
+
+/// The refusal of a name that is no field of `fields`.
+fn not_a_field(name: &str, fields: &Fields) -> Said {
+    (
+        Rule::FieldIsOfTheStruct,
+        format!(
+            "{name:?} is no field of the struct, whose fields are {}",
+            fields.listed()
+        ),
+    )
+}
+
+impl Gives {
+    /// The dtype a call gives, and the fields of the struct it gives, where it decides them.
+    pub(super) fn result(&self) -> Option<(Option<ResultDtype>, Option<Fields>)> {
+        Some(match self {
+            Self::Nothing => return None,
+            Self::Struct(Some(fields)) => (
+                Some(ResultDtype::new(
+                    fields.written(),
+                    Some(Representative::Struct),
+                )),
+                Some(fields.clone()),
+            ),
+            Self::Struct(None) => (
+                Some(ResultDtype::new(
+                    "Struct".to_owned(),
+                    Some(Representative::Struct),
+                )),
+                None,
+            ),
+            Self::Field(Some(field)) => (Some(ResultDtype::of_field(field)), field.fields.clone()),
+            Self::Field(None) | Self::Columns(_) | Self::Unknown => (None, None),
+        })
+    }
+
+    /// The columns an unnest gives, where it gives several and they are known.
+    pub(super) const fn columns(&self) -> Option<&Fields> {
+        match self {
+            Self::Columns(columns) => columns.as_ref(),
+            _ => None,
+        }
+    }
+}
+
+impl ResultDtype {
+    /// The dtype of a field, as the tables write it.
+    fn of_field(field: &Field) -> Self {
+        Self::new(field.written.clone(), field.class)
+    }
+}
+
+/// The result a struct-keeping call gives: the struct the call follows, where its fields are known.
+pub(super) fn kept(fields: Option<&Fields>) -> (ResultDtype, Option<Fields>) {
+    match fields {
+        Some(fields) => (
+            ResultDtype::new(fields.written(), Some(Representative::Struct)),
+            Some(fields.clone()),
+        ),
+        None => (
+            ResultDtype::new("Struct".to_owned(), Some(Representative::Struct)),
+            None,
+        ),
+    }
+}

@@ -41,6 +41,10 @@
       "title": "dt · dates and times"
     },
     {
+      "key": "structs",
+      "title": "struct · the fields of a struct"
+    },
+    {
       "key": "text",
       "title": "str · case, trim, pad, replace"
     },
@@ -926,6 +930,35 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.arr.to_struct",
+      "applies": "expression",
+      "family": "conversion",
+      "name": "arr.to_struct",
+      "hint": "a struct with a field for each place of the array, named as given or field_0 and on",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fields",
+          "shown": "fields",
+          "label": "field names",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.arr.unique",
@@ -4085,6 +4118,35 @@
       "parameters": []
     },
     {
+      "id": "Expr.list.to_struct",
+      "applies": "expression",
+      "family": "conversion",
+      "name": "list.to_struct",
+      "hint": "a struct whose fields are the first values of each list, under the names given",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fields",
+          "shown": "fields",
+          "label": "field names",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.list.unique",
       "applies": "expression",
       "family": "rows",
@@ -6450,6 +6512,119 @@
       ]
     },
     {
+      "id": "Expr.str.split_exact",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.split_exact",
+      "hint": "a struct of the pieces between a separator, one field more than the number of splits",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "at",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "splits",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "inclusive",
+          "shown": "inclusive",
+          "label": "keep the separator",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.splitn",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.splitn",
+      "hint": "a struct of at most n pieces between a separator, the last holding the rest",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "at",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "pieces",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.str.starts_with",
       "applies": "expression",
       "family": "compare",
@@ -6704,6 +6879,149 @@
       ]
     },
     {
+      "id": "Expr.struct.drop",
+      "applies": "expression",
+      "family": "structs",
+      "name": "struct.drop",
+      "hint": "the struct without the fields named",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "names",
+          "shown": "names",
+          "label": "fields to drop",
+          "kind": {
+            "kind": "field"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a name that is no field",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.struct.field",
+      "applies": "expression",
+      "family": "structs",
+      "name": "struct.field",
+      "hint": "the value of one field of the struct",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "name",
+          "shown": "name",
+          "label": "field",
+          "kind": {
+            "kind": "field"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "more_names",
+          "shown": "more_names",
+          "label": "more fields",
+          "kind": {
+            "kind": "field"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": false
+        }
+      ]
+    },
+    {
+      "id": "Expr.struct.json_encode",
+      "applies": "expression",
+      "family": "structs",
+      "name": "struct.json_encode",
+      "hint": "the struct as text in JSON",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.struct.rename_fields",
+      "applies": "expression",
+      "family": "structs",
+      "name": "struct.rename_fields",
+      "hint": "the same struct, its fields under new names, in the order they are",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "names",
+          "shown": "names",
+          "label": "new names",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.struct.unnest",
+      "applies": "expression",
+      "family": "structs",
+      "name": "struct.unnest",
+      "hint": "a column for each field of the struct, named as the field is",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.sub",
       "applies": "expression",
       "family": "arithmetic",
@@ -6930,6 +7248,98 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.value_counts",
+      "applies": "expression",
+      "family": "rows",
+      "name": "value_counts",
+      "hint": "a struct of each different value and how often it occurs",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "sort",
+          "shown": "sort",
+          "label": "most often first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "parallel",
+          "shown": "parallel",
+          "label": "in parallel",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        },
+        {
+          "name": "name",
+          "shown": "name",
+          "label": "name of the count",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "normalize",
+          "shown": "normalize",
+          "label": "as a share of all",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.var",
@@ -9706,6 +10116,101 @@
           },
           "position": null,
           "offered": false
+        }
+      ]
+    },
+    {
+      "id": "polars.struct",
+      "applies": "function",
+      "family": "start",
+      "name": "struct",
+      "hint": "a struct that holds the values given, each as a field named as it is",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "exprs",
+          "shown": "exprs",
+          "label": "values",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "schema",
+          "shown": "schema",
+          "label": "dtype of each field",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "dtype"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": false
+        },
+        {
+          "name": "eager",
+          "shown": "eager",
+          "label": "as a series",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        },
+        {
+          "name": "named_exprs",
+          "shown": "named_exprs",
+          "label": "values with a field name",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
         }
       ]
     },

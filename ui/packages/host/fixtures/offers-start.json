@@ -550,6 +550,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.arr.to_struct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.arr.unique",
       "verdict": {
         "kind": "refused",
@@ -2455,6 +2470,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.list.to_struct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.list.unique",
       "verdict": {
         "kind": "refused",
@@ -3415,6 +3445,36 @@
       "slots": []
     },
     {
+      "entry": "Expr.str.split_exact",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.splitn",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.str.starts_with",
       "verdict": {
         "kind": "refused",
@@ -3580,6 +3640,81 @@
       "slots": []
     },
     {
+      "entry": "Expr.struct.drop",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.field",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.json_encode",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.rename_fields",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.unnest",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.sub",
       "verdict": {
         "kind": "refused",
@@ -3716,6 +3851,21 @@
     },
     {
       "entry": "Expr.unique_counts",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.value_counts",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -3973,6 +4123,20 @@
         "kind": "allowed",
         "result": null,
         "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.struct",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Struct()",
+        "shape": "many",
         "ending": {
           "kind": "allowed"
         }

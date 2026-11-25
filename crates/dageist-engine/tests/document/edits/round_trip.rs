@@ -446,6 +446,7 @@ fn value_for(parameter: &catalog::Parameter) -> Option<Value> {
     let one = match parameter.kind() {
         Kind::Expression(_) => Value::Expression(Expression::hole()),
         Kind::Column => Value::Columns(vec!["a".to_owned()]),
+        Kind::Field => Value::Field("a".to_owned()),
         Kind::Flag => Value::Flag(Some(true)),
         Kind::Choice(words) => Value::Choice((*words.first()?).to_owned()),
         Kind::Value(ValueType::Integer) => Value::Integer(3),

@@ -138,6 +138,7 @@ function readKind(value: unknown, path: string): CensusKind {
       [
         'expression',
         'column',
+        'field',
         'flag',
         'choice',
         'dtype',

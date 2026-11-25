@@ -23,6 +23,7 @@ mod left_out;
 mod nested;
 mod pattern;
 mod starting;
+mod structs;
 #[cfg(test)]
 mod tests;
 mod timezone;
@@ -111,6 +112,9 @@ pub enum Family {
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
+    /// Reading, naming and unnesting the fields of a struct: `struct.field`, `rename_fields`,
+    /// `drop`, `json_encode` and `unnest`.
+    Structs,
     /// Changing the text itself: its case, the characters trimmed from its ends, padding,
     /// reversing, and replacing what matches a pattern, which are the methods of the `str`
     /// namespace that give text.
@@ -144,7 +148,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::Steps,
         Self::Rows,
         Self::Order,
@@ -155,6 +159,7 @@ impl Family {
         Self::Rounding,
         Self::Aggregate,
         Self::Temporal,
+        Self::Structs,
         Self::Text,
         Self::Pieces,
         Self::Search,
@@ -182,6 +187,7 @@ impl Family {
             Self::Rounding => "rounding",
             Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
+            Self::Structs => "structs",
             Self::Text => "text",
             Self::Pieces => "pieces",
             Self::Search => "search",
@@ -224,11 +230,13 @@ pub enum Dtypes {
     List,
     /// `Array`, of any element dtype and any width.
     Array,
+    /// `Struct`, of any fields.
+    Struct,
 }
 
 impl Dtypes {
     /// Every group, in the order they are listed.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Any,
         Self::Numeric,
         Self::Integer,
@@ -241,6 +249,7 @@ impl Dtypes {
         Self::Boolean,
         Self::List,
         Self::Array,
+        Self::Struct,
     ];
 
     /// The key the language files give the group's words under.
@@ -259,6 +268,7 @@ impl Dtypes {
             Self::Boolean => "Boolean",
             Self::List => "List",
             Self::Array => "Array",
+            Self::Struct => "Struct",
         }
     }
 }
@@ -301,6 +311,9 @@ pub enum Kind {
     Expression(&'static [Dtypes]),
     /// The names of input columns.
     Column,
+    /// The name of a field of the struct a method follows, which the engine knows where the walk
+    /// does: a name that is no field of the struct is refused before Polars is asked.
+    Field,
     /// A literal of the given type that cannot be an expression.
     Value(ValueType),
     /// True or false. A flag whose default is `None` is also unset, which

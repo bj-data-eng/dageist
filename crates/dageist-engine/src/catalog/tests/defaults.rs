@@ -165,9 +165,19 @@ fn every_default_the_catalogue_writes_is_read_as_the_value_its_kind_holds() {
                 (Kind::Choice(_), value) => {
                     assert_eq!(value, &DefaultValue::Unset, "{context}");
                 }
-                // A starred parameter, and `**`, hold nothing when not given.
+                // A starred parameter, and `**`, hold nothing when not given, and a mapping that
+                // Python takes as `None`, as the dtypes of `polars.struct`, is not given.
                 (Kind::Pairs(..), value) => {
-                    assert_eq!(value, &DefaultValue::Empty, "{context}");
+                    let unset = parameter.default() == ParameterDefault::Python("None");
+                    assert_eq!(
+                        value,
+                        if unset {
+                            &DefaultValue::Unset
+                        } else {
+                            &DefaultValue::Empty
+                        },
+                        "{context}"
+                    );
                 }
                 _ => {}
             }

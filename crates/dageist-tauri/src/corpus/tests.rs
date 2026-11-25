@@ -82,8 +82,18 @@ fn calls_of(document: &Document) -> Vec<&Call> {
 /// no place the walk allows them, each with why. A method the engine allows after a count of
 /// values only with an argument that meets the count is one the corpus can give no such argument
 /// of: a list of many values is refused by the rule that the values a call meets meet in count,
-/// and the argument that would be allowed is the form of `is_in` that Polars has deprecated.
-const NOT_PLACED: [(&str, &str); 1] = [("Expr.is_in", "counted")];
+/// and the argument that would be allowed is the form of `is_in` that Polars has deprecated. A field
+/// read after a count of structs is the other: the values that differ are counted by `value_counts`,
+/// whose fields are the column's own name and the count, so the one name the corpus gives a field
+/// is no field of it. Renaming the fields is the third: a method added to a chain is given no names,
+/// and a struct is refused names that are not as many as its fields.
+const NOT_PLACED: [(&str, &str); 5] = [
+    ("Expr.is_in", "counted"),
+    ("Expr.struct.field", "counted"),
+    ("Expr.struct.rename_fields", "counted"),
+    ("Expr.struct.rename_fields", "many"),
+    ("Expr.struct.rename_fields", "one"),
+];
 
 /// What the engine allows of the methods, by the entry and the word of the shape, over every place
 /// of the grid.
@@ -362,8 +372,16 @@ fn the_corpus_holds_each_outcome_of_a_step_each_state_of_its_rows_and_each_cause
 /// give a call three rules and the walk the others the corpus meets, among them those of a pattern,
 /// a duration, a time zone, a range, a join's keys, a window given a count of values, a replacement
 /// and two moments of different zones, for each of which a document is made by editing one that is
-/// allowed. These three are the rest.
+/// allowed. These are the rest.
 const NOT_HELD: &[(&str, &str)] = &[
+    (
+        "one-column-is-needed",
+        "no document the corpus plans unnests a struct of several fields where a filter needs one column; one was not tried, and may be built",
+    ),
+    (
+        "written-names-are-distinct",
+        "no document the corpus plans writes one name twice by a field of a struct; one was not tried, and may be built",
+    ),
     (
         "arrays-meet-at-one-width",
         "the arrays of the corpus's tables are all of the one width the tables measure, 2, so none meets one of another width",

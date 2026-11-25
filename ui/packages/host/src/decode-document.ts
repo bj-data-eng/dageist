@@ -89,6 +89,13 @@ function readArgumentTagged(): Decode<ArgumentView> {
         names: readField(fields, path, 'names', readList(readString)),
       }),
     },
+    field: {
+      fields: ['name'],
+      read: (fields, path) => ({
+        kind: 'field',
+        name: readField(fields, path, 'name', readString),
+      }),
+    },
     integer: {
       fields: ['shown'],
       read: (fields, path) => ({

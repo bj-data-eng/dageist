@@ -65,6 +65,8 @@ export type KindView =
   /** A chain. What may stand in it is the engine's to say through its offers. */
   | { readonly kind: 'expression' }
   | { readonly kind: 'column' }
+  /** The name of a field of the struct the method follows. */
+  | { readonly kind: 'field' }
   /** A literal typed in; `type` is the type of literal it takes. */
   | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'flag' }
@@ -633,6 +635,10 @@ export const RULE_NAMES = [
   'window-input-is-not-counted',
   'window-input-is-not-widened',
   'arrays-meet-at-one-width',
+  'field-is-of-the-struct',
+  'field-names-fit-the-struct',
+  'one-column-is-needed',
+  'written-names-are-distinct',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */
@@ -846,6 +852,7 @@ export type ArgumentView =
       readonly links: readonly CallView[];
     }
   | { readonly kind: 'columns'; readonly names: readonly string[] }
+  | { readonly kind: 'field'; readonly name: string }
   | { readonly kind: 'integer'; readonly shown: string }
   | { readonly kind: 'float'; readonly shown: string }
   | { readonly kind: 'string'; readonly value: string }
@@ -888,6 +895,7 @@ export interface DocumentStateView {
 export const VALUE_KINDS = [
   'expression',
   'columns',
+  'field',
   'integer',
   'float',
   'string',
@@ -1035,6 +1043,7 @@ export type StartRequest =
 export type ValueRequest =
   | { readonly kind: 'expression'; readonly expression: ExpressionRequest }
   | { readonly kind: 'columns'; readonly names: readonly string[] }
+  | { readonly kind: 'field'; readonly name: string }
   | { readonly kind: 'integer'; readonly value: number }
   | { readonly kind: 'float'; readonly value: number }
   | { readonly kind: 'string'; readonly value: string }

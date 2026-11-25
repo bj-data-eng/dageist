@@ -36,6 +36,7 @@ mod candidates;
 mod context;
 mod count;
 mod dtype;
+mod fields;
 mod literal;
 mod offers;
 mod rules;
@@ -56,6 +57,7 @@ pub use candidates::{
 pub use context::{Context, Nested, Outer, Position};
 pub use count::Count;
 pub use dtype::{Inner, Representative, ResultDtype, dtype_name};
+pub use fields::{Field, Fields, Input};
 pub use literal::Literal;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
@@ -63,11 +65,11 @@ pub use offers::{
     refuse_a_call_the_tables_refuse_after_lists, refuse_a_count_that_may_not_end,
     refuse_a_receiver_not_judged, refuse_an_argument_not_judged, rule_forbids,
     rule_forbids_a_folded_function_in_a_join_key, rule_forbids_a_key_known_not_elementwise,
-    rule_forbids_a_parameter_given_more_than_one_value, rule_forbids_a_range_that_cannot_be_made,
-    rule_forbids_a_receiver, rule_forbids_a_repeated_pair_of_key_names,
-    rule_forbids_a_window_over_a_count, rule_forbids_a_window_over_a_widened_value,
-    rule_forbids_arrays_of_other_widths, rule_forbids_replacement_values_of_other_numbers,
-    rule_forbids_values_of_other_counts,
+    rule_forbids_a_name_written_twice, rule_forbids_a_parameter_given_more_than_one_value,
+    rule_forbids_a_range_that_cannot_be_made, rule_forbids_a_receiver,
+    rule_forbids_a_repeated_pair_of_key_names, rule_forbids_a_window_over_a_count,
+    rule_forbids_a_window_over_a_widened_value, rule_forbids_arrays_of_other_widths,
+    rule_forbids_replacement_values_of_other_numbers, rule_forbids_values_of_other_counts,
 };
 pub(crate) use offers::{refusal_of_a_connected_list, same_for_any_number};
 pub use rules::Rule;

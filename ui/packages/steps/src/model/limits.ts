@@ -167,6 +167,7 @@ export const GAPS: readonly Gap[] = [
   entryGap('polars.int_range', NOT_A_START),
   entryGap('polars.linear_space', NOT_A_START),
   entryGap('polars.repeat', NOT_A_START),
+  entryGap('polars.struct', NOT_A_START),
   entryGap('polars.time', NOT_A_START),
   entryGap('polars.time_range', NOT_A_START),
   // The steps no list adds: the editor adds the seven it has heads for.

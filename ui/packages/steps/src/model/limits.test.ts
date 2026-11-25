@@ -28,6 +28,7 @@ describe('the declared gaps', () => {
         'entry polars.int_range',
         'entry polars.linear_space',
         'entry polars.repeat',
+        'entry polars.struct',
         'entry polars.time',
         'entry polars.time_range',
         'parameter polars.col more_names',

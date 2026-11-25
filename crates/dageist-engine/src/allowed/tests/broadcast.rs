@@ -13,7 +13,8 @@ use crate::allowed::{After, Chosen, Context, Outer, Place, offer};
 use crate::catalog::{self, Applies, Argument, Entry, Kind, Shape as ParameterShape};
 
 use super::build::{
-    column, entry, expression, expressions, integer, method, null_of, one_of, patterns, step,
+    column, entry, expression, expressions, integer, method, null_of, one_of, patterns,
+    required_values, step,
 };
 use super::probe::measure;
 use super::sample::Frames;
@@ -42,6 +43,7 @@ fn arguments(
     column_named: &str,
 ) -> Vec<(&'static str, Argument)> {
     let mut given: Vec<(&'static str, Argument)> = patterns(entry);
+    given.extend(required_values(entry));
     for parameter in entry.parameters() {
         if !matches!(parameter.kind(), Kind::Expression(_)) {
             continue;
@@ -149,7 +151,7 @@ const AGGREGATE_RECEIVER: [(&str, &str); 2] = [
 
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.
-const NOT_MEASURED: [(&str, &str, &str); 10] = [
+const NOT_MEASURED: [(&str, &str, &str); 12] = [
     ("Expr.over", "more_exprs", "a key of the window"),
     ("Expr.replace", "new", "the values a replacement lists"),
     (
@@ -164,6 +166,16 @@ const NOT_MEASURED: [(&str, &str, &str); 10] = [
     ),
     ("Expr.diff", "n", "Polars takes one value only"),
     ("Expr.pct_change", "n", "Polars takes one value only"),
+    (
+        "Expr.str.split_exact",
+        "by",
+        "Polars refuses a text of one value beside a column of separators where the table has no rows",
+    ),
+    (
+        "Expr.str.splitn",
+        "by",
+        "Polars refuses a text of one value beside a column of separators where the table has no rows",
+    ),
     ("Expr.shift", "n", "Polars takes one value only"),
     ("Expr.shift", "fill_value", "Polars takes one value only"),
     ("Expr.quantile", "quantile", "Polars takes one value only"),

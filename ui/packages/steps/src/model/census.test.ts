@@ -45,7 +45,7 @@ describe('the census the host wrote', () => {
       'flag',
     ]);
     // The twelve kinds of parameter the contract names, of which two are set as options.
-    expect(census.parameterKinds).toHaveLength(12);
+    expect(census.parameterKinds).toHaveLength(13);
     expect(census.optionKinds).toEqual(['flag', 'choice']);
     // The classes of dtype the tables hold lines for and the lists and arrays of the others, in three shapes.
     expect(census.dtypeClasses).toHaveLength(67);
@@ -102,7 +102,7 @@ describe('the census the host wrote', () => {
     expect(census.resolutions).toEqual(['dtype', 'several', 'unfinished', 'noContext', 'refused']);
     expect(census.editAnswers).toEqual(['edited', 'refused']);
     expect(census.problemKinds).toHaveLength(13);
-    expect(census.valueKinds).toHaveLength(15);
+    expect(census.valueKinds).toHaveLength(16);
     expect(census.settingKinds).toHaveLength(11);
     expect(census.defaultKinds).toHaveLength(8);
   });

@@ -334,6 +334,7 @@ const fn typed_word(value: &Held) -> Option<&'static str> {
         Held::Flag(_) => Some("flag"),
         Held::Expression(_)
         | Held::Columns(_)
+        | Held::Field(_)
         | Held::Choice(_)
         | Held::Dtype(_)
         | Held::Duration(_)
@@ -351,6 +352,7 @@ fn held_values() -> Vec<Held> {
     every_variant!(Held;
         Expression => [Held::Expression(field)],
         Columns => [Held::Columns(Vec::new())],
+        Field => [Held::Field(String::new())],
         Integer => [Held::Integer(0)],
         Float => [Held::Float(0.0)],
         String => [Held::String(String::new())],
@@ -394,6 +396,7 @@ fn typed_class(value: &Held) -> Option<Representative> {
         Held::Flag(_) => Some(Representative::Boolean),
         Held::Expression(_)
         | Held::Columns(_)
+        | Held::Field(_)
         | Held::Choice(_)
         | Held::Dtype(_)
         | Held::Duration(_)
@@ -529,6 +532,7 @@ const fn kind_word(kind: Kind) -> &'static str {
     match kind {
         Kind::Expression(_) => "expression",
         Kind::Column => "column",
+        Kind::Field => "field",
         Kind::Value(_) => "value",
         Kind::Flag => "flag",
         Kind::Choice(_) => "choice",
@@ -563,6 +567,7 @@ fn kind_json(kind: Kind) -> Value {
         }
         Kind::Expression(_)
         | Kind::Column
+        | Kind::Field
         | Kind::Flag
         | Kind::Choice(_)
         | Kind::Dtype
@@ -579,6 +584,7 @@ fn kinds() -> Vec<Kind> {
     every_variant!(Kind;
         Expression => [Kind::Expression(&[])],
         Column => [Kind::Column],
+        Field => [Kind::Field],
         Value => [Kind::Value(ValueType::Integer)],
         Flag => [Kind::Flag],
         Choice => [Kind::Choice(&[])],
@@ -600,6 +606,7 @@ const fn option_word(kind: Kind) -> Option<&'static str> {
         Kind::Choice(_) => Some("choice"),
         Kind::Expression(_)
         | Kind::Column
+        | Kind::Field
         | Kind::Value(_)
         | Kind::Dtype
         | Kind::Duration

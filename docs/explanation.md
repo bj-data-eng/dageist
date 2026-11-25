@@ -1035,7 +1035,7 @@ time zones are refused by `moments-share-a-zone`.
 Some of what the editor refuses Polars takes, on purpose:
 
 - A repeat of a struct that is cast to another dtype is refused, though Polars casts a struct of one field to the dtype of
-  its field: the tables measure a struct of two, and the editor does not know how many fields a column's struct has.
+  its field: the tables measure a struct of two.
 - An interval of nothing or below nothing is refused whatever the bounds are, though Polars gives no values where the end is
   before the start and refuses it only where it is not: the editor is strict where the data decide.
 - A count of exactly one beside the rows, an operand, a fill, an exponent or a share is refused, as `values-meet-in-count`
@@ -1197,14 +1197,13 @@ What Polars does with each is what the tables say, and some of it is not what a 
   `Struct(year: String, 2: String)`, so the report, the walk and the offers name the fields. A pattern with no
   groups gives a struct with no fields, which Polars 2.2.0 takes in a test for a value that is unique or
   duplicated and in the first and the last, as it takes a struct of two. The fields are
-  read with `struct.field`, which is not catalogued yet: the walk knows what the call gives, and a chain that
-  goes on from it is judged as one that follows a struct of two fields.
+  read with `struct.field`: the walk carries them, as [the explanation of structs](#structs) says.
 - `str.escape_regex` puts a backslash before each character that has a meaning in a pattern. Python's
   `polars.escape_regex` gives a Python string, and not an expression, so it is no start the catalogue has, and
   is left out as never offered: `literal` and the method give a step what it needs.
 - Left for later: `str.contains_any`, `str.replace_many`, `str.extract_many` and `str.find_many`, which take a
   list of literal patterns that Polars matches all at once, wait for a kind that holds a list of texts, typed or
-  connected; `str.split_exact` and `str.splitn` give a struct that waits for `struct.field`.
+  connected.
 
 The catalogue holds the twenty steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
@@ -1710,13 +1709,13 @@ The census holds:
   and `element` among them; and the 4 kinds of typed value a document holds as
   the value of `lit`, each with its class of dtype and whether the host reads
   typed text as one, and the 17 ways a slot reads a text typed into it.
-- The 12 kinds of parameter, the 5 types of literal, the 3 shapes, the 18 forms
+- The 13 kinds of parameter, the 5 types of literal, the 3 shapes, the 18 forms
   of kind and shape the catalogue's parameters have, and the 2 kinds that are set
   as options, a flag and a choice.
 - The 67 classes of dtype, the 3 shapes of a value, the 3 kinds of place and the
   4 states of a condition.
 - The 5 causes of a refusal, the 3 sources it comes from, its 3 stages and the
-  20 rules the engine holds that Polars does not, each with what it says.
+  24 rules the engine holds that Polars does not, each with what it says.
 - The 4 outcomes of a step, the 4 states of its rows, which are not counted, not
   reached, counted and failed, and the 19 states a step can be reported in: its
   outcome, the cause where it was refused, its rows, and what came before it,
@@ -1756,7 +1755,7 @@ Today the declared gaps are these:
   `otherwise`, in the 24 contexts where the engine allows one.
 - The functions the editor does not start a chain from: `date`, `date_range`,
   `datetime`, `datetime_range`, `duration`, `from_epoch`, `int_range`,
-  `linear_space`, `repeat`, `time` and `time_range`. It starts a chain from a
+  `linear_space`, `repeat`, `struct`, `time` and `time_range`. It starts a chain from a
   field, a connected input, a typed value, `when` and `element`.
 - The parameters of a start or a condition that it does not set: `col`'s further
   names, `lit`'s dtype and its object flag, and the keyword constraints of a
@@ -2342,6 +2341,64 @@ the class.
 A window that joins the values of a group into a list gives a list of what it follows for every scalar
 element dtype, and a method that follows a list of one dtype gives lists of that dtype, so what comes of
 a column of lists is carried through each call, in each place that holds an expression.
+
+### Structs
+
+A struct is one class, `Struct`, for the tables, measured as `Struct(x: Int64, y: String)`, a struct of two
+fields. Every ordinary method (`eq`, `is_null`, `first`, `sort`, `fill_null`) is judged by that one class whatever
+fields a struct has, and the tables keep it so. What depends on the fields is not the tables': the walk
+carries a struct's fields, as it carries an array's width and a moment's zone, and the calls that read, name and
+make them say what they give of the fields they were given. The fields are the names in order and the dtype of each:
+its class where the tables cover one, none where they cover none (a list of lists), and what it holds where it is a
+struct itself. The walk holds each set of fields once, by its place in a list, as it holds a time zone by its name, so
+that an operand and a link carry a handle that can be copied. Where the walk lost the fields, as it does after
+a condition whose values are structs, it carries none and says `Struct` and no fields, and a call that needs the fields
+is not judged: it gives no dtype and the walk says it cannot tell.
+
+| What the fields come from | The fields |
+| --- | --- |
+| a struct column of the table, or the column a pivot takes values from | its schema's, each with the dtype Polars gives, written as Polars names it |
+| a method that keeps the struct (`first`, `last`, `sort`, `reverse`, `shift`, `fill_null`, `replace`) | those of the struct it follows |
+| `str.extract_groups` | the groups of its pattern, as Polars works the schema of the call out, each of text |
+| `polars.struct` | its values, each named as the value is, which is the column a chain starts from, `literal` for a literal, the field a field read gives, and the name a pair gives a value; the listed values come before the named ones |
+| `str.split_exact` and `str.splitn` | `field_0` and on, each of text: one more than the number of splits for the first, as many as the number for the second |
+| `list.to_struct` | the names it is given, each of the dtype of the elements of the list |
+| `arr.to_struct` | the names it is given, which are as many as the places of the array, or `field_0` and on for each place, which the width of the array says |
+| `value_counts` | the column's own name with its dtype, and `count`, or `proportion` of a `Float64` where it is told to normalize, or the name it is given |
+
+The calls that read and change fields are the methods of the `struct` namespace:
+
+- `struct.field` gives the class of the field it is given, written as the field is. Polars reads a name that is `*` or a
+  pattern as several fields, which the editor does not take as a name: the name must be a field of the struct, and
+  `more_names` is not offered, for the columns of several fields stand where no place of the editor holds one.
+- `struct.rename_fields` gives the same fields under new names, as many names as fields and none twice.
+- `struct.drop` drops the fields it names, and refuses a name that is no field where it is strict, which is the
+  default; Polars drops nothing of a name that is no field where `strict` is false, and a struct with no field is one.
+- `struct.json_encode` gives text. Polars encodes a value of any dtype as it does a struct, so the catalogue's
+  `accepts` for it is the narrower claim, which the test of what Polars refuses names.
+- `struct.unnest` writes a column for each field, named as the field is, so it gives no dtype of one value: the
+  walk carries the columns, not the fields, and the call is judged where several columns may stand. A struct of one
+  field is one column, which the call gives as the field it holds, and is judged as the field read is; a struct of none writes
+  no column. The tables measured an unnest on a struct of two: they allow it as an item of a select and as a key of a sort,
+  and refuse it as a join's key, which Polars refuses where the other side's key is one column, in a filter, and in a pivot's aggregate.
+
+Four named rules hold what Polars does of fields and the tables cannot say:
+
+| Rule | What it holds |
+| --- | --- |
+| `field-is-of-the-struct` | A field that a method reads or drops is one of the fields of the struct it follows, which the refusal lists. A field that was renamed or dropped before is none. |
+| `field-names-fit-the-struct` | The names given to the fields are as many as the fields of the struct they rename, or the places of the array they name, and no two fields of a struct are named alike, as `polars.struct`, `value_counts` and `to_struct` make them. |
+| `one-column-is-needed` | A filter's predicate is one column: an expression that gives several, as the unnest of a struct of several fields does, is refused there. |
+| `written-names-are-distinct` | The columns that the items of a select or of `with_columns` write are named differently, where a field read or an unnest names one: a column the table already has is replaced by `with_columns`, and two items that write one name are refused. The outputs of one name that no field names wait for [#161](https://github.com/bj-data-eng/dageist/issues/161). |
+
+Where Polars does what the editor refuses, on purpose: `list.to_struct` of a name given twice gives one field, the last
+value, where the editor refuses it, for what a struct has is then not what the names say. A separator that is a column is
+refused beside a text of one value, where Polars refuses it only for a table with no rows. The rule that `written-names-are-distinct`
+asks of the items of a step is asked of those that read or unnest a field, and of the others they are written beside.
+
+`Expr.struct.with_fields`, `Expr.struct.eval` and `polars.field` take a body whose `field(...)` reads the struct's own
+fields, which is the body shape that `list.eval` is of lists. The walk carries the fields now, but no table is measured
+in a body, so they stay left out until the body shape exists.
 
 ### What The Tables Are Checked Against
 

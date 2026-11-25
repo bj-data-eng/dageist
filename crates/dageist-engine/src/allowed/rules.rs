@@ -23,6 +23,12 @@ use super::table::Shape;
 pub enum Rule {
     /// A pivot's aggregate gives one value for each group.
     PivotAggregateGivesOneValue,
+    /// A filter's predicate is one column: an expression that gives several, as the unnest of a
+    /// struct of several fields does, is refused there.
+    OneColumnIsNeeded,
+    /// The columns that the items of a select or of `with_columns` write are named differently,
+    /// as the fields that an unnest and a field read write are named by the fields.
+    WrittenNamesAreDistinct,
     /// The predicate of a condition is a `Boolean`.
     ConditionPredicateIsBoolean,
     /// The predicate of a `filter` is a `Boolean`, and so is what a condition
@@ -33,6 +39,12 @@ pub enum Rule {
     /// A moment or a length of time made of numbers typed in is no part of a join's key: Polars
     /// makes a literal of the call and names it by an alias, which a key may not hold anywhere.
     FoldedFunctionIsNoJoinKey,
+    /// A field that a method reads or drops is one of the fields of the struct it follows, which the
+    /// walk knows: Polars refuses a name that is none, one that was renamed or dropped before.
+    FieldIsOfTheStruct,
+    /// The names given to the fields of a struct are as many as its fields where it is renamed, or as
+    /// the places of the array it is made of, and no two fields of a struct are named alike.
+    FieldNamesFitTheStruct,
     /// A join pairs no two output column names twice: the keys of each side
     /// are named by the column they read, and a key that repeats the name of
     /// an earlier one, beside a key on the other side that repeats the name it
@@ -88,18 +100,21 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 24] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementDtypeIsImplemented,
         Self::ElementDtypeIsMeasured,
         Self::ElementOnlyInPivotAggregate,
+        Self::FieldIsOfTheStruct,
+        Self::FieldNamesFitTheStruct,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
+        Self::OneColumnIsNeeded,
         Self::ParameterTakesOneValue,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
@@ -109,6 +124,7 @@ impl Rule {
         Self::ValuesMeetInCount,
         Self::WindowInputIsNotCounted,
         Self::WindowInputIsNotWidened,
+        Self::WrittenNamesAreDistinct,
     ];
 
     /// The name the tables give the rule.
@@ -122,11 +138,14 @@ impl Rule {
             Self::ElementDtypeIsMeasured => "element-dtype-is-measured",
             Self::ArraysMeetAtOneWidth => "arrays-meet-at-one-width",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
+            Self::FieldIsOfTheStruct => "field-is-of-the-struct",
+            Self::FieldNamesFitTheStruct => "field-names-fit-the-struct",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
+            Self::OneColumnIsNeeded => "one-column-is-needed",
             Self::ParameterTakesOneValue => "parameter-takes-one-value",
             Self::PatternIsValid => "pattern-is-valid",
             Self::RangeIsValid => "range-is-valid",
@@ -135,6 +154,7 @@ impl Rule {
             Self::ValuesMeetInCount => "values-meet-in-count",
             Self::WindowInputIsNotCounted => "window-input-is-not-counted",
             Self::WindowInputIsNotWidened => "window-input-is-not-widened",
+            Self::WrittenNamesAreDistinct => "written-names-are-distinct",
         }
     }
 
@@ -160,6 +180,18 @@ impl Rule {
             }
             Self::ElementOnlyInPivotAggregate => {
                 "`polars.element` stands only in a pivot's aggregate"
+            }
+            Self::FieldIsOfTheStruct => {
+                "a field that a method reads or drops must be one of the fields of the struct it follows: Polars refuses a name that is none, as one that was renamed or dropped before is"
+            }
+            Self::FieldNamesFitTheStruct => {
+                "the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name"
+            }
+            Self::OneColumnIsNeeded => {
+                "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and Polars refuses it"
+            }
+            Self::WrittenNamesAreDistinct => {
+                "the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name"
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
             Self::FoldedFunctionIsNoJoinKey => {
@@ -221,6 +253,9 @@ impl Rule {
             | Self::ElementDtypeIsMeasured
             | Self::ArraysMeetAtOneWidth
             | Self::MomentsShareAZone
+            | Self::FieldIsOfTheStruct
+            | Self::FieldNamesFitTheStruct
+            | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
             | Self::RangeIsValid
@@ -228,7 +263,8 @@ impl Rule {
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
-            | Self::WindowInputIsNotWidened => false,
+            | Self::WindowInputIsNotWidened
+            | Self::WrittenNamesAreDistinct => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -374,11 +410,15 @@ impl Rule {
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
+            | Self::FieldIsOfTheStruct
+            | Self::FieldNamesFitTheStruct
+            | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
-            | Self::WindowInputIsNotWidened => false,
+            | Self::WindowInputIsNotWidened
+            | Self::WrittenNamesAreDistinct => false,
         }
     }
 }

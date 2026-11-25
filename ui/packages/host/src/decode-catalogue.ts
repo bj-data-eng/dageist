@@ -47,6 +47,7 @@ const readChoice: Decode<ChoiceView> = readRecord(['word', 'shown'], (fields, pa
 const readKind: Decode<KindView> = readTagged<KindView>('kind', {
   expression: { fields: [], read: () => ({ kind: 'expression' }) },
   column: { fields: [], read: () => ({ kind: 'column' }) },
+  field: { fields: [], read: () => ({ kind: 'field' }) },
   value: {
     fields: ['type'],
     read: (fields, path) => ({

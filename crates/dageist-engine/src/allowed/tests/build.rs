@@ -20,6 +20,44 @@ pub(super) fn patterns(entry: &Entry) -> Vec<(&'static str, Argument)> {
         .collect()
 }
 
+/// The arguments of `entry` that are no expressions, choices or patterns and must be given, each of a
+/// value any call accepts: a number of splits, the name of a field of the struct the tables measure,
+/// which has the fields `x` and `y`, and two names for the two fields of that struct or the first
+/// two values of a list.
+pub(super) fn required_values(entry: &Entry) -> Vec<(&'static str, Argument)> {
+    entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.is_needed())
+        .filter_map(|parameter| {
+            let one = match parameter.kind() {
+                Kind::Value(catalog::ValueType::Integer) => Argument::Integer(2),
+                Kind::Field => Argument::Field("x".to_owned()),
+                Kind::Value(catalog::ValueType::String) => match parameter.shape() {
+                    catalog::Shape::Many => {
+                        return Some((
+                            parameter.name(),
+                            Argument::Many(vec![
+                                Argument::String("a".to_owned()),
+                                Argument::String("b".to_owned()),
+                            ]),
+                        ));
+                    }
+                    _ => return None,
+                },
+                _ => return None,
+            };
+            Some((
+                parameter.name(),
+                match parameter.shape() {
+                    catalog::Shape::Many => Argument::Many(vec![one]),
+                    _ => one,
+                },
+            ))
+        })
+        .collect()
+}
+
 /// The arguments of `entry` that are choices that must be given, each the first word of the
 /// choice: any word makes the call run, and the option table says what each does.
 pub(super) fn required_choices(entry: &Entry) -> Vec<(&'static str, Argument)> {

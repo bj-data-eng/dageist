@@ -54,12 +54,15 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::DurationIsValid => Some(Rule::ElementDtypeIsImplemented),
         Rule::ElementDtypeIsImplemented => Some(Rule::ElementDtypeIsMeasured),
         Rule::ElementDtypeIsMeasured => Some(Rule::ElementOnlyInPivotAggregate),
-        Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
+        Rule::ElementOnlyInPivotAggregate => Some(Rule::FieldIsOfTheStruct),
+        Rule::FieldIsOfTheStruct => Some(Rule::FieldNamesFitTheStruct),
+        Rule::FieldNamesFitTheStruct => Some(Rule::FilterPredicateIsBoolean),
         Rule::FilterPredicateIsBoolean => Some(Rule::FoldedFunctionIsNoJoinKey),
         Rule::FoldedFunctionIsNoJoinKey => Some(Rule::JoinKeyNamesAreNotRepeated),
         Rule::JoinKeyNamesAreNotRepeated => Some(Rule::KeyIsElementwise),
         Rule::KeyIsElementwise => Some(Rule::MomentsShareAZone),
-        Rule::MomentsShareAZone => Some(Rule::ParameterTakesOneValue),
+        Rule::MomentsShareAZone => Some(Rule::OneColumnIsNeeded),
+        Rule::OneColumnIsNeeded => Some(Rule::ParameterTakesOneValue),
         Rule::ParameterTakesOneValue => Some(Rule::PatternIsValid),
         Rule::PatternIsValid => Some(Rule::PivotAggregateGivesOneValue),
         Rule::PivotAggregateGivesOneValue => Some(Rule::RangeIsValid),
@@ -68,7 +71,8 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::TimeZoneIsValid => Some(Rule::ValuesMeetInCount),
         Rule::ValuesMeetInCount => Some(Rule::WindowInputIsNotCounted),
         Rule::WindowInputIsNotCounted => Some(Rule::WindowInputIsNotWidened),
-        Rule::WindowInputIsNotWidened => None,
+        Rule::WindowInputIsNotWidened => Some(Rule::WrittenNamesAreDistinct),
+        Rule::WrittenNamesAreDistinct => None,
     }
 }
 

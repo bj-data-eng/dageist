@@ -51,27 +51,28 @@ describe('the methods the engine offers after a timestamp', () => {
     families.flatMap((family) => family.offers).find((offer) => offer.name === name);
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
-    // The methods of each family: window one, conversion four, cumulative, rounding and the
-    // search of text five, maths and pieces of text seven, checks eight, order and nulls nine, logic
-    // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows twenty-five,
+    // The methods of each family: window one, cumulative, rounding, the fields of a struct and the
+    // search of text five, conversion six, maths seven, checks eight, order, pieces of text and nulls nine, logic
+    // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows twenty-six,
     // temporal forty-three, and aggregate fifty-two.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
-      ['conversion', 4],
       ['cumulative', 5],
       ['rounding', 5],
+      ['structs', 5],
       ['search', 5],
+      ['conversion', 6],
       ['maths', 7],
-      ['pieces', 7],
       ['checks', 8],
       ['order', 9],
+      ['pieces', 9],
       ['nulls', 9],
       ['logic', 10],
       ['arithmetic', 11],
       ['trigonometry', 15],
       ['text', 15],
       ['compare', 16],
-      ['rows', 25],
+      ['rows', 26],
       ['temporal', 43],
       ['aggregate', 52],
     ]);
@@ -107,6 +108,7 @@ describe('the methods the engine offers after a timestamp', () => {
       'top_k',
       'unique',
       'unique_counts',
+      'value_counts',
     ]);
     expect(offerNamed('shift')?.hint).toBe('value n rows earlier');
   });
@@ -185,7 +187,7 @@ describe('the calls the engine offers at the start of an expression', () => {
     const families = prepareOffers(catalogue, atStart, ['function', 'condition']);
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['condition', 7],
-      ['start', 14],
+      ['start', 15],
     ]);
     const start = families.find((family) => family.key === 'start')?.offers ?? [];
     // `element` stands only in a pivot's aggregate, by a rule the engine holds.

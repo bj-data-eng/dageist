@@ -299,6 +299,7 @@ fn what_may_start_an_expression_depends_on_where_it_stands() {
             "polars.linear_space",
             "polars.lit",
             "polars.repeat",
+            "polars.struct",
             "polars.time",
             "polars.time_range",
             "polars.when"
@@ -319,6 +320,7 @@ fn what_may_start_an_expression_depends_on_where_it_stands() {
             "polars.linear_space",
             "polars.lit",
             "polars.repeat",
+            "polars.struct",
             "polars.time",
             "polars.time_range",
             "polars.when"
@@ -1097,6 +1099,7 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
         at("polars.linear_space"),
         at("polars.lit"),
         at("polars.repeat"),
+        at("polars.struct"),
         at("polars.time"),
         at("polars.time_range"),
         at("polars.when"),

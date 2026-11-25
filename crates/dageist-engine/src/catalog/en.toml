@@ -35,6 +35,9 @@ title = "Rounding · places, whole numbers"
 [families.temporal]
 title = "dt · dates and times"
 
+[families.structs]
+title = "struct · the fields of a struct"
+
 [families.text]
 title = "str · case, trim, pad, replace"
 
@@ -115,6 +118,10 @@ hint = "a list of values of one dtype, of any length"
 [dtypes.Array]
 name = "Array"
 hint = "an array of values of one dtype, of one length"
+
+[dtypes.Struct]
+name = "Struct"
+hint = "a value that holds several named fields, each of its own dtype"
 
 [entries."ChainedThen.otherwise"]
 name = "otherwise"
@@ -2785,3 +2792,127 @@ hint = "square of how far the values of each list spread from their average"
 [entries."Expr.list.var".parameters.ddof]
 name = "ddof"
 label = "count less"
+
+[entries."Expr.struct.field"]
+name = "struct.field"
+hint = "the value of one field of the struct"
+
+[entries."Expr.struct.field".parameters.name]
+name = "name"
+label = "field"
+
+[entries."Expr.struct.field".parameters.more_names]
+name = "more_names"
+label = "more fields"
+
+[entries."Expr.struct.rename_fields"]
+name = "struct.rename_fields"
+hint = "the same struct, its fields under new names, in the order they are"
+
+[entries."Expr.struct.rename_fields".parameters.names]
+name = "names"
+label = "new names"
+
+[entries."Expr.struct.drop"]
+name = "struct.drop"
+hint = "the struct without the fields named"
+
+[entries."Expr.struct.drop".parameters.names]
+name = "names"
+label = "fields to drop"
+
+[entries."Expr.struct.drop".parameters.strict]
+name = "strict"
+label = "refuse a name that is no field"
+
+[entries."Expr.struct.json_encode"]
+name = "struct.json_encode"
+hint = "the struct as text in JSON"
+
+[entries."Expr.struct.unnest"]
+name = "struct.unnest"
+hint = "a column for each field of the struct, named as the field is"
+
+[entries."polars.struct"]
+name = "struct"
+hint = "a struct that holds the values given, each as a field named as it is"
+
+[entries."polars.struct".parameters.exprs]
+name = "exprs"
+label = "values"
+
+[entries."polars.struct".parameters.schema]
+name = "schema"
+label = "dtype of each field"
+
+[entries."polars.struct".parameters.eager]
+name = "eager"
+label = "as a series"
+
+[entries."polars.struct".parameters.named_exprs]
+name = "named_exprs"
+label = "values with a field name"
+
+[entries."Expr.str.split_exact"]
+name = "str.split_exact"
+hint = "a struct of the pieces between a separator, one field more than the number of splits"
+
+[entries."Expr.str.split_exact".parameters.by]
+name = "by"
+label = "at"
+
+[entries."Expr.str.split_exact".parameters.n]
+name = "n"
+label = "splits"
+
+[entries."Expr.str.split_exact".parameters.inclusive]
+name = "inclusive"
+label = "keep the separator"
+
+[entries."Expr.str.splitn"]
+name = "str.splitn"
+hint = "a struct of at most n pieces between a separator, the last holding the rest"
+
+[entries."Expr.str.splitn".parameters.by]
+name = "by"
+label = "at"
+
+[entries."Expr.str.splitn".parameters.n]
+name = "n"
+label = "pieces"
+
+[entries."Expr.list.to_struct"]
+name = "list.to_struct"
+hint = "a struct whose fields are the first values of each list, under the names given"
+
+[entries."Expr.list.to_struct".parameters.fields]
+name = "fields"
+label = "field names"
+
+[entries."Expr.arr.to_struct"]
+name = "arr.to_struct"
+hint = "a struct with a field for each place of the array, named as given or field_0 and on"
+
+[entries."Expr.arr.to_struct".parameters.fields]
+name = "fields"
+label = "field names"
+
+[entries."Expr.value_counts"]
+name = "value_counts"
+hint = "a struct of each different value and how often it occurs"
+
+[entries."Expr.value_counts".parameters.sort]
+name = "sort"
+label = "most often first"
+
+[entries."Expr.value_counts".parameters.parallel]
+name = "parallel"
+label = "in parallel"
+
+[entries."Expr.value_counts".parameters.name]
+name = "name"
+label = "name of the count"
+
+[entries."Expr.value_counts".parameters.normalize]
+name = "normalize"
+label = "as a share of all"

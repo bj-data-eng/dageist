@@ -61,7 +61,7 @@ describe('the places the engine was asked about', () => {
   });
 
   it('hold every entry that stands in an expression, and no step', () => {
-    expect(grid.entries).toHaveLength(268);
+    expect(grid.entries).toHaveLength(279);
     expect(grid.entries.filter((id) => id.startsWith('LazyFrame.'))).toEqual([]);
     for (const id of grid.entries) {
       expect(catalogue.entries.has(id), id).toBe(true);
@@ -109,8 +109,8 @@ describe('the starts that are run', () => {
       ...FUNCTIONS.map(() => 'function'),
       'function',
     ]);
-    // Twelve functions start a chain besides `col` and `lit`; `when` leads into a condition.
-    expect(FUNCTIONS).toHaveLength(12);
+    // Thirteen functions start a chain besides `col` and `lit`; `when` leads into a condition.
+    expect(FUNCTIONS).toHaveLength(13);
   });
 
   it('are read from the node the host reports, where there is one to read', () => {
@@ -205,6 +205,7 @@ describe('the grid, run through the functions the components call', () => {
         'polars.int_range',
         'polars.linear_space',
         'polars.repeat',
+        'polars.struct',
         'polars.time',
         'polars.time_range',
       ]),

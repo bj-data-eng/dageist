@@ -401,6 +401,8 @@ function typedInto(type: LiteralType): TypedKind {
       return { kind: 'timeZone' };
     case 'path':
       return { kind: 'path' };
+    case 'field':
+      return { kind: 'value', type: 'string' };
     default:
       return { kind: 'value', type };
   }
@@ -417,6 +419,7 @@ const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
   pattern: 'Type a pattern, such as [aeiou]',
   timeZone: 'Type a time zone, such as Europe/Berlin',
   path: 'Type a path',
+  field: 'Type the name of a field',
 };
 
 /** What is waiting to be typed, for each type of literal. */
@@ -430,6 +433,7 @@ const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   pattern: 'pattern',
   timeZone: 'time zone',
   path: 'path',
+  field: 'field',
 };
 
 /**

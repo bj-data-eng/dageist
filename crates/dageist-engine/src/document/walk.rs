@@ -21,8 +21,8 @@
 use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
-    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
+    self, After, Chosen, ConditionState, Context, Count, Ending, Fields, Input, Literal, Nested,
+    Outer, Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -221,6 +221,9 @@ impl Step {
             .and_then(|mut table| table.collect_schema().ok());
         let mut walker = Walker {
             zones: Vec::new(),
+            fieldsets: Vec::new(),
+            written: Vec::new(),
+            pair_key: None,
             selected: Vec::new(),
             of_lists: Vec::new(),
             step: self.call(),
@@ -236,6 +239,7 @@ impl Step {
         };
         walker.arguments(self.call(), false);
         walker.selected_items_meet();
+        walker.written_names_are_distinct();
         walker.step_options(self.call());
         walker.nan_test_columns();
         walker.key_names();
@@ -310,7 +314,14 @@ struct Operand {
     zone: Option<Zone>,
     /// The width of the array it is, where the chain knows it.
     width: Option<usize>,
+    /// The fields of the struct it is, where the chain knows them.
+    fields: Option<FieldsAt>,
 }
+
+/// The fields of a struct that the walk holds once, by their place in the list, as it holds a time
+/// zone by its name: what an operand and a link carry is this handle, which can be copied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FieldsAt(usize);
 
 /// The time zone of a moment: none, or a name that the walk holds once, by its place in the list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -327,7 +338,7 @@ type Valued = (Option<Representative>, Option<Loose>);
 
 /// What surrounds a link of an expression besides the chain before it.
 #[derive(Clone, Copy)]
-struct Around {
+struct Around<'a> {
     /// Whether the values of the condition the link is part of are one expression.
     branches_are_one: bool,
     /// What the chain starts from, when that is a number typed without a dtype and the
@@ -342,8 +353,12 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
+    /// The fields of the struct the link follows, where they are known.
+    fields: Option<FieldsAt>,
     /// Whether the chain the link is part of starts from a connected list.
     from_a_list: bool,
+    /// The name the value the link follows is written under, where the chain knows it.
+    output_name: Option<&'a str>,
 }
 
 /// What a chain has so far.
@@ -397,6 +412,13 @@ struct Walker<'a> {
     not_known: Option<String>,
     /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
     zones: Vec<String>,
+    /// The fields of the structs the walk has met, which a [`FieldsAt`] points into.
+    fieldsets: Vec<Fields>,
+    /// What each item of a select or of the columns a step adds writes: where the item is, the
+    /// names it writes where they are known, and whether it is named by a field of a struct.
+    written: Vec<(Place, Option<Vec<String>>, bool)>,
+    /// The name a pair gives the expression it holds, while that is walked.
+    pair_key: Option<String>,
     /// The items of a select, where each is, and what it gives: the values of the items are met
     /// by one another in the table the select gives.
     selected: Vec<(Place, Shape, Count)>,
@@ -438,7 +460,37 @@ fn left_is_many(step: &Call, parameter: &str) -> bool {
 /// a hole. A key is never given a name by an alias, which Polars refuses in a
 /// join's key and the catalogue does not hold.
 fn key_name(key: &Expression) -> Option<String> {
-    let Start::Call(start) = key.start() else {
+    output_name(key.start(), key.links())
+}
+
+/// The output name of the expression that starts with `start` and goes on with `links`, which is
+/// the name of its start unless a link says otherwise: reading a field names the value by the field,
+/// and an unnest writes a column for each field, so it has no one name.
+fn output_name(start: &Start, links: &[Call]) -> Option<String> {
+    let mut name = start_name(start, links);
+    for link in links {
+        match link.entry().id().as_str() {
+            "Expr.struct.field" => {
+                let several = matches!(
+                    link.argument("more_names"),
+                    Some(Value::Many(more)) if !more.is_empty()
+                );
+                name = match link.argument("name") {
+                    Some(Value::Field(field)) if !several => Some(field.clone()),
+                    _ => None,
+                };
+            }
+            "Expr.struct.unnest" => name = None,
+            _ => {}
+        }
+    }
+    name
+}
+
+/// The name that the start of an expression gives it, which `links` tell where a condition's
+/// first value is one of them.
+fn start_name(start: &Start, links: &[Call]) -> Option<String> {
+    let Start::Call(start) = start else {
         return None;
     };
     match start.entry().id().as_str() {
@@ -485,8 +537,13 @@ fn key_name(key: &Expression) -> Option<String> {
             Some(Value::Expression(value)) => key_name(value),
             _ => None,
         },
-        "polars.when" => key
-            .links()
+        // A struct is named as the first of the values it is made of, which a name given to a value
+        // is where the value is one of the named ones.
+        "polars.struct" => struct_inputs(start)
+            .into_iter()
+            .next()
+            .and_then(|(name, value)| name.or_else(|| key_name(value))),
+        "polars.when" => links
             .iter()
             .find(|link| link.entry().id().as_str() == "When.then")
             .and_then(|link| match link.argument("statement") {
@@ -495,6 +552,36 @@ fn key_name(key: &Expression) -> Option<String> {
             }),
         _ => None,
     }
+}
+
+/// The values a call of `polars.struct` makes a struct of, in order, each with the name it is given
+/// where it is one of the named values: those that are listed first, then the named ones.
+fn struct_inputs(start: &Call) -> Vec<(Option<String>, &Expression)> {
+    fn expressions_of<'a>(value: &'a Value, found: &mut Vec<&'a Expression>) {
+        match value {
+            Value::Expression(expression) => found.push(expression),
+            Value::Many(items) => items.iter().for_each(|item| expressions_of(item, found)),
+            _ => {}
+        }
+    }
+    let mut listed = Vec::new();
+    if let Some(value) = start.argument("exprs") {
+        expressions_of(value, &mut listed);
+    }
+    let mut inputs: Vec<(Option<String>, &Expression)> = listed
+        .into_iter()
+        .map(|expression| (None, expression))
+        .collect();
+    if let Some(Value::Pairs(pairs)) = start.argument("named_exprs") {
+        for (key, value) in pairs {
+            if let (Value::Columns(names), Value::Expression(expression)) = (key, value)
+                && let [name] = names.as_slice()
+            {
+                inputs.push((Some(name.clone()), expression));
+            }
+        }
+    }
+    inputs
 }
 
 /// The unit a call is given for the parameter `parameter`, one of the three a time unit has, if it
@@ -1127,6 +1214,62 @@ impl Walker<'_> {
         }
     }
 
+    /// The names the item `expression` of a select writes, where they are known: the name it is
+    /// given by a pair, or the one its start and the fields it reads give it, or the names of the
+    /// fields an unnest ends it with.
+    fn names_written(&self, expression: &Expression, calls: &[Standing]) -> Option<Vec<String>> {
+        let several = |link: &Call| match link.entry().id().as_str() {
+            "Expr.struct.unnest" => true,
+            "Expr.struct.field" => matches!(
+                link.argument("more_names"),
+                Some(Value::Many(more)) if !more.is_empty()
+            ),
+            _ => false,
+        };
+        if expression.links().iter().any(several) {
+            // Only what ends in the several columns says their names.
+            if !expression.links().last().is_some_and(several) {
+                return None;
+            }
+            let columns = calls.last()?.verdict()?.allowance()?.columns()?;
+            return Some(columns.names().map(str::to_owned).collect());
+        }
+        let name = self
+            .pair_key
+            .clone()
+            .or_else(|| output_name(expression.start(), expression.links()))?;
+        Some(vec![name])
+    }
+
+    /// Asks whether the items of a select, or of the columns a step adds, write the columns they do
+    /// under names that differ, as Polars needs: it refuses two items that write one name. Names
+    /// that no field of a struct writes are not asked, which waits for the outputs of one name that
+    /// every step gives ([#161](https://github.com/bj-data-eng/dageist/issues/161)).
+    fn written_names_are_distinct(&mut self) {
+        let written = std::mem::take(&mut self.written);
+        for (at, (place, names, by_a_field)) in written.iter().enumerate() {
+            let Some(names) = names else { continue };
+            for (_, before, before_by_a_field) in &written[..at] {
+                let Some(before) = before else { continue };
+                if !(*by_a_field || *before_by_a_field) {
+                    continue;
+                }
+                let Some(clash) = names.iter().find(|name| before.contains(name)) else {
+                    continue;
+                };
+                if let Err(refusal) = allowed::rule_forbids_a_name_written_twice(clash) {
+                    self.refusal.get_or_insert(WalkRefusal {
+                        place: place.clone(),
+                        refusal,
+                        at_end: true,
+                        argument_unknown: false,
+                    });
+                }
+                return;
+            }
+        }
+    }
+
     /// Whether `value` is, or holds, an expression that starts from a connected list.
     fn starts_from_a_list(&self, value: &Value) -> bool {
         match value {
@@ -1291,9 +1434,19 @@ impl Walker<'_> {
                     self.path.push(Segment::Key(at));
                     self.value(key, parameter, held, found);
                     self.path.pop();
+                    // The name the pair gives what it holds, which an item of a select is written
+                    // under.
+                    self.pair_key = match key {
+                        Value::Columns(names) => match names.as_slice() {
+                            [name] => Some(name.clone()),
+                            _ => None,
+                        },
+                        _ => None,
+                    };
                     self.path.push(Segment::Value(at));
                     self.value(entry, parameter, held, found);
                     self.path.pop();
+                    self.pair_key = None;
                 }
             }
             _ => {}
@@ -1515,6 +1668,53 @@ impl Walker<'_> {
         Some((self.zones[first].clone(), self.zones[*other].clone()))
     }
 
+    /// The fields the walk holds, which a handle points to: held once however often they are met.
+    fn hold(&mut self, fields: Fields) -> FieldsAt {
+        let at = self
+            .fieldsets
+            .iter()
+            .position(|held| *held == fields)
+            .unwrap_or_else(|| {
+                self.fieldsets.push(fields);
+                self.fieldsets.len() - 1
+            });
+        FieldsAt(at)
+    }
+
+    /// The fields of the struct the chain has after a call whose standing is `standing`, where the
+    /// call gave a struct and the tables and the rules know its fields.
+    fn fields_after(&mut self, standing: &Standing) -> Option<FieldsAt> {
+        let fields = standing.verdict()?.allowance()?.fields()?.clone();
+        Some(self.hold(fields))
+    }
+
+    /// What a call of `polars.struct` is made of, one for each value in order: the name it is
+    /// written under, its class, and the fields it has where it is a struct. The operands are in the
+    /// order the arguments were walked, which is the document's, and the values are in the order
+    /// Python makes them in, the listed ones first.
+    fn struct_inputs_made(
+        &self,
+        start: &Call,
+        operands: &[(String, Operand)],
+    ) -> Vec<(Option<String>, Option<Representative>, Option<Fields>)> {
+        if start.entry().id().as_str() != "polars.struct" {
+            return Vec::new();
+        }
+        let listed = operands.iter().filter(|(name, _)| name == "exprs");
+        let named = operands.iter().filter(|(name, _)| name == "named_exprs");
+        struct_inputs(start)
+            .into_iter()
+            .zip(listed.chain(named))
+            .map(|((name, expression), (_, operand))| {
+                (
+                    name.or_else(|| key_name(expression)),
+                    operand.dtype,
+                    operand.fields.map(|at| self.fieldsets[at.0].clone()),
+                )
+            })
+            .collect()
+    }
+
     /// The zone the walk holds under `name`.
     fn zone_named(&mut self, name: &str) -> Zone {
         let at = self
@@ -1577,6 +1777,8 @@ impl Walker<'_> {
             "polars.col" => self.column_of(start),
             "polars.lit" => literal_class(start),
             "polars.element" => self.group_of(),
+            // A struct is the class of a struct, whatever fields it is made of.
+            "polars.struct" => Some(Representative::Struct),
             _ => Representative::of(&made_dtype(start)?),
         }
     }
@@ -1604,6 +1806,7 @@ impl Walker<'_> {
             reliable: false,
             zone: None,
             width: None,
+            fields: None,
         };
         // Whether the chain starts from a connected list, which the words of a refusal then say.
         let from_a_list =
@@ -1679,7 +1882,26 @@ impl Walker<'_> {
                     .map(|(name, word)| (name.as_str(), word.as_str()))
                     .collect();
                 let time_zones = start.time_zones();
-                let chosen = Chosen::default();
+                // The fields of a column that is a struct, which its schema gives, and what a function
+                // that makes a struct is made of.
+                let start_fields = self
+                    .start_dtype(start)
+                    .and_then(|dtype| Fields::of_dtype(&dtype));
+                let inputs_made: Vec<(Option<String>, Option<Representative>, Option<Fields>)> =
+                    self.struct_inputs_made(start, &start_arguments);
+                let input_names: Vec<Input<'_>> = inputs_made
+                    .iter()
+                    .map(|(name, class, fields)| {
+                        Input::new(name.as_deref(), *class, fields.as_ref())
+                    })
+                    .collect();
+                let names = start.names();
+                let numbers = start.numbers();
+                let chosen = Chosen::default()
+                    .following_fields(start_fields.as_ref())
+                    .with_names(&names)
+                    .with_numbers(&numbers)
+                    .with_inputs(&input_names);
                 let chosen = match class {
                     Some(dtype) => chosen.giving(dtype),
                     None => chosen,
@@ -1865,6 +2087,20 @@ impl Walker<'_> {
             Start::Call(start) => self.start_zone(start),
             _ => None,
         };
+        let mut fields: Option<FieldsAt> = match expression.start() {
+            Start::Call(start) => {
+                let held = self
+                    .start_dtype(start)
+                    .and_then(|dtype| Fields::of_dtype(&dtype))
+                    .or_else(|| {
+                        calls
+                            .first()
+                            .and_then(|standing| standing.verdict()?.allowance()?.fields().cloned())
+                    });
+                held.map(|found| self.hold(found))
+            }
+            _ => None,
+        };
         let mut compares_with_a_fraction = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -1906,6 +2142,7 @@ impl Walker<'_> {
                                 && operand.shape == Shape::Many
                                 && operand.dtype.is_some_and(is_a_whole_number)
                         }));
+            let name_before = output_name(expression.start(), &expression.links()[..at]);
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -1919,12 +2156,15 @@ impl Walker<'_> {
                     width,
                     widened,
                     zone,
+                    fields,
                     from_a_list,
+                    output_name: name_before.as_deref(),
                 },
             );
             unit = unit_after(link, unit, &standing);
             width = width_after(width, &standing);
             zone = self.zone_after(link, zone, &standing);
+            fields = self.fields_after(&standing);
             widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
@@ -2036,6 +2276,16 @@ impl Walker<'_> {
         };
         let held_here = held.is_some() && context == Context::step(Outer::Select);
         let held_place = held_here.then(|| place.clone());
+        if held_here {
+            let names = self.names_written(expression, &calls);
+            let by_a_field = expression.links().iter().any(|link| {
+                matches!(
+                    link.entry().id().as_str(),
+                    "Expr.struct.field" | "Expr.struct.unnest"
+                )
+            });
+            self.written.push((place.clone(), names, by_a_field));
+        }
         self.walked.push(WalkedExpression {
             place,
             context: Some(context),
@@ -2064,6 +2314,7 @@ impl Walker<'_> {
                 reliable: dtype.is_some() && !branches_are_one,
                 zone,
                 width,
+                fields,
             },
             Cur::Condition {
                 values,
@@ -2084,6 +2335,7 @@ impl Walker<'_> {
                 known: true,
                 reliable: !branches_are_one,
                 zone: None,
+                fields: None,
                 // The width the arrays among the values share, where they are of one.
                 width: widths
                     .iter()
@@ -2162,7 +2414,7 @@ impl Walker<'_> {
         context: Context,
         cur: Cur,
         last_end: &mut Option<Ending>,
-        around: Around,
+        around: Around<'_>,
     ) -> (Cur, Standing) {
         let Around {
             branches_are_one,
@@ -2171,8 +2423,14 @@ impl Walker<'_> {
             width,
             widened,
             zone,
+            fields,
             from_a_list,
+            output_name,
         } = around;
+        // What the call says of a struct: the fields it follows, the names and numbers it is given.
+        let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
+        let names = link.names();
+        let numbers = link.numbers();
         let entry = link.entry();
         // What the link follows is the values of another table where the chain started from a
         // connected list and still gives a count of its values.
@@ -2473,6 +2731,10 @@ impl Walker<'_> {
                     .with_time_zones(&time_zones)
                     .following(unit)
                     .following_width(width)
+                    .following_fields(fields_followed.as_ref())
+                    .with_names(&names)
+                    .with_numbers(&numbers)
+                    .named(output_name)
                     .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
@@ -2578,6 +2840,10 @@ impl Walker<'_> {
             .with_time_zones(&time_zones)
             .following(unit)
             .following_width(width)
+            .following_fields(fields_followed.as_ref())
+            .with_names(&names)
+            .with_numbers(&numbers)
+            .named(output_name)
             .in_zone(zone_name.as_deref())
             .with_zone_clash(clash_of_zones);
         let chosen = match gives {

@@ -65,6 +65,8 @@ struct NoneView {
 enum KindView {
     Expression,
     Column,
+    /// The name of a field of a struct.
+    Field,
     Value {
         #[serde(rename = "type")]
         value_type: ValueTypeView,
@@ -405,6 +407,7 @@ fn kind_of(
     Ok(match kind {
         Kind::Expression(_) => KindView::Expression,
         Kind::Column => KindView::Column,
+        Kind::Field => KindView::Field,
         Kind::Value(value_type) => KindView::Value {
             value_type: value_type_view(value_type),
         },
@@ -987,6 +990,7 @@ mod tests {
                 "rounding",
                 "aggregate",
                 "temporal",
+                "structs",
                 "text",
                 "pieces",
                 "search",

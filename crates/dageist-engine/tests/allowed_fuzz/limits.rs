@@ -1168,15 +1168,17 @@ fn gives_one_value_of_literals(expression: &Expression, upto: usize) -> bool {
 
 /// The functions that start a chain and give one value of what they are given, which a column
 /// does not stand in for: the literal, and the ones that make a date, a time, a moment, a length
-/// of time or a moment from a count since 1970. A function is no value of literals alone until it
+/// of time or a moment from a count since 1970, and the one that makes a struct of values, which is
+/// one value where each is. A function is no value of literals alone until it
 /// is named here; the catalogue's functions are checked against this list, so that a new one is
 /// decided when it is added and not excused for what it gives many values of.
-const FUNCTIONS_OF_LITERALS: [&str; 6] = [
+const FUNCTIONS_OF_LITERALS: [&str; 7] = [
     "polars.date",
     "polars.datetime",
     "polars.duration",
     "polars.from_epoch",
     "polars.lit",
+    "polars.struct",
     "polars.time",
 ];
 
@@ -5858,6 +5860,7 @@ mod tests {
                 "polars.duration",
                 "polars.from_epoch",
                 "polars.lit",
+                "polars.struct",
                 "polars.time",
             ]
         );

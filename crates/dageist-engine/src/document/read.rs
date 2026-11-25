@@ -160,6 +160,7 @@ fn read_value(json: &Json) -> Result<Value, Refusal> {
     Ok(match kind.as_str() {
         "expression" => Value::Expression(read_expression(inner)?),
         "columns" => Value::Columns(strings("columns", inner)?),
+        "field" => Value::Field(string("field", inner)?.to_owned()),
         "integer" => match inner {
             Json::Number(Number::Integer(number)) => Value::Integer(*number),
             other => return Err(shape("integer", "a whole number", other)),

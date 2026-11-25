@@ -161,6 +161,7 @@ fn value(value: &Value) -> Json {
     let (kind, inner) = match value {
         Value::Expression(inner) => ("expression", expression(inner)),
         Value::Columns(names) => ("columns", strings(names)),
+        Value::Field(name) => ("field", Json::String(name.clone())),
         Value::Integer(number) => ("integer", Json::integer(*number)),
         // A float is finite wherever a `Call` holds it; `null` is not reachable.
         Value::Float(number) => ("float", Json::float(*number).unwrap_or(Json::Null)),
