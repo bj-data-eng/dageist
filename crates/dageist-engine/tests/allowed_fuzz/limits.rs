@@ -272,22 +272,6 @@ pub enum Limit {
     /// the call. A bound or a count that is a bare column holds the sample's rows, as the tables
     /// measured it, so a refusal that is its own is not this, whatever the other one is.
     ABoundWithValuesOfItsOwn,
-    /// A window whose partition holds no column gives Polars' streaming engine no rows, so
-    /// what follows it in a chain that starts from a literal is never evaluated, and the rows
-    /// do not show a plan that they contradict. The tables hold the schema of a method and what
-    /// its rows give as one thing, and refuse a root of a date whose schema names the date and
-    /// whose rows are a float, which is the target's own comparison and shows only where rows
-    /// are given. The tables refusing, when they run rows, with the reason that the schema says
-    /// one dtype and the rows give another, at a call after such a window in a chain that
-    /// starts from a literal, which Polars allows; the window is why where Polars, asked again
-    /// with each literal partition a column, refuses the case for that reason. The same window,
-    /// and one whose keys, in its partition or its order, are literals that read no column or one
-    /// value each, as an aggregate is, give a window of a value that reads no column no rows, so
-    /// what a replacement is given as its new values has none beside old values of the table's
-    /// rows. Polars refusing the rows, with no place, for the new values of a replacement being
-    /// neither as many as the old nor one, in a case with such a window: the case run again with
-    /// the partition of each a column of the table, which gives it the rows, is not refused for it.
-    AWindowOverALiteral,
     /// A drop of nulls can leave no rows, as one of a null literal does, so the rows do not show
     /// a plan that they contradict. The tables hold the schema of a method and what its rows
     /// give as one thing, and refuse a method whose schema says one dtype and whose rows give
@@ -520,7 +504,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -539,7 +523,6 @@ impl Limit {
         Self::AHiddenSchema,
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
-        Self::AWindowOverALiteral,
         Self::ADropLeavesNoRows,
         Self::ABitwiseCallInAJoinKey,
         Self::ACastOfAValueTheDtypeCannotHold,
@@ -584,7 +567,6 @@ impl Limit {
             Self::AHiddenSchema => "a-hidden-schema",
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
-            Self::AWindowOverALiteral => "a-window-over-a-literal",
             Self::ADropLeavesNoRows => "a-drop-leaves-no-rows",
             Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
@@ -673,9 +655,6 @@ impl Limit {
             }
             Self::ABoundTheDtypeCannotHold => {
                 "Polars casts a bound of clip, and the values a replacement lists, to the dtype of what they follow and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
-            }
-            Self::AWindowOverALiteral => {
-                "a window of a literal that has no key for each row gives no rows, so the rows do not show the plan of what follows it, and what it gives has no values"
             }
             Self::ADropLeavesNoRows => {
                 "a drop of nulls can leave no rows, so the rows do not show the plan of what follows it"
@@ -3656,207 +3635,6 @@ fn is_a_clip_bounded_by_an_aggregate(call: &Call) -> bool {
             .any(|(_, bound)| any_call(bound, &is_one_value))
 }
 
-/// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
-/// key, and each of `more_exprs`, starts from a literal and reads no column, as a running sum of
-/// a literal does not.
-fn partitions_by_a_literal(call: &Call) -> bool {
-    let keys = |parameter: &str| -> Vec<&Expression> {
-        match call.argument(parameter) {
-            Some(Value::Expression(key)) => vec![key],
-            Some(Value::Many(items)) => items
-                .iter()
-                .filter_map(|item| match item {
-                    Value::Expression(key) => Some(key),
-                    _ => None,
-                })
-                .collect(),
-            _ => Vec::new(),
-        }
-    };
-    let literal = |key: &&Expression| {
-        starts_from_a_literal(key) && !any_call(key, &|call| is(call, "polars.col"))
-    };
-    is(call, "Expr.over")
-        && call.argument("partition_by").is_some()
-        && keys("partition_by").iter().all(literal)
-        && keys("more_exprs").iter().all(literal)
-}
-
-/// `value` with the partition of every window that `windowed` says yes to made the column
-/// `column`, in the calls it holds.
-fn value_partitioned_by(value: &Value, column: &str, windowed: &dyn Fn(&Call) -> bool) -> Value {
-    match value {
-        Value::Expression(expression) => Value::Expression(
-            expression_partitioned_by(expression, column, windowed)
-                .unwrap_or_else(|| expression.clone()),
-        ),
-        Value::Many(items) => Value::Many(
-            items
-                .iter()
-                .map(|item| value_partitioned_by(item, column, windowed))
-                .collect(),
-        ),
-        Value::Pairs(pairs) => Value::Pairs(
-            pairs
-                .iter()
-                .map(|(key, entry)| {
-                    (
-                        value_partitioned_by(key, column, windowed),
-                        value_partitioned_by(entry, column, windowed),
-                    )
-                })
-                .collect(),
-        ),
-        other => other.clone(),
-    }
-}
-
-fn call_partitioned_by(
-    call: &Call,
-    column: &str,
-    windowed: &dyn Fn(&Call) -> bool,
-) -> Option<Call> {
-    let is_windowed = windowed(call);
-    let by_the_column = || -> Option<Value> {
-        let key = Call::new(
-            catalog::entry("polars.col")?,
-            vec![("name", Value::Columns(vec![column.to_owned()]))],
-        )
-        .ok()?;
-        Some(Value::Many(vec![Value::Expression(
-            Expression::new(Start::Call(key), Vec::new()).ok()?,
-        )]))
-    };
-    let mut given: Vec<(&str, Value)> = call
-        .arguments()
-        .iter()
-        .map(|given| {
-            let value = if is_windowed && given.parameter() == "partition_by" {
-                by_the_column()?
-            } else if is_windowed && given.parameter() == "more_exprs" {
-                Value::Many(Vec::new())
-            } else {
-                value_partitioned_by(given.value(), column, windowed)
-            };
-            Some((given.parameter(), value))
-        })
-        .collect::<Option<Vec<_>>>()?;
-    if is_windowed && call.argument("partition_by").is_none() {
-        given.push(("partition_by", by_the_column()?));
-    }
-    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
-}
-
-fn expression_partitioned_by(
-    expression: &Expression,
-    column: &str,
-    windowed: &dyn Fn(&Call) -> bool,
-) -> Option<Expression> {
-    let start = match expression.start() {
-        Start::Call(call) => Start::Call(call_partitioned_by(call, column, windowed)?),
-        other => other.clone(),
-    };
-    let links = expression
-        .links()
-        .iter()
-        .map(|link| call_partitioned_by(link, column, windowed))
-        .collect::<Option<Vec<_>>>()?;
-    Expression::new(start, links).ok()
-}
-
-/// The case with the partition of every window that `windowed` says yes to made a column of the
-/// table the expression is read against, the same in all else. None in a pivot's aggregate, which
-/// has no column to stand in.
-fn case_with_windows_partitioned(
-    case: &Case,
-    at: Option<&Segment>,
-    windowed: &dyn Fn(&Call) -> bool,
-) -> Option<Case> {
-    let step = &case.document.steps()[0];
-    if is(step.call(), "LazyFrame.pivot") {
-        return None;
-    }
-    let column = match (is(step.call(), "LazyFrame.join"), at) {
-        (true, Some(Segment::Parameter(name))) if name == "right_on" => "rk",
-        (true, Some(Segment::Parameter(name))) if name == "on" => "u",
-        _ => "k",
-    };
-    let rebuilt = Step::new(
-        step.id().clone(),
-        call_partitioned_by(step.call(), column, windowed)?,
-    )
-    .ok()?;
-    Some(Case {
-        receiver: case.receiver,
-        argument: case.argument,
-        document: Document::new(vec![rebuilt]).ok()?,
-    })
-}
-
-/// The case with the partition of every window that partitions by a literal made a column.
-fn case_with_columns_to_partition_by(case: &Case, refused: &Refused) -> Option<Case> {
-    case_with_windows_partitioned(case, refused.place.path().first(), &partitions_by_a_literal)
-}
-
-/// Whether the call is a window none of whose keys, in its partition or its order, holds a value
-/// for each row: each is a literal that reads no column, or holds one value, as an aggregate is.
-/// Polars gives such a window of a value that reads no column no rows.
-fn has_no_key_for_each_row(call: &Call) -> bool {
-    let keys = |parameter: &str| -> Vec<&Expression> {
-        match call.argument(parameter) {
-            Some(Value::Expression(key)) => vec![key],
-            Some(Value::Many(items)) => items
-                .iter()
-                .filter_map(|item| match item {
-                    Value::Expression(key) => Some(key),
-                    _ => None,
-                })
-                .collect(),
-            _ => Vec::new(),
-        }
-    };
-    let all: Vec<&Expression> = ["partition_by", "more_exprs", "order_by"]
-        .iter()
-        .flat_map(|parameter| keys(parameter))
-        .collect();
-    is(call, "Expr.over")
-        && !all.is_empty()
-        && all.iter().all(|key| {
-            (starts_from_a_literal(key) && !any_call(key, &|call| is(call, "polars.col")))
-                || any_call(key, &is_one_value)
-        })
-}
-
-/// Whether Polars refuses the case for the reason the tables gave once each window that
-/// partitions by a literal partitions by a column: the rows are then given, and show the plan
-/// that they contradict, so the window was why they did not. Polars allows the case as it is.
-fn refused_with_columns_to_partition_by(case: &Case, refused: &Refused) -> bool {
-    case_with_columns_to_partition_by(case, refused).is_some_and(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control)
-                .refusal
-                .is_some_and(|refusal| refusal.reason == refused.reason)
-        })
-    })
-}
-
-/// Whether Polars refuses the case for the new values of a replacement being fewer than the old
-/// still when each window that has no key for each row has a column to partition by, which gives
-/// it the rows: the window is then no cause of it, and the table's rows are.
-fn refused_for_new_values_with_columns_to_partition_by(case: &Case) -> Option<bool> {
-    changed(
-        case_with_windows_partitioned(case, None, &has_no_key_for_each_row),
-        case,
-    )
-    .map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control).refusal.is_some_and(|refusal| {
-                unplaced(&refusal) && refusal.reason.contains(NEW_AS_LONG_AS_OLD)
-            })
-        })
-    })
-}
-
 /// Whether the expression is a column and nothing else, which holds the sample's rows.
 fn is_a_bare_column(expression: &Expression) -> bool {
     expression.links().is_empty()
@@ -5058,31 +4836,6 @@ fn applies(
                 // The computed bound is why where the tables allow the clip without it: a bare
                 // bound that the tables refuse is refused as Polars refuses it.
                 && !the_bare_bounds_alone_are_refused(case)
-        }
-        (Limit::AWindowOverALiteral, Disagreement::PolarsAllows(refused)) => {
-            // The rows are none where a window partitions a literal by a literal, so the target's
-            // own comparison of a plan with rows is not shown for a call that follows one in a
-            // chain that starts from a literal.
-            let locus = locate(case, &refused.place);
-            refused.stage == Some(TableStage::Rows)
-                && refused.reason.starts_with(SCHEMA_SAYS)
-                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                    starts_from_a_literal(chain)
-                        && chain.links()[..at].iter().any(partitions_by_a_literal)
-                })
-                && refused_with_columns_to_partition_by(case, refused)
-        }
-        (Limit::AWindowOverALiteral, Disagreement::PolarsRefuses(refusal)) => {
-            // A window of a value that reads no column, none of whose keys holds a value for each
-            // row, gives no rows, so what it is given as the new values of a replacement is none
-            // where the table's rows are three.
-            unplaced(refusal)
-                && refusal.stage == Stage::Rows
-                && refusal.reason.contains(NEW_AS_LONG_AS_OLD)
-                && held
-                    .iter()
-                    .any(|(_, held)| any_call(held, &has_no_key_for_each_row))
-                && refused_for_new_values_with_columns_to_partition_by(case) == Some(false)
         }
         (Limit::ADropLeavesNoRows, Disagreement::PolarsAllows(refused)) => {
             // The rows are none where a drop of nulls meets a value that is all nulls, so the
@@ -7665,128 +7418,6 @@ mod tests {
             vec![call("Expr.str.to_uppercase", Vec::new())],
         )]);
         assert_eq!(tables_refuse(&plain, at_the_call, ROWS, TEXT_COUNT), vec![]);
-    }
-
-    // ----- A window over a literal
-
-    const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
-    const LITERAL_START: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}}"#;
-    const LITERAL_NULL: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null}}}"#;
-    const LITERAL_KEY: &str =
-        r#"{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}"#;
-    const COLUMN_K: &str = r#"{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}}"#;
-    const COLUMN_KEY: &str =
-        r#"{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}"#;
-    const WINDOW: &str =
-        r#"{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":KEY}]}}},"#;
-
-    /// A key that is a running sum of a literal, which reads no column.
-    fn running_sum_of_a_literal() -> String {
-        format!(
-            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.cum_sum","arguments":{{}}}}]}}"#
-        )
-    }
-
-    /// A key that is a literal with a column added to it, which reads one.
-    fn literal_plus_a_column() -> String {
-        format!(
-            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.add","arguments":{{"other":{{"expression":{{"start":{COLUMN_K},"then":[]}}}}}}}}]}}"#
-        )
-    }
-
-    /// `select(start.over(key).cbrt())` on a sample where `a` and `b` are dates, as text.
-    fn root_after_a_window(start: &str, key: &str, windowed: bool) -> Case {
-        let window = if windowed {
-            WINDOW.replace("KEY", key)
-        } else {
-            String::new()
-        };
-        let text = format!(
-            r#"{{"a":"Date","b":"Date","revision":1}}
-{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{start},"then":[{window}{{"entry":"Expr.cbrt","arguments":{{}}}}]}}}}]}}}}}}}}]}}"#
-        );
-        Case::decode(text.as_bytes()).expect("a case")
-    }
-
-    /// What the limits make of the tables refusing at link `link` with the plan and rows saying
-    /// two dtypes, asked on a stack that Polars' plans fit on: the limit runs Polars again.
-    fn excused_for_a_root(case: &Case, link: usize, reason: &str) -> Vec<Limit> {
-        std::thread::scope(|scope| {
-            std::thread::Builder::new()
-                .stack_size(256 << 20)
-                .spawn_scoped(scope, || {
-                    tables_refuse(case, link_of("exprs", 0, link), ROWS, reason)
-                })
-                .expect("a thread")
-                .join()
-                .expect("the limits are asked")
-        })
-    }
-
-    #[test]
-    fn a_root_after_a_window_over_a_literal_is_excused_where_the_literal_starts_the_chain() {
-        let case = root_after_a_window(LITERAL_START, LITERAL_KEY, true);
-        assert_eq!(
-            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
-            vec![Limit::AWindowOverALiteral]
-        );
-    }
-
-    #[test]
-    fn a_window_whose_key_reads_no_column_gives_no_rows_but_one_that_reads_a_column_does() {
-        let sum = running_sum_of_a_literal();
-        let case = root_after_a_window(LITERAL_START, &sum, true);
-        assert_eq!(
-            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
-            vec![Limit::AWindowOverALiteral]
-        );
-        let reads_a_column = literal_plus_a_column();
-        let case = root_after_a_window(LITERAL_START, &reads_a_column, true);
-        assert!(
-            !excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT).contains(&Limit::AWindowOverALiteral)
-        );
-    }
-
-    #[test]
-    fn a_root_is_not_excused_by_a_window_that_is_not_over_a_literal_in_a_chain_of_a_literal() {
-        // The same root after a column start, after a window over a column, with no window, at
-        // the window itself, or refused for another reason, is not excused by this limit: rows
-        // are given, and the comparison of the plan with them is the tables' to make.
-        let cases = [
-            (
-                root_after_a_window(COLUMN_K, LITERAL_KEY, true),
-                1,
-                SCHEMA_SAYS_FLOAT,
-            ),
-            (
-                root_after_a_window(LITERAL_START, COLUMN_KEY, true),
-                1,
-                SCHEMA_SAYS_FLOAT,
-            ),
-            (
-                root_after_a_window(LITERAL_START, LITERAL_KEY, false),
-                0,
-                SCHEMA_SAYS_FLOAT,
-            ),
-            (
-                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
-                0,
-                SCHEMA_SAYS_FLOAT,
-            ),
-            (
-                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
-                1,
-                "no",
-            ),
-        ];
-        for (case, link, reason) in cases {
-            // Another limit may excuse a call that is not the last of the chain, which this one
-            // is not asked to.
-            assert!(
-                !excused_for_a_root(&case, link, reason).contains(&Limit::AWindowOverALiteral),
-                "{reason} at {link}"
-            );
-        }
     }
 
     // ----- A negated bitwise call
@@ -12959,33 +12590,6 @@ mod tests {
         let case = select_of_a_null_literal(&["Expr.cbrt", "Expr.drop_nulls"]);
         assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
     }
-    /// `lit(None).over(order_by=a.last())` as what `replace` is given: no key of the window holds a
-    /// value for each row, so a window of a value that reads no column gives no rows.
-    fn replace_by_a_window(window: &str) -> Case {
-        let text = format!(
-            r#"{{"a":"Date","b":"Date","revision":1}}
-{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["g"]}}}}}},"then":[{{"entry":"Expr.replace","arguments":{{"old":{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["u"]}}}}}},"then":[]}}}},"new":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"flag":null}}}}}},"then":[{{"entry":"Expr.over","arguments":{{{window}}}}}]}}}}}}}}]}}}}]}}}}}}}}]}}"#
-        );
-        Case::decode(text.as_bytes()).expect("a case")
-    }
-
-    #[test]
-    fn a_window_of_a_literal_with_no_key_for_each_row_is_why_what_replaces_has_no_values() {
-        let by_the_last = r#""order_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.last","arguments":{}}]}}]}"#;
-        assert_eq!(
-            excused_by_kept("uncovered-a-window-over-a-literal--what-replaces.case"),
-            vec![Limit::AWindowOverALiteral]
-        );
-        assert_eq!(
-            excused_by(&replace_by_a_window(by_the_last)),
-            vec![Limit::AWindowOverALiteral]
-        );
-        // A key that holds a value for each row gives the rows, and what replaces is as many as
-        // the table has: nothing is refused.
-        let by_a_column = r#""order_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}]}"#;
-        assert_eq!(excused_by(&replace_by_a_window(by_a_column)), vec![]);
-    }
-
     // ----- A gather beyond the rows
 
     const A_PLACE_OUT_OF_BOUNDS_SAID: &str = "gather indices are out of bounds";
