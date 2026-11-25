@@ -17,6 +17,7 @@ use super::ask_polars::{self, Connected};
 use super::asked::{self, Walked};
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
+use super::structs::Structs;
 
 /// How a reason that is the target's own comparison of a step's schema with its
 /// rows begins: it is no refusal of Polars, and shows only where the method that
@@ -495,7 +496,7 @@ impl Tables {
     }
 
     fn of(self, case: &Case, keys: &[DataType]) -> Frames {
-        let frames = Frames::new(case.receiver, case.argument, keys);
+        let frames = Frames::new(case.receiver, case.argument, &case.structs, keys);
         let frames = if self.other_as_left {
             frames.other_as_left()
         } else {
@@ -731,6 +732,7 @@ mod tests {
         Case {
             receiver,
             argument: Representative::String,
+            structs: Structs::default(),
             document: Document::read(&text).expect("a document"),
         }
     }
@@ -819,7 +821,12 @@ mod tests {
         let observed = observe_checked(&case);
         assert_eq!((&observed.refusal, &observed.drift), (&None, &None));
         // Both say so for real: the asker, run apart from the engine, allows it as well.
-        let frames = Frames::with_key(case.receiver, case.argument, Some(&[DataType::Int64]));
+        let frames = Frames::with_key(
+            case.receiver,
+            case.argument,
+            &case.structs,
+            Some(&[DataType::Int64]),
+        );
         let asked = asked::ask(&case.document, &frames).expect("a step that can be asked");
         assert_eq!(asked.refusal, None);
     }

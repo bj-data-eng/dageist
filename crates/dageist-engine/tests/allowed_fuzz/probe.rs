@@ -775,6 +775,7 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         })
     };
@@ -806,6 +807,7 @@ pub fn cases_of_the_part(case: &Case, refused: &Refused) -> Option<(Case, Option
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         })
     };
@@ -840,6 +842,7 @@ pub fn counts_alone(case: &Case, refused: &Refused) -> Vec<Case> {
             Some(Case {
                 receiver: case.receiver,
                 argument: case.argument,
+                structs: case.structs.clone(),
                 document,
             })
         })
@@ -1025,6 +1028,7 @@ pub fn settle_on_a_value(
         let probed = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         };
         let at = place_of_the_part(&found, false).then(Segment::Link(0));
@@ -1091,6 +1095,7 @@ pub fn settle_a_start_given_columns(
         let probed = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         };
         let at = place_of_the_part(&found, false).then(Segment::Start);
@@ -1142,6 +1147,7 @@ pub fn settle_a_predicate_on_a_value(
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: document_of(case, &found, probe.part, probe.filter)?,
     };
     let tables = Tables::standing(found.on_the_other_table, &[class])?;
@@ -1384,6 +1390,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: join_on(case, parameter, &part)?,
     };
     let at = Place::of_step(0, StepId::new(STEP).ok())
@@ -1394,6 +1401,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         let alone = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: join_on(case, parameter, &before)?,
         };
         if refused_anywhere_as(&alone, Tables::default(), refused) {
@@ -1452,6 +1460,7 @@ pub fn settle_on_a_value_as_a_key(
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: join_on(case, parameter, &part)?,
     };
     let at = Place::of_step(0, StepId::new(STEP).ok())
@@ -1583,6 +1592,7 @@ pub fn settle_in_the_position(
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: step_with(case, parameter, part)?,
         })
     };
@@ -1591,6 +1601,7 @@ pub fn settle_in_the_position(
     let selected = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: document_of(case, &found, part.clone(), false)?,
     };
     let differs_as_the_tables_say = observe_probe(&selected, on(class))
@@ -1743,6 +1754,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
         .map(|document| Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         });
     made_false.is_some_and(|made_false| (0..RUNS).all(|_| observe(&made_false).refusal.is_none()))
@@ -1966,6 +1978,7 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         })
     };
@@ -2055,6 +2068,7 @@ pub fn settle_given_no_known_dtype(case: &Case, refused: &Refused) -> Option<Set
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         })
     };

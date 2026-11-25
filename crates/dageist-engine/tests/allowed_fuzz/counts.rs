@@ -262,6 +262,7 @@ fn only_the_item(case: &Case, refused: &Refused) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![Step::new(step.id().clone(), rebuilt).ok()?]).ok()?,
     })
 }

@@ -32,6 +32,7 @@ mod observe;
 mod predict;
 mod probe;
 mod reduce;
+mod structs;
 mod target;
 mod timeout;
 mod watchdog;

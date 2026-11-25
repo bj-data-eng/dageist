@@ -118,7 +118,7 @@ fn refused(found: &WalkRefusal) -> Refused {
 fn walk_of(case: &Case) -> Walk {
     let step = &case.document.steps()[0];
     debug_assert_eq!(step.id().as_str(), STEP);
-    let frames = Frames::with_key(case.receiver, case.argument, None);
+    let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
     step.walk(0, frames.rows.schema(), &frames.inputs(false))
 }
 

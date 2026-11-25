@@ -52,6 +52,7 @@ use super::literal::{
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
+use super::structs::Structs;
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2084,6 +2085,7 @@ fn case_without(case: &Case, undo: Undo<'_>) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -2200,6 +2202,7 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -2875,6 +2878,7 @@ fn refused_for_a_value_of_another_length_with_columns(case: &Case) -> Option<boo
     let control = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     };
     changed(Some(control), case).map(|control| {
@@ -3479,6 +3483,7 @@ fn case_without_folds(case: &Case) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -3684,6 +3689,7 @@ fn control_with_columns(
         Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: Document::new(vec![rebuilt]).ok()?,
         },
         other_as_left,
@@ -3811,6 +3817,7 @@ fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
     let control = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document,
     };
     let at = Place::of_step(0, Some(step.id().clone()))
@@ -4104,7 +4111,7 @@ fn applies(
             pivot && (of_nothing || a_text_share)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
-            let frames = Frames::with_key(case.receiver, case.argument, None);
+            let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
@@ -4204,7 +4211,7 @@ fn applies(
         }
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
-            let frames = Frames::with_key(case.receiver, case.argument, None);
+            let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // What the call follows, or is given, is only nulls: as the rows of the sample, followed
             // through the calls that are known, say, or as Polars gives them where what the call
             // follows or is given is run alone on the left table.
@@ -4583,6 +4590,7 @@ mod tests {
         Case {
             receiver: Representative::Int64,
             argument: Representative::Int64,
+            structs: Structs::default(),
             document: Document::new(vec![step]).expect("a document"),
         }
     }
@@ -10250,6 +10258,7 @@ mod tests {
         Case {
             receiver: Representative::Date,
             argument: Representative::String,
+            structs: Structs::default(),
             ..sorted
         }
     }

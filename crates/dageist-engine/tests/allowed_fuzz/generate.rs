@@ -14,8 +14,8 @@
 //! is [`super::predict`]'s, and Polars' is [`super::observe`]'s.
 
 use dageist_engine::allowed::{
-    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
-    Representative, Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Fields, Inner, Input, Place as OfferPlace,
+    Position as Slot, Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{
     self, Applies, Counting, Entry, Kind, ParameterDefault, Shape as ParamShape, ValueType,
@@ -25,6 +25,7 @@ use dageist_fuzz::generation::Entropy;
 
 use super::case::{Case, STEP};
 use super::frames::{ON_COLUMNS, OTHER, key_column};
+use super::structs::{Field, Fieldset, Kind as FieldKind, Structs};
 
 /// Fewest bytes of entropy a case is made from. A shorter input is discarded,
 /// for what it lacks would be read as zeros, the same choice every time.
@@ -259,6 +260,8 @@ struct Gen<'a> {
     focus: Option<&'a Focus>,
     receiver: Representative,
     argument: Representative,
+    /// The fields of the struct columns `a` and `b` where the case names them.
+    structs: Structs,
     host: Host,
     /// How many more calls may be added.
     budget: usize,
@@ -269,6 +272,18 @@ struct Gen<'a> {
     /// What the tables said of the function that makes a moment that a chain was just started
     /// from: how many values it gives, or `None` where they refused it.
     started: Option<Option<Shape>>,
+    /// The fields of the struct the call just judged gives, where they are known.
+    next_fields: Option<Fields>,
+    /// What the function that makes a struct, which a chain was just started from, was made of.
+    made_of: Vec<MadeOf>,
+}
+
+/// One input of a call that makes a struct of expressions: the name it is written under, its class
+/// and, where it is a struct, its fields, as far as the generator knows them.
+struct MadeOf {
+    name: Option<String>,
+    class: Option<Representative>,
+    fields: Option<Fields>,
 }
 
 fn entry(id: &str) -> &'static Entry {
@@ -367,16 +382,43 @@ fn is_of_nested_dtypes(entry: &Entry) -> bool {
 }
 
 /// The classes a column under test may have: the measured ones, and where the focus holds a method of
-/// lists or arrays, the lists and arrays of every element dtype too.
+/// lists or arrays, the lists and arrays of every element dtype too. Where it holds a method that reads,
+/// names or makes a struct, the struct is among them often: twice as often as every other class
+/// together where the method reads one, and twice as often as another class where it does not.
 fn receivers(focus: Option<&Focus>) -> Vec<Representative> {
-    if focus.is_some_and(|focus| focus.methods.iter().any(|entry| is_of_nested_dtypes(entry))) {
+    let mut classes = if focus
+        .is_some_and(|focus| focus.methods.iter().any(|entry| is_of_nested_dtypes(entry)))
+    {
         Representative::ALL
             .into_iter()
             .filter(|class| class.is_nested())
             .collect()
     } else {
         Representative::MEASURED.to_vec()
+    };
+    if focus.is_some_and(Focus::is_on_structs) {
+        let own = classes.len();
+        let copies = if focus.is_some_and(Focus::is_on_reading_structs) {
+            2 * own
+        } else {
+            2
+        };
+        // The nested classes hold no struct: a focus on both gives the struct a place of its own.
+        classes.retain(|class| *class != Representative::Struct);
+        classes.extend(std::iter::repeat_n(Representative::Struct, copies));
     }
+    classes
+}
+
+/// The classes the column `b` may have, which stands for an argument: the measured ones, with the
+/// struct among them more often where the focus is on structs, for a struct is made of columns and
+/// is what a column that is one is read by.
+fn arguments(focus: Option<&Focus>) -> Vec<Representative> {
+    let mut classes = Representative::MEASURED.to_vec();
+    if focus.is_some_and(Focus::is_on_structs) {
+        classes.extend(std::iter::repeat_n(Representative::Struct, 12));
+    }
+    classes
 }
 
 /// The functions that start a chain and take expressions, which a chain may start from besides a
@@ -531,6 +573,22 @@ impl Focus {
             .join(", ")
     }
 
+    /// Whether the focus names a call that reads, names or makes a struct: the case then has struct
+    /// columns of fields of their own.
+    fn is_on_structs(&self) -> bool {
+        self.methods
+            .iter()
+            .chain(&self.starts)
+            .any(|entry| makes_or_reads_structs(entry))
+    }
+
+    /// Whether the focus names a method of the `struct` namespace, which reads a struct.
+    fn is_on_reading_structs(&self) -> bool {
+        self.methods
+            .iter()
+            .any(|entry| entry.id().as_str().starts_with("Expr.struct."))
+    }
+
     fn holds(&self, entry: &Entry) -> bool {
         self.methods
             .iter()
@@ -577,7 +635,17 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
     }
     let mut draw = Draw::new(bytes);
     let receiver = draw.pick(&receivers(focus));
-    let argument = draw.pick(&Representative::MEASURED);
+    let argument = draw.pick(&arguments(focus));
+    // A struct column of a campaign focused on structs has fields of its own, drawn for each.
+    let mut structs = Structs::default();
+    if focus.is_some_and(Focus::is_on_structs) {
+        if receiver == Representative::Struct {
+            structs.receiver = Some(draw_fieldset(&mut draw, 0));
+        }
+        if argument == Representative::Struct {
+            structs.argument = Some(draw_fieldset(&mut draw, 0));
+        }
+    }
     let host = draw.weighted(&Host::ALL);
     // A campaign focused on steps draws one of them for most cases, and nothing more is drawn
     // for one that is focused on methods only.
@@ -600,17 +668,73 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         focus,
         receiver,
         argument,
+        structs: structs.clone(),
         host,
         budget: 18,
         untyped_numbers: true,
         started: None,
+        next_fields: None,
+        made_of: Vec::new(),
     };
     let document = generator.document();
     Some(Case {
         receiver,
         argument,
+        structs,
         document,
     })
+}
+
+/// The names of the fields a struct column is drawn with: the names of the columns of the sample
+/// tables, so that a field and a column of one name meet, and names a count and a literal are
+/// given, so that those meet a field too.
+const FIELD_NAMES: [&str; 18] = [
+    "x", "y", "z", "a", "b", "c", "k", "n", "v", "id", "name", "value", "count", "field_0",
+    "field_1", "literal", "s", "t",
+];
+
+/// Names that are no field of any struct column, which a read or a drop is given where it is
+/// given a name that is none.
+const ABSENT_NAMES: [&str; 6] = ["nope", "zz", "missing", "X", "x ", "field_9"];
+
+/// The dtype of a field that a struct column of a campaign is drawn with: the scalars, the common
+/// ones more often.
+fn draw_scalar(draw: &mut Draw<'_>) -> Inner {
+    let weighted: Vec<(usize, Inner)> = Inner::ALL
+        .into_iter()
+        .map(|inner| {
+            let weight = match inner {
+                Inner::Int64 | Inner::String => 4,
+                Inner::Boolean | Inner::Float64 | Inner::Int32 => 2,
+                _ => 1,
+            };
+            (weight, inner)
+        })
+        .collect();
+    draw.weighted(&weighted)
+}
+
+/// The fields of a struct column: none, one, or up to five, of scalars, lists of scalars and
+/// structs of fields of their own up to two deep, each under a name of [`FIELD_NAMES`].
+fn draw_fieldset(draw: &mut Draw<'_>, depth: usize) -> Fieldset {
+    let count = if depth == 0 {
+        draw.weighted(&[(6, 0_usize), (22, 1), (30, 2), (24, 3), (12, 4), (6, 5)])
+    } else {
+        draw.weighted(&[(3, 0_usize), (40, 1), (40, 2), (17, 3)])
+    };
+    let mut pool: Vec<&str> = FIELD_NAMES.to_vec();
+    let mut fields = Vec::new();
+    for _ in 0..count {
+        let name = pool.remove(draw.below(pool.len()));
+        let kind = match draw.below(100) {
+            0..=69 => FieldKind::Scalar(draw_scalar(draw)),
+            70..=87 => FieldKind::List(draw_scalar(draw)),
+            _ if depth < 2 => FieldKind::Struct(draw_fieldset(draw, depth + 1)),
+            _ => FieldKind::Scalar(draw_scalar(draw)),
+        };
+        fields.push(Field::new(name, kind));
+    }
+    Fieldset::new(fields).expect("names drawn from a pool without putting one back are distinct")
 }
 
 impl Gen<'_> {
@@ -1239,7 +1363,7 @@ impl Gen<'_> {
         let (call, operands) = if counted_by_arguments {
             self.range_call(entry)
         } else {
-            self.method_call(entry, slots, depth)?
+            self.method_call(entry, slots, depth, None)?
         };
         let context = Context::from_positions(slots).expect("a position of a step comes first");
         let given: Vec<(&str, Representative)> = operands
@@ -1270,10 +1394,16 @@ impl Gen<'_> {
             }
             _ => true,
         });
+        let made = std::mem::take(&mut self.made_of);
+        let inputs: Vec<Input<'_>> = made
+            .iter()
+            .map(|input| Input::new(input.name.as_deref(), input.class, input.fields.as_ref()))
+            .collect();
         let chosen = Chosen::default()
             .with_arguments(&given)
             .with_options(&words)
-            .with_time_zones(&zones);
+            .with_time_zones(&zones)
+            .with_inputs(&inputs);
         let chosen = if counted_by_arguments {
             chosen.giving_shape(Shape::Counted)
         } else if one {
@@ -1286,8 +1416,10 @@ impl Gen<'_> {
             OfferVerdict::Allowed(allowance) => Some(allowance.shape()),
             OfferVerdict::Refused(_) => None,
         });
+        self.next_fields = None;
         let class = match verdict {
             OfferVerdict::Allowed(allowance) => {
+                self.next_fields = allowance.fields().cloned();
                 allowance.result().and_then(allowed::ResultDtype::class)
             }
             OfferVerdict::Refused(_) => None,
@@ -1558,6 +1690,20 @@ impl Gen<'_> {
         };
         let mut links: Vec<Call> = Vec::new();
         let mut cur_class = class;
+        // What the chain holds of a struct, as far as the generator knows: its fields, and the
+        // name the values are written under.
+        let mut cur_fields = if is_condition {
+            None
+        } else {
+            self.next_fields
+                .take()
+                .or_else(|| self.fields_of_start(&start))
+        };
+        let mut cur_name = if is_condition {
+            None
+        } else {
+            output_name_of_start(&start)
+        };
         let mut shape = Shape::Many;
         let mut alive = true;
         let mut values: Vec<Option<Representative>> = Vec::new();
@@ -1602,11 +1748,22 @@ impl Gen<'_> {
             if !alive || cur_class.is_none() || self.budget == 0 {
                 break;
             }
-            let Some((link, next)) =
-                self.method(slots, depth, context, cur_class.expect("a class"), shape)
-            else {
+            let Some((link, next)) = self.method(
+                slots,
+                depth,
+                context,
+                cur_class.expect("a class"),
+                shape,
+                (cur_fields.as_ref(), cur_name.as_deref()),
+            ) else {
                 break;
             };
+            cur_fields = self.next_fields.take();
+            if link.entry().id().as_str() == "Expr.struct.field"
+                && let Some(Value::Field(read)) = link.argument("name")
+            {
+                cur_name = Some(read.clone());
+            }
             links.push(link);
             match next {
                 Some((next_class, next_shape)) => {
@@ -1736,7 +1893,9 @@ impl Gen<'_> {
         context: Context,
         class: Representative,
         shape: Shape,
+        held: (Option<&Fields>, Option<&str>),
     ) -> Option<(Call, Next)> {
+        let (fields, output_name) = held;
         // The methods of lists and arrays are drawn only where a focus names them, and are not in the
         // pool otherwise, so that the cases of a campaign without one are what they were.
         let methods: Vec<&Entry> = methods()
@@ -1759,7 +1918,7 @@ impl Gen<'_> {
             {
                 chosen = self.draw.pick(&focus.methods);
             }
-            let (call, arguments) = self.method_call(chosen, slots, depth)?;
+            let (call, arguments) = self.method_call(chosen, slots, depth, fields)?;
             let given: Vec<(&str, Representative)> = arguments
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -1769,6 +1928,8 @@ impl Gen<'_> {
                 .iter()
                 .map(|(name, word)| (name.as_str(), word.as_str()))
                 .collect();
+            let names = names_of(&call);
+            let numbers = numbers_of(&call);
             let verdict = allowed::offer(
                 chosen,
                 &OfferPlace::new(
@@ -1780,14 +1941,20 @@ impl Gen<'_> {
                 ),
                 &Chosen::default()
                     .with_arguments(&given)
-                    .with_options(&words),
+                    .with_options(&words)
+                    .following_fields(fields)
+                    .with_names(&names)
+                    .with_numbers(&numbers)
+                    .named(output_name),
             );
             match verdict {
                 OfferVerdict::Allowed(allowance) => {
                     let next = allowance.result().and_then(allowed::ResultDtype::class);
+                    self.next_fields = allowance.fields().cloned();
                     return Some((call, Some((next, allowance.shape()))));
                 }
                 OfferVerdict::Refused(_) if attempt == 5 || self.draw.chance(15) => {
+                    self.next_fields = None;
                     return Some((call, None));
                 }
                 OfferVerdict::Refused(_) => {}
@@ -1817,7 +1984,7 @@ impl Gen<'_> {
             "Expr.le",
         ];
         let chosen = entry(self.draw.pick(&ids));
-        let (call, arguments) = self.method_call(chosen, slots, depth)?;
+        let (call, arguments) = self.method_call(chosen, slots, depth, None)?;
         let given: Vec<(&str, Representative)> = arguments
             .iter()
             .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -1858,10 +2025,14 @@ impl Gen<'_> {
         entry: &'static Entry,
         slots: &mut Vec<Slot>,
         depth: usize,
+        receiver_fields: Option<&Fields>,
     ) -> Option<(Call, Operands)> {
         let id = entry.id().as_str();
         let mut given: Vec<(&'static str, Value)> = Vec::new();
         let mut dtypes: Vec<(String, Option<Representative>)> = Vec::new();
+        if id == "polars.struct" {
+            self.made_of.clear();
+        }
         // Whether a window is given `partition_by`, which Polars takes without
         // `order_by` and `order_by` without it, and refuses neither.
         let mut partitioned = true;
@@ -1883,6 +2054,7 @@ impl Gen<'_> {
             let given_it = match (id, name) {
                 ("Expr.clip", "lower_bound") => bounds != 1,
                 ("Expr.clip", "upper_bound") => bounds != 0,
+                ("polars.struct", "exprs") => true,
                 ("Expr.fill_null", "value") => !fill_by_strategy,
                 // A strict replacement without a default is refused where a value is not listed,
                 // which depends on the rows, so one is sometimes given none and a limit holds the
@@ -1907,6 +2079,14 @@ impl Gen<'_> {
             let built: Vec<Built> = match (id, name) {
                 ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
                     vec![self.scalar(name == "n")]
+                }
+                // The values a struct is made of: one to three, of columns, literals and the fields
+                // of structs, which are each a field of the struct under the name they are written.
+                ("polars.struct", "exprs") => {
+                    let count = self.draw.weighted(&[(35, 1_usize), (40, 2), (25, 3)]);
+                    (0..count)
+                        .map(|_| self.struct_input(slots, depth))
+                        .collect()
                 }
                 // How many values a method keeps, or where it starts: a number typed in, of a
                 // dtype or not, which fixes the count that the walk states for the call.
@@ -1963,7 +2143,9 @@ impl Gen<'_> {
                 }
                 // A separator is often text typed in: a pattern where `literal` is false, which
                 // is then one Polars cannot compile now and then, and plain text where it is not.
-                ("Expr.str.split", "by") if self.draw.chance(50) => {
+                ("Expr.str.split" | "Expr.str.split_exact" | "Expr.str.splitn", "by")
+                    if self.draw.chance(50) =>
+                {
                     let text = if self.draw.chance(40) {
                         self.draw.pick(&INVALID_PATTERNS)
                     } else {
@@ -2060,6 +2242,24 @@ impl Gen<'_> {
             };
             given.push((name, value));
         }
+        if id == "polars.struct" && self.draw.chance(30) {
+            // Values given a name of their own, which a field is named by.
+            let count = 1 + self.draw.below(2);
+            let mut pairs = Vec::new();
+            for _ in 0..count {
+                let name = (*self.draw.pick(&NAMED_VALUES)).to_owned();
+                let built = self.struct_input(slots, depth);
+                if let Some(input) = self.made_of.last_mut() {
+                    input.name = Some(name.clone());
+                }
+                dtypes.push(("named_exprs".to_owned(), built.class));
+                pairs.push((
+                    Value::Columns(vec![name]),
+                    Value::Expression(built.expression),
+                ));
+            }
+            given.push(("named_exprs", Value::Pairs(pairs)));
+        }
         given.extend(self.options(entry));
         if fill_by_strategy
             && let Some(Kind::Choice(words)) = entry
@@ -2074,6 +2274,7 @@ impl Gen<'_> {
             ));
         }
         given.extend(self.dtype_arguments(entry));
+        given.extend(self.struct_arguments(entry, receiver_fields));
         given.extend(self.numbers(entry, &given));
         given.extend(self.texts(entry));
         given.extend(self.patterns(entry));
@@ -2158,6 +2359,15 @@ impl Gen<'_> {
                 "offset" if entry.id().as_str() == "Expr.gather_every" => {
                     Value::Integer(self.draw.pick(&[0, 0, 1, 2, 4]))
                 }
+                // How many parts a text is split into: none, some, and many, which Polars refuses
+                // below zero as a number of parts.
+                "n" if matches!(
+                    entry.id().as_str(),
+                    "Expr.str.split_exact" | "Expr.str.splitn"
+                ) =>
+                {
+                    Value::Integer(self.draw.pick(&[0, 0, 1, 1, 2, 2, 3, 4, 7]))
+                }
                 // How many matches `replace` replaces: none, some, or all of them below zero.
                 "n" => Value::Integer(self.draw.pick(&[-1, 0, 1, 1, 2, 3])),
                 // The seed of a random rank: Polars takes any unsigned number.
@@ -2186,6 +2396,7 @@ impl Gen<'_> {
         let mut texts = Vec::new();
         for parameter in entry.parameters() {
             if parameter.kind() != Kind::Value(ValueType::String)
+                || is_named_by_struct_arguments(entry.id().as_str(), parameter.name())
                 || (!parameter.is_needed() && !self.draw.chance(50))
             {
                 continue;
@@ -2290,6 +2501,263 @@ impl Gen<'_> {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Structs
+
+    /// The fields of the struct column `name` of the sample tables, as the walk reads them from the
+    /// schema, or none for a column that is no struct: the fields the case names, or the ones the
+    /// tables measured.
+    fn column_fields(&self, name: &str) -> Option<Fieldset> {
+        if self.class_of(name) != Some(Representative::Struct) {
+            return None;
+        }
+        let drawn = match name {
+            "a" | "ra" => &self.structs.receiver,
+            _ => &self.structs.argument,
+        };
+        Some(drawn.clone().unwrap_or_else(measured_fields))
+    }
+
+    /// The fields of the struct that a chain starting with `start` has, where the start is a
+    /// column or the values of a group that are one.
+    fn fields_of_start(&self, start: &Call) -> Option<Fields> {
+        let set = match start.entry().id().as_str() {
+            "polars.col" => match start.argument("name") {
+                Some(Value::Columns(names)) => self.column_fields(names.first()?)?,
+                _ => return None,
+            },
+            "polars.element" if self.receiver == Representative::Struct => self
+                .structs
+                .receiver
+                .clone()
+                .unwrap_or_else(measured_fields),
+            _ => return None,
+        };
+        set.as_walked()
+    }
+
+    /// The fields of the struct that `expression` gives, where it is a column or a field of a
+    /// column that holds a struct of fields of its own.
+    fn fields_of(&self, expression: &Expression) -> Option<Fields> {
+        let Start::Call(start) = expression.start() else {
+            return None;
+        };
+        let mut set = match start.argument("name") {
+            Some(Value::Columns(names)) if start.entry().id().as_str() == "polars.col" => {
+                self.column_fields(names.first()?)?
+            }
+            _ => return None,
+        };
+        for link in expression.links() {
+            if link.entry().id().as_str() != "Expr.struct.field" {
+                return None;
+            }
+            let Some(Value::Field(name)) = link.argument("name") else {
+                return None;
+            };
+            let FieldKind::Struct(inner) = set.iter().find(|field| field.name() == name)?.kind()
+            else {
+                return None;
+            };
+            set = inner.clone();
+        }
+        set.as_walked()
+    }
+
+    /// The name of a field a call reads or drops: one of the fields where they are known, mostly,
+    /// and a name that is none of them otherwise.
+    fn field_name(&mut self, fields: Option<&Fields>) -> String {
+        let names: Vec<&str> = fields
+            .map(|fields| fields.names().collect())
+            .unwrap_or_default();
+        let real = if names.is_empty() {
+            self.draw.chance(30)
+        } else {
+            self.draw.chance(72)
+        };
+        if real {
+            if names.is_empty() {
+                (*self.draw.pick(&FIELD_NAMES)).to_owned()
+            } else {
+                (*self.draw.pick(&names)).to_owned()
+            }
+        } else {
+            (*self.draw.pick(&ABSENT_NAMES)).to_owned()
+        }
+    }
+
+    /// `count` names for fields: new ones or those that a field has, one name twice now and then.
+    fn field_names(
+        &mut self,
+        count: usize,
+        fields: Option<&Fields>,
+        repeats: usize,
+    ) -> Vec<String> {
+        let own: Vec<&str> = fields
+            .map(|fields| fields.names().collect())
+            .unwrap_or_default();
+        let mut names: Vec<String> = Vec::new();
+        for _ in 0..count {
+            let name = if !own.is_empty() && self.draw.chance(25) {
+                (*self.draw.pick(&own)).to_owned()
+            } else {
+                (*self.draw.pick(&FIELD_NAMES)).to_owned()
+            };
+            names.push(name);
+        }
+        if names.len() >= 2 && self.draw.chance(repeats) {
+            let from = self.draw.below(names.len());
+            let to = self.draw.below(names.len());
+            names[to] = names[from].clone();
+        }
+        names
+    }
+
+    /// An expression a struct is made of: a column, a literal, a chain, or a field of a struct
+    /// that is read, which gives a field its own name.
+    fn struct_input(&mut self, slots: &mut Vec<Slot>, depth: usize) -> Built {
+        let in_group = self.host == Host::Pivot && self.receiver == Representative::Struct;
+        let columns: Vec<&str> = self
+            .host
+            .columns()
+            .iter()
+            .copied()
+            .filter(|name| self.class_of(name) == Some(Representative::Struct))
+            .collect();
+        let built = if (in_group || !columns.is_empty()) && self.draw.chance(40) {
+            let (start, set) = if in_group {
+                (
+                    call("polars.element", Vec::new()),
+                    self.structs
+                        .receiver
+                        .clone()
+                        .unwrap_or_else(measured_fields),
+                )
+            } else {
+                let name = self.draw.pick(&columns);
+                (column(name), self.column_fields(name).expect("a struct"))
+            };
+            let names: Vec<&str> = set.names();
+            let name = if names.is_empty() || self.draw.chance(15) {
+                (*self.draw.pick(&ABSENT_NAMES)).to_owned()
+            } else {
+                // Only the fields of the struct itself are read of it, not those inside its fields.
+                let own: Vec<&Field> = set.iter().collect();
+                own[self.draw.below(own.len())].name().to_owned()
+            };
+            let class =
+                set.iter()
+                    .find(|field| field.name() == name)
+                    .map(|field| match field.kind() {
+                        FieldKind::Scalar(inner) => inner.class(),
+                        FieldKind::List(inner) => Representative::List(*inner),
+                        FieldKind::Struct(_) => Representative::Struct,
+                    });
+            Built {
+                expression: Expression::new(
+                    Start::Call(start),
+                    vec![call(
+                        "Expr.struct.field",
+                        vec![("name", Value::Field(name))],
+                    )],
+                )
+                .expect("a field read"),
+                class,
+            }
+        } else if self.draw.chance(70) {
+            self.operand(slots, depth)
+        } else {
+            let literal = self.literal();
+            Built {
+                expression: Expression::new(Start::Call(literal.0), Vec::new()).expect("a start"),
+                class: literal.1,
+            }
+        };
+        self.made_of.push(MadeOf {
+            name: output_name_of(&built.expression),
+            class: built.class,
+            fields: self.fields_of(&built.expression),
+        });
+        built
+    }
+
+    /// What a call that reads, names or makes the fields of a struct is given beside its
+    /// expressions: the names, drawn as the fields it is judged against are, and the names of a
+    /// count of values. `fields` are those of the struct it follows, where they are known.
+    fn struct_arguments(
+        &mut self,
+        entry: &'static Entry,
+        fields: Option<&Fields>,
+    ) -> Vec<(&'static str, Value)> {
+        match entry.id().as_str() {
+            "Expr.struct.field" => {
+                vec![("name", Value::Field(self.field_name(fields)))]
+            }
+            "Expr.struct.drop" => {
+                let count = self
+                    .draw
+                    .weighted(&[(12, 0_usize), (40, 1), (30, 2), (18, 3)]);
+                let mut names: Vec<String> = (0..count).map(|_| self.field_name(fields)).collect();
+                if names.len() >= 2 && self.draw.chance(10) {
+                    names[1] = names[0].clone();
+                }
+                vec![(
+                    "names",
+                    Value::Many(names.into_iter().map(Value::Field).collect()),
+                )]
+            }
+            "Expr.struct.rename_fields" => {
+                let known = fields.map(Fields::len);
+                let count = match known {
+                    Some(known) => match self.draw.below(100) {
+                        0..=54 => known,
+                        55..=69 => known + 1,
+                        70..=84 => known.saturating_sub(1),
+                        85..=92 => 0,
+                        _ => known + 2,
+                    },
+                    None => self
+                        .draw
+                        .weighted(&[(5, 0_usize), (30, 1), (35, 2), (20, 3), (10, 4)]),
+                };
+                let names = self.field_names(count, fields, 14);
+                vec![(
+                    "names",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            "Expr.value_counts" if self.draw.chance(45) => {
+                // The name of the count, or one that a column or the count has already.
+                let name =
+                    self.draw
+                        .pick(&["count", "proportion", "a", "b", "n", "x", "total", "count"]);
+                vec![("name", Value::String(name.to_owned()))]
+            }
+            "Expr.list.to_struct" => {
+                let count = self
+                    .draw
+                    .weighted(&[(4, 0_usize), (25, 1), (35, 2), (25, 3), (11, 4)]);
+                let names = self.field_names(count, None, 18);
+                vec![(
+                    "fields",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            "Expr.arr.to_struct" if self.draw.chance(55) => {
+                // The arrays of the sample are two wide: names of the width, fewer and more.
+                let count = self
+                    .draw
+                    .weighted(&[(20, 1_usize), (45, 2), (25, 3), (10, 4)]);
+                let names = self.field_names(count, None, 12);
+                vec![(
+                    "fields",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn literal_loose_text(&mut self) -> (Call, Option<Representative>) {
         (
             call(
@@ -2299,6 +2767,101 @@ impl Gen<'_> {
             Some(Representative::String),
         )
     }
+}
+
+/// The names a value that a struct is made of is given: those of the columns and of the fields of
+/// the sample, and a word.
+const NAMED_VALUES: [&str; 7] = ["a", "b", "x", "literal", "n", "total", "k"];
+
+/// The fields of the struct that the tables were measured on, which a column of the class `Struct`
+/// has where a case names no others.
+fn measured_fields() -> Fieldset {
+    Fieldset::new(vec![
+        Field::new("x", FieldKind::Scalar(Inner::Int64)),
+        Field::new("y", FieldKind::Scalar(Inner::String)),
+    ])
+    .expect("two names")
+}
+
+/// Whether the parameter `name` of the entry `id` is given its names where the arguments of a call
+/// that names fields are drawn, and not where the texts of the others are.
+fn is_named_by_struct_arguments(id: &str, name: &str) -> bool {
+    matches!(
+        (id, name),
+        ("Expr.struct.rename_fields", "names")
+            | ("Expr.list.to_struct" | "Expr.arr.to_struct", "fields")
+            | ("Expr.value_counts", "name")
+    )
+}
+
+/// The name the values a chain starting with `start` are written under, as Polars names the
+/// output: a column's, the literal's `literal`, and none for what a chain does not name.
+fn output_name_of_start(start: &Call) -> Option<String> {
+    match start.entry().id().as_str() {
+        "polars.col" => match start.argument("name") {
+            Some(Value::Columns(names)) => names.first().cloned(),
+            _ => None,
+        },
+        "polars.lit" => Some("literal".to_owned()),
+        _ => None,
+    }
+}
+
+/// The name an expression's values are written under: that of its start, or of the last field it
+/// reads.
+fn output_name_of(expression: &Expression) -> Option<String> {
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    let mut name = output_name_of_start(start);
+    for link in expression.links() {
+        if link.entry().id().as_str() == "Expr.struct.field"
+            && let Some(Value::Field(read)) = link.argument("name")
+        {
+            name = Some(read.clone());
+        }
+    }
+    name
+}
+
+/// The names a call is given, each by its parameter, as the walk tells the tables of them: the
+/// fields it reads or drops, the names it gives fields and a count.
+fn names_of(call: &Call) -> Vec<(&'static str, &str)> {
+    let mut names = Vec::new();
+    for parameter in call.entry().parameters() {
+        if !matches!(
+            parameter.kind(),
+            Kind::Field | Kind::Value(ValueType::String)
+        ) {
+            continue;
+        }
+        let Some(value) = call.argument(parameter.name()) else {
+            continue;
+        };
+        let items: Vec<&Value> = match value {
+            Value::Many(items) => items.iter().collect(),
+            one => vec![one],
+        };
+        for item in items {
+            if let Value::Field(name) | Value::String(name) = item {
+                names.push((parameter.name(), name.as_str()));
+            }
+        }
+    }
+    names
+}
+
+/// The whole numbers a call is given, each by its parameter.
+fn numbers_of(call: &Call) -> Vec<(&'static str, i64)> {
+    call.entry()
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.kind() == Kind::Value(ValueType::Integer))
+        .filter_map(|parameter| match call.argument(parameter.name())? {
+            Value::Integer(number) => Some((parameter.name(), *number)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Patterns Polars compiles: with and without groups, named groups in both of Rust's spellings,

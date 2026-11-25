@@ -13,10 +13,15 @@
 //!
 //! Replay needs the bytes to be what writing the case gives, so a text that
 //! reads but is not written the same way is refused.
+//!
+//! A column that is a struct may name its fields, under `a_struct` and `b_struct`, which
+//! [`Structs`] says; a column that names none is the struct the tables measured.
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::document::Document;
 use dageist_fuzz::{FuzzError, FuzzErrorKind, Result};
+
+use super::structs::{Fieldset, Structs};
 
 /// The revision of the line above the document. A case of another revision is
 /// refused; there is no migration.
@@ -25,6 +30,11 @@ pub const REVISION: u64 = 1;
 /// The id of the step a generated case holds. A case holds exactly one step.
 pub const STEP: &str = "s";
 
+/// The keys of the header that name the fields of the column `a`, and of `b`, which follow the
+/// column's own.
+const A_STRUCT: &str = "a_struct";
+const B_STRUCT: &str = "b_struct";
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Case {
     /// The class of the column `a`, which the chain under test usually starts
@@ -32,6 +42,8 @@ pub struct Case {
     pub receiver: Representative,
     /// The class of the column `b`, which stands for an argument.
     pub argument: Representative,
+    /// The fields of `a` and of `b` where they are structs that name them.
+    pub structs: Structs,
     /// The document: one step.
     pub document: Document,
 }
@@ -56,8 +68,15 @@ impl Case {
     /// The canonical bytes of the case.
     pub fn encode(&self) -> Vec<u8> {
         let mut header = serde_json::Map::new();
-        header.insert("a".into(), self.receiver.name().into());
-        header.insert("b".into(), self.argument.name().into());
+        for (key, class, fields) in [
+            ("a", self.receiver, &self.structs.receiver),
+            ("b", self.argument, &self.structs.argument),
+        ] {
+            header.insert(key.into(), class.name().into());
+            if let Some(fields) = fields {
+                header.insert(format!("{key}_struct"), fields.to_json());
+            }
+        }
         header.insert("revision".into(), REVISION.into());
         let mut text = serde_json::Value::Object(header).to_string();
         text.push('\n');
@@ -77,10 +96,13 @@ impl Case {
         let serde_json::Value::Object(fields) = header else {
             return Err(invalid("the first line is not an object"));
         };
-        if fields.len() != 3 {
-            return Err(invalid(
-                "the first line holds a, b and revision, and no more",
-            ));
+        if let Some(unknown) = fields
+            .keys()
+            .find(|key| !["a", "b", "revision", A_STRUCT, B_STRUCT].contains(&key.as_str()))
+        {
+            return Err(invalid(format!(
+                "the first line holds a, b, revision and the fields of a struct, not {unknown}"
+            )));
         }
         let field = |name: &str| {
             fields
@@ -100,9 +122,28 @@ impl Case {
                 .as_str()
                 .ok_or_else(|| invalid(format!("{field_name} is not text")))
         };
+        let receiver = class(name("a")?, "a")?;
+        let argument = class(name("b")?, "b")?;
+        let named = |key: &str, column: &str, class: Representative| -> Result<Option<Fieldset>> {
+            let Some(written) = fields.get(key) else {
+                return Ok(None);
+            };
+            if class != Representative::Struct {
+                return Err(invalid(format!(
+                    "{key} names fields for {column}, which is {class} and no struct"
+                )));
+            }
+            Fieldset::from_json(written)
+                .map(Some)
+                .map_err(|refusal| invalid(format!("{key}: {refusal}")))
+        };
         let case = Self {
-            receiver: class(name("a")?, "a")?,
-            argument: class(name("b")?, "b")?,
+            receiver,
+            argument,
+            structs: Structs {
+                receiver: named(A_STRUCT, "a", receiver)?,
+                argument: named(B_STRUCT, "b", argument)?,
+            },
             document: Document::read(document).map_err(|error| invalid(error.to_string()))?,
         };
         if case.encode() != bytes {
