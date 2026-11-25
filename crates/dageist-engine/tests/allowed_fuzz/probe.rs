@@ -2533,6 +2533,63 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn a_field_that_is_none_is_one_objection_whatever_the_name_it_was_asked_for() {
+        // The tables measured a read of `x`, and a case reads the name it was drawn with.
+        for probe in [
+            "field not found: field_9",
+            "field not found: x ",
+            "field not found: id",
+        ] {
+            assert!(
+                same_reason(&Source::Polars, "field not found: x", probe),
+                "{probe}"
+            );
+        }
+        for probe in [
+            "lengths don't match: zip node received non-equal length inputs",
+            "`cum_sum` operation not supported for dtype `date`",
+            "struct.rename_fields() argument has a different number of fields than the struct it operates on (1 vs 2).",
+        ] {
+            assert!(
+                !same_reason(&Source::Polars, "field not found: x", probe),
+                "{probe}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_rule_that_a_field_be_one_of_the_struct_is_met_by_polars_not_finding_the_field() {
+        let rule = Source::Rule("field-is-of-the-struct");
+        let said = "\"zz\" is no field of the struct, whose fields are \"x\"";
+        assert!(same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
+        assert!(!same_reason(
+            &rule,
+            said,
+            "duplicate: multiple fields with name 'literal' found"
+        ));
+    }
+
+    #[test]
+    fn the_rule_that_names_fit_the_struct_is_met_by_polars_refusing_a_name_twice_or_another_number()
+    {
+        let rule = Source::Rule("field-names-fit-the-struct");
+        let said = "two fields would be named \"literal\"";
+        assert!(same_reason(
+            &rule,
+            said,
+            "duplicate: multiple fields with name 'literal' found"
+        ));
+        assert!(same_reason(
+            &rule,
+            "3 names are given to a struct of 2 fields",
+            "struct.rename_fields() argument has a different number of fields than the struct it operates on (3 vs 2)."
+        ));
+        assert!(!same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
+    }
+
     /// What the tables predict and Polars gives of the case, to settle it on a
     /// value.
     fn on_a_value(case: &Case, refused: &Refused) -> Option<Settled> {
