@@ -51,7 +51,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{is_the_same_comparison, same_reason};
+use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,6 +168,12 @@ pub enum Limit {
     /// of the sample: a probe settles them. A literal that holds a value is one value, where the
     /// sample's columns hold three, so a shift that moves it away leaves a null.
     AShiftThatLeavesNulls,
+    /// Whether values of different lengths combine, as the lists of two rows
+    /// do not, depends on the rows, which the tables measured on one sample.
+    /// Polars refusing the rows with a reason about lengths, in a case with no
+    /// `explode`, or one that Polars refuses for lengths still when each `explode`
+    /// is undone.
+    TheLengthsOfTheRows,
     /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
     /// it refuses a negative whole number as the exponent of an integer when the rows
     /// run: the number is a value, which the tables measured as the dtype and the
@@ -224,6 +230,17 @@ pub enum Limit {
     /// before the outer `over` in its chain, with the arguments of those calls.
     /// Polars refuses the rows, so there is no place and the reason gates it.
     AWindowOverAWindow,
+    /// The tables hold the schema of a method and what its rows give as one thing,
+    /// and refuse a method whose plan says another dtype than its rows give: the
+    /// target's own comparison, not a refusal of Polars, which shows only where the
+    /// method is the output of the step. Inside an expression that goes on from it
+    /// or compares it, Polars evaluates the method and the step's rows do not show
+    /// the difference; and a sort key or a join's key is never an output of the step,
+    /// which a probe of the call on a column in the key may show refused as well, and
+    /// then settles it. The tables refusing, with the reason that the schema says one
+    /// dtype and the rows give another, at a call that is not the last of the step's
+    /// own expression or in a key that no probe settles, which Polars allows.
+    AHiddenSchema,
     /// Polars casts a bound of `clip` to the dtype it clips, and the values `replace` and
     /// `replace_strict` list to the dtype they replace in, as strictly as it can, and refuses
     /// the rows when one holds a value that dtype cannot hold: a number typed without a dtype
@@ -437,13 +454,14 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 34] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
         Self::ANullComparisonInAKey,
         Self::AShiftThatLeavesNulls,
+        Self::TheLengthsOfTheRows,
         Self::ANegativeExponent,
         Self::ABitwiseCallOnANull,
         Self::ADivisionByZero,
@@ -451,6 +469,7 @@ impl Limit {
         Self::APanic,
         Self::AWindowOverAWindow,
         Self::AJoinKeyDtype,
+        Self::AHiddenSchema,
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
         Self::ADropLeavesNoRows,
@@ -481,6 +500,7 @@ impl Limit {
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
             Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
+            Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::ANegativeExponent => "a-negative-exponent",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::ADivisionByZero => "a-division-by-zero",
@@ -488,6 +508,7 @@ impl Limit {
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::AJoinKeyDtype => "a-join-key-dtype",
+            Self::AHiddenSchema => "a-hidden-schema",
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::ADropLeavesNoRows => "a-drop-leaves-no-rows",
@@ -526,6 +547,9 @@ impl Limit {
                 "an explode gives other lengths, which meet those of what follows it, as the tables did not measure"
             }
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
+            Self::TheLengthsOfTheRows => {
+                "whether values of different lengths combine depends on the rows, which the tables measured on one sample"
+            }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
             }
@@ -558,6 +582,9 @@ impl Limit {
             }
             Self::AWindowOverAWindow => {
                 "a window over a window is run in an aggregation context, where a key that is not elementwise is refused"
+            }
+            Self::AHiddenSchema => {
+                "a method whose plan and rows differ in dtype is hidden by what goes on from it"
             }
             Self::ABoundTheDtypeCannotHold => {
                 "Polars casts a bound of clip, and the values a replacement lists, to the dtype of what they follow and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
@@ -3823,6 +3850,16 @@ fn applies(
                     .any(|(holder, reach)| reached_by_an_explode(holder, *reach))
             }
         }
+        (Limit::TheLengthsOfTheRows, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows' lengths are the cause where no window explodes, or Polars
+            // refuses for lengths still when none does, and no drop is the cause either.
+            unplaced(refusal)
+                && is_lengths(&refusal.reason)
+                && (!held.iter().any(|(_, held)| explodes_in(held))
+                    || refused_for_lengths_without_explodes(case) == Some(true))
+                && (!held.iter().any(|(_, held)| any_call(held, &is_a_drop))
+                    || refused_for_lengths_without_drops(case) == Some(true))
+        }
         (Limit::ANullStructToFill, Disagreement::PolarsRefuses(refusal)) => {
             // The null is the cause where Polars stops refusing the strategy of a fill once
             // none of the five makes one.
@@ -4263,6 +4300,20 @@ fn applies(
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
                 && refusal.reason.contains("decimal")
+        }
+        (Limit::AHiddenSchema, Disagreement::PolarsAllows(refused)) => {
+            let locus = locate(case, &refused.place);
+            let last = locus.inside.last().map(|chain| chain.links().len());
+            refused.reason.starts_with(SCHEMA_SAYS)
+                && (locus.inside.len() > 1
+                    || locus.index.is_some_and(|at| Some(at + 1) != last)
+                    // A sort key is no output of the step, unless a probe of the call on a
+                    // column in the key settles it, which is asked of a case the limits do
+                    // not excuse.
+                    || (matches!(
+                        step.entry().id().as_str(),
+                        "LazyFrame.sort" | "LazyFrame.join"
+                    ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::ABoundTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of
@@ -6305,6 +6356,36 @@ mod tests {
         ]);
         assert_eq!(
             tables_refuse(&elsewhere, link_of("exprs", 0, 0), ROWS, LENGTHS),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_refusal_about_lengths_is_the_explodes_or_the_rows_by_whether_there_is_an_explode() {
+        let reason = "lengths don't match: zip node received non-equal length inputs";
+        let with = select(vec![chain_of(column("a"), vec![explode()])]);
+        assert_eq!(
+            polars_refuses(&with, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::AnExplodeChangesTheLengths]
+        );
+        let without = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            polars_refuses(&without, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::TheLengthsOfTheRows]
+        );
+        // Another reason, or a refusal placed at a link, is neither.
+        assert_eq!(
+            polars_refuses(&without, None, Stage::Rows, "no", Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &without,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
             vec![]
         );
     }
@@ -8622,6 +8703,70 @@ mod tests {
     }
 
     // ----- Places, schemas, Booleans, pivots
+
+    #[test]
+    fn a_hidden_schema_is_excused_inside_an_expression_and_not_at_its_end() {
+        let reason = "the schema says Int64 and the rows give UInt128";
+        let case = select(vec![chain(column("a"), &["Expr.cum_sum", "Expr.sum"])]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        // At the last link of the step's own expression it is the step's schema.
+        let last = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            tables_refuse(&last, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+        // Another reason.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_sort_key_which_is_no_output_of_the_step() {
+        // Polars sorts by a key without making it a column of the step's table, so a plan that
+        // says `Null` where its rows give `Float64`, as a null divided by a whole number does,
+        // is not met where the key is the last call too.
+        let reason = "the schema says Null and the rows give Float64";
+        let sorted =
+            |key: Expression| case_of(call("LazyFrame.sort", vec![("by", many(vec![key]))]));
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided.clone()), link_of("by", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        // The step's own schema is shown by what it selects, however the key is.
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+        // Another reason.
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided), link_of("by", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_join_key_which_is_no_output_of_the_step() {
+        let reason = "the schema says Null and the rows give Float64";
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        let joined = join(chain(column("key"), &[]), divided.clone());
+        assert_eq!(
+            tables_refuse(&joined, link_of("right_on", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+    }
 
     #[test]
     fn an_unrelated_failed_conversion_is_not_excused_in_a_pivots_aggregate() {
