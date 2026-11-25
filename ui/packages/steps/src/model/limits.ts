@@ -217,7 +217,7 @@ export const GAPS: readonly Gap[] = [
   {
     cover: { kind: 'noContext', entry: 'LazyFrame.filter', parameter: 'constraints' },
     reason:
-      'the engine walks the value of a keyword constraint of a filter and reports no context for it, so the editor cannot ask what may stand there (#172)',
+      'the engine walks the value of a keyword constraint of a filter and reports no context for it, so the editor cannot ask what may stand there (#179)',
   },
   // The parameters of the entries the editor draws as a word of their own, which it does not set.
   parameterGap(

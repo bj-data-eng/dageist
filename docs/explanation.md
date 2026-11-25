@@ -1520,7 +1520,7 @@ Today the declared gaps are these:
   ([#137](https://github.com/bj-data-eng/dageist/issues/137)).
 - The value of a keyword constraint of a filter, which the engine walks and names no position
   for, so the editor cannot ask what may stand there
-  ([#172](https://github.com/bj-data-eng/dageist/issues/172)).
+  ([#179](https://github.com/bj-data-eng/dageist/issues/179)).
 - A flag typed in. A document may hold one as the value of `lit`, but the host
   reads typed text as a number or as text and never as a flag, so the editor has
   no way to type one ([#177](https://github.com/bj-data-eng/dageist/issues/177)).
@@ -1664,7 +1664,7 @@ offered and an expression the walk gives no context. The declared gaps of a kind
 has come to draw fails as stale. The test finds nothing else today. The one expression of a step that was run that has no context is the
 value of a keyword constraint of a filter, which the walk walks and names no position for, so no
 list can be asked what may stand there; it is a declared gap
-([#172](https://github.com/bj-data-eng/dageist/issues/172)). The test counts about 5,000 pieces and
+([#179](https://github.com/bj-data-eng/dageist/issues/179)). The test counts about 5,000 pieces and
 takes under half a second.
 
 The test has its own checks that it can fail: a corpus without the documents of a function, a
