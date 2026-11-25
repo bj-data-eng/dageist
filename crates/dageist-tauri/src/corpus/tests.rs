@@ -360,8 +360,9 @@ fn the_corpus_holds_each_outcome_of_a_step_each_state_of_its_rows_and_each_cause
 
 /// The rules that no document of the corpus is refused by, each with why. The offers at a place
 /// give a call three rules and the walk the others the corpus meets, among them those of a pattern,
-/// a duration, a time zone, a range, a join's keys and a window given a count, for each of which a
-/// document is made by editing one that is allowed. These five are the rest.
+/// a duration, a time zone, a range, a join's keys, a window given a count of values, a replacement
+/// and two moments of different zones, for each of which a document is made by editing one that is
+/// allowed. These three are the rest.
 const NOT_HELD: &[(&str, &str)] = &[
     (
         "arrays-meet-at-one-width",
@@ -369,19 +370,11 @@ const NOT_HELD: &[(&str, &str)] = &[
     ),
     (
         "folded-function-is-no-join-key",
-        "a date made of numbers typed in, as a join's key, is refused by Polars as the tables record it before the rule is asked",
-    ),
-    (
-        "moments-share-a-zone",
-        "a comparison of a moment of a zone with one of none is refused by Polars on the rows as the tables record it before the rule is asked",
-    ),
-    (
-        "replacement-values-match-in-number",
-        "it needs a list of one length beside a list of another, and the node is connected to one list",
+        "the one document tried, a date made of numbers typed in as a join's key, is refused by Polars as the tables record it before the rule is asked; another may hold it",
     ),
     (
         "window-input-is-not-widened",
-        "it needs a value of one row that a part widens, which no chain the corpus plans reaches",
+        "no document the corpus plans gives a window a value of one row that a part widens; one was not tried, and may be built",
     ),
 ];
 

@@ -1581,8 +1581,9 @@ brings in, while a document runs on the columns it reads.
   tables give a call at a place: each rule they apply there and each stage of Polars; and
   one for each rule of the walk that a document holds by being edited from an allowed one: a
   pattern, a duration and a time zone that are not valid, a range with a step of nothing, a
-  join's key that holds an aggregate beside a column, two pairs of keys named alike, and a
-  window given a count of values.
+  join's key that holds an aggregate beside a column, two pairs of keys named alike, a
+  window given a count of values, a replacement of one value by many, and two moments of
+  different zones.
 
 **How it is made.** Every document is made by the engine's own edits, as the editor
 makes them: a step is added with `add_step`, a chain starts with `start_with` or
@@ -1624,10 +1625,10 @@ does not read:
   parameter the engine offers is given in a document that calls its entry;
 - every kind of start, outcome, state of the rows and cause that the census lists is held;
 - every source of a refusal the tables give a call at a place is held, and every rule is
-  held or declared as not held with its reason: five are not held, because the corpus's
-  arrays are of one width, because Polars refuses first, as the tables record it, a date in a
-  join's key and moments of two zones, because the node is connected to one list, and because
-  no chain it plans gives a window a value that a part widens;
+  held or declared as not held with its reason: three are not held, because the corpus's
+  arrays are of one width, because the one date tried in a join's key is refused by Polars
+  first, as the tables record it, and because no document it plans gives a window a value that a
+  part widens, which was not tried;
 - what the walk says of each call is what the tables say at the place it reports.
 
 The view's test reads the committed files alone and repeats the check of what they hold, so

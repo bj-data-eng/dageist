@@ -5,7 +5,7 @@ use dageist_engine::allowed::{
     After, Context, Literal, Outer, Place as OfferPlace, RefusalSource, Representative, Shape,
 };
 use dageist_engine::catalog::Applies;
-use dageist_engine::document::{Document, Expression, Segment, Start, Value};
+use dageist_engine::document::{Document, Expression, Place, Segment, Start, Value};
 
 use super::Case;
 use super::chains::Planner;
@@ -241,21 +241,22 @@ fn refused_the_same(document: &Document, index: usize, source: RefusalSource) ->
         .is_some_and(|refusal| refusal.source() == source)
 }
 
-/// A method of a select that the tables allow, given an argument that a rule of the walk, not of the
+/// A method of a select that the tables allow, given arguments that a rule of the walk, not of the
 /// offers at a place, refuses: the chain brought to a value of `class` and `shape`, then `id`, with
-/// `argument` set on it where there is one.
-fn method_given(
+/// each of `arguments` set on it. It gives the document, where the chain is and how many methods the
+/// chain has.
+fn method_chain(
     planner: &mut Planner<'_>,
     class: Representative,
     shape: Shape,
     id: &str,
-    argument: Option<(&str, Value)>,
-) -> Document {
+    arguments: Vec<(&str, Value)>,
+) -> (Document, Place, usize) {
     let grid = planner.grid;
     let context = grid.context_at(Context::step(Outer::Select));
     let plan = planner.reach(context)[&(class, shape)].clone();
     let (document, at) = planner.chain(grid.contexts[context], &plan);
-    let document = with_link(
+    let mut document = with_link(
         &document,
         &at,
         plan.links.len(),
@@ -269,17 +270,28 @@ fn method_given(
         ),
         class,
     );
-    let document = match argument {
-        Some((parameter, value)) => document
+    for (parameter, value) in arguments {
+        document = document
             .set_argument(
-                &at.then(Segment::Link(plan.links.len()))
+                &at.clone()
+                    .then(Segment::Link(plan.links.len()))
                     .then(Segment::Parameter(parameter.to_owned())),
                 value,
             )
-            .unwrap_or_else(|error| panic!("{id} is not given {parameter}: {error}")),
-        None => document,
-    };
-    filled(&document)
+            .unwrap_or_else(|error| panic!("{id} is not given {parameter}: {error}"));
+    }
+    (filled(&document), at, plan.links.len() + 1)
+}
+
+/// The document of [`method_chain`].
+fn method_given(
+    planner: &mut Planner<'_>,
+    class: Representative,
+    shape: Shape,
+    id: &str,
+    arguments: Vec<(&str, Value)>,
+) -> Document {
+    method_chain(planner, class, shape, id, arguments).0
 }
 
 /// The expression of a number or text typed in.
@@ -302,7 +314,7 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
                 Representative::String,
                 Shape::Many,
                 "Expr.str.contains",
-                Some(("pattern", Value::Pattern("(".to_owned()))),
+                vec![("pattern", Value::Pattern("(".to_owned()))],
             ),
         },
         Case {
@@ -312,7 +324,7 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
                 Representative::Datetime,
                 Shape::Many,
                 "Expr.dt.truncate",
-                Some(("every", text("1x"))),
+                vec![("every", text("1x"))],
             ),
         },
         Case {
@@ -322,7 +334,7 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
                 Representative::Datetime,
                 Shape::Many,
                 "Expr.dt.convert_time_zone",
-                Some(("time_zone", Value::TimeZone(Some("Not/AZone".to_owned())))),
+                vec![("time_zone", Value::TimeZone(Some("Not/AZone".to_owned())))],
             ),
         },
         Case {
@@ -332,13 +344,62 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
                 Representative::Int64,
                 Shape::Counted,
                 "Expr.over",
-                Some((
+                vec![(
                     "partition_by",
                     Value::Many(vec![field(&column_of(Representative::Int64))]),
-                )),
+                )],
             ),
         },
     ];
+
+    // A replacement of one old value by many new ones, which the rule asks to be as many as the old.
+    cases.push(Case {
+        name: "a replacement of one value by many".to_owned(),
+        document: method_given(
+            planner,
+            Representative::Int64,
+            Shape::Many,
+            "Expr.replace",
+            vec![("old", typed(&Literal::Integer(1))), ("new", field(&whole))],
+        ),
+    });
+
+    // A moment of one zone beside one of another: a column of a zone, moved to another, compared
+    // with the column of the first.
+    let (moved, at, methods) = method_chain(
+        planner,
+        Representative::DatetimeZoned,
+        Shape::Many,
+        "Expr.dt.convert_time_zone",
+        vec![("time_zone", Value::TimeZone(Some("Asia/Tokyo".to_owned())))],
+    );
+    let grid = planner.grid;
+    let select = grid.contexts[grid.context_at(Context::step(Outer::Select))];
+    let zoned = with_link(
+        &moved,
+        &at,
+        methods,
+        "Expr.eq",
+        &OfferPlace::new(
+            select,
+            After::Value {
+                dtype: Representative::DatetimeZoned,
+                shape: Shape::Many,
+            },
+        ),
+        Representative::DatetimeZoned,
+    );
+    let zoned = zoned
+        .set_argument(
+            &at.then(Segment::Link(methods))
+                .then(Segment::Parameter("other".to_owned())),
+            field(&column_of(Representative::DatetimeZoned)),
+        )
+        .expect("a column is compared with");
+    cases.push(Case {
+        name: "two moments of different zones".to_owned(),
+        document: filled(&zoned),
+    });
 
     // A range with a step of nothing cannot be made.
     let hosted = host_in(Context::step(Outer::Select), Representative::Int64);
