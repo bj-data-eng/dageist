@@ -168,12 +168,6 @@ pub enum Limit {
     /// of the sample: a probe settles them. A literal that holds a value is one value, where the
     /// sample's columns hold three, so a shift that moves it away leaves a null.
     AShiftThatLeavesNulls,
-    /// Whether values of different lengths combine, as the lists of two rows
-    /// do not, depends on the rows, which the tables measured on one sample.
-    /// Polars refusing the rows with a reason about lengths, in a case with no
-    /// `explode`, or one that Polars refuses for lengths still when each `explode`
-    /// is undone.
-    TheLengthsOfTheRows,
     /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
     /// it refuses a negative whole number as the exponent of an integer when the rows
     /// run: the number is a value, which the tables measured as the dtype and the
@@ -443,14 +437,13 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 32] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
         Self::ANullComparisonInAKey,
         Self::AShiftThatLeavesNulls,
-        Self::TheLengthsOfTheRows,
         Self::ANegativeExponent,
         Self::ABitwiseCallOnANull,
         Self::ADivisionByZero,
@@ -488,7 +481,6 @@ impl Limit {
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
             Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
-            Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::ANegativeExponent => "a-negative-exponent",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::ADivisionByZero => "a-division-by-zero",
@@ -534,9 +526,6 @@ impl Limit {
                 "an explode gives other lengths, which meet those of what follows it, as the tables did not measure"
             }
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
-            Self::TheLengthsOfTheRows => {
-                "whether values of different lengths combine depends on the rows, which the tables measured on one sample"
-            }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
             }
@@ -3834,16 +3823,6 @@ fn applies(
                     .any(|(holder, reach)| reached_by_an_explode(holder, *reach))
             }
         }
-        (Limit::TheLengthsOfTheRows, Disagreement::PolarsRefuses(refusal)) => {
-            // The rows' lengths are the cause where no window explodes, or Polars
-            // refuses for lengths still when none does, and no drop is the cause either.
-            unplaced(refusal)
-                && is_lengths(&refusal.reason)
-                && (!held.iter().any(|(_, held)| explodes_in(held))
-                    || refused_for_lengths_without_explodes(case) == Some(true))
-                && (!held.iter().any(|(_, held)| any_call(held, &is_a_drop))
-                    || refused_for_lengths_without_drops(case) == Some(true))
-        }
         (Limit::ANullStructToFill, Disagreement::PolarsRefuses(refusal)) => {
             // The null is the cause where Polars stops refusing the strategy of a fill once
             // none of the five makes one.
@@ -6326,36 +6305,6 @@ mod tests {
         ]);
         assert_eq!(
             tables_refuse(&elsewhere, link_of("exprs", 0, 0), ROWS, LENGTHS),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_refusal_about_lengths_is_the_explodes_or_the_rows_by_whether_there_is_an_explode() {
-        let reason = "lengths don't match: zip node received non-equal length inputs";
-        let with = select(vec![chain_of(column("a"), vec![explode()])]);
-        assert_eq!(
-            polars_refuses(&with, None, Stage::Rows, reason, Vec::new()),
-            vec![Limit::AnExplodeChangesTheLengths]
-        );
-        let without = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
-        assert_eq!(
-            polars_refuses(&without, None, Stage::Rows, reason, Vec::new()),
-            vec![Limit::TheLengthsOfTheRows]
-        );
-        // Another reason, or a refusal placed at a link, is neither.
-        assert_eq!(
-            polars_refuses(&without, None, Stage::Rows, "no", Vec::new()),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(
-                &without,
-                Some(link_of("exprs", 0, 0)),
-                Stage::Schema,
-                reason,
-                Vec::new()
-            ),
             vec![]
         );
     }
