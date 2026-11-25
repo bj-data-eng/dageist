@@ -12,7 +12,7 @@
 //! predicted before that.
 
 use dageist_engine::allowed::{self, RefusalSource, Representative};
-use dageist_engine::document::{Place, Segment, Walk, WalkRefusal, WalkedExpression};
+use dageist_engine::document::{Place, Walk, WalkRefusal, WalkedExpression};
 
 use super::case::{Case, STEP};
 use super::frames::Frames;
@@ -120,24 +120,6 @@ fn walk_of(case: &Case) -> Walk {
     debug_assert_eq!(step.id().as_str(), STEP);
     let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
     step.walk(0, frames.rows.schema(), &frames.inputs(false))
-}
-
-/// The places of the links that follow a struct which the walk knows has no field, where an unnest
-/// of it gives no expression.
-pub fn places_after_no_field(case: &Case) -> Vec<Place> {
-    walk_of(case)
-        .expressions()
-        .iter()
-        .flat_map(|expression| {
-            expression
-                .fields()
-                .iter()
-                .enumerate()
-                .filter(|(_, fields)| fields.as_ref().is_some_and(|fields| fields.is_empty()))
-                .map(|(at, _)| expression.place().clone().then(Segment::Link(at)))
-                .collect::<Vec<_>>()
-        })
-        .collect()
 }
 
 pub fn predict(case: &Case) -> Prediction {

@@ -231,6 +231,7 @@ impl Step {
         let mut walker = Walker {
             zones: Vec::new(),
             fieldsets: Vec::new(),
+            gave_no_expression: 0,
             names: Vec::new(),
             written: Vec::new(),
             pair_key: None,
@@ -430,6 +431,8 @@ struct Walker<'a> {
     zones: Vec<String>,
     /// The fields of the structs the walk has met, which a [`FieldsAt`] points into.
     fieldsets: Vec<Fields>,
+    /// How many expressions gave no expression: an unnest of a struct that has no field.
+    gave_no_expression: usize,
     /// The names the walk has met expressions written under, which a [`NameAt`] points into.
     names: Vec<String>,
     /// What each item of a select or of the columns a step adds writes: where the item is, the
@@ -1822,6 +1825,7 @@ impl Walker<'_> {
     /// Walks `expression`, which a position holds when `held` says whether it ends
     /// the predicate there, and which is an argument of a call otherwise.
     fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
+        let none_before = self.gave_no_expression;
         // The values of a condition end the predicate where the condition is
         // all the expression is: a method that goes on from it is what ends it.
         let values_end = held == Some(true)
@@ -2151,6 +2155,9 @@ impl Walker<'_> {
             start => start_name(start, expression.links()),
         };
         let mut compares_with_a_fraction = false;
+        // Whether a link unnests a struct that has no field: it gives no expression, and what
+        // follows it is none either.
+        let mut gives_no_expression = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -2192,6 +2199,8 @@ impl Walker<'_> {
                                 && operand.dtype.is_some_and(is_a_whole_number)
                         }));
             let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
+            gives_no_expression |= link.entry().id().as_str() == "Expr.struct.unnest"
+                && fields_followed.as_ref().is_some_and(Fields::is_empty);
             let name_before = name.clone();
             let (next, standing) = self.link(
                 link,
@@ -2295,10 +2304,13 @@ impl Walker<'_> {
                     ..
                 }
             );
-            if (is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
-                || compares_with_a_fraction
-                    && is_many
-                    && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight))
+            // An expression that holds what gives no expression is judged without it, which the
+            // syntax of the whole does not show.
+            if self.gave_no_expression == none_before
+                && (is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
+                    || compares_with_a_fraction
+                        && is_many
+                        && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight))
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -2355,6 +2367,13 @@ impl Walker<'_> {
             self.names.push(held);
             NameAt(self.names.len() - 1)
         });
+        // What gives no expression is left out by what holds it, as Polars does: it is no value to
+        // judge, and what holds it cannot be told without it.
+        if gives_no_expression {
+            self.gave_no_expression += 1;
+            self.blind("an unnest of a struct that has no field gives no expression");
+            return unsaid;
+        }
         let operand = match cur {
             Cur::Value {
                 dtype,

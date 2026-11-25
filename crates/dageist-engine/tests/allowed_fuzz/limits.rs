@@ -513,13 +513,6 @@ pub enum Limit {
     /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
     /// reason the tables gave of a key of the join, where it allows the inner join.
     AJoinKeyPolarsDoesNotRun,
-    /// An unnest of a struct that has no field, as the one whose fields were all dropped is, gives
-    /// no expression, which Polars leaves out of the key, the operands or the struct that hold it.
-    /// The tables judge what it follows as written, a count of values a struct held that is no
-    /// part of the case Polars runs. The tables refusing, or Polars refusing, a call that holds an
-    /// unnest of a struct the walk knows to have no field, at a place that holds the unnest or is
-    /// the step.
-    AnUnnestOfNoFields,
     /// Polars counts the names given to an array against the array's width, which a struct that
     /// holds the array has in its dtype, and the walk carries no width for a field of a struct. The
     /// tables measured an array that a column is. Polars refusing the plan with the refusal that
@@ -530,7 +523,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 45] = [
+    pub const ALL: [Self; 44] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -574,7 +567,6 @@ impl Limit {
         Self::AToStructGivenNamesAlike,
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
-        Self::AnUnnestOfNoFields,
         Self::AnArrayWidthAStructFieldHolds,
     ];
 
@@ -636,7 +628,6 @@ impl Limit {
             Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
-            Self::AnUnnestOfNoFields => "an-unnest-of-no-fields",
             Self::AnArrayWidthAStructFieldHolds => "an-array-width-a-struct-field-holds",
         }
     }
@@ -733,9 +724,6 @@ impl Limit {
             }
             Self::AnArrayWidthAStructFieldHolds => {
                 "Polars counts the names given to an array against its width, which a struct that holds the array has in its dtype, where the walk carries no width for the field of a struct that it read"
-            }
-            Self::AnUnnestOfNoFields => {
-                "an unnest of a struct that has no field gives no expression, which Polars leaves out of what holds it, where the tables judged what it follows as written"
             }
             Self::AJoinKeyPolarsDoesNotRun => {
                 "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
@@ -4565,10 +4553,6 @@ fn applies(
             Limit::SeveralCountsInOneItem,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_among_counts(case, refused),
-        (
-            Limit::AnUnnestOfNoFields,
-            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
-        ) => holds_an_unnest_of_no_field(case, refused.place.path()),
         (Limit::AnArrayWidthAStructFieldHolds, Disagreement::PolarsRefuses(refusal)) => {
             refusal.reason.contains("number of field names provided")
                 && refusal.place.as_ref().is_some_and(|place| {
@@ -4582,12 +4566,6 @@ fn applies(
                                 .any(|link| is(link, "Expr.struct.field"))
                         })
                 })
-        }
-        (Limit::AnUnnestOfNoFields, Disagreement::PolarsRefuses(refusal)) => {
-            holds_an_unnest_of_no_field(
-                case,
-                refusal.place.as_ref().map_or(&[][..], |place| place.path()),
-            )
         }
         (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
             is(step, "LazyFrame.join")
@@ -4795,19 +4773,6 @@ fn applies(
         }
         _ => false,
     }
-}
-
-/// Whether the case holds an unnest of a struct the walk knows to have no field, at `path` or inside
-/// what is there: the whole step where the path is empty.
-fn holds_an_unnest_of_no_field(case: &Case, path: &[Segment]) -> bool {
-    super::predict::places_after_no_field(case)
-        .iter()
-        .any(|at| {
-            at.path().starts_with(path)
-                && locate(case, at)
-                    .call
-                    .is_some_and(|call| is(call, "Expr.struct.unnest"))
-        })
 }
 
 /// The case with its join made a left join, which runs the keys of the left table where an inner
@@ -11898,25 +11863,6 @@ mod tests {
             rule_refuses(&renamed, place, "field-names-fit-the-struct", reason),
             vec![]
         );
-    }
-
-    #[test]
-    fn an_unnest_of_a_struct_with_no_field_excuses_what_it_is_in_and_nothing_beside_it() {
-        assert_eq!(
-            excused_by_kept("uncovered-an-unnest-of-no-fields.case"),
-            vec![Limit::AnUnnestOfNoFields]
-        );
-        // An unnest of a struct with fields gives them, so a key refused for what it holds is not
-        // the limit's: the same case with a struct that drops fewer fields has no unnest of none.
-        let case = kept_case("uncovered-an-unnest-of-no-fields.case");
-        let text = String::from_utf8(case.encode()).expect("text");
-        let kept_one = text.replace(
-            r#"{"field":"literal"},{"field":"n"}"#,
-            r#"{"field":"literal"}"#,
-        );
-        assert_ne!(kept_one, text);
-        let other = Case::decode(kept_one.as_bytes()).expect("a case");
-        assert!(!excused_by(&other).contains(&Limit::AnUnnestOfNoFields));
     }
 
     #[test]

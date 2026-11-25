@@ -24,7 +24,8 @@ pub enum Rule {
     /// A pivot's aggregate gives one value for each group.
     PivotAggregateGivesOneValue,
     /// A filter's predicate is one column: an expression that gives several, as the unnest of a
-    /// struct of several fields does, is refused there.
+    /// struct of several fields does, or none, as the unnest of a struct of no field does, is
+    /// refused there.
     OneColumnIsNeeded,
     /// The columns that the items of a select or of `with_columns` write are named differently,
     /// as the fields that an unnest and a field read write are named by the fields.
@@ -188,7 +189,7 @@ impl Rule {
                 "the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name"
             }
             Self::OneColumnIsNeeded => {
-                "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and Polars refuses it"
+                "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty: Polars refuses both"
             }
             Self::WrittenNamesAreDistinct => {
                 "the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name"

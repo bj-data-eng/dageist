@@ -1023,10 +1023,11 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     let struct_gives = fields::gives(entry, receiver_class, chosen)
         .map_err(|(rule, said)| Refusal::rule_because(rule, &said))?;
     // A filter's predicate is one column. The tables measured an unnest on a struct of two fields, so
-    // a struct of one, which is one column, is judged as the field it is.
+    // a struct of one, which is one column, is judged as the field it is, and one of none, which
+    // Polars expands to no expression, is refused.
     if struct_gives
         .columns()
-        .is_some_and(|columns| columns.len() >= 2)
+        .is_some_and(|columns| columns.len() != 1)
         && place.context.outer() == Outer::Filter
         && place.context.nested().is_none()
     {
