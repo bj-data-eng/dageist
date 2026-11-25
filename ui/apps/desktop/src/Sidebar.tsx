@@ -49,6 +49,13 @@ export interface AppSidebarProps<Id extends string> {
   readonly onShow: (id: Id) => void;
   /** What is said about the host, at the foot of the panel. */
   readonly status: React.ReactNode;
+  /**
+   * Opens a workspace on disk, chosen in the system's folder dialog; `null` while it cannot, until
+   * the host is found and while a workspace is being opened.
+   */
+  readonly onOpenWorkspace: (() => void) | null;
+  /** Why the last workspace asked for was not opened, or `null`. */
+  readonly openProblem: string | null;
 }
 
 /** The number of stand-ins in the list of nodes, which the panel does not have yet. */
@@ -56,8 +63,8 @@ const NODE_STAND_INS = ['first', 'second', 'third', 'fourth'];
 
 /**
  * Draws the side panel: the window's controls and the toggle, the
- * workspaces, a list of the graph's nodes still to come, and the host's
- * status at the foot. It must stand inside a `SidebarProvider`, which holds
+ * workspaces, opening a workspace on disk, a list of the graph's nodes still
+ * to come, and the host's status at the foot. It must stand inside a `SidebarProvider`, which holds
  * whether it is shown.
  */
 export function AppSidebar<Id extends string>({
@@ -65,6 +72,8 @@ export function AppSidebar<Id extends string>({
   current,
   onShow,
   status,
+  onOpenWorkspace,
+  openProblem,
 }: AppSidebarProps<Id>): React.JSX.Element {
   return (
     <Sidebar collapsible="offcanvas">
@@ -93,6 +102,28 @@ export function AppSidebar<Id extends string>({
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                disabled={onOpenWorkspace === null}
+                onClick={() => {
+                  onOpenWorkspace?.();
+                }}
+              >
+                <span aria-hidden="true" className="w-4 text-center text-accent">
+                  ⌂
+                </span>
+                <span>Open workspace…</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          {openProblem !== null && (
+            <p role="alert" className="m-0 px-2 pt-1 text-xs text-danger">
+              {openProblem}
+            </p>
+          )}
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Nodes</SidebarGroupLabel>

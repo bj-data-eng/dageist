@@ -220,10 +220,15 @@ application, the commits are made by `dageist <workspace@dageist.invalid>`; the
 `.invalid` domain can never be registered, so no account is credited with them.
 A save that fails is reported as the edit's failure, but the edit is made: the
 session holds it, and the next save commits it with that save's own message.
-For now the application keeps the sample in a workspace made for each run, in
-the run's temporary folder. The window packs the workspace whole as it exits,
-and the run then removes the folder. The bridge is stopped by a signal, so it
-packs the workspace only every 100 commits and leaves the folder for the system
+The application starts on the sample, kept in a workspace made for each run in
+the run's temporary folder. "Open workspace…" in the side panel picks another
+workspace's folder in the system's dialog: the host reads its latest commit,
+holds it in place of the one it held, and closes that one, packing it whole. A
+folder that holds no workspace is refused, and the one held stays.
+
+The window packs the workspace it holds whole as it exits, and the run then
+removes its temporary folder. The bridge is stopped by a signal, so it packs its
+workspace only every 100 commits and leaves the temporary folder for the system
 to clear.
 
 A node's history is the commits that changed its folder, read from the branch's

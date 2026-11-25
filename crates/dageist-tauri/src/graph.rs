@@ -118,6 +118,43 @@ impl Workspace {
         }
     }
 
+    /// Opens the workspace on disk in `folder` in place of the one held, with every revision of
+    /// its session starting at `first_revision`, and closes the one held, packing it whole. The
+    /// workspace is read before anything is let go, so one that cannot be opened leaves the one
+    /// held as it was.
+    ///
+    /// # Errors
+    ///
+    /// When `folder` holds no workspace this application reads, or the application is closing.
+    pub(crate) fn open(&self, folder: &Path, first_revision: u64) -> Result<(), ErrorView> {
+        let mut session = self.lock();
+        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        if matches!(*kept, Keeping::Closed) {
+            return Err(ErrorView::new(
+                "the application is closing, so no workspace is opened",
+            ));
+        }
+        let (opened, saved) = dageist::workspace::Workspace::open(
+            folder,
+            dageist::unsigned_author(),
+            dageist::workspace::Options::default(),
+        )
+        .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        let read = Session::from_saved(saved, first_revision)
+            .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        *session = read;
+        let held = std::mem::replace(&mut *kept, Keeping::In(Box::new(opened)));
+        if let Keeping::In(held) = held {
+            // The workspace let go is closed as the application would close it on exit. One that
+            // cannot be packed keeps its loose objects, which its next close packs; the opening
+            // has been made all the same, so the failure is told, not answered.
+            if let Err(error) = held.close() {
+                eprintln!("dageist: the workspace let go was not packed: {error}");
+            }
+        }
+        Ok(())
+    }
+
     /// Closes the workspace on disk, packing it whole, once the edit being made is done. An edit
     /// made after it is refused its save.
     ///
@@ -1000,6 +1037,21 @@ pub fn place_view(
     })
 }
 
+/// Opens the workspace on disk in `folder` in place of the one the host holds, and reports its
+/// graph, worked out. Its revisions start where no view of the workspace let go can be, so an edit
+/// sent from such a view is stale.
+///
+/// # Errors
+///
+/// When `folder` holds no workspace this application reads.
+pub fn open_workspace_view(workspace: &Workspace, folder: &str) -> Result<GraphView, ErrorView> {
+    workspace.open(
+        Path::new(folder),
+        crate::document::first_revision(std::time::SystemTime::now()),
+    )?;
+    Ok(graph_view(workspace))
+}
+
 // -- Tauri commands ------------------------------------------------------------------------
 
 /// Reports the graph, worked out.
@@ -1027,6 +1079,15 @@ pub fn place_node(
     frame: FrameView,
 ) -> Result<PlacedView, ErrorView> {
     place_view(&workspace, revision, &node, frame)
+}
+
+/// Opens the workspace on disk in `folder` in place of the one held.
+#[tauri::command(async)]
+pub fn open_workspace(
+    workspace: State<'_, Workspace>,
+    folder: String,
+) -> Result<GraphView, ErrorView> {
+    open_workspace_view(&workspace, &folder)
 }
 
 #[cfg(test)]

@@ -135,7 +135,13 @@ export {
   decodeStepStarts,
 } from './decode-offers';
 export { decodeDocumentState, decodeEditAnswer } from './decode-document';
-export { decodeChosenFile, decodeGraph, decodeGraphEditAnswer, decodePlaced } from './decode-graph';
+export {
+  decodeChosenFile,
+  decodeChosenFolder,
+  decodeGraph,
+  decodeGraphEditAnswer,
+  decodePlaced,
+} from './decode-graph';
 export { decodeRun } from './decode-run';
 export { decodeBlock } from './decode-block';
 export { decodeIdentity, decodeTable } from './decode-sample';
