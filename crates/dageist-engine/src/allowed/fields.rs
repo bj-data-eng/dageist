@@ -29,6 +29,10 @@ pub struct Field {
     class: Option<Representative>,
     /// What a field that is a struct holds, where that is known.
     fields: Option<Fields>,
+    /// Whether the field was made of a number typed without a dtype, which Polars keeps open: what
+    /// reads the field and meets another number gives the dtype of that number, not the one the
+    /// struct is written with.
+    loose: bool,
 }
 
 impl Field {
@@ -40,6 +44,7 @@ impl Field {
             written: dtype_name(dtype),
             class: Representative::of(dtype),
             fields: Fields::of_dtype(dtype),
+            loose: false,
         }
     }
 
@@ -52,6 +57,7 @@ impl Field {
             written: class.map_or_else(|| "?".to_owned(), |class| class.name().to_owned()),
             class,
             fields: None,
+            loose: false,
         }
     }
 
@@ -207,6 +213,7 @@ pub struct Input<'a> {
     name: Option<&'a str>,
     class: Option<Representative>,
     fields: Option<&'a Fields>,
+    loose: bool,
 }
 
 impl<'a> Input<'a> {
@@ -222,7 +229,15 @@ impl<'a> Input<'a> {
             name,
             class,
             fields,
+            loose: false,
         }
+    }
+
+    /// The same input, which is a number typed without a dtype where `loose`.
+    #[must_use]
+    pub const fn loose_if(mut self, loose: bool) -> Self {
+        self.loose = loose;
+        self
     }
 }
 
@@ -401,6 +416,7 @@ pub(super) fn gives(
                 .map(|input| {
                     input.name.map(|name| {
                         let mut field = Field::of_class(name, input.class);
+                        field.loose = input.loose;
                         if let (Some(fields), Some(Representative::Struct)) =
                             (input.fields, input.class)
                         {
@@ -562,7 +578,8 @@ impl Gives {
 impl ResultDtype {
     /// The dtype of a field, as the tables write it.
     fn of_field(field: &Field) -> Self {
-        Self::new(field.written.clone(), field.class)
+        // A number left open meets another as that one's dtype, which the tables do not say.
+        Self::new(field.written.clone(), field.class.filter(|_| !field.loose))
     }
 }
 

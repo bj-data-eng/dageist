@@ -554,6 +554,10 @@ fn start_name(start: &Start, links: &[Call]) -> Option<String> {
     }
 }
 
+/// One value a call of `polars.struct` makes a struct of: the name it writes, its class, the fields
+/// it holds where it is a struct, and whether it is a number typed without a dtype.
+type StructInput = (Option<String>, Option<Representative>, Option<Fields>, bool);
+
 /// The values a call of `polars.struct` makes a struct of, in order, each with the name it is given
 /// where it is one of the named values: those that are listed first, then the named ones.
 fn struct_inputs(start: &Call) -> Vec<(Option<String>, &Expression)> {
@@ -1727,11 +1731,7 @@ impl Walker<'_> {
     /// written under, its class, and the fields it has where it is a struct. The operands are in the
     /// order the arguments were walked, which is the document's, and the values are in the order
     /// Python makes them in, the listed ones first.
-    fn struct_inputs_made(
-        &self,
-        start: &Call,
-        operands: &[(String, Operand)],
-    ) -> Vec<(Option<String>, Option<Representative>, Option<Fields>)> {
+    fn struct_inputs_made(&self, start: &Call, operands: &[(String, Operand)]) -> Vec<StructInput> {
         if start.entry().id().as_str() != "polars.struct" {
             return Vec::new();
         }
@@ -1745,6 +1745,7 @@ impl Walker<'_> {
                     name.or_else(|| operand.name.map(|at| self.names[at.0].clone())),
                     operand.dtype,
                     operand.fields.map(|at| self.fieldsets[at.0].clone()),
+                    operand.loose.is_some(),
                 )
             })
             .collect()
@@ -1926,15 +1927,15 @@ impl Walker<'_> {
                 let start_fields = self
                     .start_dtype(start)
                     .and_then(|dtype| Fields::of_dtype(&dtype));
-                let inputs_made: Vec<(Option<String>, Option<Representative>, Option<Fields>)> =
+                let inputs_made: Vec<StructInput> =
                     self.struct_inputs_made(start, &start_arguments);
                 let input_names: Vec<Input<'_>> = inputs_made
                     .iter()
-                    .map(|(name, class, fields)| {
-                        Input::new(name.as_deref(), *class, fields.as_ref())
+                    .map(|(name, class, fields, loose)| {
+                        Input::new(name.as_deref(), *class, fields.as_ref()).loose_if(*loose)
                     })
                     .collect();
-                start_given = inputs_made.first().and_then(|(name, _, _)| name.clone());
+                start_given = inputs_made.first().and_then(|(name, _, _, _)| name.clone());
                 let names = start.names();
                 let numbers = start.numbers();
                 let chosen = Chosen::default()
