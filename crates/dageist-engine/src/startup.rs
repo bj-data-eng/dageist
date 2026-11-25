@@ -39,6 +39,10 @@
 //!   resolver, reader, dataset and Delta deletion-vector providers that call
 //!   into Python, and the callers of Python functions used as `map` and `apply`
 //!   functions.
+//! - The locator that finds I/O plugins through their Python packages
+//!   (`install_locator`, behind the release's `io_plugin_ffi` feature). The
+//!   plugins hand Iceberg and database reads to Python, and the engine is built
+//!   without the support they need.
 //! - The function that reports Polars' warnings through Python's `warnings`.
 //!   Without it Polars prints a warning on the standard error stream.
 //! - Allowing extension types to be created (`set_polars_allow_extension`),
