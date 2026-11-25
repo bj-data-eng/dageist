@@ -374,11 +374,10 @@ fn a_split_may_stand_in_a_join_key_as_polars_joins_on_a_list_of_text() {
         assert!(verdict.is_allowed(), "{outer:?}: {verdict:?}");
     }
     // A cast of text to a whole number is no way to meet it: the key that the other table has is
-    // a list of the same text, and the list is not cast.
-    assert!(!joins_on(
-        split().cast(DataType::Int64),
-        col("ra").cast(DataType::Int64)
-    ));
+    // a list of the same text, and the list is not cast. The other key is a column of whole
+    // numbers, for Python Polars 2.2.0's streaming engine does not evaluate a key where the
+    // other side has no key that holds a value.
+    assert!(!joins_on(split().cast(DataType::Int64), col("rk")));
 }
 
 /// What a literal given as the argument `parameter` of `id` after text gives, as the offers say.
