@@ -5,6 +5,7 @@ License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml),
 [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml),
+[crates/dageist-graph/Cargo.toml](crates/dageist-graph/Cargo.toml),
 [crates/dageist-pack/Cargo.toml](crates/dageist-pack/Cargo.toml) and
 [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml), including the
 fuzz framework's optional dependencies, and the crates patched in the root
@@ -320,6 +321,13 @@ of either license:
 * License: [Apache License 2.0](licenses/toml/LICENSE-APACHE)
 * License: [MIT License](licenses/toml/LICENSE-MIT)
 * Homepage: [toml](https://github.com/toml-rs/toml)
+
+This product depends on uuid 1.24.1, distributed by Ashley Mannix, Dylan DPC and
+Hunar Roop Kahlon, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/uuid/LICENSE-APACHE)
+* License: [MIT License](licenses/uuid/LICENSE-MIT)
+* Homepage: [uuid](https://github.com/uuid-rs/uuid)
 
 The fuzz framework `dageist-fuzz` is a verification tool and is not part of the
 application. It was ported from Surgeist's `surgeist-fuzz` (see its

@@ -24,6 +24,7 @@ fn source(session: &mut Session, name: &str, file: &str) -> NodeId {
     let node = edit(
         session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Source,
             follows: None,
             name: None,
@@ -95,6 +96,7 @@ fn a_source_without_a_file_or_with_one_that_cannot_be_read_says_so() {
     let empty = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Source,
             follows: None,
             name: None,
@@ -118,6 +120,7 @@ fn a_transform_with_no_steps_gives_the_table_it_starts_from_and_an_output_writes
     let transform = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Transform,
             follows: Some(orders.clone()),
             name: None,
@@ -127,6 +130,7 @@ fn a_transform_with_no_steps_gives_the_table_it_starts_from_and_an_output_writes
     let output = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Output,
             follows: Some(transform.clone()),
             name: None,
@@ -166,6 +170,7 @@ fn connected() -> (Session, NodeId, NodeId, NodeId) {
     let parameters = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Parameters,
             follows: None,
             name: None,
@@ -186,6 +191,7 @@ fn connected() -> (Session, NodeId, NodeId, NodeId) {
     let transform = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Transform,
             follows: Some(orders),
             name: None,
@@ -298,6 +304,7 @@ fn a_refused_step_stops_the_transform_and_what_reads_it_gets_nothing() {
     let output = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Output,
             follows: Some(transform.clone()),
             name: None,
@@ -328,6 +335,7 @@ fn an_edit_against_an_old_revision_is_stale_and_changes_nothing() {
         session.edit_graph(
             6,
             &Edit::Add {
+                id: NodeId::mint(),
                 kind: Kind::Source,
                 follows: None,
                 name: None,
@@ -347,6 +355,7 @@ fn a_transform_has_a_document_of_its_own_and_removing_it_drops_its_document_and_
     let transform = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Transform,
             follows: None,
             name: None,
@@ -382,6 +391,7 @@ fn a_document_edit_against_an_old_revision_is_stale() {
     let transform = edit(
         &mut session,
         Edit::Add {
+            id: NodeId::mint(),
             kind: Kind::Transform,
             follows: None,
             name: None,

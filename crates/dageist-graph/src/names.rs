@@ -26,77 +26,44 @@ impl fmt::Display for NameError {
 
 impl std::error::Error for NameError {}
 
-/// What identifies a node in its graph. It is made from the node's name when
-/// the node is added, stays when the node is renamed, and is not given to
-/// another node of the same graph after the node is removed.
-///
-/// An id is lowercase ASCII letters, digits and single hyphens between them.
+/// What identifies a node: a UUID, written as 36 lowercase characters with
+/// hyphens. A new node's id is [minted](Self::mint) by whoever asks for the
+/// node and carried by the edit that adds it, so making an edit is
+/// deterministic. The id stays when the node is renamed, and no two nodes,
+/// in any graph, are given the same one.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(String);
 
 impl NodeId {
+    /// A new id, a UUID of version 7, which holds the time it was made: ids
+    /// minted later by the same process sort after it.
+    #[must_use]
+    pub fn mint() -> Self {
+        Self(uuid::Uuid::now_v7().hyphenated().to_string())
+    }
+
     /// Reads `text` as a node id.
     ///
     /// # Errors
     ///
-    /// When `text` is empty, holds anything other than lowercase ASCII
-    /// letters, digits and hyphens, or starts, ends or doubles a hyphen.
+    /// When `text` is not a UUID written as 36 lowercase characters with
+    /// hyphens, the one way an id is written.
     pub fn new(text: impl Into<String>) -> Result<Self, NameError> {
         let text = text.into();
-        let refuse = |reason| {
-            Err(NameError {
+        match uuid::Uuid::try_parse(&text) {
+            Ok(id) if id.hyphenated().to_string() == text => Ok(Self(text)),
+            _ => Err(NameError {
                 what: "node id",
-                text: text.clone(),
-                reason,
-            })
-        };
-        if text.is_empty() {
-            return refuse("it is empty");
+                text,
+                reason: "it must be a UUID written in lowercase with hyphens",
+            }),
         }
-        if !text
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-        {
-            return refuse("it may hold only lowercase letters, digits and hyphens");
-        }
-        if text.starts_with('-') || text.ends_with('-') || text.contains("--") {
-            return refuse("a hyphen must stand between two other characters");
-        }
-        Ok(Self(text))
     }
 
     /// The id as text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-
-    /// The id made from `name`: its ASCII letters and digits in lowercase,
-    /// with a hyphen for each run of anything else, and `node` when nothing is
-    /// left.
-    pub(crate) fn from_name(name: &Name) -> Self {
-        let mut id = String::new();
-        let mut gap = false;
-        for character in name.as_str().chars() {
-            if character.is_ascii_alphanumeric() {
-                if gap && !id.is_empty() {
-                    id.push('-');
-                }
-                gap = false;
-                id.push(character.to_ascii_lowercase());
-            } else {
-                gap = true;
-            }
-        }
-        if id.is_empty() {
-            id.push_str("node");
-        }
-        Self(id)
-    }
-
-    /// This id with `-` and `number` after it.
-    pub(crate) fn numbered(&self, number: usize) -> Self {
-        Self(format!("{}-{number}", self.0))
     }
 }
 
@@ -276,21 +243,34 @@ mod tests {
     use super::{InputName, Name, NodeId, ParameterName};
 
     #[test]
-    fn node_ids_take_lowercase_words_joined_by_single_hyphens() {
-        assert!(NodeId::new("claims-2").is_ok());
+    fn a_node_id_is_a_uuid_written_in_lowercase_with_hyphens() {
+        let text = "0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31";
+        assert_eq!(NodeId::new(text).unwrap().as_str(), text);
         for refused in [
-            "", "Claims", "claims_2", "-claims", "claims-", "a--b", "a b",
+            "",
+            "claims",
+            "0197A3C2-5E10-7D4B-9C1E-2B6F0A8D4E31",
+            "0197a3c25e107d4b9c1e2b6f0a8d4e31",
+            "{0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31}",
+            "urn:uuid:0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31",
+            "0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e3",
         ] {
             assert!(NodeId::new(refused).is_err(), "{refused:?} was taken");
         }
     }
 
     #[test]
-    fn an_id_made_from_a_name_keeps_its_words() {
-        let name = Name::new("SLA by step (2026)").unwrap();
-        assert_eq!(NodeId::from_name(&name).as_str(), "sla-by-step-2026");
-        let symbols = Name::new("→ ←").unwrap();
-        assert_eq!(NodeId::from_name(&symbols).as_str(), "node");
+    fn minted_ids_read_back_differ_and_sort_in_the_order_they_were_made() {
+        let ids: Vec<NodeId> = (0..64).map(|_| NodeId::mint()).collect();
+        for id in &ids {
+            assert_eq!(&NodeId::new(id.as_str()).unwrap(), id);
+            // Version 7, in the place RFC 9562 gives the version.
+            assert_eq!(id.as_str().as_bytes()[14], b'7');
+        }
+        let mut sorted = ids.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted, ids);
     }
 
     #[test]

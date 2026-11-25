@@ -921,7 +921,7 @@ fn through_a_socket_the_bridge_answers_a_command_and_refuses_a_wrong_host_and_ty
             "POST",
             "/bridge/node_inputs",
             &[("Host", &own_host), ("Content-Type", "application/json")],
-            br#"{"node": "claim-timing"}"#,
+            br#"{"node": "00000000-0000-7000-8000-000000000006"}"#,
         ),
     );
     assert_eq!(answered.status, 200);

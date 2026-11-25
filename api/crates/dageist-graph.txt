@@ -19,6 +19,7 @@ pub const fn dageist_graph::Body::kind(&self) -> dageist_graph::Kind
 pub enum dageist_graph::Edit
 pub dageist_graph::Edit::Add
 pub dageist_graph::Edit::Add::follows: core::option::Option<dageist_graph::NodeId>
+pub dageist_graph::Edit::Add::id: dageist_graph::NodeId
 pub dageist_graph::Edit::Add::kind: dageist_graph::Kind
 pub dageist_graph::Edit::Add::name: core::option::Option<dageist_graph::Name>
 pub dageist_graph::Edit::AddInput
@@ -58,6 +59,7 @@ pub dageist_graph::EditError::Cycle
 pub dageist_graph::EditError::Cycle::from: dageist_graph::NodeId
 pub dageist_graph::EditError::Cycle::node: dageist_graph::NodeId
 pub dageist_graph::EditError::EmptyColumn
+pub dageist_graph::EditError::IdTaken(dageist_graph::NodeId)
 pub dageist_graph::EditError::InputTaken(dageist_graph::InputName)
 pub dageist_graph::EditError::KindMismatch
 pub dageist_graph::EditError::KindMismatch::gives: dageist_graph::InputKind
@@ -177,6 +179,7 @@ pub fn dageist_graph::Node::slots(&self) -> alloc::vec::Vec<(dageist_graph::Slot
 pub struct dageist_graph::NodeId(_)
 impl dageist_graph::NodeId
 pub fn dageist_graph::NodeId::as_str(&self) -> &str
+pub fn dageist_graph::NodeId::mint() -> Self
 pub fn dageist_graph::NodeId::new(text: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_graph::NameError>
 impl core::fmt::Display for dageist_graph::NodeId
 pub fn dageist_graph::NodeId::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result

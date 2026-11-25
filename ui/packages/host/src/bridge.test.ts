@@ -57,7 +57,7 @@ describe('the host that calls the bridge', () => {
   it('posts the arguments of a command as JSON to its path and decodes the answer', async () => {
     bridgeAnswers(() => jsonResponse(documentFixture));
 
-    const state = await bridgeHost().nodeDocument('claim-timing');
+    const state = await bridgeHost().nodeDocument('00000000-0000-7000-8000-000000000006');
 
     expect(state.revision).toBe(1);
     expect(sent).toEqual([
@@ -65,7 +65,7 @@ describe('the host that calls the bridge', () => {
         path: '/bridge/node_document',
         method: 'POST',
         contentType: 'application/json',
-        body: { node: 'claim-timing' },
+        body: { node: '00000000-0000-7000-8000-000000000006' },
       },
     ]);
   });
@@ -73,7 +73,7 @@ describe('the host that calls the bridge', () => {
   it('sends an empty object for a command that takes no arguments', async () => {
     bridgeAnswers(() => jsonResponse(nodeFixture));
 
-    const node = await bridgeHost().nodeInputs('claim-timing');
+    const node = await bridgeHost().nodeInputs('00000000-0000-7000-8000-000000000006');
 
     expect(node.source.name).toBe('claims');
     expect(sent[0]).toMatchObject({ path: '/bridge/node_inputs', body: {} });
@@ -156,7 +156,7 @@ describe('the host that calls the bridge', () => {
 
   it('names the arguments of the rows and the sample commands as the host does', async () => {
     bridgeAnswers(() => jsonResponse(rowsFixture));
-    await bridgeHost().rowsAfterStep('claim-timing', 1, 'days_open', 7);
+    await bridgeHost().rowsAfterStep('00000000-0000-7000-8000-000000000006', 1, 'days_open', 7);
     bridgeAnswers(() => jsonResponse(windowFixture));
     const table = await bridgeHost().openSampleWindow(10);
 
@@ -167,7 +167,7 @@ describe('the host that calls the bridge', () => {
   it('posts an edit with the revision it was made against and decodes what it came to', async () => {
     bridgeAnswers(() => jsonResponse(editedFixture));
 
-    const answer = await bridgeHost().editDocument('claim-timing', 1, {
+    const answer = await bridgeHost().editDocument('00000000-0000-7000-8000-000000000006', 1, {
       kind: 'removeStep',
       step: { stepIndex: 0, stepId: 'sort', path: [] },
     });
@@ -212,21 +212,23 @@ describe('the host that calls the bridge', () => {
       jsonResponse({ kind: 'limit', message: 'a preview holds at most 1000 rows' }, 422),
     );
 
-    await expect(bridgeHost().rowsAfterStep('claim-timing', 1, 'a', 5000)).rejects.toThrow(
-      'rows_after_step: a preview holds at most 1000 rows',
-    );
+    await expect(
+      bridgeHost().rowsAfterStep('00000000-0000-7000-8000-000000000006', 1, 'a', 5000),
+    ).rejects.toThrow('rows_after_step: a preview holds at most 1000 rows');
   });
 
   it('refuses an answer of a shape the contract lacks, with its place', async () => {
     bridgeAnswers(() => jsonResponse(withField(nodeFixture, [], 'unexpected', 1)));
 
-    await expect(bridgeHost().nodeInputs('claim-timing')).rejects.toThrow(/node_inputs: \$/u);
+    await expect(bridgeHost().nodeInputs('00000000-0000-7000-8000-000000000006')).rejects.toThrow(
+      /node_inputs: \$/u,
+    );
   });
 
   it('refuses an answer that is not JSON', async () => {
     bridgeAnswers(() => new Response('<html></html>', { status: 200 }));
 
-    await expect(bridgeHost().nodeInputs('claim-timing')).rejects.toThrow(
+    await expect(bridgeHost().nodeInputs('00000000-0000-7000-8000-000000000006')).rejects.toThrow(
       'node_inputs: the answer is not JSON',
     );
   });

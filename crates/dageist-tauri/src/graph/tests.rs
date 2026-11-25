@@ -22,8 +22,15 @@ const REFRESH: &str = "DAGEIST_REFRESH_GRAPH";
 /// The command that refreshes the snapshot.
 const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri graph::tests::the_snapshot_is_what_the_command_returns";
 
-/// The id of the starting graph's transform, as the view sends it.
-pub(crate) const NODE: &str = "claim-timing";
+/// The ids of the starting graph's nodes, in the order they are added, as the view sends them.
+const CLAIMS: &str = "00000000-0000-7000-8000-000000000001";
+const SLA: &str = "00000000-0000-7000-8000-000000000002";
+const NAMES: &str = "00000000-0000-7000-8000-000000000003";
+const CALENDAR: &str = "00000000-0000-7000-8000-000000000004";
+const PARAMETERS: &str = "00000000-0000-7000-8000-000000000005";
+/// The id of the starting graph's transform.
+pub(crate) const NODE: &str = "00000000-0000-7000-8000-000000000006";
+const OUTPUT: &str = "00000000-0000-7000-8000-000000000007";
 
 /// A folder of its own for each workspace a test makes, so that tests running at once do not
 /// write each other's tables.
@@ -120,15 +127,7 @@ fn the_starting_graph_lists_every_node_after_the_nodes_it_reads() {
         .collect();
     assert_eq!(
         order,
-        [
-            "claims",
-            "holiday-calendar",
-            "parameters",
-            "sla-by-step",
-            "step-names",
-            "claim-timing",
-            "claim-timing-output",
-        ]
+        [CLAIMS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT]
     );
     let transform = node(&graph, NODE);
     assert_eq!(transform["kind"], "transform");
@@ -139,16 +138,16 @@ fn the_starting_graph_lists_every_node_after_the_nodes_it_reads() {
         json!({
             "slot": { "kind": "start" },
             "takes": "table",
-            "from": { "kind": "table", "node": "claims" },
+            "from": { "kind": "table", "node": CLAIMS },
             "fits": [
-                { "kind": "table", "node": "claims" },
-                { "kind": "table", "node": "holiday-calendar" },
-                { "kind": "table", "node": "sla-by-step" },
-                { "kind": "table", "node": "step-names" },
+                { "kind": "table", "node": CLAIMS },
+                { "kind": "table", "node": SLA },
+                { "kind": "table", "node": NAMES },
+                { "kind": "table", "node": CALENDAR },
             ],
         })
     );
-    let output = node(&graph, "claim-timing-output");
+    let output = node(&graph, OUTPUT);
     assert_eq!(output["problems"], json!(["no file is chosen"]));
     assert_eq!(
         output["columns"][0],
@@ -163,15 +162,18 @@ fn an_edit_answers_with_the_edited_graph_and_a_refusal_with_why() {
     let added = invoke(
         workspace,
         "edit_graph",
-        json!({ "revision": revision, "edit": { "edit": "add", "kind": "transform", "follows": "claims" } }),
+        json!({ "revision": revision, "edit": { "edit": "add", "kind": "transform", "follows": CLAIMS } }),
     )
     .expect("an answer");
     assert_eq!(added["graph"]["revision"], revision + 1);
     assert_eq!(added["kind"], "edited");
-    assert_eq!(added["added"], "transform");
+    // The host mints the new node's id.
+    let id = added["added"].as_str().expect("the id of the node added");
+    assert!(![CLAIMS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT].contains(&id));
+    assert_eq!(node(&added["graph"], id)["name"], "Transform");
     assert_eq!(
-        node(&added["graph"], "transform")["slots"][0]["from"],
-        json!({ "kind": "table", "node": "claims" })
+        node(&added["graph"], id)["slots"][0]["from"],
+        json!({ "kind": "table", "node": CLAIMS })
     );
     let workspace = sample();
     let revision = graph_view(&workspace).revision;
@@ -179,8 +181,8 @@ fn an_edit_answers_with_the_edited_graph_and_a_refusal_with_why() {
         workspace,
         "edit_graph",
         json!({ "revision": revision, "edit": {
-            "edit": "connect", "node": "claims", "slot": { "kind": "start" },
-            "from": { "kind": "table", "node": "claim-timing" },
+            "edit": "connect", "node": CLAIMS, "slot": { "kind": "start" },
+            "from": { "kind": "table", "node": NODE },
         } }),
     )
     .expect("an answer");
@@ -193,7 +195,7 @@ fn an_edit_against_another_revision_is_stale_and_an_id_that_is_not_one_is_unknow
     let stale = invoke(
         sample(),
         "edit_graph",
-        json!({ "revision": 99_999, "edit": { "edit": "remove", "node": "claims" } }),
+        json!({ "revision": 99_999, "edit": { "edit": "remove", "node": CLAIMS } }),
     )
     .expect_err("a rejection");
     assert_eq!(stale["kind"], "stale");
@@ -255,8 +257,13 @@ fn a_transform_with_nothing_to_start_from_says_so_and_a_stale_edit_on_it_is_stal
         json!({ "edit": "add", "kind": "transform", "follows": null, "name": "Loose" }),
     )
     .expect("a request");
-    super::edit_graph_view(&workspace, revision, &request).expect("added");
-    let state = crate::document::document_state_view(&workspace, "loose").expect_err("no state");
+    let super::GraphEditAnswerView::Edited {
+        added: Some(loose), ..
+    } = super::edit_graph_view(&workspace, revision, &request).expect("an answer")
+    else {
+        panic!("the transform was not added");
+    };
+    let state = crate::document::document_state_view(&workspace, &loose).expect_err("no state");
     let state = serde_json::to_value(&state).expect("a view");
     assert_eq!(state["kind"], "failed");
     assert!(
@@ -271,7 +278,7 @@ fn a_transform_with_nothing_to_start_from_says_so_and_a_stale_edit_on_it_is_stal
         json!({ "kind": "removeStep", "step": { "stepIndex": 0, "stepId": "sort", "path": [] } }),
     )
     .expect("a request");
-    let stale = crate::document::edit_view(&workspace, "loose", 7, &edit).expect_err("stale");
+    let stale = crate::document::edit_view(&workspace, &loose, 7, &edit).expect_err("stale");
     assert_eq!(
         serde_json::to_value(&stale).expect("a view")["kind"],
         "stale"

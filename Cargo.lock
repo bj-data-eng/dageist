@@ -1025,6 +1025,9 @@ dependencies = [
 [[package]]
 name = "dageist-graph"
 version = "0.1.0"
+dependencies = [
+ "uuid",
+]
 
 [[package]]
 name = "dageist-pack"
