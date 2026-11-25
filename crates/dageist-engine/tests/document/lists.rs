@@ -1790,3 +1790,124 @@ fn no_argument_of_two_levels_is_run_into_a_panic_of_polars() {
         list(&accepted)
     );
 }
+
+// ---------------------------------------------------------------------------
+// A refused call of lists or arrays is not built
+
+/// The expression `when(g is not) .then(inner) .otherwise(inner) is null` as the second predicate of
+/// a condition whose values are text without the suffix an array holds, where the shared `inner`
+/// is a call that Polars refuses and that its optimizer then derives the schema of again.
+fn a_condition_that_holds_twice(inner: &Value, array: &str) -> Value {
+    let value = || {
+        chain(
+            col_call("g"),
+            vec![call(
+                "Expr.str.strip_suffix",
+                json!({ "suffix": field(array) }),
+            )],
+        )
+    };
+    let held = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![chain(
+                col_call("g"),
+                vec![call("Expr.not_", json!({}))],
+            )]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": inner.clone() })),
+            call("Then.otherwise", json!({ "statement": inner.clone() })),
+            call("Expr.is_null", json!({})),
+        ],
+    );
+    chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": value() })),
+            call("Then.when", json!({ "predicates": many(vec![held]) })),
+            call("ChainedWhen.then", json!({ "statement": value() })),
+            call("ChainedThen.otherwise", json!({ "statement": value() })),
+        ],
+    )
+}
+
+/// A call of the `list` or the `arr` namespace that the tables refuse, and a call after a list or
+/// an array class that they refuse, is not built, so what Polars does with the plan is not asked:
+/// it works out the schema of a condition without the call that is shared by both of its branches
+/// and accepts it, and its optimizer then panics on the plan, as it does of a `list` method given
+/// an array. Every method, of every class, is shared so by a condition after a column, and after
+/// one value taken of a column of two levels, which the tables lose the dtype of.
+#[test]
+fn a_refused_call_of_lists_or_arrays_is_not_run_into_a_panic_of_polars() {
+    let array = column_of(Representative::Array(Inner::String));
+    let mut starts: Vec<(String, Vec<Value>)> = Vec::new();
+    for class in Representative::ALL
+        .into_iter()
+        .filter(|class| class.is_nested())
+    {
+        starts.push((column_of(class), Vec::new()));
+    }
+    for (prefix, outer_is_array) in DEPTH_TWO_KINDS {
+        let namespace = if outer_is_array { "arr" } else { "list" };
+        for element in [Inner::Null, Inner::String] {
+            starts.push((
+                depth_two_name(prefix, element),
+                vec![call(&format!("Expr.{namespace}.first"), json!({}))],
+            ));
+        }
+    }
+    let mut panicked: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+    let mut asked = 0;
+    for (column, before) in &starts {
+        for (namespace, name, arguments) in methods() {
+            let mut links = before.clone();
+            links.push(call(&format!("Expr.{namespace}.{name}"), arguments.clone()));
+            let inner = chain(col_call(column), links);
+            let held = a_condition_that_holds_twice(&inner, &array);
+            let value = step(
+                "s",
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![held]) }),
+            );
+            let Ok(read) = Document::read(&document(vec![value])) else {
+                continue;
+            };
+            asked += 1;
+            let label = format!("{column} {before:?} {namespace}.{name} {arguments}");
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                read.run_on(&inputs(), &frame())
+            }))
+            .is_err()
+            {
+                panicked.entry(label.clone()).or_default().push("run_on");
+            }
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                read.rows(
+                    &inputs(),
+                    &frame(),
+                    &StepId::new("s").expect("an identifier"),
+                    10,
+                )
+            }))
+            .is_err()
+            {
+                panicked.entry(label).or_default().push("rows");
+            }
+        }
+    }
+    assert!(
+        panicked.is_empty(),
+        "{} of {asked} documents reach a panic of Polars':\n{}",
+        panicked.len(),
+        panicked
+            .iter()
+            .take(40)
+            .map(|(label, paths)| format!("{label}: {}", paths.join(", ")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
