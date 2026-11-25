@@ -9,7 +9,8 @@
  */
 
 import type { ExpressionView, Shape, TestView, WhenLayout } from './doc';
-import { fieldNameOf, isElement, shapeOf, startCall, testOf, whenOf } from './doc';
+import type { Typed } from './doc';
+import { fieldNameOf, isElement, shapeOf, startCall, testOf, typedOf, whenOf } from './doc';
 
 /** A group of offers, as a list holds it. */
 export type Group =
@@ -95,11 +96,16 @@ export function listsChainRow(typed: string): boolean {
 /** What a value slot draws when it holds one word and not a chain. */
 export type WordShape = Exclude<Shape, { readonly kind: 'chain' }>;
 
+/** What a value in the document is when it is a connected input or a number or text typed in, alone. */
+export type StartShape = Extract<Shape, { readonly kind: 'input' | 'literal' }>;
+
 /** How a slot draws the value it holds. */
 export type ValueDrawing =
   /** As the chain it is, which starts from a field or a function and has methods. */
   | { readonly drawn: 'chain' }
-  /** As one word: nothing picked, a connected input, a field, or a number or text typed in. */
+  /** As one word that a method can be added after: a connected input or a number or text typed in, in the document. */
+  | { readonly drawn: 'start'; readonly shape: StartShape }
+  /** As one word, after which nothing can be added: nothing picked, or a value that is not in the document. */
   | { readonly drawn: 'word'; readonly shape: WordShape };
 
 /** What a slot with nothing picked draws. */
@@ -107,8 +113,9 @@ const UNSET: WordShape = { kind: 'unset' };
 
 /**
  * Returns how a slot draws `expression`: a field and any other chain are written where they
- * stand, which needs the expression to be in the document, `inDocument`; a connected input, a
- * typed value and nothing at all are one word each.
+ * stand, which needs the expression to be in the document, `inDocument`; a connected input and a
+ * typed value are one word each, which a method can be added after where they are in the document,
+ * and nothing at all is one word.
  */
 export function valueDrawing(expression: ExpressionView | null, inDocument: boolean): ValueDrawing {
   const shape = expression === null ? UNSET : shapeOf(expression);
@@ -116,6 +123,10 @@ export function valueDrawing(expression: ExpressionView | null, inDocument: bool
     return inDocument ? { drawn: 'chain' } : { drawn: 'word', shape: UNSET };
   }
   if (shape.kind === 'column' && inDocument && expression !== null) return { drawn: 'chain' };
+  // A method is added at a place of the document, so a value that is not in it has nothing to add to.
+  if ((shape.kind === 'input' || shape.kind === 'literal') && inDocument) {
+    return { drawn: 'start', shape };
+  }
   return { drawn: 'word', shape };
 }
 
@@ -125,6 +136,8 @@ export type ChainBody =
   | { readonly body: 'when'; readonly layout: WhenLayout }
   /** `element`, which stands for the values of one cell of a pivot. */
   | { readonly body: 'element' }
+  /** A number or text typed in, drawn as the word it is shown by. */
+  | ({ readonly body: 'typed' } & Omit<Typed, 'kind'>)
   /** A function with no word of its own, drawn as its name with what it was given. */
   | { readonly body: 'function' }
   /** A field, a connected input or nothing yet, drawn as one word. */
@@ -136,6 +149,8 @@ export function chainBodyOf(expression: ExpressionView): ChainBody {
   if (layout !== null) return { body: 'when', layout };
   const call = startCall(expression.start);
   if (call !== null && isElement(call)) return { body: 'element' };
+  const typed = call === null ? null : typedOf(call);
+  if (typed !== null) return { body: 'typed', shown: typed.shown, text: typed.text };
   if (call !== null && fieldNameOf(call) === null) return { body: 'function' };
   return { body: 'start' };
 }
@@ -164,6 +179,8 @@ export type PieceKind =
   | 'method'
   /** A value drawn as one word. */
   | 'word'
+  /** A connected input or a number or text typed in, alone in the document, drawn as one word. */
+  | 'startWord'
   /** The name of a step. */
   | 'step'
   /** The word `all of`, which heads a condition. */
@@ -183,9 +200,10 @@ export interface Actions<Add extends boolean = boolean> {
 
 /**
  * Whether something can be added after each kind of piece. Nothing can be added after a word that
- * is one value, a connected input or a typed number or text, though the engine allows methods
- * after it; the list of declared gaps says so. The type of each entry is its value, so that a
- * component that draws no adding for a kind fails to compile when this table says it has one.
+ * holds no value in the document yet, or after an entry of pairs. A method can be added after a
+ * connected input or a typed number or text that stands in the document. The type of each entry is
+ * its value, so that a component that draws no adding for a kind fails to compile when this table
+ * says it has one.
  */
 const ADDS = {
   chainStart: true,
@@ -193,19 +211,20 @@ const ADDS = {
   step: true,
   conditionHead: true,
   conditionLine: true,
+  startWord: true,
   word: false,
   entry: false,
 } as const satisfies Readonly<Record<PieceKind, boolean>>;
 
 /**
- * Returns what can be done to a piece of `kind`. A word that is one of several can be taken away
- * where `removable`, and otherwise only be unset.
+ * Returns what can be done to a piece of `kind`. A word that is one of several, with or without
+ * a method to follow it, can be taken away where `removable`, and otherwise only be unset.
  */
 export function actionsOf<Kind extends PieceKind>(
   kind: Kind,
   removable = true,
 ): Actions<(typeof ADDS)[Kind]> {
-  return { add: ADDS[kind], remove: kind === 'word' ? removable : true };
+  return { add: ADDS[kind], remove: kind === 'word' || kind === 'startWord' ? removable : true };
 }
 
 /**

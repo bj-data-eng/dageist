@@ -182,8 +182,17 @@ export function canPick(catalogue: Catalogue, entry: EntryView, place: OfferPlac
 /**
  * Returns what can be done to the piece a value slot draws for `drawing`: a value drawn as a chain
  * is drawn by the chain, whose piece is the word it starts from, and one drawn as one word by the
- * slot, whose piece is a word.
+ * slot, whose piece is a word, which a method can follow where it is a connected input or a typed value.
  */
 export function actionsOfSlot(drawing: ValueDrawing, removable = true): Actions {
-  return drawing.drawn === 'chain' ? actionsOf('chainStart') : actionsOf('word', removable);
+  switch (drawing.drawn) {
+    case 'chain':
+      return actionsOf('chainStart');
+    case 'start':
+      return actionsOf('startWord', removable);
+    case 'word':
+      return actionsOf('word', removable);
+    default:
+      return drawing satisfies never;
+  }
 }

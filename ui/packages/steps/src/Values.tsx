@@ -20,7 +20,7 @@ import type {
 
 import type { FitSlot } from './ask';
 import { useCandidateFits, useOffers, useReadTyped } from './ask';
-import { ChainBlocks } from './Chain';
+import { ChainBlocks, MethodInsertion } from './Chain';
 import { useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
@@ -127,6 +127,8 @@ export function ValueSlot({
   const edits = useStepEdits();
   const list = useListState();
   const drawing = valueDrawing(expression, path !== null);
+  // The piece a method is being added after, while the list of methods is open.
+  const [inserting, setInserting] = useState<HTMLElement | null>(null);
   // What may stand here, as the engine says of the place: the functions that may start an
   // expression, and which of the fields, inputs and values typed in fit.
   const startKnown = positions !== null && positions.length > 0;
@@ -206,8 +208,13 @@ export function ValueSlot({
   }
 
   // A chain that is not in the document cannot be written where it stands, so it says nothing is picked.
-  const shape: WordShape = drawing.drawn === 'word' ? drawing.shape : { kind: 'unset' };
-  const actions = actionsOf('word', onRemove !== undefined);
+  const shape: WordShape = drawing.drawn === 'chain' ? { kind: 'unset' } : drawing.shape;
+  const removable = onRemove !== undefined;
+  // A method can follow a connected input or a typed value that stands in the document.
+  const adding =
+    drawing.drawn === 'start' && path !== null ? actionsOf('startWord', removable) : null;
+  const word = actionsOf('word', removable);
+  const actions = adding ?? word;
   let shown: { label: string; tone: Tone; look: Look; wrong: boolean; lines: string[] };
   if (shape.kind === 'input') {
     const input = findInput(node, shape.name);
@@ -234,33 +241,49 @@ export function ValueSlot({
     shown = { label: 'value', tone: 'value', look: 'none', wrong: true, lines: [] };
   }
   return (
-    <Piece
-      remove={
-        actions.remove && onRemove !== undefined
-          ? {
-              label: 'Remove this one',
-              onPress: onRemove,
-            }
-          : null
-      }
-      add={noAddition(actions)}
-    >
-      <Hint lines={shown.lines} code={false}>
-        <Slot
-          label={shown.label}
-          tone={shown.tone}
-          look={shown.look}
-          wrong={shown.wrong}
-          openNow={openId !== undefined && fresh.id === openId}
-          names
-          describedAs={label}
-          placeholder="Type a value, or search"
-          offers={offers}
-          onOpenChange={list.onOpenChange}
-          onType={list.onType}
+    <>
+      <Piece
+        remove={
+          actions.remove && onRemove !== undefined
+            ? {
+                label: 'Remove this one',
+                onPress: onRemove,
+              }
+            : null
+        }
+        add={
+          adding === null
+            ? noAddition(word)
+            : { label: `Add a method after ${shown.label}`, onPress: setInserting }
+        }
+      >
+        <Hint lines={shown.lines} code={false}>
+          <Slot
+            label={shown.label}
+            tone={shown.tone}
+            look={shown.look}
+            wrong={shown.wrong}
+            openNow={openId !== undefined && fresh.id === openId}
+            names
+            describedAs={label}
+            placeholder="Type a value, or search"
+            offers={offers}
+            onOpenChange={list.onOpenChange}
+            onType={list.onType}
+          />
+        </Hint>
+      </Piece>
+      {inserting !== null && path !== null && (
+        <MethodInsertion
+          path={path}
+          at={0}
+          anchor={inserting}
+          onDone={() => {
+            setInserting(null);
+          }}
         />
-      </Hint>
-    </Piece>
+      )}
+    </>
   );
 }
 

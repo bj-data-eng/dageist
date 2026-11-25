@@ -119,10 +119,6 @@ const FURTHER_CASE = 'the editor draws one case of a when; a further case follow
 const NOT_A_START =
   'the editor starts a chain from a field, an input, a typed value, when and element; this function is not offered where an expression starts';
 
-/** Why nothing is added after a connected input or a typed value. */
-const NOTHING_AFTER_A_WORD =
-  'a connected input or a typed value is drawn as one word that offers no method after it, though the engine allows methods there (#171)';
-
 /** Why no flag can be typed in. */
 const NO_TYPED_FLAG =
   'a document may hold a flag typed in as the value of lit, which the engine allows, but the host reads typed text as a number or as text and never as a flag, so the editor has no way to type one (#177)';
@@ -152,11 +148,6 @@ function entryGap(entry: string, reason: string): Gap {
 /** Declares the parameter `parameter` of `entry`, which its drawing does not set, for `reason`. */
 function parameterGap(entry: string, parameter: string, reason: string): Gap {
   return { cover: { kind: 'parameter', entry, parameter }, reason };
-}
-
-/** Declares that nothing is added after what an expression starts from as `start`. */
-function startGap(start: StartKind): Gap {
-  return { cover: { kind: 'start', start }, reason: NOTHING_AFTER_A_WORD };
 }
 
 /** Every gap the editor has, declared. */
@@ -230,12 +221,6 @@ export const GAPS: readonly Gap[] = [
     'constraints',
     'a condition is its predicates; keyword constraints are not drawn',
   ),
-  // What an expression starts from, after which the editor offers no method.
-  startGap('connectedValue'),
-  startGap('connectedList'),
-  startGap('typedInteger'),
-  startGap('typedFloat'),
-  startGap('typedText'),
   { cover: { kind: 'typed', literal: 'flag' }, reason: NO_TYPED_FLAG },
   { cover: { kind: 'shown', what: 'literal flag' }, reason: FLAG_NOT_SHOWN },
   { cover: { kind: 'shown', what: 'resolution several' }, reason: SEVERAL_NOT_SHOWN },

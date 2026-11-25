@@ -426,6 +426,60 @@ interface Insertion {
   readonly anchor: HTMLElement;
 }
 
+/** Where the list that adds a method is, and which place of an expression the method is added at. */
+export interface MethodInsertionProps {
+  /** The way to the expression in the step. */
+  readonly path: Path;
+  /** The place among the links of the expression the method is added at. */
+  readonly at: number;
+  /** The piece the list opens from. */
+  readonly anchor: HTMLElement;
+  /** Says the list was closed, with or without a pick. */
+  readonly onDone: () => void;
+}
+
+/**
+ * Draws the list of methods that may follow what stands before the place `at` of the expression
+ * at `path`, as the engine says of the place its walk reported, and adds the one that is picked.
+ */
+export function MethodInsertion({
+  path,
+  at,
+  anchor,
+  onDone,
+}: MethodInsertionProps): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const fresh = useContext(FreshContext);
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const dtypes = usePreparedStep()?.chains.get(pathKey(path));
+  // What may stand where a method would be added, as the engine says of the place it reported.
+  const place = dtypes?.places[at] ?? null;
+  const inserting = useOffers(place === null ? null : placeRequest(place));
+  return (
+    <Popover anchor={anchor} onDismiss={onDone}>
+      <OfferList
+        placeholder="Search the methods"
+        groups={(typed) =>
+          listedGroups(
+            { word: 'insertion' },
+            {
+              methods: () =>
+                methodGroups(catalogue, inserting, place !== null, typed, (_name, picked) => {
+                  fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
+                  void edits.insertLink(path, at, picked.id, standingOf(place));
+                }),
+            },
+          )
+        }
+        keepOpen={false}
+        wide={false}
+        onDone={onDone}
+      />
+    </Popover>
+  );
+}
+
 /** What a chain shows and reports. */
 export interface ChainBlocksProps {
   /** The expression the document holds. */
@@ -500,9 +554,6 @@ export function ChainBlocks({
   const adding: Insertion | null =
     insertion ??
     (opensMethods && startWord !== null ? { at: links.length, anchor: startWord } : null);
-  // What may stand where a method would be added, as the engine says of the place it reported.
-  const addPlace = adding === null ? null : (dtypes?.places[adding.at] ?? null);
-  const inserting = useOffers(addPlace === null ? null : placeRequest(addPlace));
   // What may start the chain: the functions, the connected inputs and the fields the engine allows.
   const startList = useListState();
   const startKnown = positions.length > 0;
@@ -518,10 +569,6 @@ export function ChainBlocks({
       setOpensMethods(false);
       setInsertion({ at, anchor });
     };
-  };
-  const insert = (at: number, picked: PreparedOffer): void => {
-    fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
-    void edits.insertLink(path, at, picked.id, standingOf(dtypes?.places[at]));
   };
   // A chain is taken away by the word it starts from, and a method is added after it.
   const chainActions = actionsOf('chainStart');
@@ -769,6 +816,20 @@ export function ChainBlocks({
         {methodsDrawn}
       </>
     );
+  } else if (chainBody.body === 'typed') {
+    // A number or text typed in is drawn as the word it is shown by, with its methods after it.
+    body = (
+      <>
+        {startSlot(
+          chainBody.shown,
+          'value',
+          chainBody.text ? 'quoted' : 'plain',
+          [],
+          'What the chain starts from',
+        )}
+        {methodsDrawn}
+      </>
+    );
   } else {
     body = (
       <>
@@ -788,31 +849,7 @@ export function ChainBlocks({
     <>
       {body}
       {adding !== null && (
-        <Popover anchor={adding.anchor} onDismiss={closeList}>
-          <OfferList
-            placeholder="Search the methods"
-            groups={(typed) =>
-              listedGroups(
-                { word: 'insertion' },
-                {
-                  methods: () =>
-                    methodGroups(
-                      catalogue,
-                      inserting,
-                      addPlace !== null,
-                      typed,
-                      (_name, picked) => {
-                        insert(adding.at, picked);
-                      },
-                    ),
-                },
-              )
-            }
-            keepOpen={false}
-            wide={false}
-            onDone={closeList}
-          />
-        </Popover>
+        <MethodInsertion path={path} at={adding.at} anchor={adding.anchor} onDone={closeList} />
       )}
     </>
   );
