@@ -913,8 +913,8 @@ Trigonometry and Comparison, and fewer than the longest list one family of all t
 
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
-- `str.find` gives the place in bytes from the start, as Polars does, so a character of two bytes before the
-  match makes it two further than the characters say, and nothing where there is no match. `str.count_matches` gives a
+- `str.find` gives the place in characters from the start, as Polars does,
+  and nothing where there is no match. `str.count_matches` gives a
   `UInt32`, and every method of text refuses what is no text, a `Null` among them, at the stage the tables show.
 - `str.extract` takes a group number, `group_index`, whose default is 1, 0 the whole match and a group
   the pattern lacks a null. Python's binding takes it as an unsigned whole number, so a negative one is refused by the build.

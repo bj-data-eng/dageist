@@ -887,7 +887,7 @@ label = "pattern"
 
 [entries."Expr.str.find"]
 name = "str.find"
-hint = "where a pattern first matches, in bytes from the start, nothing where it does not"
+hint = "where a pattern first matches, in characters from the start, nothing where it does not"
 
 [entries."Expr.str.find".parameters.pattern]
 name = "pattern"
