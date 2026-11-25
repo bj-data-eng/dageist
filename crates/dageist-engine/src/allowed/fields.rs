@@ -88,6 +88,26 @@ impl Field {
     }
 }
 
+/// A name that two fields of a struct would have, which Polars refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepeatedName(String);
+
+impl RepeatedName {
+    /// The name two fields would have.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for RepeatedName {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "two fields would be named {:?}", self.0)
+    }
+}
+
+impl std::error::Error for RepeatedName {}
+
 /// The fields of a struct, in order. No two of them have one name, which Polars refuses.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Fields(Vec<Field>);
@@ -111,10 +131,10 @@ impl Fields {
     /// # Errors
     ///
     /// The first name that two of them share, which Polars refuses.
-    pub fn new(fields: Vec<Field>) -> Result<Self, String> {
+    pub fn new(fields: Vec<Field>) -> Result<Self, RepeatedName> {
         for (at, field) in fields.iter().enumerate() {
             if fields[..at].iter().any(|before| before.name == field.name) {
-                return Err(field.name.clone());
+                return Err(RepeatedName(field.name.clone()));
             }
         }
         Ok(Self(fields))
@@ -275,7 +295,7 @@ fn named_fields(names: &[&str], class: Option<Representative>) -> Result<Fields,
         .iter()
         .map(|name| Field::of_class(*name, class))
         .collect();
-    Fields::new(fields).map_err(|name| repeated(&name))
+    Fields::new(fields).map_err(|error| repeated(error.name()))
 }
 
 fn repeated(name: &str) -> Said {
@@ -364,7 +384,7 @@ pub(super) fn gives(
                 .collect();
             Fields::new(renamed)
                 .map(|fields| Gives::Struct(Some(fields)))
-                .map_err(|name| repeated(&name))
+                .map_err(|error| repeated(error.name()))
         }
         "Expr.struct.unnest" if follows_a_struct => Ok(match held {
             // A struct of one field is one column, as the field it holds is read.
@@ -393,7 +413,7 @@ pub(super) fn gives(
                 .collect();
             match made.map(Fields::new) {
                 Some(Ok(fields)) => Ok(Gives::Struct(Some(fields))),
-                Some(Err(name)) => Err(repeated(&name)),
+                Some(Err(error)) => Err(repeated(error.name())),
                 // A value whose name the chain does not know, as the columns an unnest writes,
                 // may be named as another is, which Polars refuses.
                 None => Ok(Gives::Undecided),
@@ -483,7 +503,7 @@ pub(super) fn gives(
             );
             Fields::new(vec![values, counts])
                 .map(|fields| Gives::Struct(Some(fields)))
-                .map_err(|name| repeated(&name))
+                .map_err(|error| repeated(error.name()))
         }
         _ => Ok(Gives::Nothing),
     }
@@ -557,5 +577,24 @@ pub(super) fn kept(fields: Option<&Fields>) -> (ResultDtype, Option<Fields>) {
             ResultDtype::new("Struct".to_owned(), Some(Representative::Struct)),
             None,
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn two_fields_of_one_name_are_refused_with_the_name() {
+        let fields = vec![
+            Field::of_class("x", None),
+            Field::of_class("y", None),
+            Field::of_class("x", None),
+        ];
+
+        let error = Fields::new(fields).expect_err("a name repeated is refused");
+
+        assert_eq!(error.name(), "x");
+        assert_eq!(error.to_string(), "two fields would be named \"x\"");
     }
 }

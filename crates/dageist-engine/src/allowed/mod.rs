@@ -57,7 +57,7 @@ pub use candidates::{
 pub use context::{Context, Nested, Outer, Position};
 pub use count::Count;
 pub use dtype::{Inner, Representative, ResultDtype, dtype_name};
-pub use fields::{Field, Fields, Input};
+pub use fields::{Field, Fields, Input, RepeatedName};
 pub use literal::Literal;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
