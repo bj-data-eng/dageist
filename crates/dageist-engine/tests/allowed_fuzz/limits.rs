@@ -11658,6 +11658,36 @@ mod tests {
     }
 
     #[test]
+    fn a_struct_met_by_a_struct_of_other_fields_is_the_cause_of_a_refusal_of_arithmetic_on_it() {
+        // Polars adds two structs field by field, and refuses the rows of a pair that do not have
+        // the fields or the lengths to meet.
+        for reason in [
+            "`add` operation not supported for dtype `struct[1]`",
+            "must specify one field in the struct",
+            "expected struct fields to have given length. given = 1, field length = 3.",
+        ] {
+            let structs = chain(
+                call(
+                    "polars.struct",
+                    vec![("exprs", many(vec![chain(column("k"), &[])]))],
+                ),
+                &["Expr.add"],
+            );
+            let case = select(vec![structs]);
+            let traced = vec![Traced {
+                place: at(&[Segment::Parameter("exprs".to_owned()), Segment::Item(0)]),
+                start: Some(Representative::Struct),
+                links: vec![Some(Representative::Struct)],
+            }];
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, reason, traced),
+                vec![Limit::ArithmeticOnAStructOfNumbers],
+                "{reason}"
+            );
+        }
+    }
+
+    #[test]
     fn the_fields_of_a_struct_that_do_not_meet_are_the_cause_of_a_refusal_of_arithmetic_on_it() {
         let reason = "add operation not supported for dtypes `i8` and `duration[μs]`";
         let structs = chain(

@@ -1,0 +1,2 @@
+{"a":"List(Int64)","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.list.to_struct","arguments":{"fields":{"many":[{"string":"y"},{"string":"y"}]}}}]}}]}}}}]}

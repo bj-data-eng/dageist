@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[{"entry":"Expr.list.to_struct","arguments":{"fields":{"many":[{"string":"z"},{"string":"z"}]}}}]}}]}}}}]}
