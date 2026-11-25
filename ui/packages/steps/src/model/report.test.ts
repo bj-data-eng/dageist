@@ -9,7 +9,7 @@ import refusedFixture from '../../../host/fixtures/step-report-refused.json';
 import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
-import type { PreparedRun, PreparedStep } from './report';
+import type { ChainDtypes, PreparedRun, PreparedStep } from './report';
 import {
   isChanged,
   linkHint,
@@ -287,6 +287,24 @@ describe('a refusal', () => {
     // The sum of a text column: the walk puts the sum after a value of the class String.
     expect(refusedChain?.places[0]).toEqual(selectAfter('String', 'many'));
     expect(linkHint(refusedChain, 0)).toBe('after a value of the class String');
+  });
+
+  it('says a struct by the fields the walk gives it, not by the class the tables measured', () => {
+    const chain: ChainDtypes = {
+      source: null,
+      links: [],
+      places: [selectAfter('Struct(x: Int64, y: String)', 'many')],
+      fields: [
+        [
+          { name: 'dcn', dtype: 'String' },
+          { name: 'count', dtype: 'UInt32' },
+        ],
+      ],
+    };
+    expect(linkHint(chain, 0)).toBe(
+      'after a value of the class Struct(dcn: String, count: UInt32)',
+    );
+    expect(linkHint({ ...chain, fields: [null] }, 0)).toBe('after a value of the class Struct');
   });
 
   it('shows the dtype in and the dtype out of a link of a step that was planned, not a class', () => {
