@@ -159,7 +159,7 @@ function Flow({ graph }: { readonly graph: CanvasGraph }): React.JSX.Element {
         fitViewOptions={{ padding: FIT_PADDING }}
         minZoom={0.2}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable />
       </ReactFlow>
@@ -209,7 +209,7 @@ export function FlowCanvas({ host }: FlowCanvasProps): React.JSX.Element {
   }
   // Until the host answers, the canvas is its dots, with stand-ins where the boxes will be.
   return (
-    <div className="relative h-full bg-canvas bg-dots">
+    <div className="dageist-canvas-surface relative h-full">
       {loaded.kind === 'loading' ? (
         <div className="flex h-full items-center justify-center gap-40">
           <div className="flex flex-col gap-6">

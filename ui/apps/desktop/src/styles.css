@@ -8,6 +8,10 @@
 @theme {
   --color-canvas: #1b1d22;
   --color-dot: #2c2f36;
+  /* The flow canvas: its dots, and the lighter middle and darker edges of its glow. */
+  --color-canvas-dot: #3d414b;
+  --color-canvas-glow: #22252c;
+  --color-canvas-edge: #16181c;
   --color-panel: #23262c;
   --color-raised: #272a31;
   --color-row: #2a2e36;

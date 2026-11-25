@@ -4,7 +4,7 @@
  */
 .dageist-flow {
   --xy-background-color: var(--color-canvas);
-  --xy-background-pattern-color: var(--color-dot);
+  --xy-background-pattern-color: var(--color-canvas-dot);
   --xy-edge-stroke: var(--color-line-strong);
   --xy-edge-stroke-selected: var(--color-accent);
   --xy-edge-stroke-width: 1.5;
@@ -80,4 +80,38 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+/*
+ * The canvas's surface: a soft lighter middle that falls away towards the
+ * window's edges, with a mottle over it too faint to see as a pattern. The
+ * mottle is SVG noise that lightens the surface by one to three levels of
+ * brightness, varying by under half a level from place to place.
+ * Both stay still while the dots pan and zoom with the boxes.
+ */
+.dageist-flow,
+.dageist-canvas-surface {
+  --canvas-mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.015 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --canvas-glow: radial-gradient(
+    ellipse at 55% 45%,
+    var(--color-canvas-glow) 0%,
+    var(--color-canvas) 55%,
+    var(--color-canvas-edge) 100%
+  );
+}
+
+.dageist-flow .react-flow__background {
+  background-image: var(--canvas-mottle), var(--canvas-glow);
+}
+
+/* While the canvas waits for the host, the same surface carries still dots. */
+.dageist-canvas-surface {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(var(--color-canvas-dot) 0.75px, transparent 0.75px), var(--canvas-mottle),
+    var(--canvas-glow);
+  background-size:
+    20px 20px,
+    auto,
+    auto;
 }
