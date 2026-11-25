@@ -926,3 +926,52 @@ fn an_unnest_as_a_join_key_is_one_the_walk_cannot_tell_to_stand() {
     );
     assert!(found.walk_knows_nothing_of_it.is_some());
 }
+
+#[test]
+fn an_unnest_of_one_field_is_named_by_the_field_as_a_struct_input() {
+    // The struct of an unnest of one field and a literal holds two fields named `literal`, and
+    // Polars refuses it, as the walk must for the name the unnest gives its value.
+    let found = a_struct_of(
+        vec![
+            chain(
+                call("polars.struct", json!({ "exprs": many(vec![whole(1)]) })),
+                vec![unnest()],
+            ),
+            chain(
+                call("polars.lit", json!({ "value": { "flag": true } })),
+                vec![],
+            ),
+        ],
+        vec![],
+    );
+    assert_refused_by(
+        &found,
+        "field-names-fit-the-struct",
+        &["literal"],
+        "a struct of the unnested literal and a flag",
+    );
+}
+
+#[test]
+fn keys_that_an_unnest_of_one_field_names_alike_are_refused_as_a_repeated_pair() {
+    let key = |links: Vec<Value>| chain(col_call("s_one"), links);
+    let held = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![
+                key(vec![unnest(), call("Expr.struct.json_encode", json!({}))]),
+                key(vec![unnest(), call("Expr.abs", json!({})), call("Expr.struct.json_encode", json!({}))]),
+            ]),
+            "right_on": many(vec![field("rk"), field("rk")]),
+        }),
+    );
+    let found = ask_step(held);
+    assert_refused_by(
+        &found,
+        "join-key-names-are-not-repeated",
+        &[],
+        "two keys of the field v paired with rk twice",
+    );
+}
