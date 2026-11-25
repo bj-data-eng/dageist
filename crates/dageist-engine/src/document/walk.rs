@@ -222,6 +222,7 @@ impl Step {
         let mut walker = Walker {
             zones: Vec::new(),
             selected: Vec::new(),
+            of_lists: Vec::new(),
             step: self.call(),
             source,
             inputs,
@@ -397,6 +398,8 @@ struct Walker<'a> {
     /// The items of a select, where each is, and what it gives: the values of the items are met
     /// by one another in the table the select gives.
     selected: Vec<(Place, Shape, Count)>,
+    /// Where an expression is a chain from a connected list that still gives a count of its values.
+    of_lists: Vec<Place>,
 }
 
 /// The output names of a join's keys before the first whose name is not known, in
@@ -1162,6 +1165,11 @@ impl Walker<'_> {
                 Some(next) => met = next,
                 None => {
                     if let Err(refusal) = allowed::rule_forbids_values_of_other_counts() {
+                        let refusal = if self.of_lists.contains(&place) {
+                            allowed::refusal_of_a_connected_list(&refusal)
+                        } else {
+                            refusal
+                        };
                         self.refusal.get_or_insert(WalkRefusal {
                             place,
                             refusal,
@@ -1903,6 +1911,21 @@ impl Walker<'_> {
         {
             last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
         }
+        // A chain that goes on from a connected list and still gives a count of its values is the
+        // values of another table, which the words of a refusal of it say.
+        let of_a_list = matches!(
+            &cur,
+            Cur::Value {
+                shape: Shape::Counted,
+                ..
+            }
+        ) && matches!(
+            expression.start(),
+            Start::Input(name) if self.inputs.is_list(name)
+        );
+        if of_a_list {
+            self.of_lists.push(place.clone());
+        }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
             // A value of a condition in a filter need be a Boolean only where
@@ -1913,7 +1936,13 @@ impl Walker<'_> {
                 ending = last_end;
             }
             if let Some(Ending::Refused(refusal)) = &ending {
-                self.refuse(&refusal.clone(), true);
+                let refusal = if of_a_list {
+                    allowed::refusal_of_a_connected_list(refusal)
+                } else {
+                    refusal.clone()
+                };
+                self.refuse(&refusal, true);
+                ending = Some(Ending::Refused(refusal));
             } else if let Some(Ending::NotKnown(unknown)) = &ending {
                 self.blind(format!("whether it may end is not known: {unknown}"));
             }

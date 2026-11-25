@@ -57,7 +57,6 @@ pub use context::{Context, Nested, Outer, Position};
 pub use count::Count;
 pub use dtype::{Inner, Representative, ResultDtype, dtype_name};
 pub use literal::Literal;
-pub(crate) use offers::same_for_any_number;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
     Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options,
@@ -70,6 +69,7 @@ pub use offers::{
     rule_forbids_arrays_of_other_widths, rule_forbids_replacement_values_of_other_numbers,
     rule_forbids_values_of_other_counts,
 };
+pub(crate) use offers::{refusal_of_a_connected_list, same_for_any_number};
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};
 pub use typed::{LARGEST_WHOLE_NUMBER, Read, Typed, Unread, read_typed};

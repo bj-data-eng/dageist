@@ -49,7 +49,7 @@
       "verdict": {
         "kind": "allowed",
         "result": "Date",
-        "shape": "many",
+        "shape": "counted",
         "ending": {
           "kind": "refused",
           "refusal": {

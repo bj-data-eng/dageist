@@ -1300,8 +1300,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
 ///
 /// The run makes a connected input a literal of its dtype, so the tables' lines
 /// of `polars.lit` judge it, as they judge a literal given a dtype: where a
-/// literal may stand and may end, so may the input. A list gives many values,
-/// where a value gives one, which `shape` says. A place that is not a start refuses it.
+/// literal may stand and may end, so may the input. A value gives one value, and a list gives a
+/// count of values of its own, [`Shape::Counted`]: the values of another table, as many as it
+/// has, which are not the rows of the table the expression is read against. `shape` says which;
+/// [`Shape::Many`] makes it as many values as a column has. A place that is not a start refuses it.
 #[must_use]
 pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdict {
     let Some(literal) = catalog::entry("polars.lit") else {
@@ -1312,7 +1314,8 @@ pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdic
         literal,
         place,
         &match shape {
-            Shape::Many | Shape::Counted => chosen.giving_many(),
+            Shape::Many => chosen.giving_many(),
+            Shape::Counted => chosen.giving_shape(Shape::Counted),
             Shape::One => chosen,
         },
     )
@@ -1551,6 +1554,19 @@ pub fn rule_forbids_a_window_over_a_count() -> Result<(), Refusal> {
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_values_of_other_counts() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::ValuesMeetInCount))
+}
+
+/// `refusal`, which refused a chain that starts from a connected list, as it is said of such a
+/// chain: the list is the values of another table, a count of its own and not the rows of this one.
+#[must_use]
+pub(crate) fn refusal_of_a_connected_list(refusal: &Refusal) -> Refusal {
+    Refusal {
+        source: refusal.source,
+        reason: format!(
+            "a connected list is the values of another table, a count of its own and not this table's rows: {}",
+            refusal.reason
+        ),
+    }
 }
 
 /// The refusal of a chain that gives a count of values that the data or the arguments decide, which

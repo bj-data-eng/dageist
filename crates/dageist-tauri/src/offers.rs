@@ -468,7 +468,7 @@ fn candidate_of(request: &CandidateRequest) -> Result<Candidate, String> {
         CandidateRequest::Field { dtype } => Candidate::Field(class(dtype)?),
         CandidateRequest::Input { dtype, list } => Candidate::Input {
             dtype: class(dtype)?,
-            shape: if *list { Shape::Many } else { Shape::One },
+            shape: if *list { Shape::Counted } else { Shape::One },
         },
     })
 }

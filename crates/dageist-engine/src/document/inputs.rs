@@ -130,7 +130,8 @@ struct Connected {
 }
 
 /// What a connected value or list is as the start of an expression: the class
-/// of its dtype, when the tables cover it, and whether it holds many values.
+/// of its dtype, when the tables cover it, and how many values it gives: one for a value, and for
+/// a list a count of its own, the values of another table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct StartLiteral {
     pub(super) class: Option<Representative>,
@@ -277,13 +278,21 @@ impl Inputs {
     pub(super) fn start_literal(&self, name: &str) -> Option<StartLiteral> {
         let (dtype, shape) = match &self.inputs.get(name)?.input {
             Input::Value(value) => (value.dtype(), Shape::One),
-            Input::List(values) => (values.dtype(), Shape::Many),
+            Input::List(values) => (values.dtype(), Shape::Counted),
             Input::Table(_) => return None,
         };
         Some(StartLiteral {
             class: Representative::of(dtype),
             shape,
         })
+    }
+
+    /// Whether `name` is a connected list.
+    pub(super) fn is_list(&self, name: &str) -> bool {
+        matches!(
+            self.inputs.get(name).map(|connected| &connected.input),
+            Some(Input::List(_))
+        )
     }
 
     /// The single value or list called `name` as an expression: a literal of
