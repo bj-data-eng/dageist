@@ -403,3 +403,72 @@ fn a_document_edit_against_an_old_revision_is_stale() {
     let made = session.edit_document(&transform, 1, |document| Ok::<_, ()>(document.clone()));
     assert_eq!(made, Ok(Ok(2)));
 }
+
+#[test]
+fn a_session_saved_and_read_back_holds_the_same_graph_layout_and_steps() {
+    let (mut session, transform, ..) = connected();
+    let revision = session.layout_revision();
+    session
+        .place(
+            revision,
+            &transform,
+            Frame {
+                place: Place { x: 400, y: 20 },
+                size: None,
+            },
+        )
+        .unwrap()
+        .unwrap();
+    let saved = session.saved();
+    assert_eq!(saved.documents.len(), 1);
+    let read = Session::from_saved(saved.clone(), 9).unwrap();
+    assert_eq!(read.saved(), saved);
+    assert_eq!(read.graph_revision(), 9);
+    assert_eq!(read.document(&transform).unwrap().1, 9);
+    // The steps read back are the steps written, and work the graph out the same.
+    assert_eq!(columns(&read, &transform), columns(&session, &transform));
+}
+
+#[test]
+fn a_transform_saved_without_steps_starts_with_none_and_other_steps_are_refused() {
+    let (session, transform, holidays, _) = connected();
+    let mut saved = session.saved();
+    saved.documents.remove(&transform);
+    let read = Session::from_saved(saved.clone(), 1).unwrap();
+    assert!(read.document(&transform).unwrap().0.steps().is_empty());
+    saved
+        .documents
+        .insert(transform.clone(), "{\"version\": 1}".to_owned());
+    let refused = Session::from_saved(saved.clone(), 1).unwrap_err();
+    assert!(matches!(refused, dageist::SavedError::UnreadSteps { node, .. } if node == transform));
+    saved.documents.remove(&transform);
+    saved.documents.insert(holidays.clone(), "{}".to_owned());
+    let refused = Session::from_saved(saved, 1).unwrap_err();
+    assert!(matches!(refused, dageist::SavedError::NotATransform(node) if node == holidays));
+}
+
+#[test]
+fn a_session_saved_to_a_workspace_opens_as_it_was() {
+    let root =
+        std::env::temp_dir().join(format!("dageist-session-workspace-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let (session, transform, ..) = connected();
+    let workspace = dageist::workspace::Workspace::create(
+        &root,
+        &session.saved(),
+        dageist::unsigned_author(),
+        dageist::workspace::Options::default(),
+    )
+    .unwrap();
+    workspace.close().unwrap();
+    let (_, saved) = dageist::workspace::Workspace::open(
+        &root,
+        dageist::unsigned_author(),
+        dageist::workspace::Options::default(),
+    )
+    .unwrap();
+    let read = Session::from_saved(saved, 1).unwrap();
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(read.saved(), session.saved());
+    assert_eq!(columns(&read, &transform), columns(&session, &transform));
+}

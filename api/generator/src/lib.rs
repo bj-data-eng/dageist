@@ -222,6 +222,12 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 reason: "tauri-macros turns it on; proc-macro2 runs only while building",
             },
             ExpectedFeatures {
+                package: "regex-automata",
+                only_here: &["dfa-search"],
+                only_in_release: &[],
+                reason: GIX,
+            },
+            ExpectedFeatures {
                 package: "serde_json",
                 only_here: &["alloc"],
                 only_in_release: &[],
@@ -234,10 +240,22 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 reason: "fdeflate, which Tauri's PNG handling uses, takes its default features",
             },
             ExpectedFeatures {
+                package: "smallvec",
+                only_here: &["write"],
+                only_in_release: &[],
+                reason: GIX,
+            },
+            ExpectedFeatures {
                 package: "url",
                 only_here: &["serde"],
                 only_in_release: &[],
                 reason: "Tauri's tauri-utils turns it on",
+            },
+            ExpectedFeatures {
+                package: "zlib-rs",
+                only_here: &["c-allocator", "default"],
+                only_in_release: &[],
+                reason: GIX,
             },
         ],
     },
@@ -256,6 +274,12 @@ pub const DAGEIST: Workspace<'static> = Workspace {
 const IO_PLUGINS: &str = "only connects Polars to Python: the I/O plugins that hand Iceberg and \
      database reads to Python are found through their Python packages, and the engine has no locator \
      for them";
+
+/// Why the build compiles some crates with more features than the release: the gix crates the
+/// workspace keeps its repository with.
+const GIX: &str = "gix, which the core's workspace keeps its repository with, turns it on: bstr \
+     for regex-automata's dfa-search, gix-object for smallvec's write, and gix-zlib, which \
+     dageist-pack also compresses its packs with, through zlib-rs's default features";
 
 /// Why the release compiles some numeric crates with more features.
 const NUMPY: &str = "numpy, which Polars' Python glue uses, takes ndarray's default features, \

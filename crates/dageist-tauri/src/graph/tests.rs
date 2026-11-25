@@ -298,3 +298,95 @@ fn a_size_needs_both_its_width_and_its_height() {
     assert!(super::place_view(&workspace, revision, NODE, half).is_err());
     assert_eq!(graph_view(&workspace).layout_revision, revision);
 }
+
+/// Runs git in `repository` and gives what it printed.
+fn git(repository: &std::path::Path, arguments: &[&str]) -> String {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(arguments)
+        .output()
+        .expect("git runs; this test checks the workspace with git and needs it on the path");
+    assert!(
+        output.status.success(),
+        "git {arguments:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("text")
+}
+
+#[test]
+fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_was() {
+    let folder = folder();
+    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let kept = folder.join("workspace");
+    let subjects = || git(&kept, &["log", "--format=%s"]);
+    assert_eq!(subjects(), "Make the workspace\n");
+    let rename: super::GraphEditRequest = serde_json::from_value(
+        json!({ "edit": "rename", "node": NODE, "name": "Document timing" }),
+    )
+    .expect("a request");
+    let revision = graph_view(&workspace).revision;
+    super::edit_graph_view(&workspace, revision, &rename).expect("renamed");
+    let layout = graph_view(&workspace).layout_revision;
+    let frame = super::FrameView {
+        x: 40,
+        y: -20,
+        width: None,
+        height: None,
+    };
+    super::place_view(&workspace, layout, NODE, frame).expect("placed");
+    // A refused edit makes no commit.
+    let refused: super::GraphEditRequest =
+        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Claims" }))
+            .expect("a request");
+    let revision = graph_view(&workspace).revision;
+    super::edit_graph_view(&workspace, revision, &refused).expect("an answer");
+    // An edit of the steps is saved, and one against another revision of them is not.
+    let remove: crate::document::EditRequest = serde_json::from_value(json!({
+        "kind": "removeStep",
+        "step": { "stepIndex": 0, "stepId": "sort", "path": [] },
+    }))
+    .expect("a request");
+    crate::document::edit_view(&workspace, NODE, 7, &remove).expect_err("stale");
+    crate::document::edit_view(&workspace, NODE, 1, &remove).expect("removed");
+    assert_eq!(
+        subjects(),
+        "Change the steps of Document timing\nMove Document timing\n\
+         Rename Claim timing to Document timing\nMake the workspace\n"
+    );
+    let steps =
+        std::fs::read_to_string(kept.join(format!("nodes/{NODE}/steps.json"))).expect("the steps");
+    assert!(!steps.contains("\"sort\""), "{steps}");
+    assert_eq!(
+        git(&kept, &["log", "-1", "--format=%an <%ae>"]).trim(),
+        "dageist <workspace@dageist.invalid>"
+    );
+    assert_eq!(git(&kept, &["status", "--porcelain"]), "");
+    let held = workspace.lock().saved();
+    workspace.close().expect("closed");
+    // An edit made once the workspace is closed is refused its save, and the session holds it.
+    let late: super::GraphEditRequest =
+        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Late" }))
+            .expect("a request");
+    let revision = graph_view(&workspace).revision;
+    super::edit_graph_view(&workspace, revision, &late).expect_err("not saved");
+    assert_eq!(
+        workspace
+            .lock()
+            .graph()
+            .node(&starting_transform())
+            .expect("the transform")
+            .name()
+            .as_str(),
+        "Late"
+    );
+    let (_, saved) = dageist::workspace::Workspace::open(
+        &kept,
+        dageist::unsigned_author(),
+        dageist::workspace::Options::default(),
+    )
+    .expect("opens");
+    let _ = std::fs::remove_dir_all(&folder);
+    assert_eq!(saved, held);
+}

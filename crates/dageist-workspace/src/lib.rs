@@ -117,3 +117,9 @@ impl fmt::Display for WorkspaceError {
 }
 
 impl std::error::Error for WorkspaceError {}
+
+/// A workspace can be held by a host that answers on several threads, one at a time.
+const _: () = {
+    const fn sendable<T: Send>() {}
+    sendable::<Workspace>();
+};
