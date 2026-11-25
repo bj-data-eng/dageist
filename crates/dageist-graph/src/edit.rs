@@ -9,13 +9,16 @@ use crate::node::{Body, File, Input, InputKind, Kind, Node, Parameter, Reference
 /// One change to a graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Edit {
-    /// Adds a node of `kind`, named after its kind. With `follows`, a
-    /// transform starts from that node's table and an output writes it.
+    /// Adds a node of `kind`, named `name` or, without one, after its kind,
+    /// with its id made from that name. With `follows`, a transform starts
+    /// from that node's table and an output writes it.
     Add {
         /// What the node is.
         kind: Kind,
         /// The node whose table the new node reads, if any.
         follows: Option<NodeId>,
+        /// The node's name, if it is given one.
+        name: Option<Name>,
     },
     /// Removes a node, and clears every reference to it.
     Remove {
@@ -60,6 +63,15 @@ pub enum Edit {
         node: NodeId,
         /// The slot.
         slot: Slot,
+    },
+    /// Adds a named input to a transform, not connected.
+    AddInput {
+        /// The transform.
+        node: NodeId,
+        /// The name its steps call it by.
+        name: InputName,
+        /// What it takes.
+        kind: InputKind,
     },
     /// Removes a named input from a transform.
     RemoveInput {
@@ -126,6 +138,8 @@ pub enum EditError {
     NameTaken(Name),
     /// The transform has no input of this name.
     NoSuchInput(InputName),
+    /// The transform already has an input of this name.
+    InputTaken(InputName),
     /// The Parameters node has no value of this name.
     NoSuchParameter(ParameterName),
     /// The column named is empty.
@@ -166,6 +180,7 @@ impl fmt::Display for EditError {
             ),
             Self::NameTaken(name) => write!(formatter, "another node is named {name:?}"),
             Self::NoSuchInput(name) => write!(formatter, "there is no input {name}"),
+            Self::InputTaken(name) => write!(formatter, "there is already an input {name}"),
             Self::NoSuchParameter(name) => write!(formatter, "there is no parameter {name}"),
             Self::EmptyColumn => formatter.write_str("the column has no name"),
             Self::ReadsNoTable(kind) => {
@@ -214,7 +229,11 @@ impl Graph {
 
     fn apply(&mut self, edit: &Edit) -> Result<Option<NodeId>, EditError> {
         match edit {
-            Edit::Add { kind, follows } => self.add(*kind, follows.as_ref()).map(Some),
+            Edit::Add {
+                kind,
+                follows,
+                name,
+            } => self.add(*kind, follows.as_ref(), name.as_ref()).map(Some),
             Edit::Remove { node } => {
                 if self.nodes.remove(node).is_none() {
                     return Err(EditError::NoSuchNode(node.clone()));
@@ -300,6 +319,27 @@ impl Graph {
                 self.fill(node, slot, None)?;
                 Ok(None)
             }
+            Edit::AddInput { node, name, kind } => {
+                let target = self.node_mut(node)?;
+                let node_kind = target.kind();
+                let Body::Transform { inputs, .. } = &mut target.body else {
+                    return Err(EditError::WrongKind {
+                        node: node.clone(),
+                        kind: node_kind,
+                    });
+                };
+                if inputs.contains_key(name) {
+                    return Err(EditError::InputTaken(name.clone()));
+                }
+                inputs.insert(
+                    name.clone(),
+                    Input {
+                        kind: *kind,
+                        from: None,
+                    },
+                );
+                Ok(None)
+            }
             Edit::RemoveInput { node, name } => {
                 let target = self.node_mut(node)?;
                 let kind = target.kind();
@@ -354,7 +394,17 @@ impl Graph {
         }
     }
 
-    fn add(&mut self, kind: Kind, follows: Option<&NodeId>) -> Result<NodeId, EditError> {
+    fn add(
+        &mut self,
+        kind: Kind,
+        follows: Option<&NodeId>,
+        name: Option<&Name>,
+    ) -> Result<NodeId, EditError> {
+        if let Some(name) = name
+            && self.name_taken(name, None)
+        {
+            return Err(EditError::NameTaken(name.clone()));
+        }
         let mut body = Body::empty(kind);
         if let Some(followed) = follows {
             let read = self
@@ -375,7 +425,7 @@ impl Graph {
                 }
             }
         }
-        let name = self.fresh_name(kind);
+        let name = name.cloned().unwrap_or_else(|| self.fresh_name(kind));
         let id = self.fresh_id(&name);
         self.nodes.insert(id.clone(), Node { name, body });
         Ok(id)

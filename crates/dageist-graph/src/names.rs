@@ -227,7 +227,7 @@ impl InputName {
     }
 
     /// An input name made from `text`.
-    pub(crate) fn made_from(text: &str) -> Self {
+    pub fn made_from(text: &str) -> Self {
         Self(identifier_of(text, "input"))
     }
 

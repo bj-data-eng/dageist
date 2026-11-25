@@ -26,6 +26,7 @@ fn source(session: &mut Session, name: &str, file: &str) -> NodeId {
         Edit::Add {
             kind: Kind::Source,
             follows: None,
+            name: None,
         },
     )
     .unwrap();
@@ -96,6 +97,7 @@ fn a_source_without_a_file_or_with_one_that_cannot_be_read_says_so() {
         Edit::Add {
             kind: Kind::Source,
             follows: None,
+            name: None,
         },
     )
     .unwrap();
@@ -118,6 +120,7 @@ fn a_transform_with_no_steps_gives_the_table_it_starts_from_and_an_output_writes
         Edit::Add {
             kind: Kind::Transform,
             follows: Some(orders.clone()),
+            name: None,
         },
     )
     .unwrap();
@@ -126,6 +129,7 @@ fn a_transform_with_no_steps_gives_the_table_it_starts_from_and_an_output_writes
         Edit::Add {
             kind: Kind::Output,
             follows: Some(transform.clone()),
+            name: None,
         },
     )
     .unwrap();
@@ -164,6 +168,7 @@ fn connected() -> (Session, NodeId, NodeId, NodeId) {
         Edit::Add {
             kind: Kind::Parameters,
             follows: None,
+            name: None,
         },
     )
     .unwrap();
@@ -183,6 +188,7 @@ fn connected() -> (Session, NodeId, NodeId, NodeId) {
         Edit::Add {
             kind: Kind::Transform,
             follows: Some(orders),
+            name: None,
         },
     )
     .unwrap();
@@ -294,6 +300,7 @@ fn a_refused_step_stops_the_transform_and_what_reads_it_gets_nothing() {
         Edit::Add {
             kind: Kind::Output,
             follows: Some(transform.clone()),
+            name: None,
         },
     )
     .unwrap();
@@ -323,6 +330,7 @@ fn an_edit_against_an_old_revision_is_stale_and_changes_nothing() {
             &Edit::Add {
                 kind: Kind::Source,
                 follows: None,
+                name: None,
             },
         ),
         Err(Stale {
@@ -341,6 +349,7 @@ fn a_transform_has_a_document_of_its_own_and_removing_it_drops_its_document_and_
         Edit::Add {
             kind: Kind::Transform,
             follows: None,
+            name: None,
         },
     )
     .unwrap();
@@ -375,6 +384,7 @@ fn a_document_edit_against_an_old_revision_is_stale() {
         Edit::Add {
             kind: Kind::Transform,
             follows: None,
+            name: None,
         },
     )
     .unwrap();

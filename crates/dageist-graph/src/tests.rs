@@ -23,6 +23,7 @@ fn add(graph: &Graph, kind: Kind, follows: Option<&str>) -> (Graph, NodeId) {
         Edit::Add {
             kind,
             follows: follows.map(id),
+            name: None,
         },
     );
     (graph, added.unwrap())
@@ -72,6 +73,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
         graph.edit(&Edit::Add {
             kind: Kind::Source,
             follows: Some(id("source")),
+            name: None,
         }),
         Err(EditError::ReadsNoTable(Kind::Source))
     );
@@ -79,6 +81,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
         graph.edit(&Edit::Add {
             kind: Kind::Transform,
             follows: Some(id("parameters")),
+            name: None,
         }),
         Err(EditError::NoSuchOutput(table("parameters")))
     );
@@ -86,6 +89,7 @@ fn only_a_transform_or_an_output_can_follow_and_only_a_node_that_gives_a_table()
         graph.edit(&Edit::Add {
             kind: Kind::Transform,
             follows: Some(id("missing")),
+            name: None,
         }),
         Err(EditError::NoSuchNode(id("missing")))
     );
@@ -467,4 +471,46 @@ fn a_layout_places_only_nodes_of_its_graph_and_drops_removed_ones() {
     );
     layout.keep_to(&graph);
     assert_eq!(layout.frame(&id("transform")), None);
+}
+
+#[test]
+fn an_input_added_by_name_waits_unconnected_and_its_name_is_not_given_twice() {
+    let holidays = InputName::new("holidays").unwrap();
+    let add = Edit::AddInput {
+        node: id("transform"),
+        name: holidays.clone(),
+        kind: InputKind::List,
+    };
+    let (graph, _) = edited(&chain(), add.clone());
+    assert_eq!(
+        graph.gaps(&id("transform")),
+        vec![Gap::Unconnected(Slot::Input(holidays.clone()))]
+    );
+    assert_eq!(graph.edit(&add), Err(EditError::InputTaken(holidays)));
+    assert_eq!(
+        graph.edit(&Edit::AddInput {
+            node: id("source"),
+            name: InputName::new("x").unwrap(),
+            kind: InputKind::Table,
+        }),
+        Err(EditError::WrongKind {
+            node: id("source"),
+            kind: Kind::Source,
+        })
+    );
+}
+
+#[test]
+fn a_node_added_with_a_name_takes_its_id_from_it_and_a_name_taken_is_refused() {
+    let named = |name: &str| Edit::Add {
+        kind: Kind::Source,
+        follows: None,
+        name: Some(Name::new(name).unwrap()),
+    };
+    let (graph, added) = edited(&Graph::new(), named("Holiday calendar"));
+    assert_eq!(added.unwrap().as_str(), "holiday-calendar");
+    assert_eq!(
+        graph.edit(&named("holiday CALENDAR")),
+        Err(EditError::NameTaken(Name::new("holiday CALENDAR").unwrap()))
+    );
 }
