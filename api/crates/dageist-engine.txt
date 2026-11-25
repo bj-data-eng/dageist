@@ -1236,7 +1236,6 @@ impl dageist_engine::document::Walk
 pub fn dageist_engine::document::Walk::expressions(&self) -> &[dageist_engine::document::WalkedExpression]
 pub fn dageist_engine::document::Walk::not_known(&self) -> core::option::Option<&str>
 pub const fn dageist_engine::document::Walk::refusal(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
-pub const fn dageist_engine::document::Walk::unsafe_to_run(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
 pub struct dageist_engine::document::WalkRefusal
 impl dageist_engine::document::WalkRefusal
 pub const fn dageist_engine::document::WalkRefusal::argument_unknown(&self) -> bool

@@ -84,9 +84,10 @@ pub enum RunCause {
     /// The catalogue could not build the call: an argument is missing, or
     /// Polars refused it.
     Build(BuildError),
-    /// A named rule does not let an entry stand where it does, such as
-    /// `element` outside a pivot's aggregate. Polars decides the rest, as it
-    /// builds.
+    /// The tables of allowed combinations or a named rule do not let an entry stand where it does,
+    /// as the walk found, such as `element` outside a pivot's aggregate or a call that the tables
+    /// record Polars refusing. Polars was not asked: a step the walk refuses is not run. Polars
+    /// decides what the tables cannot judge, as it builds.
     NotAllowed(Refusal),
     /// Polars refused the step when it worked out its schema.
     Polars(PolarsError),
@@ -324,8 +325,12 @@ impl std::error::Error for RowsError {
 impl Document {
     /// Builds every step in order, the first on `source`, and reports each:
     /// valid with its schema and the dtypes of its expressions, refused with
-    /// its place and Polars' reason, or not run because a step before it was
-    /// refused. No data is read, except by a step that needs a collect.
+    /// its place and the reason, or not run because a step before it was
+    /// refused. A step the tables refuse, which its [`Walk`] says, is refused
+    /// where the walk found the refusal and with its words, and is neither
+    /// built nor planned, whether or not Polars would accept it; any other
+    /// step that Polars refuses is refused with Polars' reason. No data is
+    /// read, except by a step that needs a collect.
     ///
     /// `inputs` are what the steps' `table` arguments and `input` starts name.
     ///
@@ -442,6 +447,8 @@ impl Document {
 
     /// The rows of the table the step `through` gives, at most `limit` of
     /// them, with the steps up to it run on `working`: a table held in memory.
+    /// A step the tables refuse is not run, so no rows are collected for it
+    /// or after it.
     ///
     /// # Errors
     ///
@@ -534,9 +541,11 @@ fn run_step(
             written: Vec::new(),
         };
     }
-    // What Polars panics on is not run, wherever the probe of the builder could not see it: a pivot's
-    // aggregate starts from the values of a group, whose dtype it has no column for.
-    if let Some(found) = walk.unsafe_to_run() {
+    // A step the tables refuse is not run, whether or not Polars would plan it: Polars plans a part
+    // that it never evaluates, and panics on some of what the tables refuse, in a thread of its own
+    // that cannot be recovered from. It is refused where the walk found the refusal, with the
+    // walk's words, and is neither planned nor collected.
+    if let Some(found) = walk.refusal() {
         return StepRun {
             result: Err(Halt::Refused(StepRefusal {
                 place: found.place().clone(),

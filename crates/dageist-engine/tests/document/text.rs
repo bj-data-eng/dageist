@@ -6,6 +6,7 @@ use dageist_engine::allowed::{After, RefusalSource, Representative, Stage};
 use dageist_engine::document::{Document, Outcome, RunCause, Segment, StepId, StepRows};
 use serde_json::{Value, json};
 
+use crate::ask_polars::{self, Connected};
 use crate::claims::{claims, inputs};
 use crate::support::{call, document, field, field_then, named, step, text, whole};
 
@@ -109,7 +110,7 @@ fn a_chain_of_text_methods_runs_and_previews_what_is_left_of_each_owner() {
 #[test]
 fn a_method_of_text_after_whole_numbers_is_refused_at_its_link_as_polars_refuses_it() {
     let upper = field_then("row_days", vec![call("Expr.str.to_uppercase", json!({}))]);
-    let report = report_of(&selecting(upper));
+    let report = report_of(&selecting(upper.clone()));
     let step = &report.steps()[0];
     let refusal = step.walk().refusal().expect("the walk refuses it");
     assert_eq!(
@@ -121,11 +122,21 @@ fn a_method_of_text_after_whole_numbers_is_refused_at_its_link_as_polars_refuses
         "{}",
         refusal.refusal().reason()
     );
-    // Polars refuses the rows of the same step, as the walk says it does.
+    // Polars refuses the rows of the same step, as the walk says it does, which it is asked apart
+    // from the step engine: the step is refused and its rows are not collected.
+    assert!(matches!(step.outcome(), Outcome::Refused(_)));
+    assert!(matches!(step.rows(), StepRows::NotCounted));
+    let document = Document::read(&selecting(upper)).expect("a document");
+    let nothing = |_: &str| None;
     assert!(
-        matches!(step.rows(), StepRows::Failed(_)),
-        "{:?}",
-        step.rows()
+        ask_polars::collect(
+            &document.steps()[0],
+            0,
+            &claims(),
+            Connected::tables(&nothing),
+            100
+        )
+        .is_err()
     );
 }
 

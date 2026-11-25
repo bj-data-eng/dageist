@@ -22,8 +22,7 @@ use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
-    Place as OfferPlace, Position as Slot, Refusal, RefusalSource, Representative, Rule, Shape,
-    Unknown, Verdict,
+    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -179,7 +178,6 @@ impl WalkRefusal {
 pub struct Walk {
     expressions: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
-    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
 }
 
@@ -192,17 +190,11 @@ impl Walk {
     }
 
     /// The first thing refused: a call that may not stand, an expression that
-    /// may not end, or an option Polars refuses.
+    /// may not end, or an option Polars refuses. A step that holds one is not
+    /// run: it is refused at its place and with its words.
     #[must_use]
     pub const fn refusal(&self) -> Option<&WalkRefusal> {
         self.refusal.as_ref()
-    }
-
-    /// The first call that Polars panics on, which no document may run: refused by a rule
-    /// before Polars is asked. It is the first thing refused only where nothing came before it.
-    #[must_use]
-    pub const fn unsafe_to_run(&self) -> Option<&WalkRefusal> {
-        self.unsafe_to_run.as_ref()
     }
 
     /// Why the tables could not be asked past a point, where they could not.
@@ -239,7 +231,6 @@ impl Step {
             slots: Vec::new(),
             walked: Vec::new(),
             refusal: None,
-            unsafe_to_run: None,
             not_known: None,
         };
         walker.arguments(self.call(), false);
@@ -250,7 +241,6 @@ impl Step {
         Walk {
             expressions: walker.walked,
             refusal: walker.refusal,
-            unsafe_to_run: walker.unsafe_to_run,
             not_known: walker.not_known,
         }
     }
@@ -407,8 +397,6 @@ struct Walker<'a> {
     slots: Vec<Slot>,
     walked: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
-    /// The first call that Polars panics on, whether or not another was refused before it.
-    unsafe_to_run: Option<WalkRefusal>,
     not_known: Option<String>,
     /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
     zones: Vec<String>,
@@ -1025,40 +1013,8 @@ impl Walker<'_> {
             at_end,
             argument_unknown,
         };
-        if matches!(
-            refusal.source(),
-            RefusalSource::Rule(Rule::ElementDtypeIsImplemented | Rule::ElementDtypeIsMeasured)
-        ) && self.unsafe_to_run.is_none()
-        {
-            self.unsafe_to_run = Some(found.clone());
-        }
         if self.refusal.is_none() {
             self.refusal = Some(found);
-        }
-    }
-
-    /// Notes a call that is not to be run in Polars: a method of lists or arrays, or a call that
-    /// follows a list or an array, that is refused, whatever it is given.
-    ///
-    /// What Polars refuses when it works out the schema it may plan nevertheless where the call is
-    /// not worked out, as where both branches of a condition share it, and its optimizer then
-    /// panics on the plan, as it does of a `list` method given an array, of a sum of an array of
-    /// dates and a boolean, and of the combination of a list with a time. A call after one whose
-    /// schema and whose rows differ, or on which Polars panicked, that trusts the schema, as an
-    /// aggregate or a cut does, panics too. A panic on a thread of Polars' own may not be recovered
-    /// from, so the step is refused with the words of the walk and the place of the call, and is
-    /// not built.
-    fn note_danger(&mut self, entry: &Entry, after: After, refusal: &Refusal) {
-        let in_lists = entry.id().as_str().starts_with("Expr.list.")
-            || entry.id().as_str().starts_with("Expr.arr.")
-            || matches!(after, After::Value { dtype, .. } if dtype.is_nested());
-        if in_lists && self.unsafe_to_run.is_none() {
-            self.unsafe_to_run = Some(WalkRefusal {
-                place: self.here(),
-                refusal: refusal.clone(),
-                at_end: false,
-                argument_unknown: false,
-            });
         }
     }
 
@@ -2432,7 +2388,6 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
-                self.note_danger(entry, after, refusal);
                 self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
@@ -2543,7 +2498,6 @@ impl Walker<'_> {
         };
         let allowance = match &verdict {
             Verdict::Refused(refusal) => {
-                self.note_danger(entry, after, refusal);
                 self.refuse(refusal, false);
                 return (Cur::Dead, standing);
             }

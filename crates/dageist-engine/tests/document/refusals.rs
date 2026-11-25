@@ -4,12 +4,13 @@
 use dageist_engine::allowed::{RefusalSource, Rule};
 use dageist_engine::catalog::BuildError;
 use dageist_engine::document::{
-    Document, Outcome, Report, Resolution, RowsError, RunCause, Segment, StepId, StepRefusal,
+    Document, Outcome, Report, RowsError, RunCause, Segment, StepId, StepRefusal,
 };
 use polars::prelude::*;
 use serde_json::{Value, json};
 use std::sync::Arc;
 
+use crate::ask_polars::{self, Connected};
 use crate::claims::{claims, inputs};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
@@ -34,6 +35,38 @@ fn refusal_of<'a>(report: &'a Report, id: &str) -> &'a StepRefusal {
         Outcome::Refused(refusal) => refusal,
         other => panic!("step {id} is {other:?}"),
     }
+}
+
+/// The refusal of the tables that refused the step `id` of `report`, which the step engine reports
+/// as it is, at the place the walk found it, and which records what Polars said of the call.
+fn refused_by_the_tables_as_polars_did<'a>(
+    report: &'a Report,
+    id: &str,
+    refusal: &StepRefusal,
+) -> &'a dageist_engine::allowed::Refusal {
+    let step = report
+        .steps()
+        .iter()
+        .find(|step| step.id().as_str() == id)
+        .unwrap_or_else(|| panic!("no step {id}"));
+    let walked = step.walk().refusal().expect("the walk refuses the step");
+    assert_eq!(refusal.place(), walked.place());
+    assert!(
+        matches!(walked.refusal().source(), RefusalSource::Polars(_)),
+        "the tables record Polars refusing it: {:?}",
+        walked.refusal().source()
+    );
+    assert!(
+        matches!(refusal.cause(), RunCause::NotAllowed(said) if said == walked.refusal()),
+        "not the words of the tables: {refusal}"
+    );
+    walked.refusal()
+}
+
+/// The first line of Polars' words, which the tables record: the plan it adds after them is
+/// Polars' own.
+fn first_line(words: &str) -> &str {
+    words.lines().next().unwrap_or_default()
 }
 
 /// Polars' own words for the plan the step builds: what `collect_schema` says
@@ -72,12 +105,15 @@ fn a_sum_of_text_is_refused_at_its_link_with_polars_reason() {
             Segment::Link(0)
         ]
     );
-    let RunCause::Polars(reason) = refusal.cause() else {
-        panic!("not Polars' reason: {refusal}");
-    };
-    assert_eq!(reason.to_string(), polars_says(vec![col("dcn").sum()]));
-    assert!(reason.to_string().contains("sum"), "{reason}");
-    assert!(reason.to_string().contains("str"), "{reason}");
+    // The step is not built: it is refused where the walk found the refusal, with the words the
+    // tables recorded of Polars, which are Polars' own for the same call.
+    let said = refused_by_the_tables_as_polars_did(&report, "bad", refusal);
+    assert_eq!(
+        said.reason(),
+        first_line(&polars_says(vec![col("dcn").sum()]))
+    );
+    assert!(said.reason().contains("sum"), "{said}");
+    assert!(said.reason().contains("str"), "{said}");
 }
 
 #[test]
@@ -99,21 +135,19 @@ fn taking_text_from_a_timestamp_is_refused_at_its_link_with_polars_reason() {
             Segment::Link(0)
         ]
     );
-    let RunCause::Polars(reason) = refusal.cause() else {
-        panic!("not Polars' reason: {refusal}");
-    };
+    let said = refused_by_the_tables_as_polars_did(&report, "bad", refusal);
     assert_eq!(
-        reason.to_string(),
-        polars_says(vec![binary_expr(
+        said.reason(),
+        first_line(&polars_says(vec![binary_expr(
             col("timestamp"),
             Operator::Minus,
             col("dcn")
-        )])
+        )]))
     );
 }
 
 #[test]
-fn the_dtypes_before_a_refused_link_are_still_reported() {
+fn a_step_the_walk_refuses_is_not_planned_so_it_reports_no_dtype_but_says_where_it_is_refused() {
     let report = run(vec![step(
         "bad",
         "LazyFrame.with_columns",
@@ -122,17 +156,10 @@ fn the_dtypes_before_a_refused_link_are_still_reported() {
             field_then("dcn", vec![call("Expr.first", json!({})), call("Expr.sum", json!({}))]),
         )]) }),
     )]);
-    let trace = report.steps()[0]
-        .expressions()
-        .iter()
-        .find(|trace| trace.place().path() == [parameter("named_exprs"), Segment::Value(0)])
-        .expect("the expression");
-    assert!(matches!(trace.start(), Resolution::Dtype(DataType::String)));
-    assert!(matches!(
-        &trace.links()[0],
-        Resolution::Dtype(DataType::String)
-    ));
-    assert!(matches!(&trace.links()[1], Resolution::Refused(_)));
+    // The dtype of each part of an expression is worked out by planning it, which a step the walk
+    // refuses is not.
+    assert!(report.steps()[0].expressions().is_empty());
+    assert!(report.steps()[0].schema().is_none());
     let refusal = refusal_of(&report, "bad");
     assert_eq!(
         refusal.place().path(),
@@ -142,6 +169,16 @@ fn the_dtypes_before_a_refused_link_are_still_reported() {
             Segment::Link(1)
         ]
     );
+    // The walk still says what each part is, by its class.
+    let walked = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|expression| {
+            expression.place().path() == [parameter("named_exprs"), Segment::Value(0)]
+        })
+        .expect("the expression");
+    assert!(!walked.places().is_empty());
 }
 
 #[test]
@@ -436,16 +473,28 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
             field_then("dcn", vec![call("Expr.dt.date", json!({}))]),
         )]) }),
     )];
-    let report = run(steps.clone());
-    let schema = report.steps()[0].schema().expect("valid");
-    assert_eq!(schema.get("day"), Some(&DataType::Date));
-
     let document = Document::read(&document(steps)).expect("a document");
+    let nothing = |_: &str| None;
+    let connected = Connected::tables(&nothing);
+    let planned = ask_polars::plan(&document.steps()[0], 0, &claims(), connected)
+        .expect("a step that can be asked");
+    let schema = planned.schema.expect("Polars plans it");
+    assert_eq!(schema.get("day"), Some(&DataType::Date));
+    let error = ask_polars::collect(&document.steps()[0], 0, &claims(), connected, 10)
+        .expect_err("Polars cannot take the date of text");
+    assert!(!error.is_empty());
+
+    // The tables record the failure, so the step engine does not run the step, and neither plans
+    // it nor collects its rows.
     let id = StepId::new("day").expect("an id");
+    let report = document
+        .run(&inputs(), claims().lazy())
+        .expect("the claims have a schema");
+    assert!(matches!(report.steps()[0].outcome(), Outcome::Refused(_)));
     let error = document
         .rows(&inputs(), &claims(), &id, 10)
-        .expect_err("Polars cannot take the date of text");
-    assert!(matches!(error, RowsError::Polars(_)), "{error}");
+        .expect_err("the step is refused");
+    assert!(matches!(error, RowsError::Refused(_)), "{error}");
 }
 
 #[test]
@@ -666,7 +715,8 @@ fn a_join_key_that_is_a_condition_of_typed_literals_is_valid_as_polars_accepts_i
 }
 
 #[test]
-fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step() {
+fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step_as_the_tables_record_it()
+ {
     // The aggregate of a pivot is built from `element()`, not from a column.
     // No named rule holds this, so Polars decides as the step is built, and
     // refuses the pivot as a whole: it does not say which expression.
@@ -683,8 +733,17 @@ fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step() {
     )]);
     let refusal = refusal_of(&report, "pivot");
     assert_eq!(refusal.place().step_index(), Some(0));
-    assert!(refusal.place().path().is_empty(), "{refusal}");
-    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    // The step is not built: it is refused where the walk found the refusal, in the words the
+    // tables recorded of Polars.
+    let walked = report.steps()[0]
+        .walk()
+        .refusal()
+        .expect("the walk refuses it");
+    assert_eq!(refusal.place(), walked.place());
+    assert!(
+        matches!(refusal.cause(), RunCause::NotAllowed(said) if said == walked.refusal()),
+        "{refusal}"
+    );
     assert!(
         refusal.to_string().contains("column references"),
         "{refusal}"
