@@ -1465,6 +1465,10 @@ The census holds:
   failed on the rows or one that was not run.
 - The 3 kinds of input a node is connected to, the 3 places they come from and
   the 2 kinds of cell the rows show, text and null.
+- The families the view decodes and decides on: the 2 changes of a column, the 5
+  resolutions of an expression, the 8 defaults and 11 settings of a parameter, the
+  2 answers to an edit, the 13 kinds of refusal of an edit and the 10 things, 15
+  kinds of value and 10 needs a place can name.
 
 The test decodes the census with the host package's decoders, and for each variant
 asks the model's functions whether the editor has a plan for it. Each start must
@@ -1473,7 +1477,11 @@ option, must get a control from `model/controls.ts`. Each class, shape and kind 
 place must be a place of the grid. Each cause, source, stage, rule, outcome and
 state must have words from `model/report.ts`, built into a report the host's
 decoders read, so that a word the decoders do not know fails there. Each kind of
-input and cell must have a way to be shown. A variant with no plan fails the
+input and cell must have a way to be shown. Each change, resolution, default,
+setting, answer and kind of refusal is built into a value the host's decoders read
+and put through the model's function that decides on it: `isChanged`, `pairsJoiner`,
+`defaultWordOf` and `handlingOf`. What a document holds typed in is put through
+`shownOf`, which says how it is shown. A variant with no plan fails the
 test, with its words, until the editor draws it or `limits.ts` declares it with
 its reason, and a gap declared and no longer shown fails it too. A change that
 adds a variant to the host or the engine therefore changes the census, and the
@@ -1497,16 +1505,21 @@ Today the declared gaps are these:
   the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 - A flag typed in. A document may hold one as the value of `lit`, but the host
   reads typed text as a number or as text and never as a flag, so the editor has
-  no way to type one; one a document holds is drawn as a function, and the grid
-  test runs a start of it.
+  no way to type one.
+- A flag a document holds as the value of `lit`, which the editor does not show.
+  The start is drawn as a function and its value by the literal control, which
+  shows a number or text, so the value is drawn as its empty label, marked wrong
+  ([#171](https://github.com/bj-data-eng/dageist/issues/171)). The grid test runs a
+  start of it and finds a method can be added after it.
+- The dtypes of a chain that gives several columns, which the editor does not show:
+  it shows the dtype after a chain only where it is one column.
 
-A document holds a number, text or a flag as the value of `lit`, and nothing else
-typed in: a Boolean, a date, a time, a moment or a length of time is not a literal
-a document holds, and the engine allows none as a start. A date is read from typed
-text as the text of the day, with the class `Date`, and a duration as text with no
-class, each in a slot that takes one as an argument, not at the start of an
-expression; the census lists those readings, and each gets the control of its
-slot.
+A document holds a number, text or a flag as the value of `lit` and no other value
+typed in: a date, a time, a moment or a length of time is not a literal a document
+holds, and the engine allows none as a start. A date is read from typed text as
+the text of the day, with the class `Date`, and a duration as text with no class,
+each in a slot that takes one as an argument, not at the start of an expression;
+the census lists those readings, and each gets the control of its slot.
 
 ## The Step Document
 
