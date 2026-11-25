@@ -11,6 +11,7 @@ import type {
   InputView,
   KindView,
   ParameterView,
+  ProblemView,
   RunView,
   ShapeView,
   TypedKind,
@@ -37,6 +38,7 @@ import {
   startsWithEngineWord,
 } from '../src/model/controls';
 import { parameterSegment, pathKey } from '../src/model/doc';
+import type { Handling } from '../src/model/edits';
 import { handlingOf } from '../src/model/edits';
 import { inputDetail, inputLines, originWords } from '../src/model/inputs';
 import type { Cover, Gap, ReportState } from '../src/model/limits';
@@ -749,8 +751,15 @@ function withParameter(field: string, value: unknown): unknown {
   return replaced(catalogueFixture, ['entries', 0, 'parameters', 0, field], value);
 }
 
+/** What the editor shows as the dtype after the start of the expression at `key` in the only step of `run`, or `null`. */
+export type DtypeShown = (run: RunView, key: string) => string | null;
+
+/** What the editor shows, as the model prepares the run. */
+const PREPARED_DTYPE: DtypeShown = (run, key) =>
+  prepareRun([], run).steps[0]?.chains.get(key)?.source ?? null;
+
 /** Holds how a column changed, how an expression resolved, what a parameter holds by default and how an edit came out against the model's functions. */
-function planFamilies(census: Census, found: Findings): void {
+function planFamilies(census: Census, found: Findings, dtypeShown: DtypeShown): void {
   const source = [{ name: 'a', dtype: 'Int64' }];
   const place = { stepIndex: 0, stepId: 'tested', path: [parameterSegment('exprs')] };
   for (const change of census.changes) {
@@ -775,11 +784,8 @@ function planFamilies(census: Census, found: Findings): void {
     const run = readOr(found, words, () =>
       decodeRun({ source, steps: [plainStep({ expressions })] }),
     );
-    const dtype =
-      run === null
-        ? null
-        : (prepareRun([], run).steps[0]?.chains.get(pathKey(place.path))?.source ?? null);
     if (run === null) continue;
+    const dtype = dtypeShown(run, pathKey(place.path));
     if (word === 'dtype' && dtype !== 'Int64') found.lacks(`${words}: no dtype shown`);
     // The dtypes of a chain that gives several columns are not shown, which is a gap; what is
     // unfinished, has no context or is refused has none to show, and the step says why.
@@ -829,8 +835,18 @@ function planFamilies(census: Census, found: Findings): void {
       found.lacks(`edit answer ${word}: reads as ${answer.status}`);
     }
   }
-  /** Reads an edit refused for `problem`, and what the editor does with it. */
-  const refusedFor = (words: string, problem: unknown): void => {
+  /**
+   * Reads an edit refused for `problem` with the host's decoder, which must read it as the thing
+   * `is` says, and holds what the editor does with it to `expected`, which is written here by hand:
+   * it asks for the value of an option that starts with none, and tells the person every other
+   * refusal.
+   */
+  const refusedFor = (
+    words: string,
+    problem: unknown,
+    expected: Handling,
+    is: (read: ProblemView) => boolean,
+  ): void => {
     if (problem === null) {
       found.lacks(words);
       return;
@@ -839,25 +855,45 @@ function planFamilies(census: Census, found: Findings): void {
       decodeEditAnswer(replaced(editRefusedFixture, ['problem'], problem)),
     );
     if (answer?.status !== 'refused') return;
-    const handling = handlingOf(answer.problem);
-    if (handling === 'tell' && answer.message.trim() === '') found.lacks(`${words}: no words`);
+    if (!is(answer.problem)) found.lacks(`${words}: is read as ${answer.problem.kind}`);
+    if (handlingOf(answer.problem) !== expected) {
+      found.lacks(`${words}: is not handled as ${expected}`);
+    }
   };
   const step = { kind: 'step' };
   for (const kind of census.problemKinds) {
-    refusedFor(`problem ${kind}`, problemOf(kind, step, 'call'));
+    refusedFor(
+      `problem ${kind}`,
+      problemOf(kind, step, 'call'),
+      kind === 'needsValue' ? 'askForValue' : 'tell',
+      (read) => read.kind === kind,
+    );
   }
+  const someValue = census.valueKinds[0] ?? 'expression';
   for (const thing of census.thingKinds) {
-    const found_ =
-      thing === 'value'
-        ? { kind: thing, of: census.valueKinds[0] ?? 'expression' }
-        : { kind: thing };
-    refusedFor(`thing ${thing}`, problemOf('doesNotFit', found_, 'call'));
+    const held = thing === 'value' ? { kind: thing, of: someValue } : { kind: thing };
+    refusedFor(
+      `thing ${thing}`,
+      problemOf('doesNotFit', held, 'call'),
+      'tell',
+      (read) => read.kind === 'doesNotFit' && read.found.kind === thing,
+    );
   }
   for (const kind of census.valueKinds) {
-    refusedFor(`value kind ${kind}`, problemOf('doesNotFit', { kind: 'value', of: kind }, 'call'));
+    refusedFor(
+      `value kind ${kind}`,
+      problemOf('doesNotFit', { kind: 'value', of: kind }, 'call'),
+      'tell',
+      (read) => read.kind === 'doesNotFit' && read.found.kind === 'value' && read.found.of === kind,
+    );
   }
   for (const needs of census.wanted) {
-    refusedFor(`wanted ${needs}`, problemOf('wrongPlace', step, needs));
+    refusedFor(
+      `wanted ${needs}`,
+      problemOf('wrongPlace', step, needs),
+      'tell',
+      (read) => read.kind === 'wrongPlace' && read.needs === needs,
+    );
   }
 }
 
@@ -943,16 +979,17 @@ function planRows(census: Census, found: Findings): void {
 
 /**
  * Holds every variant of `census` against what the editor can draw, and returns those it has no
- * plan for and the gaps the census shows.
+ * plan for and the gaps the census shows. `dtypeShown` says what the editor shows as a dtype, which
+ * a test may replace to see a gap go stale.
  */
-export function planFor(census: Census): Planned {
+export function planFor(census: Census, dtypeShown: DtypeShown = PREPARED_DTYPE): Planned {
   const found = new Findings();
   planStarts(census, found);
   planTyped(census, found);
   planParameters(census, found);
   planPlaces(census, found);
   planReports(census, found);
-  planFamilies(census, found);
+  planFamilies(census, found, dtypeShown);
   planRows(census, found);
   return { unplanned: sorted(found.unplanned), gaps: found.gaps };
 }

@@ -244,6 +244,18 @@ describe('a family of variants the census gains that the editor lacks', () => {
   });
 });
 
+describe('a gap that goes stale when the editor draws what it lacked', () => {
+  it('fails the check where the editor shows the dtypes of an expression that gives several columns', () => {
+    // An editor that shows a dtype wherever the engine gives one, as it would for several columns.
+    const run = planFor(census, () => 'Int64');
+
+    const { undeclared, stale } = compareCensus(run, GAPS);
+
+    expect(undeclared).toEqual([]);
+    expect(stale).toContain('shown resolution several');
+  });
+});
+
 describe('a gap that is declared and the census does not show', () => {
   it('fails the check where no flag is a typed value of the census, so that the declared gap is stale', () => {
     const without: Census = {
