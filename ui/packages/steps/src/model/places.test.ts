@@ -210,10 +210,14 @@ describe('what can be done to the piece a slot draws', () => {
     });
   });
 
-  it('is taking away only, where the word is one of several, for a connected input and for nothing picked', () => {
+  it('is adding after it and taking it away, where the word is one of several, for a connected input, and taking away only for nothing picked', () => {
     expect(actionsOfSlot(valueDrawing(chain(input('as_of')), true), true)).toEqual({
-      add: false,
+      add: true,
       remove: true,
+    });
+    expect(actionsOfSlot(valueDrawing(chain(input('as_of')), true), false)).toEqual({
+      add: true,
+      remove: false,
     });
     expect(actionsOfSlot(valueDrawing(chain(HOLE_START), true), false)).toEqual({
       add: false,

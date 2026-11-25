@@ -138,23 +138,11 @@ describe('the corpus, rebuilt through the functions the components call', () => 
     expect(sorted(parameters)).toEqual(['LazyFrame.join on', 'LazyFrame.sort more_by']);
   });
 
-  it('finds a method after a connected value, a connected list and a typed whole number, number and text, though the engine allows one', () => {
+  it('finds no start that a method cannot follow, now that a connected value, a connected list and a typed value can have one added', () => {
     const starts = [...found.gaps.values()].flatMap((gap) =>
       gap.cover.kind === 'start' ? [gap.cover.start] : [],
     );
-    expect(sorted(starts)).toEqual([
-      'connectedList',
-      'connectedValue',
-      'typedFloat',
-      'typedInteger',
-      'typedText',
-    ]);
-  });
-
-  it('names the document and the way to a piece it cannot build', () => {
-    const piece = found.gaps.get('start connectedValue')?.pieces[0];
-    expect(piece).toContain('a connected value followed by');
-    expect(piece).toContain('› link 0');
+    expect(starts).toEqual([]);
   });
 
   it('places every expression of a step that was run, and finds the one the walk gives no context', () => {

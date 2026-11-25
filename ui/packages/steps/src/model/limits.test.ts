@@ -37,11 +37,6 @@ describe('the declared gaps', () => {
         'shown literal flag',
         'shown resolution several',
         'noContext LazyFrame.filter constraints',
-        'start connectedList',
-        'start connectedValue',
-        'start typedFloat',
-        'start typedInteger',
-        'start typedText',
         'step LazyFrame.drop',
         'step LazyFrame.drop_nans',
         'step LazyFrame.drop_nulls',
@@ -67,14 +62,6 @@ describe('the declared gaps', () => {
     expect(new Set(keys).size).toBe(keys.length);
     for (const gap of GAPS) {
       expect(gap.reason.length, coverKey(gap.cover)).toBeGreaterThan(20);
-    }
-  });
-
-  it('name the issue that is to draw what a connected input and a typed value leave undrawn', () => {
-    for (const gap of GAPS) {
-      if (gap.cover.kind === 'start') {
-        expect(gap.reason, coverKey(gap.cover)).toContain('#171');
-      }
     }
   });
 
