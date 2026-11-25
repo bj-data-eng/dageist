@@ -1980,15 +1980,10 @@ fn an_interval_of_nothing_is_refused_where_polars_gives_no_values_for_the_end_be
 #[test]
 fn a_count_of_exactly_one_is_refused_beside_every_kind_of_place_that_polars_broadcasts_it_to() {
     // Stricter by design, as for a select beside the rows: the streaming engine meets a count of one
-    // with each of the values of an operand, a fill, an exponent and a share, where Python's
-    // in-memory engine refuses it. A count is not one value, and the editor refuses all of them.
+    // with each of the values of an operand, a fill and an exponent, where Python's in-memory
+    // engine refuses it. A count is not one value, and the editor refuses all of them.
     let one = || int_range(vec![("start", whole(0)), ("end", whole(1))]);
     let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
-    let share = linear_space(vec![
-        ("start", whole(0)),
-        ("end", whole(1)),
-        ("num_samples", whole(1)),
-    ]);
     let cases = [
         (
             "an operand",
@@ -2001,13 +1996,6 @@ fn a_count_of_exactly_one_is_refused_beside_every_kind_of_place_that_polars_broa
         (
             "an exponent",
             on_column("a", vec![call("Expr.pow", json!({ "exponent": one() }))]),
-        ),
-        (
-            "a share",
-            on_column(
-                "a",
-                vec![call("Expr.quantile", json!({ "quantile": share }))],
-            ),
         ),
     ];
     let mut found = Vec::new();
@@ -2148,9 +2136,10 @@ fn a_range_of_times_is_not_asked_of_polars_where_its_bounds_are_not_read() {
 
 #[test]
 fn a_range_is_not_cut_by_a_length_below_nothing_as_polars_refuses_it() {
-    // Python Polars 2.1.0, in both engines: "unable to extract length from Scalar(... -2)" of the
+    // Python Polars 2.2.0, in both engines: "unable to extract length from Scalar(... -2)" of the
     // first, last and `limit` values and of a slice with a length, where the receiver is a range
-    // or a repeat. The same calls of a column run, and so do the places counted from the end.
+    // or a repeat, and "unable to extract length from Int32(-2)" where it is a column of the table.
+    // The places counted from the end run.
     let ranges = [
         (
             "int_range",
@@ -2217,9 +2206,9 @@ fn a_range_is_not_cut_by_a_length_below_nothing_as_polars_refuses_it() {
         }
     }
     for (cut, link, _) in &cuts[..4] {
-        // The same calls of a column of the table run, as the engine of steps runs them.
+        // The same calls of a column of the table are refused too.
         let report = select_of(vec![on_column("a", vec![link.clone()])]);
-        if !polars_says(&report).accepts() || !walk_says(&report).accepts() {
+        if polars_says(&report).accepts() || walk_says(&report).accepts() {
             found.push(format!(
                 "{cut} of a column: Polars says {:?}, the walk says {:?}",
                 polars_says(&report),
@@ -2397,13 +2386,12 @@ fn a_range_is_not_cut_by_a_length_below_nothing_after_any_chain_the_engine_of_st
 }
 
 #[test]
-fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_cut_into() {
-    // Stricter by design: after the first values or a method that gives a value for each value it
-    // follows, Python Polars 2.1.0 and the engine of steps fold a cut by `head`, `limit` or the
-    // length of a slice into the range and run `int_range(0, 10).abs().head(-2)`, where they refuse
-    // `tail` of some. With the optimizations off Polars refuses every one of them: its answer is the
-    // optimizer's, and the engines differ on it, so the editor refuses a cut below nothing after
-    // every chain that starts at a range.
+fn a_range_is_not_cut_by_a_length_below_nothing_after_any_chain_as_polars_refuses_it() {
+    // After the first values or a method that gives a value for each value it follows, Python
+    // Polars 2.2.0 refuses a cut below nothing as it refuses it of the range itself, where 2.1.0
+    // folded a cut by `head`, `limit` or the length of a slice into the range and ran
+    // `int_range(0, 10).abs().head(-2)`. The editor refuses a cut below nothing after every chain
+    // that starts at a range.
     let mut found = Vec::new();
     for (range, start) in ranges_to_cut() {
         for (first_name, first) in chains_a_cut_is_folded_into() {
@@ -2411,12 +2399,9 @@ fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_c
                 let mut links = first.clone();
                 links.push(cut);
                 let report = select_of(vec![on_start(&start, links)]);
-                // The cut by the first values is the one that is folded into every one of them.
-                if cut_name == "head"
-                    && matches!(polars_says(&report), Said::Refuses(text) if text.contains("unable to extract length"))
-                {
+                if polars_says(&report).accepts() {
                     found.push(format!(
-                        "{cut_name} after {first_name} of {range}: the engine of steps says {:?}, which ends this exception",
+                        "{cut_name} after {first_name} of {range}: the engine of steps takes it: {:?}",
                         polars_says(&report)
                     ));
                 }
@@ -2437,7 +2422,7 @@ fn a_range_is_not_cut_by_a_length_below_nothing_after_a_chain_polars_folds_the_c
 }
 
 // ---------------------------------------------------------------------------
-// A cut below nothing of a value made of literals and ranges alone
+// A cut below nothing of a value with a column and of one without
 
 /// `expression` followed by `links`, whatever it has already.
 fn then(expression: &Value, links: Vec<Value>) -> Value {
@@ -2450,12 +2435,12 @@ fn then(expression: &Value, links: Vec<Value>) -> Value {
 }
 
 #[test]
-fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as_polars_cuts_it() {
-    // Polars' physical slice casts the length to an unsigned number where it cuts a series of
-    // literals, so a number below nothing is refused wherever the value has no column in it and the
-    // optimizer does not fold the cut away: of a chain that meets a range as an operand, a branch, a
-    // predicate or a fill, and of a literal that is no range. Where a column is what is cut, and a
-    // range is met by it, the engine of steps runs the cut.
+fn a_cut_by_a_length_below_nothing_is_refused_of_a_value_with_a_column_and_of_one_without_as_polars_refuses_it()
+ {
+    // Python Polars 2.2.0 casts the length to an unsigned number where it cuts a value, so a number
+    // below nothing is refused whether the value has a column in it or not: of a chain that meets a
+    // range as an operand, a branch, a predicate or a fill, of a literal that is no range, and of a
+    // column that meets a range.
     let ten = || int_range(vec![("start", whole(0)), ("end", whole(10))]);
     let four = || int_range(vec![("start", whole(0)), ("end", whole(4))]);
     let on = |start: Value, links: Vec<Value>| chain(start, links);
@@ -2589,20 +2574,14 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
         for (cut_name, cut) in cuts() {
             let report = select_of(vec![then(value, vec![cut])]);
             let (polars, walk) = (polars_says(&report), walk_says(&report));
-            // The one value for each value that a number and a range make is folded into, where the
-            // cut is by the first values, as it is of the chains pinned above.
-            let folded = matches!(
-                *name,
-                "a number and a range" | "a connected value and a range"
-            ) && cut_name != "tail";
-            if polars.accepts() != folded || walk.accepts() {
+            if polars.accepts() || walk.accepts() {
                 found.push(format!(
                     "{cut_name} of {name}: Polars says {polars:?}, the walk says {walk:?}"
                 ));
             }
         }
     }
-    // Each has a column that is cut, which a range beside it does not make a value of literals.
+    // Each has a column that is cut, which Polars refuses as it refuses a value of literals.
     let head = || call("Expr.head", json!({ "n": whole(-2) }));
     let controls: Vec<(&str, Value)> = vec![
         (
@@ -2637,7 +2616,7 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
         ),
     ];
     // A range that starts the chain and a column that is added to it: a column is in the value, and
-    // the engine of steps runs the cut.
+    // the cut is refused.
     let mut controls = controls;
     for (cut_name, cut) in cuts() {
         let name = match cut_name {
@@ -2663,7 +2642,7 @@ fn a_value_made_of_literals_and_ranges_alone_is_cut_by_a_length_below_nothing_as
     for (name, expression) in &controls {
         let report = select_of(vec![expression.clone()]);
         let (polars, walk) = (polars_says(&report), walk_says(&report));
-        if !polars.accepts() || !walk.accepts() {
+        if polars.accepts() || walk.accepts() {
             found.push(format!(
                 "{name}: Polars says {polars:?}, the walk says {walk:?}"
             ));

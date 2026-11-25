@@ -5,7 +5,7 @@
 //! many. The catalogue holds that for each parameter, apart from how a number typed without a
 //! dtype adapts, and the walk reads it: a method added without saying so is found here.
 
-use polars::prelude::{DataFrame, DataType, IntoLazy, NamedFrom, Series, lit};
+use polars::prelude::{DataFrame, DataType, IntoLazy, NamedFrom, Series};
 
 use crate::allowed::dtype::Representative;
 use crate::allowed::table::Shape;
@@ -49,10 +49,6 @@ fn arguments(
         let value = if parameter.name() == name {
             if column_named.is_empty() {
                 literal_of(&operand.dtype())
-            } else if SHARES.contains(&(entry.id().as_str(), name)) {
-                // The sample's column holds 1, a null and 3, which are no share, and Polars refuses a
-                // null: a quarter of each is one, and a half stands for the null.
-                (column(column_named) / lit(4.0)).fill_null(lit(0.5))
             } else {
                 column(column_named)
             }
@@ -124,16 +120,23 @@ fn gives(
 /// The first receiver and operand dtypes with which Polars allows the method with the parameter
 /// `name` a column beside a literal receiver, and what it gives.
 fn found(entry: &'static Entry, name: &str) -> Option<(Representative, Representative, Shape)> {
-    Representative::MEASURED.into_iter().find_map(|receiver| {
-        Representative::MEASURED.into_iter().find_map(|operand| {
+    // A parameter that takes no operand of many is measured on the dtypes that are no list or
+    // array: Python Polars 2.2.0 takes a list literal beside a column of what a replacement lists,
+    // which it refuses for every other dtype.
+    let listed = NOT_MEASURED
+        .iter()
+        .any(|(owner, parameter, _)| *owner == entry.id().as_str() && *parameter == name);
+    let measured = || {
+        Representative::MEASURED
+            .into_iter()
+            .filter(move |class| !(listed && class.is_nested()))
+    };
+    measured().find_map(|receiver| {
+        measured().find_map(|operand| {
             gives(entry, name, (receiver, true), operand).map(|shape| (receiver, operand, shape))
         })
     })
 }
-
-/// The parameters that Polars takes a column of as shares from 0 to 1, and refuses a column of the
-/// sample's numbers or a null for: they are measured with a column of shares made of its numbers.
-const SHARES: [(&str, &str); 1] = [("Expr.approx_quantile", "quantile")];
 
 /// The parameters measured with an aggregate of the column `a` as the receiver of one value, and
 /// not a literal: Polars meets a text of one value that is an aggregate with each value of what
@@ -146,7 +149,7 @@ const AGGREGATE_RECEIVER: [(&str, &str); 2] = [
 
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.
-const NOT_MEASURED: [(&str, &str, &str); 9] = [
+const NOT_MEASURED: [(&str, &str, &str); 10] = [
     ("Expr.over", "more_exprs", "a key of the window"),
     ("Expr.replace", "new", "the values a replacement lists"),
     (
@@ -164,6 +167,11 @@ const NOT_MEASURED: [(&str, &str, &str); 9] = [
     ("Expr.shift", "n", "Polars takes one value only"),
     ("Expr.shift", "fill_value", "Polars takes one value only"),
     ("Expr.quantile", "quantile", "Polars takes one value only"),
+    (
+        "Expr.approx_quantile",
+        "quantile",
+        "Polars takes one value only",
+    ),
 ];
 
 #[test]

@@ -218,7 +218,9 @@ fn an_aggregate_of_a_condition_of_identical_values_is_one_value_and_is_counted_a
         refusal.refusal().source(),
         RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
 }
 
 #[test]
@@ -282,9 +284,10 @@ fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refus
             .map(|refusal| refusal.refusal().source()),
         Some(RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber))
     );
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
     assert!(
-        polars_says(&many_beside_one)
-            .is_some_and(|reason| reason.contains("must have the same length as the input")),
+        polars_says(&many_beside_one).is_none(),
         "{:?}",
         outcome(&many_beside_one)
     );
@@ -750,7 +753,9 @@ fn a_default_of_many_values_after_an_aggregate_of_a_condition_of_identical_value
         "LazyFrame.select",
         select(vec![condition(vec![call("Expr.last", json!({})), replace])]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -782,7 +787,9 @@ fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of
             vec![call("Expr.max", json!({})), replace("a", "k"), strict],
         )]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -897,7 +904,9 @@ fn a_condition_of_single_values_that_are_one_expression_gives_one_value_for_a_re
         ],
     );
     let report = report_of("LazyFrame.select", select(vec![condition]));
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -973,7 +982,9 @@ fn one_value_over_a_window_that_explodes_is_one_value_for_each_group_and_not_for
             vec![call("Expr.min", json!({})), windowed, replace],
         )]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()

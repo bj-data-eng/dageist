@@ -225,7 +225,7 @@ fn a_quantile_is_a_float_and_the_interpolation_says_where_between_two_values_it_
 }
 
 #[test]
-fn a_quantile_of_the_moments_is_a_moment_and_one_of_a_boolean_or_text_is_refused() {
+fn a_quantile_of_the_moments_is_a_moment_one_of_a_boolean_is_a_float_and_one_of_text_is_refused() {
     let written = selecting(after(
         &field("timestamp"),
         vec![call("Expr.quantile", json!({ "quantile": float(0.5) }))],
@@ -234,10 +234,14 @@ fn a_quantile_of_the_moments_is_a_moment_and_one_of_a_boolean_or_text_is_refused
         dtype_of(&written),
         DataType::Datetime(polars::prelude::TimeUnit::Microseconds, None)
     );
-    assert!(!is_valid(&selecting(after(
-        &is_two(),
-        vec![call("Expr.quantile", json!({ "quantile": float(0.5) }))]
-    ))));
+    // Python Polars 2.2.0 takes the quantile of a boolean as it takes a number's.
+    assert_eq!(
+        dtype_of(&selecting(after(
+            &is_two(),
+            vec![call("Expr.quantile", json!({ "quantile": float(0.5) }))]
+        ))),
+        DataType::Float64
+    );
     assert!(!is_valid(&selecting(after(
         &field("step_to"),
         vec![call("Expr.quantile", json!({ "quantile": float(0.5) }))]

@@ -164,11 +164,11 @@ fn the_share_of_a_quantile_takes_numbers_only() {
 
 #[test]
 fn only_the_parameters_polars_reads_as_one_value_say_how_they_must_be_given_it() {
-    // Python Polars 2.1.0, in a select: `shift`'s count and fill and `diff`'s count refuse the rows, a
-    // count of values and the one value that `head` took of one value, with "must be a scalar value";
-    // a percentage change, a quantile and `top_k` and `bottom_k` refuse the rows and a count and take
-    // that value. A count of values that `head` or `slice` take, and an approximate quantile's
-    // share, take any of them. Every expression a range or a repeat takes is read as one value, and
+    // Python Polars 2.2.0, in a select: `shift`'s count and fill, `diff`'s count, a percentage change's
+    // count, a quantile's and an approximate quantile's share, `top_k`'s and `bottom_k`'s count and
+    // the offset and the length of `slice` refuse the rows, a count of values and the one value that
+    // `head` took of one value, with "must be a scalar value". A count of values that `head` takes
+    // takes any of them. Every expression a range or a repeat takes is read as one value, and
     // refuses the rows, a count and the value that `head` took of one value alike, with "non-scalar
     // start passed" or "must be a scalar value".
     let mut found: Vec<(&str, &str, catalog::OneValue)> = catalog::entries()
@@ -185,13 +185,20 @@ fn only_the_parameters_polars_reads_as_one_value_say_how_they_must_be_given_it()
     assert_eq!(
         found,
         [
-            ("Expr.bottom_k", "k", catalog::OneValue::SingleRow),
+            (
+                "Expr.approx_quantile",
+                "quantile",
+                catalog::OneValue::Scalar
+            ),
+            ("Expr.bottom_k", "k", catalog::OneValue::Scalar),
             ("Expr.diff", "n", catalog::OneValue::Scalar),
-            ("Expr.pct_change", "n", catalog::OneValue::SingleRow),
-            ("Expr.quantile", "quantile", catalog::OneValue::SingleRow),
+            ("Expr.pct_change", "n", catalog::OneValue::Scalar),
+            ("Expr.quantile", "quantile", catalog::OneValue::Scalar),
             ("Expr.shift", "fill_value", catalog::OneValue::Scalar),
             ("Expr.shift", "n", catalog::OneValue::Scalar),
-            ("Expr.top_k", "k", catalog::OneValue::SingleRow),
+            ("Expr.slice", "length", catalog::OneValue::Scalar),
+            ("Expr.slice", "offset", catalog::OneValue::Scalar),
+            ("Expr.top_k", "k", catalog::OneValue::Scalar),
             ("polars.date_range", "end", catalog::OneValue::Scalar),
             ("polars.date_range", "start", catalog::OneValue::Scalar),
             ("polars.datetime_range", "end", catalog::OneValue::Scalar),
