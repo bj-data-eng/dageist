@@ -1365,11 +1365,11 @@ result:
 
 | Decision | Function the components call |
 | --- | --- |
-| Which groups of offers a word's list holds, and the connected inputs it offers | `listsOf`, `listsChainRow`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile |
+| Which groups of offers a word's list holds, and the connected inputs it offers | `listsOf`, `listsChainRow`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile; `listsOf` takes its groups from `GROUPS_OF_WORD`, the table `listedGroups` is made from, and leaves out only the options of a name with none and the functions of a value outside the document |
 | Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `noAddition` in `model/words.ts`; a component that draws no adding for a piece stops compiling when the model gives that piece one |
 | How a value is drawn: as one word, as a chain, or as the lines of a condition | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
 | Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
-| Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts) |
+| Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts); `HeadName` is the type of those names, a step parameter is drawn by one, and `CONDITION_TESTS`, which a `when` reads for its predicates, is the name `HEAD` gives a filter's |
 | Which functions a chain starts from besides a field and a typed value | `START_FUNCTIONS` in `model/catalogue.ts`, which the start list reads through `startOffers` |
 | What a step's report and its rows say, beside its row and at its end | `sayingOf`, `rowEndOf`, `rowsFailure` in [model/report.ts](../ui/packages/steps/src/model/report.ts) |
 
@@ -1383,8 +1383,9 @@ documentation says so rather than pretend otherwise. It is kept with the test, i
 - Which words stand at a place. The components compose their words by their
   structure, so the test states what that structure puts at each place: a value
   slot where a step's head or an option draws a parameter that holds an
-  expression, the word a chain starts from with it, the argument of a method where
-  some method takes an expression first, and after a value a list that adds a
+  expression, the word a chain starts from with it, the argument of a method
+  where the position that holds the expression is held by an argument, which the
+  catalogue's parameter settings say, and after a value a list that adds a
   method and the name of a method. A component that moves a word is not caught.
 - Which group of a list an entry is picked from. A method comes from the methods,
   `when` and `element` from the functions, a field from the fields and a typed
@@ -1401,17 +1402,18 @@ What the editor has no way to draw is written once, in
 gaps. Each gap names what it covers, an entry the editor cannot pick or make, a
 place no word of the editor stands at, a kind of start after which it cannot add
 a method, a parameter it does not set, a kind of parameter that has no drawing,
-or a state of a step's report that says nothing, and it says why. A list shows
-an entry that is declared as disabled with the reason, where it lists the entry.
+a state of a step's report that says nothing, or a kind of value a document
+holds typed in that the host cannot read, and it says why. A list shows an entry
+that is declared as disabled with the reason, where it lists the entry.
 
-Two view tests hold the list against what the engine allows. The host writes
-the grid of every call the engine allows at every place of every kind,
+Three view tests hold the list against what the engine and the host allow. The
+host writes the grid of every call the engine allows at every place of every kind,
 `ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
 classes of dtype in 3 shapes and 4 states of a condition. The grid test,
 `model/grid.test.ts`, runs the functions above over every cell of it and checks
 three things. For each cell, that each start that leads to it can have a method
 added after it. A start is a field, a connected value, a connected list, a typed
-whole number, number or text, or a function that starts a chain; a field and a
+whole number, number, text or flag, or a function that starts a chain; a field and a
 connected list lead to the places of many values, a connected value and a typed
 value to those of one, a typed value to the classes of dtype the host's readings
 give it, and a function to every place of a value, because what a function gives
@@ -1432,6 +1434,48 @@ is built by hand: the host's reports hold no step after a failure, so it is the
 failed step followed by an accepted step with its count changed to not counted,
 as the engine's counts tests show it.
 
+The third test, `model/census.test.ts`, holds the variants the grid cannot list.
+The host writes the census, `ui/packages/host/fixtures/census.json`, from the Rust
+types, so that a variant added to a type reaches it without a hand edit. A type
+that has a list of its own variants, such as the rules of the tables or the
+classes of dtype, is read through that list. Any other is walked by a function in
+`crates/dageist-tauri/src/report/census.rs` that names every variant with no
+wildcard arm, so a variant added to the type does not compile until it has a
+place there. A word in the census is the word the host serializes for the
+variant. The census holds:
+
+- 21 starts: a field, a connected value, a connected list, nothing picked yet, a
+  number, text or flag typed in, and each function that starts a chain, `when`
+  and `element` among them; and the 4 kinds of typed value a document holds as
+  the value of `lit`, each with its class of dtype and whether the host reads
+  typed text as one, and the 17 ways a slot reads a text typed into it.
+- The 12 kinds of parameter, the 5 types of literal, the 3 shapes, the 18 forms
+  of kind and shape the catalogue's parameters have, and the 2 kinds that are set
+  as options, a flag and a choice.
+- The 67 classes of dtype, the 3 shapes of a value, the 3 kinds of place and the
+  4 states of a condition.
+- The 5 causes of a refusal, the 3 sources it comes from, its 3 stages and the
+  20 rules the engine holds that Polars does not, each with what it says.
+- The 4 outcomes of a step, the 3 states of its rows and the 19 states a step
+  can be reported in: its outcome, the cause where it was refused, its rows, and
+  what came before it, nothing, a refused step, an incomplete one, one that
+  failed on the rows or one that was not run.
+- The 3 kinds of input a node is connected to, the 3 places they come from and
+  the 2 kinds of cell the rows show, text and null.
+
+The test decodes the census with the host package's decoders, and for each variant
+asks the model's functions whether the editor has a plan for it. Each start must
+be one the grid test runs. Each kind and form of parameter, and each kind of
+option, must get a control from `model/controls.ts`. Each class, shape and kind of
+place must be a place of the grid. Each cause, source, stage, rule, outcome and
+state must have words from `model/report.ts`, built into a report the host's
+decoders read, so that a word the decoders do not know fails there. Each kind of
+input and cell must have a way to be shown. A variant with no plan fails the
+test, with its words, until the editor draws it or `limits.ts` declares it with
+its reason, and a gap declared and no longer shown fails it too. A change that
+adds a variant to the host or the engine therefore changes the census, and the
+view's tests tell what is left to draw.
+
 Today the declared gaps are these:
 
 - A further case of a condition, which the editor draws as a `when` after
@@ -1448,11 +1492,18 @@ Today the declared gaps are these:
   allows methods there ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 - A step Polars accepts that was not counted because a step before it failed on
   the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
+- A flag typed in. A document may hold one as the value of `lit`, but the host
+  reads typed text as a number or as text and never as a flag, so the editor has
+  no way to type one; one a document holds is drawn as a function, and the grid
+  test runs a start of it.
 
-The tests do not cover which classes of dtype the editor can type as an
-argument: the document holds a number, text or a flag as a literal, so a typed
-date, duration or Boolean literal, which the engine may allow, is not on the
-list.
+A document holds a number, text or a flag as the value of `lit`, and nothing else
+typed in: a Boolean, a date, a time, a moment or a length of time is not a literal
+a document holds, and the engine allows none as a start. A date is read from typed
+text as the text of the day, with the class `Date`, and a duration as text with no
+class, each in a slot that takes one as an argument, not at the start of an
+expression; the census lists those readings, and each gets the control of its
+slot.
 
 ## The Step Document
 
