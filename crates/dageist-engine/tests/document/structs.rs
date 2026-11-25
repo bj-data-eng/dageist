@@ -1155,3 +1155,52 @@ fn arithmetic_given_a_struct_to_meet_is_not_said_by_the_walk() {
     );
     assert_the_walk_cannot_tell(&found, "a sum of a number and a struct");
 }
+
+// ---------------------------------------------------------------------------
+// A number typed without a dtype in a struct that is a join's key
+
+fn struct_of_a_number(typed: bool) -> Value {
+    let literal = if typed {
+        call(
+            "polars.lit",
+            json!({ "value": { "integer": 5 }, "dtype": { "dtype": "Int32" } }),
+        )
+    } else {
+        call("polars.lit", json!({ "value": { "integer": 5 } }))
+    };
+    chain(
+        call(
+            "polars.struct",
+            json!({ "exprs": many(vec![chain(literal, vec![])]) }),
+        ),
+        vec![],
+    )
+}
+
+#[test]
+fn a_struct_of_an_untyped_number_as_a_key_is_not_said_by_the_walk_where_polars_matches_its_dtype() {
+    // Polars keeps the number open in a key, so the key does not match the same struct with the
+    // number given its dtype, though both resolve to one. See Polars issue draft 23.
+    let key = |left: bool, right: bool| {
+        step(
+            "s",
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "other" },
+                "left_on": many(vec![struct_of_a_number(left)]),
+                "right_on": many(vec![struct_of_a_number(right)]),
+            }),
+        )
+    };
+    let open_and_typed = ask_step(key(false, true));
+    assert!(
+        matches!(open_and_typed.polars, Said::Refuses(_)),
+        "{:?}",
+        open_and_typed.polars
+    );
+    assert_the_walk_cannot_tell(&open_and_typed, "a key of an open number");
+    // Both typed is the keys of one dtype, which the walk says.
+    let typed = ask_step(key(true, true));
+    assert_eq!(typed.polars, Said::Accepts, "{:?}", typed.polars);
+    assert!(typed.walk_refusal.is_none(), "{:?}", typed.walk_refusal);
+}
