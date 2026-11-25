@@ -52,9 +52,18 @@ impl Workspace {
         Ok(Self::of(starting_session(revision, directory, steps)?))
     }
 
-    /// The session, locked for as long as the guard is held.
+    /// The session, locked for as long as the guard is held. Hold it only to read or make an
+    /// edit; work a graph out on a [`snapshot`](Self::snapshot), so that reading files does not
+    /// keep other commands waiting.
     pub(crate) fn lock(&self) -> MutexGuard<'_, Session> {
         self.session.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// A copy of the session as it is now, to work out or read without holding the lock. Every
+    /// view of it carries the revisions it was taken at, so a later edit made on it is checked
+    /// against the session as it is then.
+    pub(crate) fn snapshot(&self) -> Session {
+        self.lock().clone()
     }
 }
 
@@ -473,17 +482,29 @@ impl FrameView {
         }
     }
 
-    const fn frame(self) -> Frame {
-        Frame {
+    /// The frame this asks for.
+    ///
+    /// # Errors
+    ///
+    /// When it gives only one of a width and a height: a size has both, or neither while the box
+    /// takes the size its content needs.
+    fn frame(self) -> Result<Frame, ErrorView> {
+        let size = match (self.width, self.height) {
+            (Some(width), Some(height)) => Some(Size { width, height }),
+            (None, None) => None,
+            _ => {
+                return Err(ErrorView::new(
+                    "placing the box: a size gives both its width and its height",
+                ));
+            }
+        };
+        Ok(Frame {
             place: Place {
                 x: self.x,
                 y: self.y,
             },
-            size: match (self.width, self.height) {
-                (Some(width), Some(height)) => Some(Size { width, height }),
-                _ => None,
-            },
-        }
+            size,
+        })
     }
 }
 
@@ -635,7 +656,7 @@ fn graph_view_of(session: &Session, workings: &Workings) -> GraphView {
 
 /// The graph the host holds, worked out, as the canvas draws it.
 pub fn graph_view(workspace: &Workspace) -> GraphView {
-    let session = workspace.lock();
+    let session = workspace.snapshot();
     let workings = session.work_out();
     graph_view_of(&session, &workings)
 }
@@ -811,11 +832,15 @@ pub fn edit_graph_view(
     request: &GraphEditRequest,
 ) -> Result<GraphEditAnswerView, ErrorView> {
     let edit = request.edit()?;
-    let mut session = workspace.lock();
-    match session
-        .edit_graph(revision, &edit)
-        .map_err(|error| stale(error, "graph"))?
-    {
+    // The edit is made under the lock, and the edited graph worked out after it is let go.
+    let (made, session) = {
+        let mut session = workspace.lock();
+        let made = session
+            .edit_graph(revision, &edit)
+            .map_err(|error| stale(error, "graph"))?;
+        (made, session.clone())
+    };
+    match made {
         Ok(added) => {
             let workings = session.work_out();
             Ok(GraphEditAnswerView::Edited {
@@ -850,9 +875,10 @@ pub fn place_view(
     frame: FrameView,
 ) -> Result<PlacedView, ErrorView> {
     let node = known_id(node)?;
+    let frame = frame.frame()?;
     let mut session = workspace.lock();
     session
-        .place(revision, &node, frame.frame())
+        .place(revision, &node, frame)
         .map_err(|error| stale(error, "layout"))?
         .map_err(unknown)?;
     Ok(PlacedView {

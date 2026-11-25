@@ -90,17 +90,25 @@ fn main() -> ExitCode {
     let context = tauri::generate_context!();
     // Held until the job ends, whichever way `main` returns or a panic unwinds out of it.
     let _polars = PolarsSession::start();
-    // The starting graph reads the sample's tables from files written for this run.
-    let sample = std::env::temp_dir().join(format!("dageist-sample-{}", std::process::id()));
+    // The starting graph reads the sample's tables from files written for this run, in a folder
+    // made for it that no other run has, which is removed when the run ends.
+    let sample = match sample_folder() {
+        Ok(folder) => folder,
+        Err(error) => {
+            eprintln!("dageist: a folder for the sample's tables cannot be made: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let workspace =
         match graph::Workspace::starting(document::first_revision(SystemTime::now()), &sample) {
             Ok(workspace) => workspace,
             Err(error) => {
                 eprintln!("dageist: the starting graph cannot be made: {error:?}");
+                remove_sample_folder(&sample);
                 return ExitCode::FAILURE;
             }
         };
-    match invocation {
+    let code = match invocation {
         cli::Invocation::Application => match open_application(context, workspace) {
             0 => ExitCode::SUCCESS,
             code => ExitCode::from(u8::try_from(code).unwrap_or(1)),
@@ -114,5 +122,26 @@ fn main() -> ExitCode {
                 }
             }
         }
-    }
+    };
+    remove_sample_folder(&sample);
+    code
+}
+
+/// Makes a new folder for the sample's tables in the system's temporary folder. It is made, not
+/// found: a folder of that name that is already there is refused, so no file is written through
+/// a folder someone else put there.
+fn sample_folder() -> std::io::Result<std::path::PathBuf> {
+    let started = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_nanos());
+    let folder =
+        std::env::temp_dir().join(format!("dageist-sample-{}-{started}", std::process::id()));
+    std::fs::create_dir(&folder)?;
+    Ok(folder)
+}
+
+/// Removes the sample's folder. A folder that cannot be removed is left for the system, which
+/// clears its temporary folder in time; so is the folder of a bridge stopped by a signal.
+fn remove_sample_folder(folder: &std::path::Path) {
+    let _ = std::fs::remove_dir_all(folder);
 }

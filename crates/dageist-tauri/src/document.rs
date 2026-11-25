@@ -850,7 +850,7 @@ pub fn document_state_view(
     node: &str,
 ) -> Result<DocumentStateView, ErrorView> {
     let node = known_id(node)?;
-    let session = workspace.lock();
+    let session = workspace.snapshot();
     let (document, revision) = session
         .document(&node)
         .ok_or_else(|| document_error(DocumentError::NoSuchTransform(node.clone())))?;
@@ -874,9 +874,10 @@ fn state_of(
 /// reports it: the edited document at its new revision with what running it reported, or why the
 /// engine refused.
 ///
-/// The edited document is held only once its report has been made, and the session is locked
-/// from the check of the revision to that, so that an answer that fails leaves the document and
-/// its revision as they were and two edits made against one revision cannot both be made.
+/// The edit and its report are made on a snapshot of the session, which must be at `revision`,
+/// without holding the lock. The edited document is then held only if the document is still at
+/// `revision`, under the lock, so that an answer that fails leaves the document and its revision
+/// as they were and two edits made against one revision cannot both be made.
 ///
 /// # Errors
 ///
@@ -889,35 +890,35 @@ pub fn edit_view(
     request: &EditRequest,
 ) -> Result<EditAnswerView, ErrorView> {
     let node = known_id(node)?;
-    let mut session = workspace.lock();
-    let bindings = crate::node::bindings_of(&session, &node)?;
-    let mut answer = None;
-    // The closure's error is the failure of the command, or nothing when the engine refused the
-    // edit, whose answer is then already made.
-    let made = session.edit_document(&node, revision, |document| {
-        match request.make(document).map_err(Some)? {
-            Ok(edited) => {
-                let state = state_of(&edited, revision + 1, &bindings).map_err(Some)?;
-                answer = Some(EditAnswerView::Edited(state));
-                Ok(edited)
-            }
-            Err(error) => {
-                answer = Some(EditAnswerView::Refused {
-                    revision,
-                    place: place_view(error.place()),
-                    problem: problem_view(error.problem()),
-                    message: error.to_string(),
-                });
-                Err(None)
-            }
-        }
-    });
-    match made.map_err(document_error)? {
-        Err(Some(failure)) => Err(failure),
-        Ok(_) | Err(None) => {
-            answer.ok_or_else(|| ErrorView::new("editing the document: no answer was made"))
-        }
+    let snapshot = workspace.snapshot();
+    // A stale edit is said to be stale before anything else about it.
+    let (document, current) = snapshot
+        .document(&node)
+        .ok_or_else(|| document_error(DocumentError::NoSuchTransform(node.clone())))?;
+    if current != revision {
+        return Err(stale(revision, current));
     }
+    let edited = match request.make(document)? {
+        Ok(edited) => edited,
+        Err(error) => {
+            return Ok(EditAnswerView::Refused {
+                revision,
+                place: place_view(error.place()),
+                problem: problem_view(error.problem()),
+                message: error.to_string(),
+            });
+        }
+    };
+    let bindings = crate::node::bindings_of(&snapshot, &node)?;
+    let state = state_of(&edited, revision + 1, &bindings)?;
+    workspace
+        .lock()
+        .edit_document(&node, revision, |_| {
+            Ok::<_, std::convert::Infallible>(edited)
+        })
+        .map_err(document_error)?
+        .unwrap_or_else(|never| match never {});
+    Ok(EditAnswerView::Edited(state))
 }
 
 #[cfg(test)]

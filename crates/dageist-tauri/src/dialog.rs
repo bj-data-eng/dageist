@@ -106,3 +106,38 @@ pub fn choose_file(window: tauri::WebviewWindow, purpose: Purpose) -> Option<Fil
     }?;
     chosen.into_path().ok().map(|path| FileView::chosen(&path))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use std::sync::mpsc;
+
+    use super::{Dialogs, Purpose, Request};
+    use crate::graph::FileView;
+
+    #[test]
+    fn a_request_reaches_the_thread_that_runs_dialogs_and_its_answer_comes_back() {
+        let (requests, asked) = mpsc::channel::<Request>();
+        let runner = std::thread::spawn(move || {
+            // Stands in for the main thread: it answers by the purpose, as a dialog would.
+            for request in asked {
+                let chosen = (request.purpose == Purpose::Save)
+                    .then(|| FileView::chosen(Path::new("/data/out.csv")));
+                request.answer.send(chosen).expect("the asker waits");
+            }
+        });
+        let dialogs = Dialogs::to(requests);
+        assert_eq!(
+            dialogs.choose(Purpose::Save),
+            Some(FileView::chosen(Path::new("/data/out.csv")))
+        );
+        assert_eq!(dialogs.choose(Purpose::Open), None);
+        drop(dialogs);
+        runner.join().expect("the runner ends once no one can ask");
+    }
+
+    #[test]
+    fn dialogs_no_thread_runs_choose_nothing() {
+        assert_eq!(Dialogs::none().choose(Purpose::Open), None);
+    }
+}

@@ -246,3 +246,48 @@ fn the_snapshot_is_what_the_command_returns() {
     let graph = without_folders(serde_json::to_value(graph_view(&sample())).expect("a view"));
     crate::snapshot::check("graph.json", &graph, REFRESH, REFRESH_COMMAND);
 }
+
+#[test]
+fn a_transform_with_nothing_to_start_from_says_so_and_a_stale_edit_on_it_is_stale() {
+    let workspace = sample();
+    let revision = graph_view(&workspace).revision;
+    let request: super::GraphEditRequest = serde_json::from_value(
+        json!({ "edit": "add", "kind": "transform", "follows": null, "name": "Loose" }),
+    )
+    .expect("a request");
+    super::edit_graph_view(&workspace, revision, &request).expect("added");
+    let state = crate::document::document_state_view(&workspace, "loose").expect_err("no state");
+    let state = serde_json::to_value(&state).expect("a view");
+    assert_eq!(state["kind"], "failed");
+    assert!(
+        state["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("no table to start from")),
+        "{state}"
+    );
+    // The document starts at revision 0, so an edit made against another is stale before the
+    // missing table is mentioned.
+    let edit: crate::document::EditRequest = serde_json::from_value(
+        json!({ "kind": "removeStep", "step": { "stepIndex": 0, "stepId": "sort", "path": [] } }),
+    )
+    .expect("a request");
+    let stale = crate::document::edit_view(&workspace, "loose", 7, &edit).expect_err("stale");
+    assert_eq!(
+        serde_json::to_value(&stale).expect("a view")["kind"],
+        "stale"
+    );
+}
+
+#[test]
+fn a_size_needs_both_its_width_and_its_height() {
+    let workspace = sample();
+    let revision = graph_view(&workspace).layout_revision;
+    let half = super::FrameView {
+        x: 0,
+        y: 0,
+        width: Some(300),
+        height: None,
+    };
+    assert!(super::place_view(&workspace, revision, NODE, half).is_err());
+    assert_eq!(graph_view(&workspace).layout_revision, revision);
+}

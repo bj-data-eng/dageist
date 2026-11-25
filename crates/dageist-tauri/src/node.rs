@@ -140,7 +140,7 @@ pub(crate) fn bindings_of(session: &Session, node: &NodeId) -> Result<Bindings, 
 /// When the graph has no such transform, or its steps have no table to start from.
 pub fn node_view(workspace: &Workspace, node: &str) -> Result<NodeView, ErrorView> {
     let node = known_id(node)?;
-    let bindings = bindings_of(&workspace.lock(), &node)?;
+    let bindings = bindings_of(&workspace.snapshot(), &node)?;
     let columns = bindings.start.columns().map_err(ErrorView::from)?;
     Ok(NodeView {
         source: SourceView {
@@ -221,7 +221,7 @@ pub fn rows_view(
         ));
     }
     let node = known_id(node)?;
-    let session = workspace.lock();
+    let session = workspace.snapshot();
     let (document, current) = session
         .document(&node)
         .ok_or_else(|| document_error(dageist::DocumentError::NoSuchTransform(node.clone())))?;
