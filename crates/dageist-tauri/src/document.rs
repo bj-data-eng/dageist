@@ -911,13 +911,14 @@ pub fn edit_view(
     };
     let bindings = crate::node::bindings_of(&snapshot, &node)?;
     let state = state_of(&edited, revision + 1, &bindings)?;
-    workspace
-        .lock()
+    let mut session = workspace.lock();
+    session
         .edit_document(&node, revision, |_| {
             Ok::<_, std::convert::Infallible>(edited)
         })
         .map_err(document_error)?
         .unwrap_or_else(|never| match never {});
+    workspace.save(&session, &dageist::steps_message(session.graph(), &node))?;
     Ok(EditAnswerView::Edited(state))
 }
 

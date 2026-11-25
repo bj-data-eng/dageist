@@ -209,6 +209,23 @@ by making the edits that would build it: every node is added, then each is set,
 and then each reference is connected. A graph read from a workspace therefore
 passes every check an edit on the canvas passes.
 
+The core saves its session to a workspace and opens one, with each step
+document written as the engine writes it. The host keeps the workspace beside
+the session and saves after every edit of the graph, every box moved and every
+edit of a transform's steps, before it lets the session go, so the commits come
+in the order the edits were made. Each commit says what its edit did in the
+names the canvas shows, such as "Rename Claims to Documents" or "Connect Claims
+to the start of Claim timing". Until a developer signs into GitHub in the
+application, the commits are made by `dageist <workspace@dageist.invalid>`; the
+`.invalid` domain can never be registered, so no account is credited with them.
+A save that fails is reported as the edit's failure, but the edit is made: the
+session holds it, and the next save commits it with that save's own message.
+For now the application keeps the sample in a workspace made for each run, in
+the run's temporary folder. The window packs the workspace whole as it exits,
+and the run then removes the folder. The bridge is stopped by a signal, so it
+packs the workspace only every 100 commits and leaves the folder for the system
+to clear.
+
 A node's history is the commits that changed its folder, read from the branch's
 one line of commits; moving its box is in the history of the layout, not of the
 node. Undo inside a node will be a new commit that puts back what the last of

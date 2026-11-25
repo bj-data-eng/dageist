@@ -3,8 +3,10 @@
 //! dialog that picks a source's or an output's file.
 //!
 //! The host holds one [`Workspace`]: the core's session, which holds the graph,
-//! its layout and each transform's step document. Each command locks it for as
-//! long as it answers. The commands are thin: the functions beside them answer,
+//! its layout and each transform's step document, and the workspace on disk every
+//! edit is saved to as a commit. Each command locks it for as long as it answers,
+//! and an edit is saved before the lock is let go, so the commits are in the order
+//! the edits were made. The commands are thin: the functions beside them answer,
 //! so that the bridge serves the same views. The shapes mirror `GraphView`,
 //! `GraphEditRequest`, `GraphEditAnswerView` and `FrameView` in
 //! `ui/packages/host/src/contract.ts`.
@@ -25,31 +27,115 @@ use tauri::State;
 use crate::report::FieldView;
 use crate::sample_table::{ErrorKind, ErrorView};
 
-/// What the host holds while a graph is edited: the core's session. Tauri keeps it as managed
-/// state; the bridge keeps it for as long as it runs.
+/// Where the host saves the session's edits.
+#[derive(Debug)]
+enum Keeping {
+    /// Nowhere, as the tests hold a session.
+    #[cfg(test)]
+    Nowhere,
+    /// In a workspace on disk.
+    In(Box<dageist::workspace::Workspace>),
+    /// In a workspace that was closed as the application exits; an edit made after it is
+    /// refused its save.
+    Closed,
+}
+
+/// What the host holds while a graph is edited: the core's session, and the workspace on disk
+/// its edits are saved to. Tauri keeps it as managed state; the bridge keeps it for as long as it
+/// runs.
 #[derive(Debug)]
 pub struct Workspace {
     session: Mutex<Session>,
+    /// The workspace on disk, when the session is kept in one. It is locked only while the
+    /// session is, after it, so that saves are made in the order of the edits.
+    kept: Mutex<Keeping>,
 }
 
 impl Workspace {
-    /// A workspace holding `session`.
+    /// A workspace holding `session`, saved nowhere, as the tests hold one.
+    #[cfg(test)]
     pub const fn of(session: Session) -> Self {
         Self {
             session: Mutex::new(session),
+            kept: Mutex::new(Keeping::Nowhere),
+        }
+    }
+
+    /// A workspace holding `session`, every edit of which is saved to `kept`.
+    pub fn kept(session: Session, kept: dageist::workspace::Workspace) -> Self {
+        Self {
+            session: Mutex::new(session),
+            kept: Mutex::new(Keeping::In(Box::new(kept))),
         }
     }
 
     /// The workspace the application opens on: the claim-timing sample as a graph, its tables
-    /// written as Parquet files in `directory`, with every revision starting at `revision`.
+    /// written as Parquet files in `tables` under `directory`, kept in a new workspace on disk in
+    /// `workspace` under it, with every revision starting at `revision`.
     ///
     /// # Errors
     ///
-    /// When the tables cannot be written or the sample's steps cannot be read.
+    /// When the tables cannot be written, the sample's steps cannot be read, or the workspace
+    /// cannot be made.
     pub fn starting(revision: u64, directory: &Path) -> Result<Self, ErrorView> {
         let steps = Document::read(ClaimTiming::STEPS_JSON)
             .map_err(|error| ErrorView::new(format!("reading the sample steps: {error}")))?;
-        Ok(Self::of(starting_session(revision, directory, steps)?))
+        let session = starting_session(revision, &directory.join("tables"), steps)?;
+        let kept = dageist::workspace::Workspace::create(
+            &directory.join("workspace"),
+            &session.saved(),
+            dageist::unsigned_author(),
+            dageist::workspace::Options::default(),
+        )
+        .map_err(|error| ErrorView::new(format!("making the workspace: {error}")))?;
+        Ok(Self::kept(session, kept))
+    }
+
+    /// Saves the session, as it is after an edit, to the workspace on disk with `message`. It
+    /// takes the session's guard, so that a save is made only under the lock the edit was made
+    /// under, and saves keep the edits' order.
+    ///
+    /// # Errors
+    ///
+    /// When the workspace cannot be written, or has been closed. The edit is held either way, and
+    /// a later save of an open workspace holds it too.
+    pub(crate) fn save(
+        &self,
+        session: &MutexGuard<'_, Session>,
+        message: &str,
+    ) -> Result<(), ErrorView> {
+        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        match &mut *kept {
+            #[cfg(test)]
+            Keeping::Nowhere => Ok(()),
+            Keeping::In(kept) => kept
+                .save(&session.saved(), message)
+                .map(drop)
+                .map_err(|error| ErrorView::new(format!("saving the workspace: {error}"))),
+            Keeping::Closed => Err(ErrorView::new(
+                "the workspace is closed, so the edit is not saved",
+            )),
+        }
+    }
+
+    /// Closes the workspace on disk, packing it whole, once the edit being made is done. An edit
+    /// made after it is refused its save.
+    ///
+    /// # Errors
+    ///
+    /// When the workspace cannot be packed.
+    pub fn close(&self) -> Result<(), ErrorView> {
+        let _session = self.lock();
+        let kept = std::mem::replace(
+            &mut *self.kept.lock().unwrap_or_else(PoisonError::into_inner),
+            Keeping::Closed,
+        );
+        match kept {
+            Keeping::In(kept) => kept
+                .close()
+                .map_err(|error| ErrorView::new(format!("closing the workspace: {error}"))),
+            _ => Ok(()),
+        }
     }
 
     /// The session, locked for as long as the guard is held. Hold it only to read or make an
@@ -857,9 +943,14 @@ pub fn edit_graph_view(
     // The edit is made under the lock, and the edited graph worked out after it is let go.
     let (made, session) = {
         let mut session = workspace.lock();
+        let before = session.graph().clone();
         let made = session
             .edit_graph(revision, &edit)
             .map_err(|error| stale(error, "graph"))?;
+        if made.is_ok() {
+            let message = dageist::graph_message(&edit, &before, session.graph());
+            workspace.save(&session, &message)?;
+        }
         (made, session.clone())
     };
     match made {
@@ -903,6 +994,7 @@ pub fn place_view(
         .place(revision, &node, frame)
         .map_err(|error| stale(error, "layout"))?
         .map_err(unknown)?;
+    workspace.save(&session, &dageist::place_message(session.graph(), &node))?;
     Ok(PlacedView {
         layout_revision: session.layout_revision(),
     })

@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [dependencies]
 dageist-engine = { path = "crates/dageist-engine", version = "=0.1.0" }
 dageist-graph = { path = "crates/dageist-graph", version = "=0.1.0" }
+dageist-workspace = { path = "crates/dageist-workspace", version = "=0.1.0" }
 
 [lints]
 workspace = true

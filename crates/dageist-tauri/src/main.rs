@@ -74,7 +74,14 @@ fn open_application(context: tauri::Context, workspace: graph::Workspace) -> i32
         ])
         .build(context)
         .unwrap_or_else(|error| panic!("dageist failed to run: {error}"))
-        .run_return(|_application, _event| {})
+        .run_return(|application, event| {
+            // The workspace on disk is packed whole as the application exits.
+            if let tauri::RunEvent::Exit = event
+                && let Err(error) = tauri::Manager::state::<graph::Workspace>(application).close()
+            {
+                eprintln!("dageist: the workspace was not packed: {error:?}");
+            }
+        })
 }
 
 fn main() -> ExitCode {
