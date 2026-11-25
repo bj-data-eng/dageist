@@ -261,8 +261,16 @@ impl ExpressionRequest {
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum StartRequest {
     Hole,
-    Input { name: String },
-    Field { name: String },
+    Input {
+        name: String,
+    },
+    Field {
+        name: String,
+    },
+    /// A number or text typed in, which an expression that has methods is retyped by.
+    Literal {
+        literal: LiteralRequest,
+    },
 }
 
 impl StartRequest {
@@ -271,6 +279,9 @@ impl StartRequest {
             Self::Hole => Ok(Start::Hole),
             Self::Input { name } => Ok(Start::Input(name.clone())),
             Self::Field { name } => Start::field(name.as_str())
+                .map_err(|refusal| ErrorView::of(ErrorKind::Failed, refusal.to_string())),
+            Self::Literal { literal } => Expression::literal(&literal.literal())
+                .map(|made| made.start().clone())
                 .map_err(|refusal| ErrorView::of(ErrorKind::Failed, refusal.to_string())),
         }
     }

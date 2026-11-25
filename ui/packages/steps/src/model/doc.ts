@@ -199,6 +199,23 @@ export function fieldNameOf(call: CallView): string | null {
   return name !== undefined && more.length === 0 ? name : null;
 }
 
+/** A number or text typed in, as the words the editor shows it by. */
+export type Typed = Extract<Shape, { readonly kind: 'literal' }>;
+
+/**
+ * Returns the number or text a call of `polars.lit` holds alone, as it is shown, or `null` where
+ * the call is another or holds a value the editor shows no word for, such as a flag.
+ */
+export function typedOf(call: CallView): Typed | null {
+  if (call.entry !== LITERAL_ID || call.arguments.length !== 1) return null;
+  const value = call.arguments[0]?.value;
+  if (value?.kind === 'integer' || value?.kind === 'float') {
+    return { kind: 'literal', shown: value.shown, text: false };
+  }
+  if (value?.kind === 'string') return { kind: 'literal', shown: value.value, text: true };
+  return null;
+}
+
 /** Returns what an expression is, in the editor's terms. */
 export function shapeOf(expression: ExpressionView): Shape {
   if (expression.links.length > 0) return { kind: 'chain' };
@@ -211,14 +228,7 @@ export function shapeOf(expression: ExpressionView): Shape {
     case 'call': {
       const name = fieldNameOf(start.call);
       if (name !== null) return { kind: 'column', name };
-      if (start.call.entry === LITERAL_ID && start.call.arguments.length === 1) {
-        const value = start.call.arguments[0]?.value;
-        if (value?.kind === 'integer' || value?.kind === 'float') {
-          return { kind: 'literal', shown: value.shown, text: false };
-        }
-        if (value?.kind === 'string') return { kind: 'literal', shown: value.value, text: true };
-      }
-      return { kind: 'chain' };
+      return typedOf(start.call) ?? { kind: 'chain' };
     }
     default:
       return start satisfies never;

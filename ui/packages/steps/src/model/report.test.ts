@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CallView, DocumentStepView } from '@dageist/host';
+import type { CallView, DocumentStepView, StepReportView } from '@dageist/host';
 import { decodeDocumentState, decodeRun, HostError } from '@dageist/host';
 
 import documentFixture from '../../../host/fixtures/node-document.json';
@@ -10,7 +10,15 @@ import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
 import type { PreparedRun, PreparedStep } from './report';
-import { isChanged, prepareRun, rowEndOf, rowsFailure, rowsToShow, sayingOf } from './report';
+import {
+  isChanged,
+  linkHint,
+  prepareRun,
+  rowEndOf,
+  rowsFailure,
+  rowsToShow,
+  sayingOf,
+} from './report';
 
 // What the host reports of the claim-timing steps, and what the editor shows of it. The fixtures
 // are written from Rust; the expectations are written by hand from what the steps do.
@@ -33,7 +41,7 @@ function named(...ids: string[]): DocumentStepView[] {
 const COLUMN: Path = [parameterSegment('named_exprs'), valueSegment(0)];
 
 /** The place a link stands in, in a select, after a value of `dtype`. */
-function selectAfter(dtype: string, shape: 'one' | 'many') {
+function selectAfter(dtype: string, shape: 'one' | 'many' | 'counted') {
   return {
     context: { outer: 'select', nested: null },
     after: { kind: 'value', dtype, shape },
@@ -121,6 +129,44 @@ describe('the rows each step kept and the first values it added', () => {
   });
 });
 
+describe('a step the engine did not run on the rows because an earlier step failed there', () => {
+  const variants = decodeRun(variantsFixture);
+  const found = variants.steps.find((step) => step.id === 'failed');
+  if (found === undefined) throw new Error('no failed step');
+  const failed: StepReportView = found;
+  /** The step `failed` followed by a step Polars accepts, which the host says was not reached. */
+  function after(named_: string): PreparedRun {
+    const reached: StepReportView = {
+      ...failed,
+      id: 'later',
+      count: { kind: 'notReached', failed: named_ },
+    };
+    return prepareRun(named('failed', 'later'), { ...variants, steps: [failed, reached] });
+  }
+
+  it('is valid, was not counted, and says which step failed there', () => {
+    expect(stepOf(after('failed'), 'later')).toMatchObject({
+      status: 'valid',
+      rows: null,
+      first: new Map(),
+      rowsProblem: 'Not run on the sample rows: step 1 failed on them.',
+    });
+  });
+
+  it('is said to be after a step before it where the step that failed is not in the document', () => {
+    expect(stepOf(after('gone'), 'later').rowsProblem).toBe(
+      'Not run on the sample rows: a step before it failed on them.',
+    );
+  });
+
+  it('is said as a matter beside its row, as a step that failed there is', () => {
+    expect(sayingOf(stepOf(after('failed'), 'later'))).toEqual({
+      says: 'problem',
+      lines: ['Not run on the sample rows: step 1 failed on them.'],
+    });
+  });
+});
+
 describe('a step the engine could not run on the rows', () => {
   it('is valid, and says what went wrong', () => {
     const variants = decodeRun(variantsFixture);
@@ -175,8 +221,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'holiday_count').chains.get(pathKey(COLUMN))).toEqual({
       source: 'Date',
       links: ['UInt32'],
-      // A list of dates gives many; its length is one count.
-      places: [selectAfter('Date', 'many'), selectAfter('UInt32', 'one')],
+      // A list of dates is a count of values of its own; its length is one value.
+      places: [selectAfter('Date', 'counted'), selectAfter('UInt32', 'one')],
     });
   });
 
@@ -230,6 +276,29 @@ describe('a refusal', () => {
       source: null,
       links: [],
     });
+  });
+
+  it('shows the class before each link, which the walk gives where no dtype is built, worded as a class', () => {
+    const refusedChain = stepOf(run, 'total').chains.get(pathKey(COLUMN));
+
+    // The sum of a text column: the walk puts the sum after a value of the class String.
+    expect(refusedChain?.places[0]).toEqual(selectAfter('String', 'many'));
+    expect(linkHint(refusedChain, 0)).toBe('after a value of the class String');
+  });
+
+  it('shows the dtype in and the dtype out of a link of a step that was planned, not a class', () => {
+    const planned = stepOf(prepared, 'step_index').chains.get(pathKey(COLUMN));
+
+    expect(linkHint(planned, 0)).toBe('String → UInt32');
+    expect(linkHint(planned, 1)).toBe('UInt32 → UInt32');
+  });
+
+  it('shows nothing of a link whose place the walk did not give, or of a chain the engine did not report', () => {
+    const refusedChain = stepOf(run, 'total').chains.get(pathKey(COLUMN));
+
+    // The place after the refused link is not known, and nothing stands after it.
+    expect(linkHint(refusedChain, 1)).toBeNull();
+    expect(linkHint(undefined, 0)).toBeNull();
   });
 });
 

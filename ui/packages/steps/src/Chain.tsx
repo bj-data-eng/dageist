@@ -79,8 +79,15 @@ import type { PreparedOffer } from './model/offers';
 import { chosenOptions } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import type { ChainDtypes } from './model/report';
-import { fieldArgument, inputArgument, listArgument, literalExpression } from './model/requests';
-import { OFFERED_INPUTS, actionsOf, chainBodyOf } from './model/words';
+import { linkHint } from './model/report';
+import {
+  fieldArgument,
+  inputArgument,
+  listArgument,
+  literalExpression,
+  literalStart,
+} from './model/requests';
+import { OFFERED_INPUTS, actionsOf, chainBodyOf, startWordOf } from './model/words';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -278,12 +285,6 @@ function ArgumentSlot({
   );
 }
 
-/** Returns the dtype a method of a chain is handed: what stands before the method at `index`, or the start for the first. */
-function dtypeBefore(dtypes: ChainDtypes | undefined, index: number): string | null {
-  if (dtypes === undefined) return null;
-  return index === 0 ? dtypes.source : (dtypes.links[index - 1] ?? null);
-}
-
 interface MethodLinkProps {
   /** The way to the call of the method in the step. */
   readonly path: Path;
@@ -317,8 +318,7 @@ function MethodLink({
   const rule = argumentRule(entry);
   // What the catalogue calls the method; a method it lacks keeps its Polars name.
   const shown = entry?.name ?? methodNameOf(call.entry) ?? call.entry;
-  const input = dtypeBefore(dtypes, index);
-  const output = dtypes?.links[index] ?? null;
+  const dtypeHint = linkHint(dtypes, index);
   // Where the method stands, as the engine reported it: what may follow what comes before it.
   const place = dtypes?.places[index] ?? null;
   const wrong = wrongAt(path);
@@ -366,7 +366,7 @@ function MethodLink({
         <Hint
           lines={[
             `${shown} · ${entry?.hint ?? 'not in the catalogue'}`,
-            ...(input === null ? [] : [`${input} → ${output ?? 'does not fit'}`]),
+            ...(dtypeHint === null ? [] : [dtypeHint]),
           ]}
           code={false}
         >
@@ -430,6 +430,60 @@ function MethodLink({
 interface Insertion {
   readonly at: number;
   readonly anchor: HTMLElement;
+}
+
+/** Where the list that adds a method is, and which place of an expression the method is added at. */
+export interface MethodInsertionProps {
+  /** The way to the expression in the step. */
+  readonly path: Path;
+  /** The place among the links of the expression the method is added at. */
+  readonly at: number;
+  /** The piece the list opens from. */
+  readonly anchor: HTMLElement;
+  /** Says the list was closed, with or without a pick. */
+  readonly onDone: () => void;
+}
+
+/**
+ * Draws the list of methods that may follow what stands before the place `at` of the expression
+ * at `path`, as the engine says of the place its walk reported, and adds the one that is picked.
+ */
+export function MethodInsertion({
+  path,
+  at,
+  anchor,
+  onDone,
+}: MethodInsertionProps): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const fresh = useContext(FreshContext);
+  const edits = useStepEdits();
+  const step = useStepAt();
+  const dtypes = usePreparedStep()?.chains.get(pathKey(path));
+  // What may stand where a method would be added, as the engine says of the place it reported.
+  const place = dtypes?.places[at] ?? null;
+  const inserting = useOffers(place === null ? null : placeRequest(place));
+  return (
+    <Popover anchor={anchor} onDismiss={onDone}>
+      <OfferList
+        placeholder="Search the methods"
+        groups={(typed) =>
+          listedGroups(
+            { word: 'insertion' },
+            {
+              methods: () =>
+                methodGroups(catalogue, inserting, place !== null, typed, (_name, picked) => {
+                  fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
+                  void edits.insertLink(path, at, picked.id, standingOf(place));
+                }),
+            },
+          )
+        }
+        keepOpen={false}
+        wide={false}
+        onDone={onDone}
+      />
+    </Popover>
+  );
 }
 
 /** What a chain shows and reports. */
@@ -506,9 +560,6 @@ export function ChainBlocks({
   const adding: Insertion | null =
     insertion ??
     (opensMethods && startWord !== null ? { at: links.length, anchor: startWord } : null);
-  // What may stand where a method would be added, as the engine says of the place it reported.
-  const addPlace = adding === null ? null : (dtypes?.places[adding.at] ?? null);
-  const inserting = useOffers(addPlace === null ? null : placeRequest(addPlace));
   // What may start the chain: the functions, the connected inputs and the fields the engine allows.
   const startList = useListState();
   const startKnown = positions.length > 0;
@@ -519,15 +570,22 @@ export function ChainBlocks({
     frame,
     node,
   );
+  // What is typed into the list of a start that is a number or text typed in is read as the value
+  // it is retyped as.
+  const startReadings = useReadTyped(
+    startList.open && chainBody.body === 'typed'
+      ? {
+          text: startList.typed,
+          typed: { kind: 'expression' },
+          slot: startKnown ? { start: positions, argument: null } : null,
+        }
+      : null,
+  );
   const addAt = (at: number): ((anchor: HTMLElement) => void) => {
     return (anchor) => {
       setOpensMethods(false);
       setInsertion({ at, anchor });
     };
-  };
-  const insert = (at: number, picked: PreparedOffer): void => {
-    fresh.mark(freshKey(step.id, under(path, linkSegment(at))));
-    void edits.insertLink(path, at, picked.id, standingOf(dtypes?.places[at]));
   };
   // A chain is taken away by the word it starts from, and a method is added after it.
   const chainActions = actionsOf('chainStart');
@@ -545,7 +603,11 @@ export function ChainBlocks({
       node,
       typed,
       fits: startFits,
+      readings: startReadings,
       inputs: OFFERED_INPUTS,
+      onLiteral: (picked: LiteralView) => {
+        void edits.setStart(path, literalStart(picked));
+      },
       onInput: (picked: string) => {
         void edits.setStart(path, { kind: 'input', name: picked });
       },
@@ -553,27 +615,25 @@ export function ChainBlocks({
         void edits.setStart(path, { kind: 'field', name: picked });
       },
     };
-    return listedGroups(
-      { word: 'chainStart' },
-      {
-        functions: () =>
-          startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
-            if (id === 'polars.when') {
-              fresh.mark(
-                freshKey(
-                  step.id,
-                  under(startPath, parameterSegment(CONDITION_TESTS), itemSegment(0)),
-                ),
-              );
-            } else {
-              fresh.mark(`${freshKey(step.id, path)}:method`);
-            }
-            void edits.startWith(path, id);
-          }),
-        inputs: () => [inputGroup(rows)],
-        fields: () => [fieldGroup(rows)],
-      },
-    );
+    return listedGroups(startWordOf(chainBody), {
+      values: () => [valueGroup(rows)],
+      functions: () =>
+        startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+          if (id === 'polars.when') {
+            fresh.mark(
+              freshKey(
+                step.id,
+                under(startPath, parameterSegment(CONDITION_TESTS), itemSegment(0)),
+              ),
+            );
+          } else {
+            fresh.mark(`${freshKey(step.id, path)}:method`);
+          }
+          void edits.startWith(path, id);
+        }),
+      inputs: () => [inputGroup(rows)],
+      fields: () => [fieldGroup(rows)],
+    });
   };
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
@@ -775,6 +835,20 @@ export function ChainBlocks({
         {methodsDrawn}
       </>
     );
+  } else if (chainBody.body === 'typed') {
+    // A number or text typed in is drawn as the word it is shown by, with its methods after it.
+    body = (
+      <>
+        {startSlot(
+          chainBody.shown,
+          'value',
+          chainBody.text ? 'quoted' : 'plain',
+          [],
+          'What the chain starts from',
+        )}
+        {methodsDrawn}
+      </>
+    );
   } else {
     body = (
       <>
@@ -794,31 +868,7 @@ export function ChainBlocks({
     <>
       {body}
       {adding !== null && (
-        <Popover anchor={adding.anchor} onDismiss={closeList}>
-          <OfferList
-            placeholder="Search the methods"
-            groups={(typed) =>
-              listedGroups(
-                { word: 'insertion' },
-                {
-                  methods: () =>
-                    methodGroups(
-                      catalogue,
-                      inserting,
-                      addPlace !== null,
-                      typed,
-                      (_name, picked) => {
-                        insert(adding.at, picked);
-                      },
-                    ),
-                },
-              )
-            }
-            keepOpen={false}
-            wide={false}
-            onDone={closeList}
-          />
-        </Popover>
+        <MethodInsertion path={path} at={adding.at} anchor={adding.anchor} onDone={closeList} />
       )}
     </>
   );

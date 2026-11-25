@@ -133,14 +133,15 @@ fn a_candidate_as_a_start_is_judged_by_the_context_it_stands_in() {
             .can_end()
             .is_allowed()
     );
-    // A connected value is a literal of its dtype, and a list gives many values.
+    // A connected value is a literal of its dtype, and a list is a count of values of its own: the
+    // values of another table, which are not this table's rows.
     let value = Candidate::Input {
         dtype: Representative::Boolean,
         shape: Shape::One,
     };
     let list = Candidate::Input {
         dtype: Representative::Boolean,
-        shape: Shape::Many,
+        shape: Shape::Counted,
     };
     let shapes = [value, list].map(|candidate| {
         fit(&candidate, &filter)
@@ -150,7 +151,7 @@ fn a_candidate_as_a_start_is_judged_by_the_context_it_stands_in() {
             .expect("it may stand")
             .shape()
     });
-    assert_eq!(shapes, [Shape::One, Shape::Many]);
+    assert_eq!(shapes, [Shape::One, Shape::Counted]);
 }
 
 #[test]

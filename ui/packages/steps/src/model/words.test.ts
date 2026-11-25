@@ -14,6 +14,7 @@ import {
   listsChainRow,
   listsOf,
   noAddition,
+  startWordOf,
   valueDrawing,
 } from './words';
 
@@ -28,6 +29,7 @@ const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 /** Every word of the editor that opens a list, in each form it takes. */
 const WORDS: readonly ListedWord[] = [
   { word: 'chainStart' },
+  { word: 'typedStart' },
   { word: 'method', options: true },
   { word: 'method', options: false },
   { word: 'insertion' },
@@ -66,6 +68,11 @@ describe('the groups each kind of word may list', () => {
 describe('the groups a word lists', () => {
   it('are the functions, inputs and fields for the word a chain starts from', () => {
     expect(listsOf({ word: 'chainStart' })).toEqual(['functions', 'inputs', 'fields']);
+  });
+
+  it('are the typed values first, then the functions, inputs and fields, for the word a typed value starts from', () => {
+    // The typed value is retyped where it stands, so its list offers what a value is typed as.
+    expect(listsOf({ word: 'typedStart' })).toEqual(['values', 'functions', 'inputs', 'fields']);
   });
 
   it('are the options, where the method has some, then the methods, for the name of a method', () => {
@@ -144,28 +151,47 @@ describe('the adding of a piece that has none', () => {
     const entry: TakesNoAddition<'entry'> = true;
     const method: TakesNoAddition<'method'> = false;
     const chainStart: TakesNoAddition<'chainStart'> = false;
+    const startWord: TakesNoAddition<'startWord'> = false;
     const step: TakesNoAddition<'step'> = false;
-    expect([word, entry, method, chainStart, step]).toEqual([true, true, false, false, false]);
+    expect([word, entry, method, chainStart, startWord, step]).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });
 
 describe('how a slot draws the value it holds', () => {
-  it('is as a word for nothing, a connected input, and a number or text typed in', () => {
+  it('is as a word for nothing, and for a connected input or a number or text typed in that is not in the document', () => {
     expect(valueDrawing(null, true)).toEqual({ drawn: 'word', shape: { kind: 'unset' } });
     expect(valueDrawing(chain(HOLE_START), true)).toEqual({
       drawn: 'word',
       shape: { kind: 'unset' },
     });
-    expect(valueDrawing(chain(input('as_of')), true)).toEqual({
+    expect(valueDrawing(chain(input('as_of')), false)).toEqual({
       drawn: 'word',
       shape: { kind: 'input', name: 'as_of' },
     });
-    expect(valueDrawing(chain(calls(lit({ kind: 'integer', shown: '5' }))), true)).toEqual({
+    expect(valueDrawing(chain(calls(lit({ kind: 'integer', shown: '5' }))), false)).toEqual({
       drawn: 'word',
       shape: { kind: 'literal', shown: '5', text: false },
     });
+  });
+
+  it('is as a word that a method can follow for a connected input, and a number or text typed in, in the document', () => {
+    expect(valueDrawing(chain(input('as_of')), true)).toEqual({
+      drawn: 'start',
+      shape: { kind: 'input', name: 'as_of' },
+    });
+    expect(valueDrawing(chain(calls(lit({ kind: 'integer', shown: '5' }))), true)).toEqual({
+      drawn: 'start',
+      shape: { kind: 'literal', shown: '5', text: false },
+    });
     expect(valueDrawing(chain(calls(lit({ kind: 'string', value: 'a' }))), true)).toEqual({
-      drawn: 'word',
+      drawn: 'start',
       shape: { kind: 'literal', shown: 'a', text: true },
     });
   });
@@ -213,6 +239,39 @@ describe('how a chain is laid out', () => {
     expect(chainBodyOf(chain(input('as_of')))).toEqual({ body: 'start' });
     expect(chainBodyOf(chain(HOLE_START))).toEqual({ body: 'start' });
   });
+
+  it('is as the number or text it starts from for a typed value, not as the function that holds it', () => {
+    expect(chainBodyOf(chain(calls(lit({ kind: 'integer', shown: '5' }))))).toEqual({
+      body: 'typed',
+      shown: '5',
+      text: false,
+    });
+    expect(
+      chainBodyOf(chain(calls(lit({ kind: 'string', value: 'a' })), [bare('Expr.abs')])),
+    ).toEqual({ body: 'typed', shown: 'a', text: true });
+  });
+});
+
+describe('the word a chain starts from', () => {
+  it('lists the typed values where the chain starts from a number or text typed in, so it can be retyped', () => {
+    const typed = chainBodyOf(
+      chain(calls(lit({ kind: 'integer', shown: '5' })), [bare('Expr.abs')]),
+    );
+
+    expect(startWordOf(typed)).toEqual({ word: 'typedStart' });
+    expect(listsOf(startWordOf(typed))).toContain('values');
+  });
+
+  it('is the word that lists no typed value for a field, an input and nothing yet', () => {
+    for (const body of [
+      chainBodyOf(chain(calls(col('dcn')))),
+      chainBodyOf(chain(input('as_of'))),
+      chainBodyOf(chain(HOLE_START)),
+    ]) {
+      expect(startWordOf(body)).toEqual({ word: 'chainStart' });
+      expect(listsOf(startWordOf(body))).not.toContain('values');
+    }
+  });
 });
 
 describe('how a line of a condition is drawn', () => {
@@ -250,6 +309,11 @@ describe('what can be done to a piece', () => {
   it('is taking it away only, where the word is one of several, for a value drawn as one word', () => {
     expect(actionsOf('word', true)).toEqual({ add: false, remove: true });
     expect(actionsOf('word', false)).toEqual({ add: false, remove: false });
+  });
+
+  it('is adding a method after it, and taking it away where the word is one of several, for a connected input or a typed value in the document', () => {
+    expect(actionsOf('startWord', true)).toEqual({ add: true, remove: true });
+    expect(actionsOf('startWord', false)).toEqual({ add: true, remove: false });
   });
 
   it('is taking it away only for an entry of pairs', () => {

@@ -550,7 +550,7 @@
     }
   ],
   "outcomes": ["valid", "refused", "incomplete", "notRun"],
-  "rowsStates": ["notCounted", "counted", "failed"],
+  "rowsStates": ["notCounted", "notReached", "counted", "failed"],
   "changes": ["added", "replaced"],
   "states": [
     {
@@ -574,7 +574,7 @@
     {
       "outcome": "valid",
       "cause": null,
-      "rows": "notCounted",
+      "rows": "notReached",
       "after": "failed"
     },
     {

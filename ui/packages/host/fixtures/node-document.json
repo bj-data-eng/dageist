@@ -5705,7 +5705,7 @@
                   "verdict": {
                     "kind": "allowed",
                     "result": "Date",
-                    "shape": "many",
+                    "shape": "counted",
                     "ending": {
                       "kind": "allowed"
                     }
@@ -5715,7 +5715,7 @@
                   "follows": {
                     "kind": "value",
                     "dtype": "Date",
-                    "shape": "many"
+                    "shape": "counted"
                   },
                   "verdict": {
                     "kind": "allowed",
@@ -5736,7 +5736,7 @@
                   "after": {
                     "kind": "value",
                     "dtype": "Date",
-                    "shape": "many"
+                    "shape": "counted"
                   }
                 },
                 {

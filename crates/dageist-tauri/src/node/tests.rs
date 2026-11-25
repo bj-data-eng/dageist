@@ -400,7 +400,7 @@ fn a_step_that_is_refused_is_not_counted_and_nor_are_the_steps_after_it() {
 }
 
 #[test]
-fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_not_counted() {
+fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_name_it() {
     let answer = run_text(failing_text());
     let steps = &answer["steps"];
     // The step is valid by its schema.
@@ -414,7 +414,12 @@ fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_n
         "Polars says what it could not do: {}",
         steps[0]["count"]
     );
-    assert_eq!(steps[1]["count"], json!({ "kind": "notCounted" }));
+    // The step after it is valid and was not run on the rows, which it says by naming the step.
+    assert_eq!(steps[1]["outcome"]["status"], "valid");
+    assert_eq!(
+        steps[1]["count"],
+        json!({ "kind": "notReached", "failed": "date" })
+    );
 }
 
 #[test]

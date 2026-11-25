@@ -652,6 +652,28 @@ as its group, so `window-input-is-not-counted` refuses a count unless the window
 list or explodes them. A join's key that holds a method that takes some of the values is not elementwise, unless it
 goes on to an aggregate: the key `a.head(2).sum()` is one value.
 
+A connected list is a count of values of its own. It is the values of another table, or a list the graph holds,
+so how many it has is not how many rows the table a step reads has: the walk gives it the shape `counted`, whose
+count is not known, and not `many`. A chain that starts from one and gives a value for each of its values stays
+`counted`, and a method that takes an aggregate of it, such as `len` or `sum`, gives one value. The rules of a
+count therefore apply to it. A step that adds it as a column, `with_columns(day = holidays)`, is refused by
+`values-meet-in-count`, and a filter's predicate, a sort key, a window's key and a join's key that end in one are
+refused by the table of counts, each before Polars is asked: Polars fails the same step where the rows run, with a
+length that does not match. A select takes it beside no column, as it takes any count. What takes a count of values
+stays allowed: `is_in(holidays)` looks up in the values and gives one value for each row, and `holidays.len()` is
+one value. An operation of a column and a connected list is refused for the same rule, though the two may have as
+many values by chance: the editor is strict, and a list that is as long as the rows is not told apart from one that
+is not.
+
+The words of such a refusal begin by saying that a connected list is the values of another table, a count of its
+own and not this table's rows. They are said where the refusal is about counts: the count a place refuses, and the
+rules `values-meet-in-count`, `pivot-aggregate-gives-one-value` and `window-input-is-not-counted`. They are said
+where the list stands as the chain that is refused and where it is met with the rows, as an operand (`a + holidays`,
+`holidays.add(a)`), a bound (`a.clip(lower_bound = holidays)`), the value of a condition or an item of a select. A
+refusal that is about something else is worded as it is for any chain: a list of whole numbers is no predicate, and
+that is all a filter says of it. Two connected lists that meet each other are not told apart from two that are as
+many.
+
 The statistics of a column, the places of its largest and smallest values, the tests of truth, the
 approximations and the bitwise methods are more of three families that exist. Aggregate gains `mean`, `median`,
 `std`, `var`, `quantile`, `product`, `skew`, `kurtosis`, `entropy`, `arg_max`, `arg_min`, `nan_max`, `nan_min`,
@@ -1352,9 +1374,9 @@ result:
 
 | Decision | Function the components call |
 | --- | --- |
-| Which groups of offers a word's list holds, and the connected inputs it offers | `listsOf`, `listsChainRow`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile; `listsOf` takes its groups from `GROUPS_OF_WORD`, the table `listedGroups` is made from, and leaves out only the options of a name with none and the functions of a value outside the document |
+| Which groups of offers a word's list holds, and the connected inputs it offers; the word a chain starts from lists the typed values too where it starts from a number or text typed in, so that the value is retyped where it stands and its methods stay | `listsOf`, `listsChainRow`, `startWordOf`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile; `listsOf` takes its groups from `GROUPS_OF_WORD`, the table `listedGroups` is made from, and leaves out only the options of a name with none and the functions of a value outside the document |
 | Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `noAddition` in `model/words.ts`; a component that draws no adding for a piece stops compiling when the model gives that piece one |
-| How a value is drawn: as one word, as a chain, or as the lines of a condition | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
+| How a value is drawn: as one word, as one word that a method can follow, as a chain, or as the lines of a condition; a connected input or a number or text typed in is drawn as a word a method can follow where it stands in the document, and as a word with its methods after it where it has some | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
 | Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
 | Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts); `HeadName` is the type of those names, a step parameter is drawn by one, and `CONDITION_TESTS`, which a `when` reads for its predicates, is the name `HEAD` gives a filter's |
 | Which functions a chain starts from besides a field and a typed value | `START_FUNCTIONS` in `model/catalogue.ts`, which the start list reads through `startOffers` |
@@ -1390,22 +1412,23 @@ gaps. Each gap names what it covers, an entry the editor cannot pick or make, a
 place no word of the editor stands at, a kind of start after which it cannot add
 a method, a parameter it does not set, a kind of parameter that has no drawing,
 a step no list adds, a parameter of a step that is neither drawn in its head nor
-offered as an option, an expression the walk gives no context, a state of a step's report that says nothing, or a kind of
+offered as an option, an expression the walk gives no context, or a kind of
 value a document holds typed in that the host cannot read, and it says why. A list
 shows an entry that is declared as disabled with the reason, where it lists the
 entry.
 
-Four view tests hold the list against what the engine and the host allow. The
+Four view tests hold the editor against what the engine and the host allow, and three of them hold the list of
+gaps. The
 host writes the grid of every call the engine allows at every place of every kind,
 `ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
 classes of dtype in 3 shapes and 4 states of a condition. The grid test,
 `model/grid.test.ts`, runs the functions above over every cell of it and checks
 three things. For each cell, that each start that leads to it can have a method
 added after it. A start is a field, a connected value, a connected list, a typed
-whole number, number, text or flag, or a function that starts a chain; a field and a
-connected list lead to the places of many values, a connected value and a typed
-value to those of one, a typed value to the classes of dtype the host's readings
-give it, and a function to every place of a value, because what a function gives
+whole number, number, text or flag, or a function that starts a chain; a field leads
+to the places of many values, a connected list to those of a count of values, which are
+a list's own, a connected value and a typed value to those of one, a typed value to the
+classes of dtype the host's readings give it, and a function to every place of a value, because what a function gives
 is the engine's to say. For each cell, that each entry the engine allows there
 can be picked or made, and has a row in the list the editor builds from the
 engine's answer. And for each entry, that each of its parameters and options gets
@@ -1415,13 +1438,13 @@ have a method added is one gap, however many entries the engine allows after it.
 What the test finds is compared with the declared gaps, and the comparison
 fails both ways: on a gap that is found and not declared, and on a gap that is
 declared and no longer one, so a gap that is drawn is taken off the list with
-the change that draws it. A second test, `model/states.test.ts`, does the same
-for every outcome of a step, every cause of a refusal and every state of its rows
+the change that draws it. A second test, `model/states.test.ts`, takes
+every outcome of a step, every cause of a refusal and every state of its rows
 that the host can report, built from the reports the host writes, and asks that
-each says something. One of its states, a step after one that failed on the rows,
-is built by hand: the host's reports hold no step after a failure, so it is the
-failed step followed by an accepted step with its count changed to not counted,
-as the engine's counts tests show it.
+each says something. It compares nothing with the declared gaps, for no state of a report is one. A step after one that
+failed on the rows is one of them: the host reports it as not reached, with the step that
+failed, and the editor says beside its row that it was not run on the sample rows and
+which step failed there.
 
 The third test, `model/census.test.ts`, holds the variants the grid cannot list.
 The host writes the census, `ui/packages/host/fixtures/census.json`, from the Rust
@@ -1448,10 +1471,12 @@ The census holds:
   4 states of a condition.
 - The 5 causes of a refusal, the 3 sources it comes from, its 3 stages and the
   20 rules the engine holds that Polars does not, each with what it says.
-- The 4 outcomes of a step, the 3 states of its rows and the 19 states a step
-  can be reported in: its outcome, the cause where it was refused, its rows, and
-  what came before it, nothing, a refused step, an incomplete one, one that
-  failed on the rows or one that was not run.
+- The 4 outcomes of a step, the 4 states of its rows, which are not counted, not
+  reached, counted and failed, and the 19 states a step can be reported in: its
+  outcome, the cause where it was refused, its rows, and what came before it,
+  nothing, a refused step, an incomplete one, one that failed on the rows or one
+  that was not run. A step Polars accepts is not reached only after a step that
+  failed on the rows.
 - The 3 kinds of input a node is connected to, the 3 places they come from and
   the 2 kinds of cell the rows show, text and null.
 - The families the view decodes and decides on: the 2 changes of a column, the 5
@@ -1490,11 +1515,6 @@ Today the declared gaps are these:
 - The parameters of a start or a condition that it does not set: `col`'s further
   names, `lit`'s dtype and its object flag, and the keyword constraints of a
   condition.
-- A connected value, a connected list and a typed whole number, number or text,
-  each drawn as one word that offers no method after it, though the engine
-  allows methods there ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
-- A step Polars accepts that was not counted because a step before it failed on
-  the rows, which says nothing ([#171](https://github.com/bj-data-eng/dageist/issues/171)).
 - The thirteen steps no list adds: the list holds the seven the editor has heads
   for, `with_columns`, `filter`, `sort`, `select`, `rename`, `join` and `pivot`,
   and `drop`, `drop_nans`, `drop_nulls`, `fill_nan`, `first`, `gather_every`,
@@ -1669,8 +1689,7 @@ has, with the words each is shown with. The corpus is the depth: the pieces toge
 documents the engine made and reports it gave, so that a piece the grid and the census cannot
 see, such as a step outside the list or a parameter of a step that is not offered, or a chain in
 which a start, a method and its arguments each fail on their own, shows. A gap can show in more
-than one: a method after a connected value is found at every place by the grid and in each
-document that holds one by the corpus. Each declared gap is held both ways by the test that
+than one: a step no list adds is found by the corpus in each document that holds one. Each declared gap is held both ways by the test that
 finds its kind, `FOUND_BY` in `limits.ts` says which, and the others accept it.
 
 ## The Step Document
@@ -1752,7 +1771,9 @@ the first values are those of the rows the preview gives, except after a join th
 not told to keep the order of its rows, which Polars does not promise;
 the window is the only table that is counted, because it is held in memory
 and bounded. A step Polars accepts but cannot collect on those rows is reported
-as failed, and the steps after it are not counted. A connected input is
+as failed, and each step after it that Polars accepts is reported as not reached,
+naming the step that failed: it was not run on the rows, which is not the same as
+no rows read. A connected input is
 reported with what supplies it, and a value or the first values of a list as
 Polars writes them. Some mistakes, such as `dt.date` on a String
 column, are only found when rows are read, not from the schema; the editor
@@ -1760,7 +1781,7 @@ learns them in advance from the
 [tables of allowed combinations](#which-combinations-polars-allows).
 A chain that starts from a connected input is walked as the run makes it, a
 literal of the input's dtype, so the tables' lines for a literal judge it, and a
-list gives many values where a value gives one. A name that is not connected
+list gives [a count of values](#a-count-of-values) of its own where a value gives one. A name that is not connected
 leaves what follows it not known.
 A number typed without a dtype is walked as the dtype Polars gives it by
 itself, a whole number an `Int32` and one with a fraction a `Float64`, which `fit`

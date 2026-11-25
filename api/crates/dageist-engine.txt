@@ -947,6 +947,8 @@ pub enum dageist_engine::document::StepRows
 pub dageist_engine::document::StepRows::Counted(dageist_engine::document::Counted)
 pub dageist_engine::document::StepRows::Failed(polars_error::PolarsError)
 pub dageist_engine::document::StepRows::NotCounted
+pub dageist_engine::document::StepRows::NotReached
+pub dageist_engine::document::StepRows::NotReached::failed: dageist_engine::document::StepId
 pub enum dageist_engine::document::SyntaxProblem
 pub dageist_engine::document::SyntaxProblem::ControlCharacter(char)
 pub dageist_engine::document::SyntaxProblem::DuplicateKey(alloc::string::String)

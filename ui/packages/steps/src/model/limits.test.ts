@@ -12,7 +12,7 @@ import { GAPS, coverKey, editorLimit } from './limits';
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 
 describe('the declared gaps', () => {
-  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, the steps no list adds and the parameters of a step that are not offered, a report that says nothing, a flag that cannot be typed and a flag and several dtypes that are not shown', () => {
+  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, the steps no list adds and the parameters of a step that are not offered, a flag that cannot be typed and a flag and several dtypes that are not shown', () => {
     expect(sorted(GAPS.map((gap) => coverKey(gap.cover)))).toEqual(
       sorted([
         'entry ChainedThen.otherwise',
@@ -34,15 +34,9 @@ describe('the declared gaps', () => {
         'parameter polars.lit allow_object',
         'parameter polars.lit dtype',
         'parameter polars.when constraints',
-        'report notCountedAfterRowsFailure',
         'shown literal flag',
         'shown resolution several',
         'noContext LazyFrame.filter constraints',
-        'start connectedList',
-        'start connectedValue',
-        'start typedFloat',
-        'start typedInteger',
-        'start typedText',
         'step LazyFrame.drop',
         'step LazyFrame.drop_nans',
         'step LazyFrame.drop_nulls',
@@ -68,14 +62,6 @@ describe('the declared gaps', () => {
     expect(new Set(keys).size).toBe(keys.length);
     for (const gap of GAPS) {
       expect(gap.reason.length, coverKey(gap.cover)).toBeGreaterThan(20);
-    }
-  });
-
-  it('name the issue that is to draw what a connected input, a typed value and a report leave undrawn', () => {
-    for (const gap of GAPS) {
-      if (gap.cover.kind === 'start' || gap.cover.kind === 'report') {
-        expect(gap.reason, coverKey(gap.cover)).toContain('#171');
-      }
     }
   });
 

@@ -325,6 +325,13 @@ const readColumnValues: Decode<ColumnValuesView> = readRecord(
 
 const readCountView: Decode<CountView> = readTagged<CountView>('kind', {
   notCounted: { fields: [], read: () => ({ kind: 'notCounted' }) },
+  notReached: {
+    fields: ['failed'],
+    read: (fields, path) => ({
+      kind: 'notReached',
+      failed: readField(fields, path, 'failed', readString),
+    }),
+  },
   counted: {
     fields: ['received', 'kept', 'first'],
     read: (fields, path) => ({

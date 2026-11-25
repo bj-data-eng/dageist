@@ -12,6 +12,7 @@ import {
   listOfOne,
   literalArgument,
   literalExpression,
+  literalStart,
   wordArgument,
 } from './requests';
 
@@ -22,6 +23,23 @@ const text = (value: string): LiteralView => ({ kind: 'text', value, shown: `"${
 const valueOf = (type: 'integer' | 'float' | 'string' | 'date' | 'any'): KindView => ({
   kind: 'value',
   type,
+});
+
+describe('a typed literal as what an expression starts from', () => {
+  it('is the start of one word of the number or text, which an edit puts where the start was', () => {
+    expect(literalStart(integer(3))).toEqual({
+      kind: 'literal',
+      literal: { kind: 'integer', value: 3 },
+    });
+    expect(literalStart(float(1.5))).toEqual({
+      kind: 'literal',
+      literal: { kind: 'float', value: 1.5 },
+    });
+    expect(literalStart(text('x'))).toEqual({
+      kind: 'literal',
+      literal: { kind: 'text', value: 'x' },
+    });
+  });
 });
 
 describe('a typed literal as the argument of a parameter', () => {

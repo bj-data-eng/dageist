@@ -56,7 +56,7 @@ export interface Start {
 /** A value place of one of the classes `dtypes` and of shape `shape`, or of any class where `dtypes` is `null`. */
 function valueAfter(
   dtypes: ReadonlySet<string> | null,
-  shape: 'one' | 'many',
+  shape: 'one' | 'many' | 'counted',
 ): (after: AfterView) => boolean {
   return (after) =>
     after.kind === 'value' && after.shape === shape && (dtypes === null || dtypes.has(after.dtype));
@@ -175,7 +175,8 @@ export const STARTS: readonly Start[] = [
     kind: 'connectedList',
     name: LIST.name,
     expression: chain(input(LIST.name)),
-    leads: valueAfter(null, 'many'),
+    // The values of another table: a count of their own, and not the rows of this one.
+    leads: valueAfter(null, 'counted'),
   },
   typedStart('typedInteger'),
   typedStart('typedFloat'),

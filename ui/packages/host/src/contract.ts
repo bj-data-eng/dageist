@@ -592,8 +592,10 @@ export interface ColumnValuesView {
 
 /** What running a step on the rows of the working window came to. */
 export type CountView =
-  /** The step was not run on rows: the run read none, or a step before it was refused, incomplete or failed on the rows. */
+  /** The step was not run on rows: the run read none, or a step before it was refused or incomplete, or it was itself. */
   | { readonly kind: 'notCounted' }
+  /** Polars accepts the step, and it was not run on the rows because the step `failed` before it could not be. */
+  | { readonly kind: 'notReached'; readonly failed: string }
   /** The step was given `received` rows and kept `kept`, with the first values of each column it changed. */
   | {
       readonly kind: 'counted';
@@ -876,7 +878,8 @@ export type ExpressionRequest =
 export type StartRequest =
   | { readonly kind: 'hole' }
   | { readonly kind: 'input'; readonly name: string }
-  | { readonly kind: 'field'; readonly name: string };
+  | { readonly kind: 'field'; readonly name: string }
+  | { readonly kind: 'literal'; readonly literal: LiteralRequest };
 
 /**
  * An argument an edit gives a parameter. Its kind is the kind of the parameter it is for, as the

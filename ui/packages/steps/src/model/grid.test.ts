@@ -17,9 +17,12 @@ import {
   findGaps,
   grid,
 } from '../../test-support/grid-gaps';
+import type { Start } from '../../test-support/grid-gaps';
+import { HOLE_START, chain } from '../../test-support/expressions';
 import { isDrawn } from '../../test-support/places';
 import { sorted } from '../../test-support/sorted';
 import { stepOptionParameters } from './catalogue';
+import { chainBodyOf, listsOf, startWordOf } from './words';
 import type { Catalogue } from './catalogue';
 import { settingOf } from './controls';
 import type { Gap } from './limits';
@@ -87,7 +90,7 @@ describe('the places the engine was asked about', () => {
 });
 
 /** Whether the first start of `kind` leads to a place of a value of the class `dtype` and shape `shape`. */
-function leadsTo(kind: string, dtype: string, shape: 'one' | 'many'): boolean {
+function leadsTo(kind: string, dtype: string, shape: 'one' | 'many' | 'counted'): boolean {
   return (
     STARTS.find((start) => start.kind === kind)?.leads({ kind: 'value', dtype, shape }) ?? false
   );
@@ -131,13 +134,31 @@ describe('the starts that are run', () => {
     expect(leadsTo('typedFlag', 'Boolean', 'many')).toBe(false);
   });
 
-  it('lead to the places of one value for a connected value and a typed value, and of many for a field and a list', () => {
+  it('lead to the places of one value for a connected value and a typed value, of many for a field, and of a count for a list', () => {
     expect(leadsTo('connectedValue', 'Int32', 'one')).toBe(true);
     expect(leadsTo('connectedValue', 'Int32', 'many')).toBe(false);
     expect(leadsTo('field', 'Int32', 'many')).toBe(true);
     expect(leadsTo('field', 'Int32', 'one')).toBe(false);
-    expect(leadsTo('connectedList', 'Int32', 'many')).toBe(true);
+    // A list is the values of another table: a count of its own, and not the rows of this one.
+    expect(leadsTo('connectedList', 'Int32', 'counted')).toBe(true);
+    expect(leadsTo('connectedList', 'Int32', 'many')).toBe(false);
     expect(leadsTo('connectedList', 'Int32', 'one')).toBe(false);
+  });
+});
+
+describe('the starts that are typed in', () => {
+  it('are drawn by a word that lists the typed values, so that a value can be retyped where it stands', () => {
+    // A typed value with methods after it has no other word to be retyped by: a start is changed by
+    // the word it is drawn with.
+    const typed = STARTS.filter(
+      (start) => start.kind.startsWith('typed') && start.kind !== 'typedFlag',
+    );
+    expect(typed).toHaveLength(3);
+    for (const start of typed) {
+      const body = chainBodyOf(start.expression);
+      expect(body.body, start.kind).toBe('typed');
+      expect(listsOf(startWordOf(body)), start.kind).toContain('values');
+    }
   });
 });
 
@@ -154,18 +175,10 @@ describe('the grid, run through the functions the components call', () => {
     expect(compare(found, GAPS).stale).toEqual([]);
   });
 
-  it('finds nothing after a connected input or a typed value, though the engine allows methods there', () => {
-    // A connected single value or list and a typed whole number, number or text is drawn as one
-    // word, which has no way to add a method after it (#171). A field and a function are drawn as chains.
+  it('finds no start after which a method cannot be added, for a connected input and a typed value are drawn so that one can', () => {
     expect(
       [...found.gaps.values()].filter((gap) => gap.cover.kind === 'start').map((gap) => gap.cover),
-    ).toEqual([
-      { kind: 'start', start: 'connectedValue' },
-      { kind: 'start', start: 'connectedList' },
-      { kind: 'start', start: 'typedInteger' },
-      { kind: 'start', start: 'typedFloat' },
-      { kind: 'start', start: 'typedText' },
-    ]);
+    ).toEqual([]);
   });
 
   it('finds the entries the engine allows that no list offers, and no others', () => {
@@ -235,15 +248,17 @@ describe('the grid, run through the functions the components call', () => {
 });
 
 describe('a gap that is found and not declared, or declared and not found', () => {
-  it('fails the check where the editor has no way to add after a connected input and the gap is not declared', () => {
-    const without = GAPS.filter(
-      (gap) => !(gap.cover.kind === 'start' && gap.cover.start === 'connectedValue'),
-    );
+  it('fails the check where the editor has no way to add after a start and the gap is not declared', () => {
+    // A start that holds nothing picked is drawn as a word that nothing can follow.
+    const unpicked: Start = {
+      kind: 'connectedValue',
+      name: 'nothing',
+      expression: chain(HOLE_START),
+      leads: (after) => after.kind === 'value' && after.shape === 'one',
+    };
+    const run = findGaps(grid, catalogue, [...STARTS, unpicked], grid.contexts);
 
-    expect(compare(found, without)).toEqual({
-      undeclared: ['start connectedValue'],
-      stale: [],
-    });
+    expect(compare(run, GAPS)).toEqual({ undeclared: ['start connectedValue'], stale: [] });
   });
 
   it('fails the check where a gap is declared that the editor has drawn, such as a method after a field', () => {

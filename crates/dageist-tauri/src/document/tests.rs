@@ -214,6 +214,92 @@ fn a_method_inserted_where_the_report_says_it_stands_gets_the_default_the_tables
     assert_eq!(links[1]["arguments"], json!([]));
 }
 
+/// The way to the number the shift of `small_text` is given, which is typed in.
+fn shifted_by() -> Value {
+    json!([
+        { "kind": "parameter", "name": "named_exprs" },
+        { "kind": "value", "index": 0 },
+        { "kind": "link", "index": 0 },
+        { "kind": "parameter", "name": "n" }
+    ])
+}
+
+/// The expression the shift of `small_text` is given, in a state the host sent.
+fn shift_count(sent: &Value) -> &Value {
+    &sent["document"]["steps"][1]["call"]["arguments"][0]["value"]["entries"][0]["value"]["links"]
+        [0]["arguments"][0]["value"]
+}
+
+#[test]
+fn a_method_inserted_after_a_typed_value_leaves_the_value_where_it_starts_the_expression() {
+    let sent = edit(
+        documents_of(&small_text()),
+        1,
+        json!({
+            "kind": "insertLink",
+            "expression": place(1, "earlier", shifted_by()),
+            "at": 0,
+            "entry": "Expr.abs",
+            "standing": null
+        }),
+    )
+    .expect("an answer");
+    let count = shift_count(&sent);
+    assert_eq!(
+        count["start"],
+        json!({ "kind": "call", "call": {
+            "entry": "polars.lit",
+            "arguments": [{ "parameter": "value", "value": { "kind": "integer", "shown": "1" } }]
+        } })
+    );
+    assert_eq!(
+        count["links"],
+        json!([{ "entry": "Expr.abs", "arguments": [] }])
+    );
+}
+
+#[test]
+fn a_typed_value_that_starts_an_expression_with_methods_is_retyped_with_its_methods_kept() {
+    let documents = documents_of(&small_text());
+    let make = |revision: u64, edit: Value| {
+        edit_view(
+            &documents,
+            revision,
+            &serde_json::from_value::<EditRequest>(edit).expect("a request"),
+        )
+        .expect("an answer")
+    };
+    make(
+        1,
+        json!({
+            "kind": "insertLink",
+            "expression": place(1, "earlier", shifted_by()),
+            "at": 0,
+            "entry": "Expr.abs",
+            "standing": null
+        }),
+    );
+    // The number is typed again where it stands: the start is another value and the method stays.
+    make(
+        2,
+        json!({
+            "kind": "setStart",
+            "expression": place(1, "earlier", shifted_by()),
+            "start": { "kind": "literal", "literal": { "kind": "integer", "value": 7 } }
+        }),
+    );
+    let sent = state(&documents);
+    let count = shift_count(&sent);
+    assert_eq!(
+        count["start"]["call"]["arguments"],
+        json!([{ "parameter": "value", "value": { "kind": "integer", "shown": "7" } }])
+    );
+    assert_eq!(
+        count["links"],
+        json!([{ "entry": "Expr.abs", "arguments": [] }])
+    );
+}
+
 #[test]
 fn an_edit_made_against_an_older_revision_is_refused_and_changes_nothing() {
     let documents = documents_of(&small_text());

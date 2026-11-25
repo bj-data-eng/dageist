@@ -190,14 +190,14 @@ describe('the report of running the claim-timing steps', () => {
   });
 
   it('asks the tables about a chain that starts from a connected list, as a literal of its dtype', () => {
-    // `holidays` is a list of dates: many values of a date, and its length is one count.
+    // `holidays` is a list of dates: a count of values of a date of its own, and its length is one value.
     const walked = stepNamed(run, 'holiday_count').walk.expressions[0];
     expect(stepNamed(run, 'holiday_count').walk.notKnown).toBeNull();
     expect(walked?.calls[0]).toEqual({
       follows: { kind: 'start' },
-      verdict: { kind: 'allowed', result: 'Date', shape: 'many', ending: { kind: 'allowed' } },
+      verdict: { kind: 'allowed', result: 'Date', shape: 'counted', ending: { kind: 'allowed' } },
     });
-    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'many' });
+    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'counted' });
     expect(walked?.calls[1]?.verdict).toEqual({
       kind: 'allowed',
       result: 'UInt32',
@@ -207,7 +207,7 @@ describe('the report of running the claim-timing steps', () => {
     expect(walked?.places).toEqual([
       {
         context: { outer: 'select', nested: null },
-        after: { kind: 'value', dtype: 'Date', shape: 'many' },
+        after: { kind: 'value', dtype: 'Date', shape: 'counted' },
       },
       {
         context: { outer: 'select', nested: null },
@@ -538,7 +538,12 @@ function runOf(count: unknown): unknown {
 
 describe('the columns a step changed and how its rows were counted', () => {
   it('are read as the host sends them, each way a count can be', () => {
-    for (const count of [COUNTED, { kind: 'notCounted' }, { kind: 'failed', reason: 'no' }]) {
+    for (const count of [
+      COUNTED,
+      { kind: 'notCounted' },
+      { kind: 'notReached', failed: 'date' },
+      { kind: 'failed', reason: 'no' },
+    ]) {
       expect(stepsOf(decodeRun(runOf(count)))[0]).toEqual(handWrittenStep(count));
     }
   });
@@ -555,7 +560,7 @@ describe('the columns a step changed and how its rows were counted', () => {
     expect(
       refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kind'], 'partial')).message,
     ).toBe(
-      '$.steps[0].count.kind: must be one of "notCounted", "counted", "failed", not "partial"',
+      '$.steps[0].count.kind: must be one of "notCounted", "notReached", "counted", "failed", not "partial"',
     );
     expect(refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kept'], 'four')).message).toBe(
       '$.steps[0].count.kept: must be a whole number, not a string',
@@ -569,6 +574,11 @@ describe('the columns a step changed and how its rows were counted', () => {
     expect(
       refusal(withField(runOf({ kind: 'notCounted' }), ['steps', 0, 'count'], 'kept', 1)).message,
     ).toBe('$.steps[0].count: has the field "kept", which the contract lacks');
+    expect(
+      refusal(
+        replaced(runOf({ kind: 'notReached', failed: 'date' }), ['steps', 0, 'count', 'failed'], 3),
+      ).message,
+    ).toBe('$.steps[0].count.failed: must be a string, not a number');
     expect(refusal(without(runOf(COUNTED), ['steps', 0], 'count')).message).toBe(
       '$.steps[0]: is missing the field "count"',
     );

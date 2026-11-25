@@ -118,9 +118,19 @@ fn no_state_is_listed_twice() {
 fn a_step_is_counted_or_fails_on_its_rows_only_when_it_is_accepted_after_steps_that_ran() {
     let held = census();
     for state in held["states"].as_array().expect("a list") {
-        if state["rows"] != "notCounted" {
+        if state["rows"] == "notReached" {
+            // Only a step Polars accepts is not reached, and only after a step that failed there.
+            assert_eq!(state["outcome"], "valid", "{state}");
+            assert_eq!(state["after"], "failed", "{state}");
+        } else if state["rows"] != "notCounted" {
             assert_eq!(state["outcome"], "valid", "{state}");
             assert_eq!(state["after"], "nothing", "{state}");
+        } else {
+            // A step Polars accepts after one that failed is not reached, not left uncounted.
+            assert!(
+                !(state["outcome"] == "valid" && state["after"] == "failed"),
+                "{state}"
+            );
         }
         // A step is not run after one that was refused or incomplete, and only then.
         let blocked =

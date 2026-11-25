@@ -422,6 +422,27 @@
         "notKnown": null
       },
       "atDefault": []
+    },
+    {
+      "id": "not_reached",
+      "summary": "by a",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [],
+        "changes": []
+      },
+      "count": {
+        "kind": "notReached",
+        "failed": "failed"
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      },
+      "atDefault": []
     }
   ]
 }

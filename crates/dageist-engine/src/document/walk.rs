@@ -222,6 +222,7 @@ impl Step {
         let mut walker = Walker {
             zones: Vec::new(),
             selected: Vec::new(),
+            of_lists: Vec::new(),
             step: self.call(),
             source,
             inputs,
@@ -341,6 +342,8 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
+    /// Whether the chain the link is part of starts from a connected list.
+    from_a_list: bool,
 }
 
 /// What a chain has so far.
@@ -397,6 +400,8 @@ struct Walker<'a> {
     /// The items of a select, where each is, and what it gives: the values of the items are met
     /// by one another in the table the select gives.
     selected: Vec<(Place, Shape, Count)>,
+    /// Where an expression is a chain from a connected list that still gives a count of its values.
+    of_lists: Vec<Place>,
 }
 
 /// The output names of a join's keys before the first whose name is not known, in
@@ -1122,15 +1127,47 @@ impl Walker<'_> {
         }
     }
 
+    /// Whether `value` is, or holds, an expression that starts from a connected list.
+    fn starts_from_a_list(&self, value: &Value) -> bool {
+        match value {
+            Value::Expression(expression) => {
+                matches!(expression.start(), Start::Input(name) if self.inputs.is_list(name))
+            }
+            Value::Many(items) => items.iter().any(|item| self.starts_from_a_list(item)),
+            _ => false,
+        }
+    }
+
+    /// Whether `call` is given, as an argument that gives a count of values, a chain from a
+    /// connected list.
+    fn is_given_a_list(&self, call: &Call, arguments: &[(String, Operand)]) -> bool {
+        arguments.iter().any(|(name, operand)| {
+            operand.shape == Shape::Counted
+                && call
+                    .argument(name)
+                    .is_some_and(|value| self.starts_from_a_list(value))
+        })
+    }
+
     /// Meets what parts give together, refusing where they are not as many as one another, and
-    /// giving what they are before the first that is not.
-    fn meet_all(&mut self, parts: impl Iterator<Item = (Shape, Count)>) -> (Shape, Count) {
+    /// giving what they are before the first that is not. `of_a_list` says a part is a connected
+    /// list's values, which the words of the refusal then say.
+    fn meet_all(
+        &mut self,
+        parts: impl Iterator<Item = (Shape, Count)>,
+        of_a_list: bool,
+    ) -> (Shape, Count) {
         let mut met = (Shape::One, Count::NotKnown);
         for part in parts {
             match meet(met, part) {
                 Some(next) => met = next,
                 None => {
                     if let Err(refusal) = allowed::rule_forbids_values_of_other_counts() {
+                        let refusal = if of_a_list {
+                            allowed::refusal_of_a_connected_list(&refusal)
+                        } else {
+                            refusal
+                        };
                         self.refuse(&refusal, false);
                     }
                     return met;
@@ -1162,6 +1199,15 @@ impl Walker<'_> {
                 Some(next) => met = next,
                 None => {
                     if let Err(refusal) = allowed::rule_forbids_values_of_other_counts() {
+                        // A list among the items so far, or this one, is what the others are met with.
+                        let listed = self.selected[..=at]
+                            .iter()
+                            .any(|(held, _, _)| self.of_lists.contains(held));
+                        let refusal = if listed {
+                            allowed::refusal_of_a_connected_list(&refusal)
+                        } else {
+                            refusal
+                        };
                         self.refusal.get_or_insert(WalkRefusal {
                             place,
                             refusal,
@@ -1559,6 +1605,9 @@ impl Walker<'_> {
             zone: None,
             width: None,
         };
+        // Whether the chain starts from a connected list, which the words of a refusal then say.
+        let from_a_list =
+            matches!(expression.start(), Start::Input(name) if self.inputs.is_list(name));
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
         let mut cur = Cur::Dead;
@@ -1723,6 +1772,7 @@ impl Walker<'_> {
                                         .iter()
                                         .filter(|(_, operand)| operand.known && operand.reliable)
                                         .map(|(_, operand)| (operand.shape, operand.count)),
+                                    self.is_given_a_list(start, &start_arguments),
                                 ),
                                 taken: start_arguments
                                     .iter()
@@ -1869,6 +1919,7 @@ impl Walker<'_> {
                     width,
                     widened,
                     zone,
+                    from_a_list,
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -1903,6 +1954,19 @@ impl Walker<'_> {
         {
             last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
         }
+        // A chain that goes on from a connected list and still gives a count of its values is the
+        // values of another table, which the words of a refusal of it say.
+        let of_a_list = from_a_list
+            && matches!(
+                &cur,
+                Cur::Value {
+                    shape: Shape::Counted,
+                    ..
+                }
+            );
+        if of_a_list {
+            self.of_lists.push(place.clone());
+        }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
             // A value of a condition in a filter need be a Boolean only where
@@ -1913,7 +1977,13 @@ impl Walker<'_> {
                 ending = last_end;
             }
             if let Some(Ending::Refused(refusal)) = &ending {
-                self.refuse(&refusal.clone(), true);
+                let refusal = if of_a_list {
+                    allowed::refusal_of_a_connected_list(refusal)
+                } else {
+                    refusal.clone()
+                };
+                self.refuse(&refusal, true);
+                ending = Some(Ending::Refused(refusal));
             } else if let Some(Ending::NotKnown(unknown)) = &ending {
                 self.blind(format!("whether it may end is not known: {unknown}"));
             }
@@ -2101,8 +2171,20 @@ impl Walker<'_> {
             width,
             widened,
             zone,
+            from_a_list,
         } = around;
         let entry = link.entry();
+        // What the link follows is the values of another table where the chain started from a
+        // connected list and still gives a count of its values.
+        let receiver_listed = from_a_list
+            && matches!(
+                &cur,
+                Cur::Value {
+                    shape: Shape::Counted,
+                    ..
+                }
+            );
+        let involves_a_list = receiver_listed || self.is_given_a_list(link, arguments);
         // A window is refused a value of one row that a part widened, whose output is longer than
         // its input.
         if widened
@@ -2583,6 +2665,11 @@ impl Walker<'_> {
             && replaces_by_another_count(entry, arguments, receiver)
             && let Err(refusal) = allowed::rule_forbids_values_of_other_counts()
         {
+            let refusal = if involves_a_list {
+                allowed::refusal_of_a_connected_list(&refusal)
+            } else {
+                refusal
+            };
             self.refuse(&refusal, false);
             return (
                 Cur::Dead,
@@ -2618,6 +2705,11 @@ impl Walker<'_> {
                 {
                     Ok(found) => found,
                     Err(refusal) => {
+                        let refusal = if involves_a_list {
+                            allowed::refusal_of_a_connected_list(&refusal)
+                        } else {
+                            refusal
+                        };
                         self.refuse(&refusal, false);
                         return (
                             Cur::Dead,
@@ -2679,6 +2771,11 @@ impl Walker<'_> {
                                 let Err(refusal) = allowed::rule_forbids_values_of_other_counts()
                                 else {
                                     unreachable!("the rule always refuses")
+                                };
+                                let refusal = if involves_a_list {
+                                    allowed::refusal_of_a_connected_list(&refusal)
+                                } else {
+                                    refusal
                                 };
                                 self.refuse(&refusal, false);
                                 return (

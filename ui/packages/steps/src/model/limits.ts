@@ -1,11 +1,11 @@
 /**
  * @file The one list of what the step editor does not yet express of what the engine allows. Each
  * declared gap names what it covers, an entry, a place, a start, a parameter, a step, a parameter of
- * a step, an expression the walk gives no context, a state of a report, a kind of value typed in, or
- * something a document or a report holds that the editor does not show, and says why. Four tests find the gaps, each of the kinds that
- * `FOUND_BY` names for it, and fail on a gap that is found and not declared, and on a gap that is
- * declared and not found. The grid test runs the model's functions for every place the engine was
- * asked about; the test of states does the same for every state of a step's report; the census
+ * a step, an expression the walk gives no context, a kind of value typed in, or something a
+ * document or a report holds that the editor does not show, and says why. Three tests find the
+ * gaps, each of the kinds that `FOUND_BY` names for it, and fail on a gap that is found and not
+ * declared, and on a gap that is declared and not found. The grid test runs the model's functions
+ * for every place the engine was asked about; the census
  * test holds every variant the host lists against what the editor can draw; and the corpus test
  * rebuilds every piece of every document the engine made, and finds the steps, the parameters of
  * steps and the expressions without a context that the grid does not reach. The corpus test accepts any gap declared of a kind another test
@@ -38,11 +38,6 @@ export type StartKind =
   /** A function that starts a chain. */
   | 'function';
 
-/** The states of a step's report that the editor has no words for. */
-export type ReportState =
-  /** A step Polars accepts that was not counted because a step before it failed on the rows. */
-  'notCountedAfterRowsFailure';
-
 /** What a declared gap covers. */
 export type Cover =
   /** An entry the engine allows that the editor cannot pick or make. */
@@ -61,15 +56,13 @@ export type Cover =
   | { readonly kind: 'step'; readonly entry: string }
   /** A parameter of a step that the editor draws neither in the step's head nor as an option. */
   | { readonly kind: 'stepParameter'; readonly entry: string; readonly parameter: string }
-  /** A state of a step's report that says nothing. */
-  | { readonly kind: 'report'; readonly state: ReportState }
   /** A kind of number, text or flag a document holds typed in, which the editor has no way to type. */
   | { readonly kind: 'typed'; readonly literal: string }
   /** What a document or a report holds that the editor does not show, by what it is. */
   | { readonly kind: 'shown'; readonly what: string };
 
 /**
- * What finds the gaps of each kind of cover: the grid test, the test of states, the census test, or
+ * What finds the gaps of each kind of cover: the grid test, the census test, or
  * the corpus test.
  */
 export const FOUND_BY = {
@@ -81,10 +74,9 @@ export const FOUND_BY = {
   noContext: 'corpus',
   step: 'corpus',
   stepParameter: 'corpus',
-  report: 'states',
   typed: 'census',
   shown: 'census',
-} as const satisfies Readonly<Record<Cover['kind'], 'grid' | 'states' | 'census' | 'corpus'>>;
+} as const satisfies Readonly<Record<Cover['kind'], 'grid' | 'census' | 'corpus'>>;
 
 /** One declared gap: what it covers and why. */
 export interface Gap {
@@ -111,8 +103,6 @@ export function coverKey(cover: Cover): string {
       return `step ${cover.entry}`;
     case 'stepParameter':
       return `stepParameter ${cover.entry} ${cover.parameter}`;
-    case 'report':
-      return `report ${cover.state}`;
     case 'typed':
       return `typed ${cover.literal}`;
     case 'shown':
@@ -128,10 +118,6 @@ const FURTHER_CASE = 'the editor draws one case of a when; a further case follow
 /** Why a function that starts a chain is not offered. */
 const NOT_A_START =
   'the editor starts a chain from a field, an input, a typed value, when and element; this function is not offered where an expression starts';
-
-/** Why nothing is added after a connected input or a typed value. */
-const NOTHING_AFTER_A_WORD =
-  'a connected input or a typed value is drawn as one word that offers no method after it, though the engine allows methods there (#171)';
 
 /** Why no flag can be typed in. */
 const NO_TYPED_FLAG =
@@ -162,11 +148,6 @@ function entryGap(entry: string, reason: string): Gap {
 /** Declares the parameter `parameter` of `entry`, which its drawing does not set, for `reason`. */
 function parameterGap(entry: string, parameter: string, reason: string): Gap {
   return { cover: { kind: 'parameter', entry, parameter }, reason };
-}
-
-/** Declares that nothing is added after what an expression starts from as `start`. */
-function startGap(start: StartKind): Gap {
-  return { cover: { kind: 'start', start }, reason: NOTHING_AFTER_A_WORD };
 }
 
 /** Every gap the editor has, declared. */
@@ -240,20 +221,9 @@ export const GAPS: readonly Gap[] = [
     'constraints',
     'a condition is its predicates; keyword constraints are not drawn',
   ),
-  // What an expression starts from, after which the editor offers no method.
-  startGap('connectedValue'),
-  startGap('connectedList'),
-  startGap('typedInteger'),
-  startGap('typedFloat'),
-  startGap('typedText'),
   { cover: { kind: 'typed', literal: 'flag' }, reason: NO_TYPED_FLAG },
   { cover: { kind: 'shown', what: 'literal flag' }, reason: FLAG_NOT_SHOWN },
   { cover: { kind: 'shown', what: 'resolution several' }, reason: SEVERAL_NOT_SHOWN },
-  {
-    cover: { kind: 'report', state: 'notCountedAfterRowsFailure' },
-    reason:
-      'a step after one that failed on the rows is accepted and not counted, so the editor says nothing of it (#171)',
-  },
 ];
 
 /**

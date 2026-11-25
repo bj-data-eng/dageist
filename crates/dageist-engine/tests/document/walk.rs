@@ -7,7 +7,7 @@
 //! rules, not read from a run.
 
 use dageist_engine::allowed::{
-    After, ConditionState, Context, Ending, Inner, Nested, Outer, Place as OfferPlace,
+    After, ConditionState, Context, Count, Ending, Inner, Nested, Outer, Place as OfferPlace,
     RefusalSource, Representative, Rule, Shape, Unknown,
 };
 use dageist_engine::document::{
@@ -16,7 +16,7 @@ use dageist_engine::document::{
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, field_then, many, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -1697,20 +1697,207 @@ fn a_chain_that_starts_from_a_connected_value_is_walked_as_a_literal_of_its_dtyp
 }
 
 #[test]
-fn a_connected_list_gives_many_values_of_its_dtype() {
+fn a_connected_list_gives_a_count_of_values_of_its_own() {
+    // A list that another table gives is as long as that table, not as long as this one: it is a
+    // count of values of its dtype that the data decide, and no more is known of it.
     let walk = walk_of(
         "LazyFrame.select",
         json!({ "exprs": many(vec![from_input("holidays", vec![])]) }),
     );
     assert_eq!(walk.not_known(), None);
+    assert_eq!(walk.refusal(), None);
     let walked = expression_at(&walk, &item("exprs", 0));
     assert_eq!(
         walked.places(),
         vec![at(
             Context::step(Outer::Select),
-            after(Representative::Int64, Shape::Many)
+            after(Representative::Int64, Shape::Counted)
         )]
     );
+    assert_eq!(walked.count(), Some(Count::NotKnown));
+}
+
+/// The step that adds the column `day` from `expression`.
+fn adding_day(expression: Value) -> Walk {
+    walk_of(
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![("day", expression)]) }),
+    )
+}
+
+#[test]
+fn a_connected_list_is_refused_where_the_rows_of_the_table_are_needed() {
+    // Polars refuses the same step where the rows run: a column of two values cannot be added to a
+    // table of three rows.
+    let failed = source()
+        .lazy()
+        .with_columns([lit(Series::new("day".into(), [1_i64, 2])).alias("day")])
+        .collect();
+    assert!(failed.is_err(), "Polars takes a list of two for three rows");
+
+    let walk = adding_day(from_input("holidays", vec![]));
+    let refusal = walk.refusal().expect("a connected list is not the rows");
+    assert!(refusal.at_end());
+    let said = refusal.refusal().reason();
+    assert!(
+        said.contains("a connected list") && said.contains("the values of another table"),
+        "{said}"
+    );
+    // The same of a chain that goes on from the list and still gives a count of its values.
+    let sorted = adding_day(from_input("holidays", vec![call("Expr.sort", json!({}))]));
+    let said = sorted.refusal().expect("a refusal").refusal().reason();
+    assert!(said.contains("the values of another table"), "{said}");
+}
+
+#[test]
+fn a_connected_list_is_not_met_with_the_rows_of_the_table() {
+    // Two values are not the three rows they would be added to, whatever the lengths are.
+    let walk = adding_day(field_then(
+        "a",
+        vec![call(
+            "Expr.add",
+            json!({ "other": from_input("holidays", vec![]) }),
+        )],
+    ));
+    assert_eq!(
+        walk.refusal().expect("a refusal").refusal().source(),
+        RefusalSource::Rule(Rule::ValuesMeetInCount)
+    );
+}
+
+/// What a refusal says, with its rule where a rule refused.
+fn refused_with(walk: &Walk) -> (RefusalSource, String) {
+    let refusal = walk.refusal().expect("a refusal").refusal();
+    (refusal.source(), refusal.reason().to_owned())
+}
+
+/// Whether the words of a refusal say the list is the values of another table.
+fn says_another_table(said: &str) -> bool {
+    said.contains("a connected list is the values of another table")
+}
+
+#[test]
+fn a_connected_list_that_meets_the_rows_is_refused_in_words_that_say_whose_values_it_has() {
+    let holidays = || from_input("holidays", vec![]);
+    let select = |items: Vec<Value>| walk_of("LazyFrame.select", json!({ "exprs": many(items) }));
+    let cases: Vec<(&str, Walk)> = vec![
+        (
+            "a column and a list added",
+            adding_day(field_then(
+                "a",
+                vec![call("Expr.add", json!({ "other": holidays() }))],
+            )),
+        ),
+        (
+            "a list and a column added",
+            adding_day(from_input(
+                "holidays",
+                vec![call("Expr.add", json!({ "other": field("a") }))],
+            )),
+        ),
+        (
+            "a list as the value of a condition on a column",
+            adding_day(chain(
+                call(
+                    "polars.when",
+                    json!({ "predicates": many(vec![field("f")]) }),
+                ),
+                vec![call("When.then", json!({ "statement": holidays() }))],
+            )),
+        ),
+        (
+            "a list as a bound of a column",
+            adding_day(field_then(
+                "a",
+                vec![call("Expr.clip", json!({ "lower_bound": holidays() }))],
+            )),
+        ),
+        (
+            "a list and a column selected",
+            select(vec![holidays(), field("a")]),
+        ),
+        (
+            "a column and a list selected",
+            select(vec![field("a"), holidays()]),
+        ),
+    ];
+    for (name, walk) in cases {
+        let (source, said) = refused_with(&walk);
+        assert_eq!(
+            source,
+            RefusalSource::Rule(Rule::ValuesMeetInCount),
+            "{name}"
+        );
+        assert!(says_another_table(&said), "{name}: {said}");
+    }
+}
+
+#[test]
+fn a_refusal_of_a_connected_list_that_is_not_about_counts_does_not_say_whose_values_it_has() {
+    // A list of whole numbers is no predicate: the rule that a filter takes a Boolean says so, and a
+    // count has nothing to do with it.
+    let predicate = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![from_input("holidays", vec![])]) }),
+    );
+    let (source, said) = refused_with(&predicate);
+    assert_eq!(source, RefusalSource::Rule(Rule::FilterPredicateIsBoolean));
+    assert!(!says_another_table(&said), "{said}");
+    // The same of a method Polars refuses the dtype of, where the list stands as the receiver.
+    let text = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "holidays",
+            vec![call("Expr.str.to_uppercase", json!({}))],
+        )]) }),
+    );
+    let (_, said) = refused_with(&text);
+    assert!(!says_another_table(&said), "{said}");
+}
+
+#[test]
+fn uses_that_take_a_count_of_values_stay_allowed_for_a_connected_list() {
+    // The values of a list are looked up, counted or aggregated: none needs as many as the rows.
+    let membership = adding_day(field_then(
+        "a",
+        vec![call(
+            "Expr.is_in",
+            json!({ "other": from_input("holidays", vec![]) }),
+        )],
+    ));
+    assert_eq!(membership.refusal(), None);
+    assert_eq!(membership.not_known(), None);
+    let filtered = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![field_then(
+            "a",
+            vec![call("Expr.is_in", json!({ "other": from_input("holidays", vec![]) }))],
+        )]) }),
+    );
+    assert_eq!(filtered.refusal(), None);
+    // The length of the list, and an aggregate of it, are one value: that is added to every row.
+    for method in ["Expr.len", "Expr.sum"] {
+        let walk = adding_day(from_input("holidays", vec![call(method, json!({}))]));
+        assert_eq!(walk.refusal(), None, "{method}");
+        let walked = expression_at(&walk, &[parameter("named_exprs"), Segment::Value(0)]);
+        assert_eq!(
+            walked
+                .places()
+                .last()
+                .copied()
+                .flatten()
+                .map(|place| place.after()),
+            Some(after(
+                if method == "Expr.len" {
+                    Representative::UInt32
+                } else {
+                    Representative::Int64
+                },
+                Shape::One
+            )),
+            "{method}"
+        );
+    }
 }
 
 #[test]
