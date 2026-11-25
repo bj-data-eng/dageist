@@ -3,5 +3,10 @@
   "printWidth": 100,
   "singleQuote": true,
   "semi": true,
-  "ignorePatterns": ["dist/", "**/node_modules/", "package-lock.json"]
+  "ignorePatterns": [
+    "dist/",
+    "**/node_modules/",
+    "package-lock.json",
+    "packages/host/fixtures/corpus-*.json"
+  ]
 }

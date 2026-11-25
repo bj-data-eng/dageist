@@ -331,6 +331,33 @@ test, in `ui/packages/steps/src/model/census.test.ts`, until the editor draws it
 `ui/packages/steps/src/model/limits.ts` declares it as a gap with its reason. Never edit the file by
 hand.
 
+### Refresh The Corpus Snapshot
+
+After a change to the catalogue, to the tables of allowed combinations, to what the engine's edits
+start a part of a document with, to the walk or to a report, `corpus::tests::the_snapshot_is_what_the_host_reports`
+fails and names the file of `ui/packages/host/fixtures/corpus-*.json` that differs. The corpus is
+step documents the engine made by its own edits and the report the host gives of each, written by
+`crates/dageist-tauri/src/corpus/`: a chain of methods that stands after each shape of value the
+engine allows each method after, each function that starts a chain, each kind of start, each step
+of the catalogue with each parameter it has, a refusal for each cause and for each rule and stage the
+tables give a call, and a chain in each of the 30 contexts. The other tests of the module hold what
+it holds against the engine's own tables, so a catalogue entry, a step, a parameter, a context or a
+kind of start that no document holds fails there, naming it. Write the files, then run the view's
+tests, which rebuild every document:
+
+```sh
+DAGEIST_REFRESH_CORPUS=1 cargo test --offline --locked -p dageist-tauri corpus::tests::the_snapshot_is_what_the_host_reports
+npm --prefix ui run test
+```
+
+The files are written one document to a line, which `npm --prefix ui run format` leaves alone: they
+are in the formatter's ignore list in `ui/.oxfmtrc.json`, for indented they would be four times as
+long. The run builds the engine's tables of every place once, a context to a thread, which takes
+about half a minute. Review the diff. A document the corpus gains that holds a piece the editor
+cannot build fails the view's corpus test, in `ui/packages/steps/src/model/corpus.test.ts`, until the
+editor draws it or `ui/packages/steps/src/model/limits.ts` declares it as a gap with its reason. Never
+edit the files by hand.
+
 ## Open The Sample Table
 
 The `Table` workspace shows a generated claims table of about two million rows

@@ -9,7 +9,7 @@
 //! `RowsView` in `ui/packages/host/src/contract.ts`.
 
 use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::{Document, InputKind, Origin, RowsError, StepId};
+use dageist_engine::document::{Document, InputKind, Inputs, Origin, RowsError, StepId};
 use serde::Serialize;
 use tauri::State;
 
@@ -110,8 +110,19 @@ fn node() -> Result<ClaimTiming, ErrorView> {
 /// values.
 pub fn node_view() -> Result<NodeView, ErrorView> {
     let node = node()?;
-    let inputs = node
-        .inputs()
+    Ok(NodeView {
+        source: SourceView {
+            name: ClaimTiming::SOURCE_NAME,
+            from: origin_view(node.source_origin()),
+            columns: FieldView::of_columns(&node.source_columns()),
+        },
+        inputs: inputs_view(node.inputs())?,
+    })
+}
+
+/// What `inputs` hold, each with what supplies it and its columns, its value or its first values.
+pub(crate) fn inputs_view(inputs: &Inputs) -> Result<Vec<InputView>, ErrorView> {
+    Ok(inputs
         .describe()
         .map_err(|error| failed("describing the inputs", error))?
         .into_iter()
@@ -138,15 +149,7 @@ pub fn node_view() -> Result<NodeView, ErrorView> {
                 },
             }
         })
-        .collect();
-    Ok(NodeView {
-        source: SourceView {
-            name: ClaimTiming::SOURCE_NAME,
-            from: origin_view(node.source_origin()),
-            columns: FieldView::of_columns(&node.source_columns()),
-        },
-        inputs,
-    })
+        .collect())
 }
 
 /// Runs `document` on the node and reports each step.
