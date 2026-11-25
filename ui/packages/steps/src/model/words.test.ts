@@ -5,7 +5,7 @@ import { decodeCatalogue } from '@dageist/host';
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import { HOLE_START, bare, calls, chain, col, input, lit } from '../../test-support/expressions';
 import { indexCatalogue } from './catalogue';
-import type { PieceKind } from './words';
+import type { Group, ListedWord, PieceKind } from './words';
 import {
   GROUPS_OF_WORD,
   actionsOf,
@@ -24,6 +24,44 @@ type TakesNoAddition<Kind extends PieceKind> =
 // What the editor does with each piece, written from what the editor draws: no earlier version of
 // these functions existed to fail first, because the components decided all of this inline.
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
+
+/** Every word of the editor that opens a list, in each form it takes. */
+const WORDS: readonly ListedWord[] = [
+  { word: 'chainStart' },
+  { word: 'method', options: true },
+  { word: 'method', options: false },
+  { word: 'insertion' },
+  { word: 'value', fromPath: true },
+  { word: 'value', fromPath: false },
+  { word: 'argument' },
+  { word: 'step', options: true },
+  { word: 'step', options: false },
+  { word: 'newStep' },
+];
+
+describe('the groups each kind of word may list', () => {
+  it('are those of the table the components’ lists are made from, less what a form of the word lacks', () => {
+    for (const word of WORDS) {
+      const table = GROUPS_OF_WORD[word.word];
+      const lacks: readonly Group[] =
+        (word.word === 'method' || word.word === 'step') && !word.options
+          ? ['options']
+          : word.word === 'value' && !word.fromPath
+            ? ['functions']
+            : [];
+      expect(listsOf(word), JSON.stringify(word)).toEqual(
+        table.filter((group: Group) => !lacks.includes(group)),
+      );
+    }
+  });
+
+  it('are the whole table for the form of each word that has every group', () => {
+    for (const word of WORDS) {
+      const full = !('options' in word && !word.options) && !('fromPath' in word && !word.fromPath);
+      if (full) expect(listsOf(word), JSON.stringify(word)).toEqual(GROUPS_OF_WORD[word.word]);
+    }
+  });
+});
 
 describe('the groups a word lists', () => {
   it('are the functions, inputs and fields for the word a chain starts from', () => {

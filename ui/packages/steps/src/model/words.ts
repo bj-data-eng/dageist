@@ -64,25 +64,24 @@ export const GROUPS_OF_WORD = {
 /** The groups a kind of word may list. */
 export type GroupOfWord<Kind extends ListedWord['word']> = (typeof GROUPS_OF_WORD)[Kind][number];
 
-/** Returns the groups the list of `word` holds, in the order it shows them. */
+/**
+ * Returns the groups the list of `word` holds, in the order it shows them: those `GROUPS_OF_WORD`
+ * gives its kind, less the options of a name that has none to set and the functions of a value that
+ * is not in the document.
+ */
 export function listsOf(word: ListedWord): readonly Group[] {
+  const groups: readonly Group[] = GROUPS_OF_WORD[word.word];
   switch (word.word) {
-    case 'chainStart':
-      return ['functions', 'inputs', 'fields'];
     case 'method':
-      return word.options ? ['options', 'methods'] : ['methods'];
-    case 'insertion':
-      return ['methods'];
-    case 'value':
-      return word.fromPath
-        ? ['chain', 'values', 'inputs', 'fields', 'functions']
-        : ['chain', 'values', 'inputs', 'fields'];
-    case 'argument':
-      return ['values', 'inputs', 'fields'];
     case 'step':
-      return word.options ? ['options', 'steps'] : ['steps'];
+      return word.options ? groups : groups.filter((group) => group !== 'options');
+    case 'value':
+      return word.fromPath ? groups : groups.filter((group) => group !== 'functions');
+    case 'chainStart':
+    case 'insertion':
+    case 'argument':
     case 'newStep':
-      return ['steps'];
+      return groups;
     default:
       return word satisfies never;
   }
