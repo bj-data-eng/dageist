@@ -538,7 +538,12 @@ function runOf(count: unknown): unknown {
 
 describe('the columns a step changed and how its rows were counted', () => {
   it('are read as the host sends them, each way a count can be', () => {
-    for (const count of [COUNTED, { kind: 'notCounted' }, { kind: 'failed', reason: 'no' }]) {
+    for (const count of [
+      COUNTED,
+      { kind: 'notCounted' },
+      { kind: 'notReached', failed: 'date' },
+      { kind: 'failed', reason: 'no' },
+    ]) {
       expect(stepsOf(decodeRun(runOf(count)))[0]).toEqual(handWrittenStep(count));
     }
   });
@@ -555,7 +560,7 @@ describe('the columns a step changed and how its rows were counted', () => {
     expect(
       refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kind'], 'partial')).message,
     ).toBe(
-      '$.steps[0].count.kind: must be one of "notCounted", "counted", "failed", not "partial"',
+      '$.steps[0].count.kind: must be one of "notCounted", "notReached", "counted", "failed", not "partial"',
     );
     expect(refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kept'], 'four')).message).toBe(
       '$.steps[0].count.kept: must be a whole number, not a string',
@@ -569,6 +574,11 @@ describe('the columns a step changed and how its rows were counted', () => {
     expect(
       refusal(withField(runOf({ kind: 'notCounted' }), ['steps', 0, 'count'], 'kept', 1)).message,
     ).toBe('$.steps[0].count: has the field "kept", which the contract lacks');
+    expect(
+      refusal(
+        replaced(runOf({ kind: 'notReached', failed: 'date' }), ['steps', 0, 'count', 'failed'], 3),
+      ).message,
+    ).toBe('$.steps[0].count.failed: must be text, not a number');
     expect(refusal(without(runOf(COUNTED), ['steps', 0], 'count')).message).toBe(
       '$.steps[0]: is missing the field "count"',
     );
