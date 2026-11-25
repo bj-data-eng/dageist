@@ -26,7 +26,7 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
+const STRICTER_BY_DESIGN: [(&str, &str); 5] = [
     (
         "pivot-aggregate-gives-one-value",
         "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
@@ -38,6 +38,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
     (
         "element-dtype-is-measured",
         "a method that depends on the element is not run on one the tables do not measure, which Polars may panic on",
+    ),
+    (
+        "struct-is-filled-forward-or-backward",
+        "a struct is filled only forward or backward, though Polars fills it by any strategy where it holds no null",
     ),
     (
         "element-dtype-is-implemented",

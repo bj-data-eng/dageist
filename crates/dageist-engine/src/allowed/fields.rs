@@ -386,6 +386,13 @@ pub(super) fn gives(
                 _ => Gives::Columns(Fields::new(read).ok()),
             })
         }
+        "Expr.fill_null" if follows_a_struct => match word(chosen, "strategy") {
+            Some(strategy @ ("min" | "max" | "mean" | "zero" | "one")) => Err((
+                Rule::StructIsFilledForwardOrBackward,
+                format!("a struct is filled by {strategy}"),
+            )),
+            _ => Ok(Gives::Nothing),
+        },
         "Expr.struct.drop" if follows_a_struct => {
             let names = given(chosen, "names");
             let Some(fields) = held else {

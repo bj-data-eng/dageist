@@ -334,19 +334,6 @@ pub enum Limit {
     /// has a window and a replacement that lists the values of a column: the case run again with
     /// the values of each replacement made null literals is not refused for it.
     AReplacementOfColumnsInAWindow,
-    /// A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the
-    /// sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum
-    /// and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone,
-    /// are one null, where those of the sample's rows are a value, and a struct made of a list or
-    /// an array is null where the list is, which the sample's lists hold. Polars refusing the rows
-    /// or the empty table with the refusal that a strategy of a fill is not supported for a
-    /// struct, which has no place, in a case with a fill by a strategy that follows one of the
-    /// six: the case run again with each of the six made a fill of nulls forward, which leaves
-    /// the nulls of the column and no more, is not refused for a struct. Inside a condition Polars refuses the
-    /// strategy for a struct where it fills nothing, which it runs in a plain select: the case
-    /// with a condition and a fill by a strategy, run again with each fill a fill forward, is
-    /// not refused for it.
-    ANullStructToFill,
     /// A strict replacement that is given no default is held to more than one that is: it refuses
     /// a value that it does not list, which depends on the rows, and it refuses what it replaces
     /// when the dtype of that cannot become the dtype of what it follows, which a default lets
@@ -503,7 +490,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 40] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -527,7 +514,6 @@ impl Limit {
         Self::ACastOfAValueTheDtypeCannotHold,
         Self::ADropChangesTheLengths,
         Self::AReplacementOfColumnsInAWindow,
-        Self::ANullStructToFill,
         Self::AStrictReplacementGivenNoDefault,
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
@@ -573,7 +559,6 @@ impl Limit {
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
             Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
             Self::AReplacementOfColumnsInAWindow => "a-replacement-of-columns-in-a-window",
-            Self::ANullStructToFill => "a-null-struct-to-fill",
             Self::AStrictReplacementGivenNoDefault => "a-strict-replacement-given-no-default",
             Self::AReplacementOfEveryMatchGivenANullValue => {
                 "a-replacement-of-every-match-given-a-null-value"
@@ -720,9 +705,6 @@ impl Limit {
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
-            }
-            Self::ANullStructToFill => {
-                "a shift, and the first, the last, the minimum and the maximum of nothing, and a struct made of a list or an array, which is null where the list is, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
             }
             Self::AReplacementOfColumnsInAWindow => {
                 "a window gives a replacement of columns a list of values for each group, which Polars refuses as a pattern per row, where the tables measured it in select"
@@ -3211,102 +3193,6 @@ fn case_without_windows(case: &Case) -> Option<Case> {
     })
 }
 
-/// Whether the call is a shift, or the first, the last, the minimum or the maximum, which the table
-/// with no rows gives as one null.
-fn makes_a_null(call: &Call) -> bool {
-    matches!(
-        call.entry().id().as_str(),
-        "Expr.shift"
-            | "Expr.first"
-            | "Expr.last"
-            | "Expr.min"
-            | "Expr.max"
-            // A struct made of a list or an array is null where the list is, and the sample's
-            // lists hold a null.
-            | "Expr.list.to_struct"
-            | "Expr.arr.to_struct"
-    )
-}
-
-/// Whether an expression holds, at any depth, a fill by a strategy that follows one of those five
-/// in its chain, not necessarily next to it.
-fn holds_a_fill_after_a_null_is_made(expression: &Expression) -> bool {
-    let mut made = false;
-    for link in expression.links() {
-        if makes_a_null(link) {
-            made = true;
-        } else if made && is(link, "Expr.fill_null") && link.argument("strategy").is_some() {
-            return true;
-        }
-    }
-    let calls = std::iter::once(expression.start())
-        .filter_map(|start| match start {
-            Start::Call(call) => Some(call),
-            Start::Input(_) | Start::Hole => None,
-        })
-        .chain(expression.links());
-    calls.into_iter().any(|call| {
-        operands(call)
-            .into_iter()
-            .any(|(_, inside)| holds_a_fill_after_a_null_is_made(inside))
-    })
-}
-
-/// The case with each of the five a fill of nulls forward, which leaves the nulls of what it is
-/// given and no more.
-fn case_without_nulls_made(case: &Case) -> Option<Case> {
-    case_changed(case, &|call| {
-        makes_a_null(call)
-            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
-            .flatten()
-    })
-}
-
-/// Whether an expression holds, at any depth, a condition and a fill by a strategy: Polars refuses
-/// a strategy for a struct inside a condition where it fills nothing, which it runs elsewhere.
-fn holds_a_fill_by_a_strategy_in_a_condition(expression: &Expression) -> bool {
-    any_call(expression, &|call| is(call, "polars.when"))
-        && any_call(expression, &|call| {
-            is(call, "Expr.fill_null") && call.argument("strategy").is_some()
-        })
-}
-
-/// The case with each fill by a strategy made a fill of nulls forward, which a condition runs.
-fn case_without_strategies(case: &Case) -> Option<Case> {
-    case_changed(case, &|call| {
-        (is(call, "Expr.fill_null") && call.argument("strategy").is_some())
-            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
-            .flatten()
-    })
-}
-
-/// Whether Polars refuses the case for the strategy of a fill still when each is a fill forward.
-fn refused_for_a_strategy_without_strategies(case: &Case) -> Option<bool> {
-    changed(case_without_strategies(case), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control).refusal.is_some_and(|refusal| {
-                refusal
-                    .reason
-                    .contains("fill null strategy not yet supported")
-            })
-        })
-    })
-}
-
-/// Whether Polars refuses the case for the strategy of a fill still when none of the five is one:
-/// the null is then no cause of it.
-fn refused_for_a_strategy_without_nulls_made(case: &Case) -> Option<bool> {
-    changed(case_without_nulls_made(case), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control).refusal.is_some_and(|refusal| {
-                refusal
-                    .reason
-                    .contains("fill null strategy not yet supported for dtype: struct[")
-            })
-        })
-    })
-}
-
 /// How often the case without its explodes is run again: which of two failures of
 /// a plan Polars names depends on which thread gets there first.
 pub const RUNS: usize = 8;
@@ -3997,23 +3883,6 @@ fn applies(
                     || refused_for_lengths_without_explodes(case) == Some(true))
                 && (!held.iter().any(|(_, held)| any_call(held, &is_a_drop))
                     || refused_for_lengths_without_drops(case) == Some(true))
-        }
-        (Limit::ANullStructToFill, Disagreement::PolarsRefuses(refusal)) => {
-            // The null is the cause where Polars stops refusing the strategy of a fill once
-            // none of the five makes one.
-            unplaced(refusal)
-                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
-                && refusal
-                    .reason
-                    .contains("fill null strategy not yet supported for dtype: struct[")
-                && (held
-                    .iter()
-                    .any(|(_, held)| holds_a_fill_after_a_null_is_made(held))
-                    && refused_for_a_strategy_without_nulls_made(case) == Some(false)
-                    || held
-                        .iter()
-                        .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
-                        && refused_for_a_strategy_without_strategies(case) == Some(false))
         }
         (Limit::AReplacementOfAnAggregateInAWindowKey, Disagreement::PolarsRefuses(refusal)) => {
             // The window and the many values are the cause where Polars stops refusing the lengths
@@ -10860,106 +10729,6 @@ mod tests {
         );
     }
 
-    // ----- A null struct to fill
-
-    const STRATEGY_OF_NOTHING: &str = "fill null strategy not yet supported for dtype: struct[2]";
-
-    fn filled_by(strategy: &str) -> Call {
-        call(
-            "Expr.fill_null",
-            vec![("strategy", Value::Choice(strategy.to_owned()))],
-        )
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_after_a_call_that_makes_a_null_is_excused_for_a_struct() {
-        for maker in [
-            "Expr.shift",
-            "Expr.first",
-            "Expr.last",
-            "Expr.min",
-            "Expr.max",
-        ] {
-            let case = select(vec![chain_of(
-                column("a"),
-                vec![call(maker, Vec::new()), filled_by("one")],
-            )]);
-            for rows in [true, false] {
-                let stage = if rows { Stage::Rows } else { Stage::Empty };
-                assert_eq!(
-                    polars_refuses(&case, None, stage, STRATEGY_OF_NOTHING, Vec::new()),
-                    vec![Limit::ANullStructToFill],
-                    "{maker} rows: {rows}"
-                );
-            }
-        }
-        // And in a pivot's aggregate, after the last of a group.
-        let aggregate = chain_of(
-            column("a"),
-            vec![call("Expr.last", Vec::new()), filled_by("one")],
-        );
-        assert_eq!(
-            polars_refuses(
-                &pivot(aggregate),
-                None,
-                Stage::Rows,
-                STRATEGY_OF_NOTHING,
-                Vec::new()
-            ),
-            vec![Limit::ANullStructToFill]
-        );
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_in_a_condition_is_excused_for_a_struct() {
-        let case = select(vec![chain_of(
-            call(
-                "polars.when",
-                vec![("predicates", many(vec![chain(column("f"), &[])]))],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![(
-                        "statement",
-                        Value::Expression(chain_of(column("a"), vec![filled_by("zero")])),
-                    )],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![("statement", Value::Expression(chain(column("a"), &[])))],
-                ),
-            ],
-        )]);
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, STRATEGY_OF_NOTHING, Vec::new()),
-            vec![Limit::ANullStructToFill]
-        );
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_is_not_excused_without_a_call_that_makes_a_null_before_it_or_for_a_dtype_that_is_no_struct()
-     {
-        let plain = select(vec![chain_of(column("a"), vec![filled_by("one")])]);
-        assert_eq!(
-            polars_refuses(&plain, None, Stage::Empty, STRATEGY_OF_NOTHING, Vec::new()),
-            vec![]
-        );
-        let after = select(vec![chain_of(
-            column("a"),
-            vec![call("Expr.last", Vec::new()), filled_by("one")],
-        )]);
-        assert_eq!(
-            polars_refuses(
-                &after,
-                None,
-                Stage::Rows,
-                "fill null strategy not yet supported for dtype: list[i64]",
-                Vec::new()
-            ),
-            vec![]
-        );
-    }
     // ----- A drop of NaNs in a window
 
     const NAN_OF_TEXT: &str = "`is_not_nan` operation not supported for dtype `str`";
@@ -11112,7 +10881,6 @@ mod tests {
         assert_eq!(refused_for_lengths_without_drops(&plain), None);
         assert_eq!(refused_for_lengths_without_explodes(&plain), None);
         assert_eq!(refused_for_a_test_of_nan_without_drops(&plain), None);
-        assert_eq!(refused_for_a_strategy_without_nulls_made(&plain), None);
         assert_eq!(refused_for_a_pattern_per_row_without_columns(&plain), None);
         assert_eq!(refused_for_a_failed_conversion_without_bounds(&plain), None);
     }
@@ -11631,14 +11399,6 @@ mod tests {
                 "{name}"
             );
         }
-    }
-
-    #[test]
-    fn a_struct_made_of_a_list_is_null_where_the_list_is_and_a_fill_by_a_strategy_refuses_it() {
-        assert_eq!(
-            excused_by_kept("uncovered-a-null-struct-to-fill--a-struct-made-of-a-list.case"),
-            vec![Limit::ANullStructToFill]
-        );
     }
 
     #[test]

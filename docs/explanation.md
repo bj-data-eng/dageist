@@ -1715,7 +1715,7 @@ The census holds:
 - The 67 classes of dtype, the 3 shapes of a value, the 3 kinds of place and the
   4 states of a condition.
 - The 5 causes of a refusal, the 3 sources it comes from, its 3 stages and the
-  24 rules the engine holds that Polars does not, each with what it says.
+  25 rules the engine holds that Polars does not, each with what it says.
 - The 4 outcomes of a step, the 4 states of its rows, which are not counted, not
   reached, counted and failed, and the 19 states a step can be reported in: its
   outcome, the cause where it was refused, its rows, and what came before it,
@@ -2390,7 +2390,8 @@ Four named rules hold what Polars does of fields and the tables cannot say:
 | --- | --- |
 | `field-is-of-the-struct` | A field that a method reads or drops is one of the fields of the struct it follows, which the refusal lists. A field that was renamed or dropped before is none. |
 | `field-names-fit-the-struct` | The names given to the fields are as many as the fields of the struct they rename, or the places of the array they name, and no two fields of a struct are named alike, as `polars.struct`, `value_counts` and `to_struct` make them. |
-| `one-column-is-needed` | A filter's predicate is one column: an expression that gives several, as the unnest of a struct of several fields does, is refused there. |
+| `one-column-is-needed` | A filter's predicate is one column: an expression that gives several, as the unnest of a struct of several fields does, or none, as the unnest of a struct of no field does, is refused there. |
+| `struct-is-filled-forward-or-backward` | A struct is filled by a strategy only forward or backward. Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing with them where it holds none, so the editor refuses them whatever the rows hold; the rule is stricter than Polars by design. |
 | `written-names-are-distinct` | The columns that the items of a select or of `with_columns` write are named differently, where a field read or an unnest names one: a column the table already has is replaced by `with_columns`, and two items that write one name are refused. The outputs of one name that no field names wait for [#161](https://github.com/bj-data-eng/dageist/issues/161). |
 
 Where Polars does what the editor refuses, on purpose: `list.to_struct` of a name given twice gives one field, the last
@@ -2673,7 +2674,8 @@ excused by both.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
 which the target names: `pivot-aggregate-gives-one-value`, since Polars lets a running
-value stand in a pivot's aggregate, and the rule that a predicate be a `Boolean` or a
+value stand in a pivot's aggregate, `struct-is-filled-forward-or-backward`, since Polars does nothing with the
+strategies it refuses for a struct where the struct holds no null, and the rule that a predicate be a `Boolean` or a
 rule a probe shows right where Polars does not evaluate the part. Any other rule that
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the

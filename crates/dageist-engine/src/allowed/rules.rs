@@ -80,6 +80,10 @@ pub enum Rule {
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
+    /// A struct is filled by a strategy that goes forward or backward: the others, the smallest, the
+    /// largest, the mean, zero and one, Polars refuses where the struct holds a null and does
+    /// nothing with where it holds none.
+    StructIsFilledForwardOrBackward,
     /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
     TimeZoneIsValid,
     /// The operands of a comparison, a difference, a fill and the bounds of an interval, the values of
@@ -101,7 +105,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 24] = [
+    pub const ALL: [Self; 25] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -121,6 +125,7 @@ impl Rule {
         Self::PivotAggregateGivesOneValue,
         Self::RangeIsValid,
         Self::ReplacementValuesMatchInNumber,
+        Self::StructIsFilledForwardOrBackward,
         Self::TimeZoneIsValid,
         Self::ValuesMeetInCount,
         Self::WindowInputIsNotCounted,
@@ -151,6 +156,7 @@ impl Rule {
             Self::PatternIsValid => "pattern-is-valid",
             Self::RangeIsValid => "range-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
+            Self::StructIsFilledForwardOrBackward => "struct-is-filled-forward-or-backward",
             Self::TimeZoneIsValid => "time-zone-is-valid",
             Self::ValuesMeetInCount => "values-meet-in-count",
             Self::WindowInputIsNotCounted => "window-input-is-not-counted",
@@ -209,6 +215,9 @@ impl Rule {
                 "a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from"
             }
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::StructIsFilledForwardOrBackward => {
+                "a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none"
+            }
             Self::ValuesMeetInCount => {
                 "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
             }
@@ -261,6 +270,7 @@ impl Rule {
             | Self::PatternIsValid
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
+            | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
@@ -415,6 +425,7 @@ impl Rule {
             | Self::FieldNamesFitTheStruct
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
+            | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
