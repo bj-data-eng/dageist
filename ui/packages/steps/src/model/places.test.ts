@@ -28,6 +28,11 @@ const START = { context: SELECT, after: { kind: 'start' } } as const;
 const VALUE = { context: SELECT, after: { kind: 'value', dtype: 'Int64', shape: 'many' } } as const;
 const CONDITION = { context: SELECT, after: { kind: 'condition', state: 'then' } } as const;
 
+/** Whether an argument stands where an expression starts at the context `outer` and `nested`. */
+function holds(outer: ContextView['outer'], nested: ContextView['nested']): boolean {
+  return wordsAt(catalogue, { outer, nested }, 'start').some((word) => word.word === 'argument');
+}
+
 describe('the words that stand at a place', () => {
   it('are a value slot, the start of a chain and an argument where an expression starts', () => {
     expect(wordsAt(catalogue, SELECT, 'start')).toEqual([
@@ -73,10 +78,6 @@ describe('the words that stand at a place', () => {
   });
 
   it('give the argument only where the position that holds the expression is held by an argument', () => {
-    /** Whether an argument stands where an expression starts at the context `outer` and `nested`. */
-    const holds = (outer: ContextView['outer'], nested: ContextView['nested']): boolean =>
-      wordsAt(catalogue, { outer, nested }, 'start').some((word) => word.word === 'argument');
-
     // The first parameter of a step is its argument: select's expressions, a filter's predicates and
     // the keys of a sort. A join's keys come after the table it joins, and a pivot's aggregate after
     // its columns, so they are options.

@@ -7,7 +7,7 @@
  * package's front door.
  */
 
-import type { ContextView, EntryView, OfferPlaceView } from '@dageist/host';
+import type { ContextView, EntryView, OfferPlaceView, PositionView } from '@dageist/host';
 
 import type { Catalogue } from '../src/model/catalogue';
 import { HEAD, START_FUNCTIONS, VERBS, conditionId, verbId, verbOf } from '../src/model/catalogue';
@@ -60,6 +60,26 @@ function nestedIsDrawn(catalogue: Catalogue, nested: string): boolean {
   );
 }
 
+/**
+ * Returns whether an argument holds the innermost position of `context`, which is where an
+ * expression starts there: the position of an entry's parameter that is drawn beside the method's
+ * name, or the step's first parameter, as `settingOf` says.
+ */
+function argumentHolds(catalogue: Catalogue, context: ContextView): boolean {
+  const innermost: PositionView =
+    context.nested === null
+      ? { kind: 'outer', name: context.outer }
+      : { kind: 'nested', name: context.nested };
+  return [...catalogue.entries.values()].some((entry) =>
+    entry.parameters.some(
+      (parameter) =>
+        parameter.position?.kind === innermost.kind &&
+        parameter.position.name === innermost.name &&
+        settingOf(entry, parameter).by === 'argument',
+    ),
+  );
+}
+
 /** What `wordsAt` worked out, by catalogue and place, as a grid asks it for every entry of every place. */
 const REMEMBERED = new WeakMap<Catalogue, Map<string, readonly ListedWord[]>>();
 
@@ -67,7 +87,8 @@ const REMEMBERED = new WeakMap<Catalogue, Map<string, readonly ListedWord[]>>();
  * Returns the words of the editor that stand at a place of `context` and `kind` and list what the
  * engine allows there. Where an expression starts, a value slot stands wherever a step's head or
  * an option draws a parameter that holds one there, the word a chain starts from stands with it,
- * and the argument of a method stands where some method takes an expression as its argument.
+ * and the argument of a method stands where the position that holds the expression is held by an
+ * argument of some entry, as the catalogue's parameter settings say.
  * After a value, a list adds a method after it and the name of a method that stands there swaps it.
  * Inside a condition the editor draws a `when` with its `then` and `otherwise` and lists nothing at
  * the places between them. Where no position of the context is drawn, no word stands.
@@ -98,15 +119,10 @@ function wordsOf(
     (context.nested === null || nestedIsDrawn(catalogue, context.nested));
   if (!drawn || kind === 'condition') return [];
   if (kind === 'value') return [{ word: 'insertion' }, { word: 'method', options: false }];
-  const argument = [...catalogue.entries.values()].some(
-    (entry) =>
-      entry.applies === 'expression' &&
-      entry.parameters.some((parameter) => settingOf(entry, parameter).by === 'argument'),
-  );
   return [
     { word: 'value', fromPath: true },
     { word: 'chainStart' },
-    ...(argument ? [{ word: 'argument' } as const] : []),
+    ...(argumentHolds(catalogue, context) ? [{ word: 'argument' } as const] : []),
   ];
 }
 
