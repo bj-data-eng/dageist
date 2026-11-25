@@ -563,6 +563,13 @@ generator of the tables then writes `counted` for it in the dtype and option tab
 measures its context going on to one value. The fuzz target draws such a method, and such a function, only where
 `DAGEIST_FUZZ_FOCUS` names it: a campaign without a focus that draws them finds counts that no control settles, as
 [the explanation](explanation.md#what-the-tables-are-checked-against) lists.
+A method that reads, names or makes a struct, which is a method of the `struct` namespace, `value_counts`,
+`str.split_exact`, `str.splitn`, `list.to_struct`, `arr.to_struct` or `polars.struct`, is listed in
+`makes_or_reads_structs` of `allowed_fuzz/generate.rs`. The fuzz target draws it only where `DAGEIST_FUZZ_FOCUS`
+names it, and then draws struct columns of fields of its own, which the first line of a case names under `a_struct`
+and `b_struct`, so that Polars is given the same schema the walk reads. A new call of that kind is given its names,
+numbers and options in `struct_arguments` of the same file, with the names that are fields and names that are not,
+and it is focused on as `struct.,value_counts,str.split_exact,str.splitn,list.to_struct,arr.to_struct,struct` is.
 A method that follows a list or an array is measured on the classes `measured_classes` in
 `crates/dageist-engine/src/allowed/table.rs` names: the 26 of `Representative::MEASURED`, which a list or an
 array of another element dtype is read as by `Representative::sibling`; those and the lists and arrays of
@@ -642,7 +649,8 @@ cargo test --offline --locked -p dageist-engine --test allowed_fuzz
 It is built on [dageist-fuzz](../crates/dageist-fuzz/README.md)'s `property`
 feature, which is a dev-dependency of the engine. A case is the dtypes of the
 columns `a` and `b` and a step document, written by the document's own writer
-under one line that names the dtypes, so a case is plain text:
+under one line that names the dtypes, and the fields of a column that is a struct and names them, as
+`"a_struct":[["k","Int64"],["n",[["p","Date"]]]]`, so a case is plain text:
 
 ```text
 {"a":"UInt32","b":"String","revision":1}
@@ -844,14 +852,16 @@ Polars by hand, and decide which it is:
   or `it cannot end here` for a count), and Polars allows the step because the count is the table's
   rows, or one value, as `head(10)` of three rows or `mode` of a column with one most common value is.
   The target settles it by itself: it reduces the step to the one item that holds the refused place, runs
-  that item again on twelve rows, on four rows that tie, and with the number that decides its count made 2,
+  that item again on twelve rows, on four rows that tie, on three rows with a null in every column and with the
+  number that decides its count made 2,
   and counts the case as stricter by design where Polars refuses one of them for lengths. An item with
   counts in more than one place settles nothing, so report it. A sort key of one value that Polars drops is asked by the probe above,
   where the part alone is refused for lengths, and a part dropped whose count is by chance is asked of
   the part apart from the case. Keep such a case as `regressions/by-design-<what it shows>.case`, which
   the normal run replays and expects to say so. A count that stays the rows with any rows, as the values
-  that occur most of the places that sort a column, is no case of this: report it, for the walk could
-  know it.
+  that occur most of the places that sort a column, is no case of this: it is excused by the limit of a count no
+  rows change, as the sample's rows, the controls above and nothing else make it the rows or one value, and a
+  case that the limit does not excuse is for you to report, for the walk could know it.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
   nulls that the sample's rows leave), which the probes do not show: add or
