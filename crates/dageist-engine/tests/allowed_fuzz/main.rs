@@ -7,8 +7,9 @@
 //! measured as: chains several links deep from a column or a literal, expressions
 //! inside others (conditions, `over`'s keys), the places a step holds them and
 //! sets of options. It predicts each case from the tables and the named rules
-//! alone, runs it through the step document on rows of those dtypes, and
-//! compares the two. A disagreement is reduced to its smallest case and kept as
+//! alone, runs it through the step document on rows of those dtypes, or, where
+//! the walk refuses it and the step document does not run it, asks Polars of it
+//! directly, and compares the two. A disagreement is reduced to its smallest case and kept as
 //! the bytes of the case, which the step document's own writer makes, so it can
 //! be replayed.
 //!

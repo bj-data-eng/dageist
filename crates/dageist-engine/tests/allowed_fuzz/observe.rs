@@ -1,7 +1,9 @@
 //! What Polars does with a case, through the step document's own runner: the
 //! step built and its schema worked out ([`Document::run`]), then its rows on
 //! three rows with a null in them ([`Document::rows`]), then on a table with no
-//! rows. A case is allowed only when all three succeed, as the tables count it.
+//! rows. A case is allowed only when all three succeed, as the tables count it. A step the walk
+//! refuses is not run by the step document, so [`asked`] asks Polars of it directly, the same
+//! three times.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
