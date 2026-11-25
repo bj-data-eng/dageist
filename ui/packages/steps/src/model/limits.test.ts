@@ -37,6 +37,7 @@ describe('the declared gaps', () => {
         'report notCountedAfterRowsFailure',
         'shown literal flag',
         'shown resolution several',
+        'noContext LazyFrame.filter constraints',
         'start connectedList',
         'start connectedValue',
         'start typedFloat',
@@ -74,6 +75,14 @@ describe('the declared gaps', () => {
     for (const gap of GAPS) {
       if (gap.cover.kind === 'start' || gap.cover.kind === 'report') {
         expect(gap.reason, coverKey(gap.cover)).toContain('#171');
+      }
+    }
+  });
+
+  it('name the issue that tracks the steps the list does not add and the parameters of a step that are not offered', () => {
+    for (const gap of GAPS) {
+      if (gap.cover.kind === 'step' || gap.cover.kind === 'stepParameter') {
+        expect(gap.reason, coverKey(gap.cover)).toContain('#137');
       }
     }
   });

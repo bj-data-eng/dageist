@@ -157,11 +157,13 @@ describe('the corpus, rebuilt through the functions the components call', () => 
     expect(piece).toContain('› link 0');
   });
 
-  it('places every expression the walk could place, which is every one but the value of a keyword constraint', () => {
-    // The engine walks the tests of a filter that are expressions, not the keyword constraints of
-    // one, so what stands beside a name there has no context for a list to be asked at.
-    expect(found.unplaced).toEqual([
-      'LazyFrame.filter given constraints › step filter › constraints[0] value',
+  it('places every expression of a step that was run, and finds the one the walk gives no context', () => {
+    // The engine walks the value of a keyword constraint of a filter and names no position for
+    // it, so no list can be asked what may stand there: a declared gap. An expression of a step
+    // that was not run has no walk at all, and the corpus holds none.
+    expect(found.unplaced).toEqual([]);
+    expect([...found.gaps.keys()].filter((key) => key.startsWith('noContext'))).toEqual([
+      'noContext LazyFrame.filter constraints',
     ]);
   });
 });
@@ -322,6 +324,15 @@ describe('a corpus that lacks something, or holds what the editor cannot draw', 
     expect(compareCorpus(found, [...GAPS, extra, parameter])).toEqual({
       undeclared: [],
       stale: ['step LazyFrame.select', 'stepParameter LazyFrame.sort by'],
+    });
+  });
+
+  it('fails the check where an expression the walk gives no context is not declared', () => {
+    const declared = GAPS.filter((gap) => gap.cover.kind !== 'noContext');
+
+    expect(compareCorpus(found, declared)).toEqual({
+      undeclared: ['noContext LazyFrame.filter constraints'],
+      stale: [],
     });
   });
 

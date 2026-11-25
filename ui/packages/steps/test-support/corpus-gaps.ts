@@ -211,6 +211,8 @@ class Rebuild {
   readonly failures: string[] = [];
   readonly unplaced: string[] = [];
   pieces = 0;
+  /** The entry of the step being rebuilt. */
+  private stepEntry = '';
 
   constructor(
     private readonly using: Catalogue,
@@ -255,6 +257,7 @@ class Rebuild {
     index: number,
   ): void {
     const piece = `${name} › step ${report.id}`;
+    this.stepEntry = call.entry;
     this.pieces += 1;
     if (sayingOf(result).says === 'nothing') {
       const afterFailure = run.steps
@@ -389,7 +392,15 @@ class Rebuild {
   ): void {
     const walked = this.walked(report, path);
     const context = walked?.context ?? null;
-    if (context === null) this.unplaced.push(piece);
+    if (walked === null) {
+      // The step was not run, so nothing of it was walked.
+      this.unplaced.push(piece);
+    } else if (context === null) {
+      // The walk reached the expression and named no position that holds it.
+      const first = path[0];
+      const parameter = first?.kind === 'parameter' ? first.name : '';
+      this.gap({ kind: 'noContext', entry: this.stepEntry, parameter }, piece);
+    }
     // The model's own preparation of the report gives the place of each link.
     const places = walked?.places ?? [];
     const calls = walked?.calls ?? [];

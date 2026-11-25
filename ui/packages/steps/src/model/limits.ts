@@ -1,14 +1,14 @@
 /**
  * @file The one list of what the step editor does not yet express of what the engine allows. Each
  * declared gap names what it covers, an entry, a place, a start, a parameter, a step, a parameter of
- * a step, a state of a report, a kind of value typed in, or something a document or a report holds
- * that the editor does not show, and says why. Four tests find the gaps, each of the kinds that
+ * a step, an expression the walk gives no context, a state of a report, a kind of value typed in, or
+ * something a document or a report holds that the editor does not show, and says why. Four tests find the gaps, each of the kinds that
  * `FOUND_BY` names for it, and fail on a gap that is found and not declared, and on a gap that is
  * declared and not found. The grid test runs the model's functions for every place the engine was
  * asked about; the test of states does the same for every state of a step's report; the census
  * test holds every variant the host lists against what the editor can draw; and the corpus test
- * rebuilds every piece of every document the engine made, and finds the steps and the parameters of
- * steps that the grid does not reach. The corpus test accepts any gap declared of a kind another test
+ * rebuilds every piece of every document the engine made, and finds the steps, the parameters of
+ * steps and the expressions without a context that the grid does not reach. The corpus test accepts any gap declared of a kind another test
  * finds, for a piece it cannot build: it only names the piece. A change of the engine or of the
  * catalogue that adds something the editor cannot draw, or a change of the editor that draws it,
  * changes this list.
@@ -55,6 +55,8 @@ export type Cover =
   | { readonly kind: 'parameter'; readonly entry: string; readonly parameter: string }
   /** A kind of parameter that has no drawing, by the shape and kind that make it up. */
   | { readonly kind: 'parameterKind'; readonly of: string }
+  /** An expression of a document that the engine's walk walks and gives no context, so no list can be asked what may stand at it. */
+  | { readonly kind: 'noContext'; readonly entry: string; readonly parameter: string }
   /** A step of the catalogue that no list adds, though a document may hold it. */
   | { readonly kind: 'step'; readonly entry: string }
   /** A parameter of a step that the editor draws neither in the step's head nor as an option. */
@@ -76,6 +78,7 @@ export const FOUND_BY = {
   start: 'grid',
   parameter: 'grid',
   parameterKind: 'grid',
+  noContext: 'corpus',
   step: 'corpus',
   stepParameter: 'corpus',
   report: 'states',
@@ -102,6 +105,8 @@ export function coverKey(cover: Cover): string {
       return `parameter ${cover.entry} ${cover.parameter}`;
     case 'parameterKind':
       return `parameterKind ${cover.of}`;
+    case 'noContext':
+      return `noContext ${cover.entry} ${cover.parameter}`;
     case 'step':
       return `step ${cover.entry}`;
     case 'stepParameter':
@@ -142,7 +147,7 @@ const SEVERAL_NOT_SHOWN =
 
 /** Why a step the editor draws by its parameters alone is not added from the list of steps. */
 const NOT_A_STEP_OF_THE_LIST =
-  'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it';
+  'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
 
 /** Declares the step `entry`, which no list adds. */
 function stepGap(entry: string): Gap {
@@ -200,12 +205,19 @@ export const GAPS: readonly Gap[] = [
   // The parameters of a step that its head does not draw and its options do not offer.
   {
     cover: { kind: 'stepParameter', entry: 'LazyFrame.sort', parameter: 'more_by' },
-    reason: 'the fields to order by are one list, so a second list of more fields is not offered',
+    reason:
+      'the fields to order by are one list, so a second list of more fields is not offered (#137)',
   },
   {
     cover: { kind: 'stepParameter', entry: 'LazyFrame.join', parameter: 'on' },
     reason:
-      'the keys of the two tables are one list each, so `on`, one list of keys both tables share, is not offered',
+      'the keys of the two tables are one list each, so `on`, one list of keys both tables share, is not offered (#137)',
+  },
+  // An expression the walk gives no context.
+  {
+    cover: { kind: 'noContext', entry: 'LazyFrame.filter', parameter: 'constraints' },
+    reason:
+      'the engine walks the value of a keyword constraint of a filter and reports no context for it, so the editor cannot ask what may stand there (#172)',
   },
   // The parameters of the entries the editor draws as a word of their own, which it does not set.
   parameterGap(
