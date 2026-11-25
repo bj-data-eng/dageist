@@ -308,6 +308,25 @@ Review the diff. When `offers-grid.json` changes, the view's grid test, in
 `ui/packages/steps/src/model/limits.ts` are to be updated with the change, or
 the editor is to draw what the engine allows. Never edit the files by hand.
 
+### Refresh The Census Snapshot
+
+After a change to a variant the step editor has to handle, such as a kind of start, a kind of
+parameter, a class of dtype, a cause or rule of a refusal, a state of a step or of its rows or a
+kind of input, `report::census::tests::the_snapshot_is_what_the_host_reports` fails and names
+`ui/packages/host/fixtures/census.json`. The census lists every such variant from the Rust types:
+a type with a list of all its variants is read through it, and any other is walked by a function
+that names each variant with no wildcard arm, so adding a variant fails to compile until that
+function places it, in `crates/dageist-tauri/src/report/census.rs`. Write the file from there,
+format it, then run the view's tests, which decode it:
+
+```sh
+DAGEIST_REFRESH_CENSUS=1 cargo test --offline --locked -p dageist-tauri report::census::tests::the_snapshot_is_what_the_host_reports
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
+Review the diff, and never edit the file by hand.
+
 ## Open The Sample Table
 
 The `Table` workspace shows a generated claims table of about two million rows

@@ -44,3 +44,11 @@ pub fn check(file: &str, returned: &Value, refresh: &str, how: &str) {
          {refresh}=1 {how} && npm --prefix ui run format"
     );
 }
+
+/// The committed fixture `file`, as JSON, for a test that holds what a command returns against
+/// what another command's snapshot recorded.
+pub fn committed(file: &str) -> Value {
+    let text = std::fs::read_to_string(path(file))
+        .unwrap_or_else(|error| panic!("ui/packages/host/fixtures/{file} is not read: {error}"));
+    serde_json::from_str(&text).expect("a fixture is JSON")
+}

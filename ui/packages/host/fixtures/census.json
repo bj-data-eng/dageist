@@ -1,0 +1,658 @@
+{
+  "starts": [
+    {
+      "kind": "field"
+    },
+    {
+      "kind": "typed",
+      "literal": "integer"
+    },
+    {
+      "kind": "typed",
+      "literal": "float"
+    },
+    {
+      "kind": "typed",
+      "literal": "text"
+    },
+    {
+      "kind": "typed",
+      "literal": "flag"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.date"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.date_range"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.datetime"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.datetime_range"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.duration"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.element"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.from_epoch"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.int_range"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.linear_space"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.repeat"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.time"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.time_range"
+    },
+    {
+      "kind": "function",
+      "entry": "polars.when"
+    },
+    {
+      "kind": "connectedValue"
+    },
+    {
+      "kind": "connectedList"
+    },
+    {
+      "kind": "hole"
+    }
+  ],
+  "typedValues": [
+    {
+      "literal": "integer",
+      "dtype": "Int32",
+      "readable": true
+    },
+    {
+      "literal": "float",
+      "dtype": "Float64",
+      "readable": true
+    },
+    {
+      "literal": "text",
+      "dtype": "String",
+      "readable": true
+    },
+    {
+      "literal": "flag",
+      "dtype": "Boolean",
+      "readable": false
+    }
+  ],
+  "typedReadings": [
+    {
+      "slot": {
+        "kind": "expression"
+      },
+      "literal": "integer",
+      "dtype": "Int32"
+    },
+    {
+      "slot": {
+        "kind": "expression"
+      },
+      "literal": "text",
+      "dtype": "String"
+    },
+    {
+      "slot": {
+        "kind": "expression"
+      },
+      "literal": "float",
+      "dtype": "Float64"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "integer"
+      },
+      "literal": "integer",
+      "dtype": "Int32"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "integer"
+      },
+      "literal": null,
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "float"
+      },
+      "literal": "float",
+      "dtype": "Float64"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "string"
+      },
+      "literal": "text",
+      "dtype": "String"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "date"
+      },
+      "literal": "text",
+      "dtype": "Date"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "date"
+      },
+      "literal": null,
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "any"
+      },
+      "literal": "integer",
+      "dtype": "Int32"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "any"
+      },
+      "literal": "text",
+      "dtype": "String"
+    },
+    {
+      "slot": {
+        "kind": "value",
+        "type": "any"
+      },
+      "literal": "float",
+      "dtype": "Float64"
+    },
+    {
+      "slot": {
+        "kind": "duration"
+      },
+      "literal": "text",
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "duration"
+      },
+      "literal": null,
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "pattern"
+      },
+      "literal": "text",
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "timeZone"
+      },
+      "literal": "text",
+      "dtype": null
+    },
+    {
+      "slot": {
+        "kind": "path"
+      },
+      "literal": "text",
+      "dtype": null
+    }
+  ],
+  "parameterKinds": [
+    "expression",
+    "column",
+    "value",
+    "flag",
+    "choice",
+    "dtype",
+    "duration",
+    "pattern",
+    "timeZone",
+    "table",
+    "path",
+    "pairs"
+  ],
+  "valueTypes": ["integer", "float", "string", "date", "any"],
+  "parameterShapes": ["one", "many", "perItem"],
+  "parameterForms": [
+    {
+      "shape": "many",
+      "kind": {
+        "kind": "column"
+      }
+    },
+    {
+      "shape": "many",
+      "kind": {
+        "kind": "expression"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "choice"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "column"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "dtype"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "duration"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "expression"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "flag"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "pairs",
+        "key": {
+          "kind": "column"
+        },
+        "value": {
+          "kind": "expression"
+        }
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "pairs",
+        "key": {
+          "kind": "column"
+        },
+        "value": {
+          "kind": "value",
+          "type": "string"
+        }
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "pattern"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "table"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "timeZone"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "value",
+        "type": "any"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "value",
+        "type": "float"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "value",
+        "type": "integer"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "value",
+        "type": "string"
+      }
+    },
+    {
+      "shape": "perItem",
+      "kind": {
+        "kind": "flag"
+      }
+    }
+  ],
+  "optionKinds": ["flag", "choice"],
+  "dtypeClasses": [
+    "Int8",
+    "Int16",
+    "Int32",
+    "Int64",
+    "Int128",
+    "UInt8",
+    "UInt16",
+    "UInt32",
+    "UInt64",
+    "UInt128",
+    "Float16",
+    "Float32",
+    "Float64",
+    "String",
+    "Boolean",
+    "Date",
+    "Time",
+    "Datetime(us)",
+    "Datetime(us, UTC)",
+    "Duration(us)",
+    "Null",
+    "List(Int64)",
+    "List(String)",
+    "Struct(x: Int64, y: String)",
+    "Array(Int64, 2)",
+    "Decimal(10, 2)",
+    "List(Int8)",
+    "List(Int16)",
+    "List(Int32)",
+    "List(Int128)",
+    "List(UInt8)",
+    "List(UInt16)",
+    "List(UInt32)",
+    "List(UInt64)",
+    "List(UInt128)",
+    "List(Float16)",
+    "List(Float32)",
+    "List(Float64)",
+    "List(Boolean)",
+    "List(Date)",
+    "List(Time)",
+    "List(Datetime(us))",
+    "List(Datetime(us, UTC))",
+    "List(Duration(us))",
+    "List(Null)",
+    "List(Decimal(10, 2))",
+    "Array(Int8, 2)",
+    "Array(Int16, 2)",
+    "Array(Int32, 2)",
+    "Array(Int128, 2)",
+    "Array(UInt8, 2)",
+    "Array(UInt16, 2)",
+    "Array(UInt32, 2)",
+    "Array(UInt64, 2)",
+    "Array(UInt128, 2)",
+    "Array(Float16, 2)",
+    "Array(Float32, 2)",
+    "Array(Float64, 2)",
+    "Array(String, 2)",
+    "Array(Boolean, 2)",
+    "Array(Date, 2)",
+    "Array(Time, 2)",
+    "Array(Datetime(us), 2)",
+    "Array(Datetime(us, UTC), 2)",
+    "Array(Duration(us), 2)",
+    "Array(Null, 2)",
+    "Array(Decimal(10, 2), 2)"
+  ],
+  "valueShapes": ["one", "many", "counted"],
+  "afterKinds": ["start", "value", "condition"],
+  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
+  "causes": ["unknownTable", "unknownInput", "build", "notAllowed", "polars"],
+  "refusalSources": ["polars", "rule", "structure"],
+  "stages": ["schema", "rows", "empty"],
+  "rules": [
+    {
+      "name": "arrays-meet-at-one-width",
+      "statement": "arrays that meet, as the operands of a method or the values of a condition, and give an array, or that one is looked up in, must be of one width, which must be known: Polars refuses to add arrays of two widths or to look one up in the other, and gives a list where it fills one with the other or takes one for a value of a condition and the other for another"
+    },
+    {
+      "name": "condition-predicate-is-boolean",
+      "statement": "a condition's predicate must be Boolean"
+    },
+    {
+      "name": "duration-is-valid",
+      "statement": "a duration typed in must be a duration string Polars reads"
+    },
+    {
+      "name": "element-dtype-is-implemented",
+      "statement": "a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from"
+    },
+    {
+      "name": "element-dtype-is-measured",
+      "statement": "a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on"
+    },
+    {
+      "name": "element-only-in-pivot-aggregate",
+      "statement": "`polars.element` stands only in a pivot's aggregate"
+    },
+    {
+      "name": "filter-predicate-is-boolean",
+      "statement": "a filter's predicate must be Boolean"
+    },
+    {
+      "name": "folded-function-is-no-join-key",
+      "statement": "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
+    },
+    {
+      "name": "join-key-names-are-not-repeated",
+      "statement": "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
+    },
+    {
+      "name": "key-is-elementwise",
+      "statement": "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column"
+    },
+    {
+      "name": "moments-share-a-zone",
+      "statement": "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
+    },
+    {
+      "name": "parameter-takes-one-value",
+      "statement": "a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run"
+    },
+    {
+      "name": "pattern-is-valid",
+      "statement": "a pattern must be a valid regular expression"
+    },
+    {
+      "name": "pivot-aggregate-gives-one-value",
+      "statement": "a pivot's aggregate must give one value for each group"
+    },
+    {
+      "name": "range-is-valid",
+      "statement": "a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it and of any value made of literals alone, no length below nothing to cut it by"
+    },
+    {
+      "name": "replacement-values-match-in-number",
+      "statement": "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
+    },
+    {
+      "name": "time-zone-is-valid",
+      "statement": "a time zone must be one Polars reads"
+    },
+    {
+      "name": "values-meet-in-count",
+      "statement": "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
+    },
+    {
+      "name": "window-input-is-not-counted",
+      "statement": "a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, unless the window joins the values of a group into a list or explodes them"
+    },
+    {
+      "name": "window-input-is-not-widened",
+      "statement": "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
+    }
+  ],
+  "outcomes": ["valid", "refused", "incomplete", "notRun"],
+  "rowsStates": ["notCounted", "counted", "failed"],
+  "states": [
+    {
+      "outcome": "valid",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "valid",
+      "cause": null,
+      "rows": "counted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "valid",
+      "cause": null,
+      "rows": "failed",
+      "after": "nothing"
+    },
+    {
+      "outcome": "valid",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "refused",
+      "cause": "unknownTable",
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "refused",
+      "cause": "unknownTable",
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "refused",
+      "cause": "unknownInput",
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "refused",
+      "cause": "unknownInput",
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "refused",
+      "cause": "build",
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "refused",
+      "cause": "build",
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "refused",
+      "cause": "notAllowed",
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "refused",
+      "cause": "notAllowed",
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "refused",
+      "cause": "polars",
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "refused",
+      "cause": "polars",
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "incomplete",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "nothing"
+    },
+    {
+      "outcome": "incomplete",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "failed"
+    },
+    {
+      "outcome": "notRun",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "refused"
+    },
+    {
+      "outcome": "notRun",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "incomplete"
+    },
+    {
+      "outcome": "notRun",
+      "cause": null,
+      "rows": "notCounted",
+      "after": "notRun"
+    }
+  ],
+  "inputKinds": ["table", "value", "list"],
+  "origins": ["node", "column", "parameter"],
+  "cells": ["text", "null"]
+}
