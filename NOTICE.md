@@ -223,7 +223,7 @@ Amanieu d'Antras, under your choice of either license:
 * License: [MIT License](licenses/hashbrown/LICENSE-MIT)
 * Homepage: [hashbrown](https://github.com/rust-lang/hashbrown)
 
-This product depends on Polars, built from the source of Python Polars 2.1.0 in
+This product depends on Polars, built from the source of Python Polars 2.2.0 in
 [vendor/polars](vendor/polars) (the crates `polars`, `polars-lazy` and
 `polars-ooc` and the Polars crates they use, at version 0.55.1), distributed by
 Ritchie Vink, with some portions by NVIDIA Corporation and affiliates:
@@ -274,7 +274,7 @@ your choice of either license:
 * Homepage: [Tauri](https://tauri.app/)
 
 This product depends on tikv-jemalloc-sys 0.7.1, as patched by the Polars
-project at revision `0d683dfb157097e2075d5e0eaf25f71f514a7552` of
+project at revision `e947a0d1a786e221ac1c14ba1566b55151e61ec9` of
 [pola-rs/jemallocator](https://github.com/pola-rs/jemallocator), distributed by
 Alex Crichton, Gonzalo Brito Gadeschi and The TiKV Project Developers, and on
 tikv-jemallocator 0.7.0 from the same upstream project, through which Polars'
@@ -286,7 +286,7 @@ of either license:
 * License: [MIT License](licenses/jemallocator/LICENSE-MIT)
 * Homepage: [jemallocator](https://github.com/tikv/jemallocator)
 
-On macOS and Linux, tikv-jemalloc-sys builds the jemalloc 5.3.1 memory
+On macOS and Linux, tikv-jemalloc-sys builds the jemalloc 5.4.0 memory
 allocator into this product, distributed by Jason Evans, the Mozilla Foundation
 and Facebook, Inc.:
 

@@ -218,7 +218,9 @@ fn an_aggregate_of_a_condition_of_identical_values_is_one_value_and_is_counted_a
         refusal.refusal().source(),
         RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
 }
 
 #[test]
@@ -282,9 +284,10 @@ fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refus
             .map(|refusal| refusal.refusal().source()),
         Some(RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber))
     );
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
     assert!(
-        polars_says(&many_beside_one)
-            .is_some_and(|reason| reason.contains("must have the same length as the input")),
+        polars_says(&many_beside_one).is_none(),
         "{:?}",
         outcome(&many_beside_one)
     );
@@ -750,7 +753,9 @@ fn a_default_of_many_values_after_an_aggregate_of_a_condition_of_identical_value
         "LazyFrame.select",
         select(vec![condition(vec![call("Expr.last", json!({})), replace])]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -782,7 +787,9 @@ fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of
             vec![call("Expr.max", json!({})), replace("a", "k"), strict],
         )]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -790,6 +797,195 @@ fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of
         "{:?}",
         walk(&report).refusal()
     );
+}
+
+#[test]
+fn a_predicate_that_is_no_boolean_in_a_joins_key_is_refused_where_the_other_table_holds_keys() {
+    // `when(k).then(1).otherwise(0)` as the key: Python Polars 2.2.0 refuses a predicate of whole
+    // numbers when it evaluates the key, which its streaming engine does only where the other
+    // table holds a key with a value, as `rk` does here; the rule that a condition's predicate is
+    // a `Boolean` says it whatever the other table holds, so the evidence of the rule is this case.
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("k")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": whole(1) })),
+            call("Then.otherwise", json!({ "statement": whole(0) })),
+            call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+        ],
+    );
+    let report = join_on(key);
+    assert!(
+        polars_says(&report).is_some_and(|reason| reason.contains("Boolean")),
+        "{:?} {:?}",
+        polars_says(&report),
+        outcome(&report)
+    );
+    assert!(
+        walk(&report).refusal().is_some_and(|refusal| matches!(
+            refusal.refusal().source(),
+            RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
+        )),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}
+
+#[test]
+fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_as_polars_takes_it()
+{
+    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers at once, for none is 1.5,
+    // and refuses the join for a key that is not elementwise, in both engines. Polars swaps the
+    // operands when it coerces them, so `lit(1.5).ne_missing(k)` is decided the same way. A number
+    // with no fraction is held by whole numbers, so the comparison is kept and the key is taken, and
+    // so is a number given the dtype of whole numbers, which makes `1.5` the whole number 1, and a
+    // key that is one value, as the count of a column or an aggregate of the comparison is, and the
+    // same comparison in no join.
+    let number = |value: f64, whole_dtype: Option<&str>| {
+        let mut arguments = json!({ "value": { "float": value } });
+        if let Some(name) = whole_dtype {
+            arguments["dtype"] = dtype(name);
+        }
+        chain(
+            json!({ "entry": "polars.lit", "arguments": arguments }),
+            Vec::new(),
+        )
+    };
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    // `k` compared with the number, and the number compared with `k`.
+    let beside = |method: &str, value: Value| {
+        chain(
+            col_call("k"),
+            vec![call(method, json!({ "other": value })), cast()],
+        )
+    };
+    let swapped = |method: &str, value: Value| {
+        chain(
+            value["expression"]["start"].clone(),
+            vec![call(method, json!({ "other": field("k") })), cast()],
+        )
+    };
+    let refused = |said: &str, report: &Ran| {
+        assert!(
+            polars_says(report).is_some_and(|reason| reason.contains("elementwise")),
+            "{said}: {:?} {:?}",
+            polars_says(report),
+            outcome(report)
+        );
+        assert!(
+            walk(report).refusal().is_some_and(|refusal| matches!(
+                refusal.refusal().source(),
+                RefusalSource::Rule(Rule::KeyIsElementwise)
+            )),
+            "{said}: {:?}",
+            walk(report).refusal()
+        );
+    };
+    let taken = |said: &str, report: &Ran| {
+        assert!(
+            polars_says(report).is_none(),
+            "{said}: {:?}",
+            outcome(report)
+        );
+        assert_eq!(walk(report).refusal(), None, "{said}");
+    };
+    for method in ["Expr.ne_missing", "Expr.eq_missing"] {
+        refused(
+            &format!("{method} of k"),
+            &join_on(beside(method, number(1.5, None))),
+        );
+        refused(
+            &format!("{method} beside k"),
+            &join_on(swapped(method, number(1.5, None))),
+        );
+        refused(
+            &format!("{method} of k, a float given"),
+            &join_on(beside(method, number(1.5, Some("Float32")))),
+        );
+        refused(
+            &format!("{method} beside k, a float given"),
+            &join_on(swapped(method, number(1.5, Some("Float32")))),
+        );
+        // Polars rewrites the number only where it is a 32 or 64 bit float, so a 16 bit float is
+        // compared as it is and the key is taken.
+        taken(
+            &format!("{method} of k, a half float given"),
+            &join_on(beside(method, number(1.5, Some("Float16")))),
+        );
+        taken(
+            &format!("{method} beside k, a half float given"),
+            &join_on(swapped(method, number(1.5, Some("Float16")))),
+        );
+        taken(
+            &format!("{method} of k, no fraction"),
+            &join_on(beside(method, number(2.0, None))),
+        );
+        taken(
+            &format!("{method} beside k, no fraction"),
+            &join_on(swapped(method, number(2.0, None))),
+        );
+        // An aggregate that follows leaves a key of one value, which is taken whole.
+        taken(
+            &format!("{method} of k, summed"),
+            &join_on(chain(
+                col_call("k"),
+                vec![
+                    call(method, json!({ "other": number(1.5, None) })),
+                    call("Expr.sum", json!({})),
+                ],
+            )),
+        );
+        taken(
+            &format!("{method} beside k, summed"),
+            &join_on(chain(
+                number(1.5, None)["expression"]["start"].clone(),
+                vec![
+                    call(method, json!({ "other": field("k") })),
+                    call("Expr.sum", json!({})),
+                ],
+            )),
+        );
+        taken(
+            &format!("{method} of k, whole numbers given"),
+            &join_on(beside(method, number(1.5, Some("Int64")))),
+        );
+        taken(
+            &format!("{method} beside k, whole numbers given"),
+            &join_on(swapped(method, number(1.5, Some("Int64")))),
+        );
+    }
+    // A key that is one value is taken whole.
+    taken(
+        "the count of k",
+        &join_on(chain(
+            col_call("k"),
+            vec![
+                call("Expr.len", json!({})),
+                call("Expr.ne_missing", json!({ "other": number(1.5, None) })),
+                cast(),
+            ],
+        )),
+    );
+    taken(
+        "beside the count of k",
+        &join_on(chain(
+            json!({ "entry": "polars.lit", "arguments": { "value": { "float": 1.5 } } }),
+            vec![
+                call(
+                    "Expr.ne_missing",
+                    json!({ "other": chain(col_call("k"), vec![call("Expr.len", json!({}))]) }),
+                ),
+                cast(),
+            ],
+        )),
+    );
+    let selected = report_of(
+        "LazyFrame.select",
+        select(vec![beside("Expr.ne_missing", number(1.5, None))]),
+    );
+    taken("a select", &selected);
 }
 
 #[test]
@@ -897,7 +1093,9 @@ fn a_condition_of_single_values_that_are_one_expression_gives_one_value_for_a_re
         ],
     );
     let report = report_of("LazyFrame.select", select(vec![condition]));
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()
@@ -973,7 +1171,9 @@ fn one_value_over_a_window_that_explodes_is_one_value_for_each_group_and_not_for
             vec![call("Expr.min", json!({})), windowed, replace],
         )]),
     );
-    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    // Stricter by design: Python Polars 2.2.0's streaming engine, which the engine of steps is,
+    // meets the default with the one value, where its in-memory engine refuses it for the lengths.
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert!(
         walk(&report)
             .refusal()

@@ -22,7 +22,7 @@ fn root() -> PathBuf {
 
 /// The release `vendor/polars` is pinned to.
 pub(super) struct Release {
-    /// The tag of the Python Polars release, such as `py-2.1.0`.
+    /// The tag of the Python Polars release, such as `py-2.2.0`.
     tag: String,
     /// The commit the tag names.
     commit: String,

@@ -123,13 +123,16 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
     assert_eq!(result("Expr.first"), (json!("Datetime(us)"), json!("one")));
     assert_eq!(result("Expr.len"), (json!("UInt32"), json!("one")));
     // A running sum of timestamps and a length in days of what is no duration are refused by
-    // Polars, which says so when it runs rows.
+    // Polars, which says so when it runs rows, and the sum of timestamps when it resolves the schema.
     for id in ["Expr.cum_sum", "Expr.sum", "Expr.dt.total_days"] {
         let verdict = &offered(&answer, id)["verdict"];
         assert_eq!(verdict["kind"], "refused", "{id}");
         assert_eq!(
             verdict["refusal"]["source"],
-            json!({ "by": "polars", "stage": "rows" }),
+            json!({
+                "by": "polars",
+                "stage": if id == "Expr.sum" { "schema" } else { "rows" }
+            }),
             "{id}"
         );
         assert!(

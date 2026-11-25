@@ -18,9 +18,9 @@ use polars::prelude::{
     DurationArgs, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation,
     LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError,
     QuantileMethod, RankMethod, RankOptions, RoundMode, Scalar, SearchSortedSide, Selector, Series,
-    SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal,
-    binary_expr, by_name, col, cols, datetime, datetime_range, duration, element, int_range,
-    linear_space, lit, repeat, when,
+    Slice, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
+    all_horizontal, binary_expr, by_name, col, cols, datetime, datetime_range, duration, element,
+    int_range, linear_space, lit, repeat, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -49,13 +49,14 @@ const CUM_MAX: &[Dtypes] = &[
     Dtypes::String,
     Dtypes::Boolean,
 ];
-// What Polars replaces the values of: every dtype it orders, and an array, whose values it meets one
-// whole. It has no replacement for a list, which it refuses as not yet implemented.
+// What Polars replaces the values of: every dtype it orders, and a list and an array, whose values it
+// meets one whole.
 const REPLACEABLE: &[Dtypes] = &[
     Dtypes::Numeric,
     Dtypes::Temporal,
     Dtypes::String,
     Dtypes::Boolean,
+    Dtypes::List,
     Dtypes::Array,
 ];
 const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
@@ -1877,7 +1878,7 @@ fn row_count(arguments: &Arguments) -> Result<u32, BuildError> {
 }
 
 fn frame_head(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.slice(0, row_count(arguments)?))
+    Ok(frame.slice(Slice::head(row_count(arguments)? as usize)))
 }
 
 fn frame_tail(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
@@ -1895,12 +1896,13 @@ fn frame_slice(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, Bui
         Some(other) => return Err(Arguments::wrong("offset", "a whole number", other)),
     };
     // Python leaves the length out as the most rows an index holds, and refuses a negative one.
-    let length = optional_unsigned(arguments, "length")?.unwrap_or(u32::MAX);
-    Ok(frame.slice(offset, length))
+    let length =
+        optional_unsigned(arguments, "length")?.map_or(u32::MAX as usize, |length| length as usize);
+    Ok(frame.slice((offset, length)))
 }
 
 fn frame_first(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.slice(0, 1))
+    Ok(frame.slice(Slice::head(1)))
 }
 
 fn frame_last(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
@@ -2516,7 +2518,10 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Aggregate,
         accepts: CUM_MAX,
         parameters: &[
-            required("quantile", Kind::Expression(NUMERIC), Shape::One).with_role(Role::Share),
+            required("quantile", Kind::Expression(NUMERIC), Shape::One)
+                .with_role(Role::Share)
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "method",
                 Kind::Choice(APPROX_QUANTILE_METHOD),
@@ -2853,7 +2858,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(bottom_k),
     },
@@ -3907,7 +3912,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pct_change),
     },
@@ -3935,7 +3940,7 @@ pub(super) const ENTRIES: &[Entry] = &[
             required("quantile", Kind::Expression(NUMERIC), Shape::One)
                 .with_role(Role::Share)
                 .not_broadcasting()
-                .reading_one_value(OneValue::SingleRow),
+                .reading_one_value(OneValue::Scalar),
             optional(
                 "interpolation",
                 Kind::Choice(QUANTILE_METHOD),
@@ -4121,10 +4126,12 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("offset", Kind::Expression(INTEGER), Shape::One)
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
             optional("length", Kind::Expression(INTEGER), Shape::One, "None")
                 .with_role(Role::Count)
-                .not_broadcasting(),
+                .not_broadcasting()
+                .reading_one_value(OneValue::Scalar),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(slice),
@@ -4491,7 +4498,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[optional("k", Kind::Expression(INTEGER), Shape::One, "5")
             .with_role(Role::Count)
             .not_broadcasting()
-            .reading_one_value(OneValue::SingleRow)],
+            .reading_one_value(OneValue::Scalar)],
         laziness: Laziness::Lazy,
         build: Build::Expression(top_k),
     },

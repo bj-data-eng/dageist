@@ -1,7 +1,7 @@
 //! The methods of the `list` and the `arr` namespaces that take no expression argument, on a
 //! column of lists or arrays of every scalar element dtype.
 //!
-//! Every expectation is what Python Polars 2.1.0 does, which each sweep asks by running the same
+//! Every expectation is what Python Polars 2.2.0 does, which each sweep asks by running the same
 //! document on the rows of a table, and on a table with no rows, as the tables of allowed
 //! combinations count a combination. The walk must say the same of the same document, and give
 //! the dtype Polars gives after the last call and how many values it is. A sweep collects every
@@ -147,10 +147,14 @@ fn frame() -> DataFrame {
     // Lists of arrays and lists of structs: a row holds the one array, or the one struct.
     let arrays = nested(Representative::Array(Inner::Int64), "");
     columns.push(
-        ListChunked::from_iter([Some(arrays.slice(0, 1)), None, Some(arrays.slice(2, 1))])
-            .into_series()
-            .with_name("deep_array".into())
-            .into(),
+        ListChunked::from_iter([
+            Some(arrays.slice((0_usize, 1))),
+            None,
+            Some(arrays.slice((2_usize, 1))),
+        ])
+        .into_series()
+        .with_name("deep_array".into())
+        .into(),
     );
     let one_struct = |x: i64| {
         StructChunked::from_series("".into(), 1, [Series::new("x".into(), [x])].iter())
@@ -1252,8 +1256,12 @@ fn depth_two_columns() -> Vec<Column> {
     let mut columns = Vec::new();
     for element in DEPTH_TWO_ELEMENTS {
         let rows = |inner: &Series| {
-            ListChunked::from_iter([Some(inner.slice(0, 1)), None, Some(inner.slice(2, 1))])
-                .into_series()
+            ListChunked::from_iter([
+                Some(inner.slice((0_usize, 1))),
+                None,
+                Some(inner.slice((2_usize, 1))),
+            ])
+            .into_series()
         };
         let lists = nested(Representative::List(element), "");
         let arrays = nested(Representative::Array(element), "");

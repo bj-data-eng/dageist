@@ -11,8 +11,9 @@ use dageist_engine::allowed::Representative;
 use dageist_engine::document::{
     Document, Expression, Outcome, Place, Resolution, RunCause, Segment, Start, Value,
 };
-use polars::prelude::{DataType, IntoLazy};
+use polars::prelude::{DataType, Engine, IntoLazy};
 
+use super::ask_polars::{self, Connected};
 use super::asked::{self, Walked};
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
@@ -168,7 +169,7 @@ pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
             reason: if refusal.stage == Stage::Schema {
                 refusal.reason.clone()
             } else {
-                shape_of_a_failure_of_rows(&refusal.reason)
+                one_wording_of_a_replacement(&shape_of_a_failure_of_rows(&refusal.reason))
             },
             ..refusal.clone()
         })
@@ -186,6 +187,18 @@ pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
         ));
     }
     None
+}
+
+/// `reason` with the refusal of a text replacement of more than the first match worded as a regex
+/// replacement, which Polars words as a multivalue replacement where it splits its work another
+/// way, so that the two wordings of the one refusal compare as the same.
+fn one_wording_of_a_replacement(reason: &str) -> String {
+    reason
+        .strip_prefix("multivalue replacement with 'n > ")
+        .map_or_else(
+            || reason.to_owned(),
+            |rest| format!("regex replacement with 'n > {rest}"),
+        )
 }
 
 /// `reason` with the values of the rows it names, which are between brackets, left out and every
@@ -504,6 +517,26 @@ pub fn observe_probe(case: &Case, tables: Tables) -> Observed {
     observe_on(case, tables, false)
 }
 
+/// Why Polars' in-memory engine refuses the first rows of the case's step on the sample, which the
+/// step engine runs on the streaming engine, or `None` where it runs them: the control of a case
+/// that one of the two engines runs and the other refuses.
+pub fn refused_in_memory(case: &Case) -> Option<String> {
+    let frames = Tables::default().of(case, &[DataType::Int64]);
+    let tables = |name: &str| frames.table(name, false);
+    catch_unwind(AssertUnwindSafe(|| {
+        ask_polars::collect_on(
+            Engine::InMemory,
+            &case.document.steps()[0],
+            0,
+            &frames.rows,
+            Connected::tables(&tables),
+            100,
+        )
+    }))
+    .ok()?
+    .err()
+}
+
 pub fn observe(case: &Case) -> Observed {
     observe_on(case, Tables::default(), false)
 }
@@ -624,6 +657,24 @@ mod tests {
             ..said.clone()
         };
         assert!(drift_between(&said, &no_expressions).is_some());
+    }
+
+    #[test]
+    fn the_two_wordings_of_a_refusal_of_a_replacement_of_more_than_the_first_match_are_no_drift() {
+        // Polars 2.2.0 words the refusal of `str.replace` with `n` above 1 as a regex replacement
+        // or as a multivalue one, by how it splits the work, which is not the same from run to run
+        // on two threads: it is the same refusal.
+        let said = |reason: &str| Observed {
+            refusal: refusal(Stage::Rows, reason),
+            ..Observed::default()
+        };
+        let regex = said("regex replacement with 'n > 1' not yet supported");
+        let multivalue = said("multivalue replacement with 'n > 1' not yet supported");
+        assert_eq!(drift_between(&regex, &multivalue), None);
+        assert_eq!(drift_between(&multivalue, &regex), None);
+        // Another refusal is a difference.
+        let other_words = said("replacement with 'n > 1' is not wanted");
+        assert!(drift_between(&regex, &other_words).is_some());
     }
 
     #[test]

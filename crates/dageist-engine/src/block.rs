@@ -56,11 +56,11 @@ pub(crate) fn check_columns(
 }
 
 /// Converts a requested row range into the offset and length Polars slices
-/// by. A length too large for Polars means "to the end".
-pub(crate) fn slice_bounds(offset: usize, length: usize) -> Result<(i64, IdxSize), EngineError> {
+/// by. A length beyond the last row means "to the end".
+pub(crate) fn slice_bounds(offset: usize, length: usize) -> Result<(i64, usize), EngineError> {
     let offset = i64::try_from(offset)
         .map_err(|_| EngineError::request("slicing the block", "the offset is too large"))?;
-    Ok((offset, IdxSize::try_from(length).unwrap_or(IdxSize::MAX)))
+    Ok((offset, length))
 }
 
 /// A block of a table: the rows asked for, limited to the columns asked for, as an

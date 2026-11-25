@@ -795,6 +795,27 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     })
 }
 
+/// The cases that ask Polars about the part the tables refused, alone, as [`settle`] does, without
+/// asking: the case of the part, and the case of what stands before the refused call in it, which
+/// is none where the call starts the chain. `None` where the part has no probe.
+pub fn cases_of_the_part(case: &Case, refused: &Refused) -> Option<(Case, Option<Case>)> {
+    let found = find(case, &refused.place)?;
+    let probe = probe_of_the_part(&found, &refused.source)?;
+    let run = |part: Expression, filter: bool| {
+        let document = document_of(case, &found, part, filter)?;
+        Some(Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document,
+        })
+    };
+    let before = match probe.before {
+        Some(before) => Some(run(before, false)?),
+        None => None,
+    };
+    Some((run(probe.part, probe.filter)?, before))
+}
+
 /// The cases that ask Polars about the part a count was refused at, alone, as [`settle`] does,
 /// where it is allowed on the sample's rows: the chain through the refused call, and the chain of
 /// the call that takes it. `None` for a part of a pivot's aggregate or of a join's right key, which
@@ -2121,13 +2142,6 @@ mod tests {
     }
 
     #[test]
-    fn a_list_max_that_only_an_outer_window_allows_is_refused_alone_for_the_same_reason() {
-        let found = settled("stricter-a-list-max-under-an-outer-window.case");
-        assert!(found.reason.contains("not supported"), "{}", found.reason);
-        assert!(found.probe.contains("Expr.max"), "{}", found.probe);
-    }
-
-    #[test]
     fn a_bitwise_call_on_text_is_refused_alone_where_polars_gives_a_column_its_schema_does_not_say()
     {
         // `when(k > k).then(k).otherwise(k).or_(h)` of a whole number and text, in the value of
@@ -2512,27 +2526,6 @@ mod tests {
     }
 
     #[test]
-    fn a_call_after_a_part_that_polars_folds_is_refused_on_a_value_of_its_dtype() {
-        // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
-        // does not evaluate the call as written, and the probe as written is
-        // allowed. On a `Boolean` column, which is what reaches the call, it is
-        // refused for the tables' reason.
-        let name = "stricter-a-window-over-the-length-of-a-literal.case";
-        let case = kept(name);
-        let refused = refusal(&case);
-        assert_eq!(settle(&case, &refused), None);
-        let found =
-            on_a_value(&case, &refused).expect("a probe that Polars refuses as the tables do");
-        assert!(
-            found.probe.contains("\"columns\":[\"p\"]"),
-            "{}",
-            found.probe
-        );
-        assert!(!found.probe.contains("Expr.min"), "{}", found.probe);
-        assert!(found.reason.contains("Duration"), "{}", found.reason);
-    }
-
-    #[test]
     fn a_running_sum_of_a_comparison_with_a_null_is_refused_on_a_value_of_its_dtype() {
         let case = kept("stricter-a-running-sum-of-a-null-comparison.case");
         let refused = refusal(&case);
@@ -2585,7 +2578,7 @@ mod tests {
         // The probe takes the dtype that reaches the call from Polars and the
         // tables together: where they differ it asks nothing, and the case is a
         // disagreement about the dtype, which the target finds first.
-        let case = kept("stricter-a-window-over-the-length-of-a-literal.case");
+        let case = kept("fixed-polars-evaluates-a-window-over-the-length-of-a-literal.case");
         let refused = refusal(&case);
         let mut wrong = predict(&case);
         for traced in &mut wrong.expressions {
@@ -2855,56 +2848,6 @@ mod tests {
     }
 
     #[test]
-    fn what_the_target_says_of_a_schema_is_no_refusal_of_polars() {
-        // `a > a.cum_sum()` of `UInt128`: Polars evaluates the running sum and
-        // allows the step. The tables' reason, that the schema says `Int64` and the
-        // rows give `UInt128`, is the target's own comparison of a column's plan with
-        // its rows, which only shows where the running sum is the output, so the
-        // probe that selects it alone matches it though Polars refused nothing.
-        let case = kept("uncovered-a-hidden-schema.case");
-        let refused = refusal(&case);
-        assert!(
-            refused.reason.starts_with("the schema says"),
-            "{}",
-            refused.reason
-        );
-        assert_eq!(settle(&case, &refused), None);
-        assert_eq!(
-            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
-            None
-        );
-        let said = "the schema says Int64 and the rows give UInt128";
-        assert!(!same_reason(&Source::Polars, said, said));
-    }
-
-    #[test]
-    fn a_sort_key_of_one_value_that_polars_drops_is_asked_where_it_is_evaluated() {
-        // `sort(by=a.last().cum_sum())` of `UInt128`: the tables refuse the running
-        // sum because its plan says `Int64` and its rows give `UInt128`, the target's
-        // own comparison, which no probe of the call alone can show. Polars drops a
-        // sort key that is one value, so it never meets the mismatch; as the key
-        // on a column it panics, and that is where the call is asked.
-        let case = kept("stricter-a-sort-key-of-one-value-whose-schema-differs.case");
-        let refused = refusal(&case);
-        assert!(
-            refused.reason.starts_with("the schema says"),
-            "{}",
-            refused.reason
-        );
-        assert_eq!(settle(&case, &refused), None);
-        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
-            .expect("a key that Polars refuses");
-        assert!(found.probe.contains("LazyFrame.sort"), "{}", found.probe);
-        assert!(
-            found.probe.contains("\"columns\":[\"p\"]"),
-            "{}",
-            found.probe
-        );
-        assert!(found.reason.contains("panicked"), "{}", found.reason);
-        assert_eq!(found.showing, Showing::TheSchemaMismatch);
-    }
-
-    #[test]
     fn a_start_given_a_literal_is_settled_by_polars_refusing_it_given_a_column() {
         // `join(right_on=[datetime(1, from_epoch(lit(null, List(Int64))), rk).len()])`: the tables
         // refuse the count of a null list for the dtype of the list, Polars never evaluates what
@@ -3009,15 +2952,13 @@ mod tests {
     #[test]
     fn a_replacement_is_settled_by_polars_refusing_it_whatever_value_it_names() {
         // `sort(by=f // a.replace(1, 1).len())` of `List(Int64)`: the tables refuse the
-        // replacement for the values it lists apart, beside a companion that is a list, and Polars
-        // drops a sort key that is one value; asked as written, it refuses the replacement for
-        // the dtypes the values really have, and for another reason than the companion's.
+        // replacement for the values it lists apart, beside a companion that is a list; asked as
+        // written, Polars refuses the replacement for the dtypes the values really have.
         let case = kept("stricter-a-replacement-of-a-list-in-a-sort-key-of-one-value.case");
         let refused = refusal(&case);
         assert!(!refused.argument_unknown);
         let found = settle(&case, &refused).expect("a replacement that Polars refuses");
         assert!(found.probe.contains("Expr.replace"), "{}", found.probe);
-        assert_ne!(found.reason, refused.reason);
         assert_eq!(found.showing, Showing::TheSameReason);
         // A call that is no replacement or interval is settled for the tables' reason only.
         let other =
@@ -3150,6 +3091,62 @@ mod tests {
         };
         assert_eq!(
             settle_in_the_position(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
+    #[test]
+    fn what_the_target_says_of_a_schema_is_no_refusal_of_polars() {
+        // `sort_by(g.cbrt())` of a text column: Polars evaluates the cube root and allows the
+        // step. The tables' reason, that the schema says `String` and the rows give `Float64`, is
+        // the target's own comparison of a column's plan with its rows, which only shows where the
+        // cube root is the output, so no probe of the call alone is the refusal of Polars.
+        let case = kept("uncovered-a-hidden-schema.case");
+        let refused = refusal(&case);
+        let said = "the schema says String and the rows give Float64";
+        assert_eq!(refused.reason, said);
+        assert_eq!(settle(&case, &refused), None);
+        assert_eq!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+        assert!(!same_reason(&Source::Polars, said, said));
+    }
+
+    #[test]
+    fn a_key_whose_call_polars_refuses_on_a_column_is_asked_where_it_is_the_key() {
+        // `sort(by=a.cbrt())` of a text column: the tables refuse the cube root because its plan
+        // says `String` and its rows give `Float64`, which is no refusal of Polars where it is
+        // the output of a step, and a sort key is none. Asked as the key on a column, Polars
+        // panics where it meets the mismatch, while a column whose plan and rows agree, and the
+        // column alone, are allowed as the key.
+        let case = in_a_position("LazyFrame.sort", "by", "String", &["Expr.cbrt"]);
+        let refused = refusal(&case);
+        assert_eq!(
+            refused.reason,
+            "the schema says String and the rows give Float64"
+        );
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a key that Polars refuses");
+        assert_eq!(found.showing, Showing::TheSchemaMismatch);
+        assert!(found.probe.contains("LazyFrame.sort"), "{}", found.probe);
+        assert!(found.probe.contains("Expr.cbrt"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p\"]"),
+            "{}",
+            found.probe
+        );
+        assert!(found.reason.contains("panicked"), "{}", found.reason);
+        // The same call is the output of a step in `select`, and no probe settles it there.
+        let selected = in_a_position("LazyFrame.select", "exprs", "String", &["Expr.cbrt"]);
+        let refused = refusal(&selected);
+        assert_eq!(
+            settle_apart(
+                &selected,
+                &refused,
+                &predict(&selected),
+                &observe(&selected)
+            ),
             None
         );
     }
@@ -3314,7 +3311,6 @@ mod tests {
         let found = settle_by_values_that_differ(&case, &refused)
             .expect("a predicate that Polars refuses where the values differ");
         assert_eq!(found.showing, Showing::WhereTheValuesDiffer);
-        assert_ne!(found.reason, refused.reason);
         assert!(
             found.reason.contains("conversion from `str`"),
             "{}",

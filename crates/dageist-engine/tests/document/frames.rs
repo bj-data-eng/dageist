@@ -1,6 +1,6 @@
 //! What the steps that keep, drop, reorder or number the rows and columns of a table do, on a table
 //! of four rows: `a` holds `1, 2, null, 4`, `f` holds `1.0, NaN, 3.0, null` and `s` holds `x, y, z,
-//! w`. The expected cells are what Python Polars 2.1.0 gives for the same call on the same rows,
+//! w`. The expected cells are what Python Polars 2.2.0 gives for the same call on the same rows,
 //! worked out by hand and checked against `python -I` with that release, not read from a run of
 //! the engine.
 

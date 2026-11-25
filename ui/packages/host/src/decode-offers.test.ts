@@ -89,7 +89,7 @@ describe('the offers at a place', () => {
     const sum = decodeOffers(offersValue).entries.find((entry) => entry.entry === 'Expr.sum');
     expect(sum?.verdict).toMatchObject({
       kind: 'refused',
-      refusal: { source: { by: 'polars', stage: 'rows' } },
+      refusal: { source: { by: 'polars', stage: 'schema' } },
     });
     expect(sum?.verdict.kind === 'refused' ? sum.verdict.refusal.reason : null).toContain(
       'datetime',

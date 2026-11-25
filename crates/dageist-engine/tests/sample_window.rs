@@ -131,7 +131,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
 
     assert_eq!(first_keys.len(), wanted_keys as usize);
     assert_eq!(window.height(), expected_rows);
-    assert!(window.equals_missing(&as_text(&whole.slice(0, expected_rows))));
+    assert!(window.equals_missing(&as_text(&whole.slice((0_usize, expected_rows)))));
 }
 
 #[test]
@@ -186,7 +186,7 @@ fn block_matches_the_same_rows_of_the_whole() {
 
     assert_eq!(slice.width(), 3);
     assert_eq!(slice.height(), 25);
-    assert!(slice.equals(&whole.slice(40, 25)));
+    assert!(slice.equals(&whole.slice((40_usize, 25))));
 }
 
 #[test]

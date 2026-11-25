@@ -2,7 +2,7 @@
 //! catalogue that takes an expression, as Polars does.
 //!
 //! The value `k.sum().head(1)` is one value that `head` took of one: no row of a group takes it as
-//! the value of the group, so Python Polars 2.1.0 refuses a window over a call that is given it,
+//! the value of the group, so Python Polars 2.2.0 refuses a window over a call that is given it,
 //! wherever the call meets it, with "expressions must have matching group lengths", and accepts the
 //! same call given `k.sum()` or the first value of what `head` took. This builds, for each
 //! expression parameter of each method and each function that starts an expression, the call of one
@@ -495,8 +495,9 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
     for (name, text) in &fill_unbuildable {
         eprintln!("fill unbuildable {name}: {text}");
     }
-    // Polars reads the fill of a `shift` as a scalar, which only an exact quantile's share leaves a
-    // value that a method took of one value to be, of all the parameters there are.
+    // Polars reads the fill of a `shift` as a scalar, which only the values a membership test and
+    // a replacement list leave a value that a method took of one value to be, of all the
+    // parameters there are.
     assert_eq!(fill_accepted, SCALAR_EXCEPTIONS, "{fill_accepted:?}");
     assert_eq!(
         fill_unbuildable
@@ -531,8 +532,11 @@ const UNBUILDABLE: [(&str, &str); 0] = [];
 /// with the rule the walk names: Polars reads each as one value that it can tell is one, with "'n'
 /// must be a scalar value", which the first value that `head` took of one value is not, though it is
 /// one value, and a literal and an aggregate are.
-const REFUSED_BY_BOTH_OTHERWISE: [(&str, &str); 3] = [
+const REFUSED_BY_BOTH_OTHERWISE: [(&str, &str); 6] = [
+    ("Expr.approx_quantile quantile", "parameter-takes-one-value"),
     ("Expr.diff n", "parameter-takes-one-value"),
+    ("Expr.pct_change n", "parameter-takes-one-value"),
+    ("Expr.quantile quantile", "parameter-takes-one-value"),
     ("Expr.shift fill_value", "parameter-takes-one-value"),
     ("Expr.shift n", "parameter-takes-one-value"),
 ];
@@ -540,14 +544,17 @@ const REFUSED_BY_BOTH_OTHERWISE: [(&str, &str); 3] = [
 /// The parameters that Polars reads as one value, with the column the values given to them are of
 /// and whether Polars refuses even a value that a method took of one value, as `shift` and `diff`
 /// do, where the others take it and refuse a count and the rows.
-const ONE_VALUE_PARAMETERS: [(&str, &str, &str, bool); 7] = [
+const ONE_VALUE_PARAMETERS: [(&str, &str, &str, bool); 10] = [
     ("Expr.shift", "n", "a", true),
     ("Expr.shift", "fill_value", "a", true),
     ("Expr.diff", "n", "a", true),
-    ("Expr.pct_change", "n", "a", false),
-    ("Expr.quantile", "quantile", "q", false),
-    ("Expr.top_k", "k", "a", false),
-    ("Expr.bottom_k", "k", "a", false),
+    ("Expr.pct_change", "n", "a", true),
+    ("Expr.quantile", "quantile", "q", true),
+    ("Expr.approx_quantile", "quantile", "q", true),
+    ("Expr.top_k", "k", "a", true),
+    ("Expr.bottom_k", "k", "a", true),
+    ("Expr.slice", "offset", "a", true),
+    ("Expr.slice", "length", "a", true),
 ];
 
 #[test]
@@ -577,16 +584,15 @@ fn a_parameter_that_polars_reads_as_one_value_is_given_one_as_polars_asks_in_a_s
         for (form, given, refused) in forms {
             for windowed in [false, true] {
                 let mut links = vec![call("Expr.first", Vec::new())];
-                links.push(
-                    Call::new(
-                        entry,
-                        vec![(
-                            parameter_name(entry, parameter),
-                            Value::Expression(given.clone()),
-                        )],
-                    )
-                    .expect("the call"),
-                );
+                // A slice is given the offset it needs beside the length.
+                let mut arguments = vec![(
+                    parameter_name(entry, parameter),
+                    Value::Expression(given.clone()),
+                )];
+                if id == "Expr.slice" && parameter == "length" {
+                    arguments.push(("offset", Value::Expression(chain(number(0), Vec::new()))));
+                }
+                links.push(Call::new(entry, arguments).expect("the call"));
                 if windowed {
                     links.push(over());
                 }
@@ -596,14 +602,11 @@ fn a_parameter_that_polars_reads_as_one_value_is_given_one_as_polars_asks_in_a_s
                 let accepted = |said: &Said| *said == Said::Accepts;
                 // A window refuses a value that a method took of one value even where the call
                 // takes it, and a count or the rows are refused before the window is asked of.
-                // The share of the exact quantile is read once, before the groups, so a window takes
-                // what was taken of one value for it, and `top_k` and `bottom_k` take some of the
-                // values, so a window refuses their call whatever it is given.
-                let carries = id != "Expr.quantile";
-                let itself_taken = matches!(id, "Expr.top_k" | "Expr.bottom_k");
-                let expected_refusal = refused
-                    || (windowed
-                        && ((form == "a value taken of one value" && carries) || itself_taken));
+                // `top_k` and `bottom_k` take some of the values, so a window refuses their call
+                // whatever it is given.
+                let itself_taken = matches!(id, "Expr.top_k" | "Expr.bottom_k" | "Expr.slice");
+                let expected_refusal =
+                    refused || (windowed && (form == "a value taken of one value" || itself_taken));
                 if accepted(&polars) == expected_refusal || accepted(&walk) == expected_refusal {
                     failures.push(format!(
                         "{id} {parameter} given {form}{}: Polars {polars:?}, the walk {walk:?}, \
@@ -638,7 +641,13 @@ fn parameter_name(entry: &Entry, name: &str) -> &'static str {
 }
 
 /// The parameters that leave the call a scalar given a value that a method took of one value.
-const SCALAR_EXCEPTIONS: [&str; 1] = ["Expr.quantile quantile"];
+const SCALAR_EXCEPTIONS: [&str; 5] = [
+    "Expr.is_in other",
+    "Expr.replace old",
+    "Expr.replace new",
+    "Expr.replace_strict old",
+    "Expr.replace_strict new",
+];
 
 /// The calls that cannot be asked as the fill of a `shift` beside themselves, which Polars refuses
 /// for the dtype it gives, with why.

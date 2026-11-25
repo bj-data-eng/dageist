@@ -99,7 +99,7 @@ fn made(dtype: Representative, name: &str) -> Series {
 /// lists must be as long as one another, as an array's are.
 fn list_of(inner: Inner, name: &str, equal_lengths: bool) -> Series {
     let values = made(inner.class(), "");
-    let (first, second) = (values.slice(0, 1), values.slice(2, 1));
+    let (first, second) = (values.slice((0_usize, 1)), values.slice((2_usize, 1)));
     let mut both = first.clone();
     both.append(&second)
         .expect("two values of one dtype are appended");

@@ -110,7 +110,7 @@ fn block_across_a_file_boundary_matches_the_rows_read_whole() {
         .whole
         .select(columns)
         .expect("the columns exist")
-        .slice(offset as i64, 15);
+        .slice((offset as i64, 15));
     assert_eq!(block.height(), 15);
     assert!(block.equals_missing(&as_text(&expected)));
 }
@@ -122,7 +122,7 @@ fn block_with_no_columns_named_holds_every_column() {
 
     let block = read_ipc(table.block(40, 25, &[]).expect("the block is read"));
 
-    assert!(block.equals_missing(&as_text(&sample.whole.slice(40, 25))));
+    assert!(block.equals_missing(&as_text(&sample.whole.slice((40_usize, 25)))));
 }
 
 #[test]

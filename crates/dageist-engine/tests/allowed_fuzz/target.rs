@@ -16,10 +16,12 @@ use super::counts;
 use super::generate::{Focus, generate};
 use super::limits::{excuses, strict};
 use super::observe::{
-    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked,
+    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
+use super::probe::{
+    Settled, cases_of_the_part, is_a_predicate_rule, same_reason, settle, settle_apart,
+};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -42,6 +44,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
         "a method that Polars panics on for an element is not run on it, though Polars may not evaluate it",
     ),
 ];
+
+/// What the outcome of a case says where a named rule refuses what Polars' streaming engine
+/// runs and its in-memory engine refuses, for what the rule names.
+pub const STRICTER_THAN_ONE_ENGINE: &str = "stricter than one of Polars' engines";
 
 /// What the outcome of a case says where the tables refuse a part that Polars
 /// does not evaluate, and a probe of the part shows the tables right.
@@ -273,6 +279,59 @@ fn by_design(case: &Case, refused: &Refused, what: &str) -> Option<Result<CaseOu
     ))
 }
 
+/// The rule that is stricter than Polars' streaming engine by design: a default of many values
+/// beside one value, which the streaming engine meets with the one value and the in-memory engine
+/// refuses for the lengths the rule names.
+const REPLACEMENT_RULE: &str = "replacement-values-match-in-number";
+
+/// What Polars' in-memory engine says of a replacement given values of other numbers than it takes:
+/// the two refusals for the lengths of what a replacement lists and of its default.
+const LENGTHS_OF_A_REPLACEMENT: [&str; 2] = [
+    "input for `replace_strict` must have the same length as the input or have length 1",
+    "input for `replace` must have the same length as `old` or have length 1",
+];
+
+/// Whether a refusal is one of the two for the lengths of a replacement, and no refusal for the
+/// lengths of another function, as the generic words of a length mismatch are.
+fn is_a_refusal_of_the_lengths_of_a_replacement(reason: &str) -> bool {
+    LENGTHS_OF_A_REPLACEMENT
+        .iter()
+        .any(|words| reason.contains(words))
+}
+
+/// Whether the in-memory engine refuses `case` for the lengths of a replacement.
+fn refused_in_memory_for_lengths(case: &Case) -> Option<String> {
+    refused_in_memory(case).filter(|reason| is_a_refusal_of_the_lengths_of_a_replacement(reason))
+}
+
+/// The outcome of a case where the rule that a replacement is given as many values as it takes
+/// refuses what Polars' streaming engine runs, which the in-memory engine, asked as a control of the
+/// part the rule refused on its own, refuses for those lengths. Both engines may drop the part
+/// where it stands, a sort key of one value as it is, so the control asks of the part alone, not of
+/// the step; a part the in-memory engine also runs settles nothing, nor does a part whose first
+/// calls the in-memory engine refuses for the same lengths.
+fn by_engine(case: &Case, refused: &Refused, rule: &str) -> Option<Result<CaseOutcome>> {
+    if strict() || rule != REPLACEMENT_RULE {
+        return None;
+    }
+    let reason = match cases_of_the_part(case, refused) {
+        Some((part, before)) => {
+            if before.is_some_and(|before| refused_in_memory_for_lengths(&before).is_some()) {
+                return None;
+            }
+            refused_in_memory_for_lengths(&part)?
+        }
+        None => refused_in_memory_for_lengths(case)?,
+    };
+    tally(format!("{STRICTER_THAN_ONE_ENGINE}: {rule}"));
+    Some(CaseOutcome::expected_rejection(
+        Vec::new(),
+        one_line(&format!(
+            "{STRICTER_THAN_ONE_ENGINE}: the in-memory engine refuses the part where the streaming engine runs it: {reason}"
+        )),
+    ))
+}
+
 /// The first words of a reason, as a name: the same disagreement is not
 /// another one because a dtype or a number in its reason is.
 fn reason_slug(reason: &str) -> String {
@@ -309,7 +368,16 @@ fn one_line(text: &str) -> String {
         })
         .collect();
     let line = line.split_whitespace().collect::<Vec<_>>().join(" ");
-    line.chars().take(3000).collect()
+    // The contract admits a trimmed line of no more than 4096 bytes: the cut is where either is
+    // reached, and a space the cut ends on is no part of it.
+    let mut cut = String::new();
+    for character in line.chars().take(3000) {
+        if cut.len() + character.len_utf8() > 4096 {
+            break;
+        }
+        cut.push(character);
+    }
+    cut.trim_end().to_owned()
 }
 
 /// Whether Polars refused at a call that comes after the one the tables could not be asked of, in
@@ -689,6 +757,10 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = by_design(case, &refused, rule) {
                             return outcome;
                         }
+                        // What one of Polars' engines runs and the other refuses.
+                        if let Some(outcome) = by_engine(case, &refused, rule) {
+                            return outcome;
+                        }
                         return failure(
                             ALLOWANCE,
                             &format!("rule-refuses-what-polars-allows-{rule}"),
@@ -767,6 +839,58 @@ impl CaseTarget for AllowedTarget {
 
 #[cfg(test)]
 mod tests {
+
+    use super::super::observe::refused_in_memory;
+    use super::{is_a_refusal_of_the_lengths_of_a_replacement, one_line};
+
+    #[test]
+    fn a_detail_cut_short_is_a_line_that_is_trimmed() {
+        // The contract admits a detail that is trimmed, with no control character and no more than
+        // 4096 bytes. A detail cut at the 3000th character that is a space ends with it, which
+        // ended a campaign on a probe whose reason ran past it.
+        let cut_at_a_space = format!("{} {}", "a".repeat(2999), "b".repeat(10));
+        let line = one_line(&cut_at_a_space);
+        assert_eq!(line, "a".repeat(2999));
+        // Characters of more than a byte do not make it longer than the contract admits.
+        let line = one_line(&"é".repeat(4000));
+        assert!(line.len() <= 4096, "{}", line.len());
+        assert_eq!(line.trim(), line);
+        assert_eq!(one_line("  one\ttwo \n three  "), "one two three");
+    }
+
+    #[test]
+    fn a_case_that_both_engines_run_is_not_refused_by_the_control() {
+        // `lit(null).over(lit(null))` and what follows it: Polars runs it in memory as it does on the
+        // streaming engine, so the control says nothing and a refusal by a rule stays a disagreement.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-window-over-a-literal-gives-the-rows.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        assert_eq!(refused_in_memory(&case), None);
+    }
+
+    #[test]
+    fn only_the_two_refusals_of_a_replacement_for_its_lengths_settle_a_difference_of_engines() {
+        for said in [
+            "`default` input for `replace_strict` must have the same length as the input or have length 1",
+            "`new` input for `replace` must have the same length as `old` or have length 1",
+        ] {
+            assert!(is_a_refusal_of_the_lengths_of_a_replacement(said), "{said}");
+        }
+        // What Polars says of the lengths of any other function, or of a zip of unequal inputs, is
+        // no refusal of a replacement, so a case that only that refuses is still a disagreement.
+        for said in [
+            "lengths don't match: cannot compare series of different lengths",
+            "arguments of `fill_null` have different lengths (2 != 3)",
+            "zip node received non-equal length inputs",
+            "incomplete mapping specified for `replace_strict`",
+        ] {
+            assert!(
+                !is_a_refusal_of_the_lengths_of_a_replacement(said),
+                "{said}"
+            );
+        }
+    }
     use dageist_engine::allowed::Representative;
     use dageist_engine::document::{Place, Segment};
 
@@ -1052,28 +1176,6 @@ mod tests {
     }
 
     #[test]
-    fn the_outcome_of_a_schema_mismatch_probe_says_what_the_probe_showed() {
-        // The tables' reason is the target's own comparison of plan and rows, and
-        // the probe in the position is refused by Polars with a panic that says
-        // nothing of it, so the outcome says what was shown: the call's plan and
-        // rows differ as the tables say, and a call whose plan and rows agree is
-        // allowed there.
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/allowed_fuzz/regressions/stricter-a-sort-key-of-one-value-whose-schema-differs.case");
-        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
-        let outcome = std::thread::Builder::new()
-            .stack_size(256 << 20)
-            .spawn(move || AllowedTarget::new().evaluate(&case))
-            .expect("a thread")
-            .join()
-            .expect("the case is evaluated")
-            .expect("an outcome");
-        let detail = outcome.detail().expect("a detail");
-        assert!(detail.contains("plan and rows"), "{detail}");
-        assert!(!detail.contains("for the tables' reason"), "{detail}");
-    }
-
-    #[test]
     fn a_prefix_polars_refuses_at_the_call_the_tables_could_not_be_asked_about_is_no_difference() {
         // `when(when(g + 1).then(a)).then(f).otherwise(a)`: the tables cannot say what a number
         // given no dtype is added to text, and Polars refuses the sum when it works out the
@@ -1203,7 +1305,7 @@ mod tests {
         // wrong prediction of that dtype must not be hidden by it: it is found
         // as a difference of the dtypes of the case itself, whatever is probed.
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "tests/allowed_fuzz/regressions/stricter-a-window-over-the-length-of-a-literal.case",
+            "tests/allowed_fuzz/regressions/fixed-polars-evaluates-a-window-over-the-length-of-a-literal.case",
         );
         let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
         let observed = observe(&case);

@@ -50,7 +50,8 @@ pub enum Rule {
     /// arrays of two widths and gives a list where it fills one with the other.
     ArraysMeetAtOneWidth,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
-    /// no column compared with a null, and no replacement of values that are not literals.
+    /// no column compared with a null, no comparison of missing values of whole numbers with a number
+    /// that has a fraction, and no replacement of values that are not literals.
     KeyIsElementwise,
     /// A parameter that Polars reads as one value is given one: not the rows, not a count of values
     /// that the data or the arguments decide, and, for the places a shift and a difference look back
@@ -61,7 +62,7 @@ pub enum Rule {
     PatternIsValid,
     /// A range or a repeat typed in is one Polars can make and cut: a step other than nothing, an
     /// interval of the length of time its bounds are read in, bounds the dtype holds, a count that is
-    /// not below nothing and, of it and of any value made of literals alone, no length below nothing to cut it by.
+    /// not below nothing and, of it, no length below nothing to cut any value by.
     RangeIsValid,
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
@@ -168,7 +169,7 @@ impl Rule {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a replacement take a value that reads a column"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor whole numbers be compared for missing values with a number that has a fraction, nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::ElementDtypeIsImplemented => {
@@ -192,7 +193,7 @@ impl Rule {
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::RangeIsValid => {
-                "a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it and of any value made of literals alone, no length below nothing to cut it by"
+                "a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it, no length below nothing to cut any value by"
             }
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"

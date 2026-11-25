@@ -81,6 +81,17 @@ fn columns() -> Vec<(&'static str, Vec<Dtypes>)> {
     ]
 }
 
+/// The methods that Python Polars 2.2.0 takes a list and an array for, which the catalogue does not
+/// offer: the greatest and the least list, and the approximate quantile of each place across the
+/// rows. What a method of lists says is what the values of a list are asked.
+const TAKEN_OF_NESTED_VALUES: [&str; 5] = [
+    "Expr.approx_quantile",
+    "Expr.max",
+    "Expr.min",
+    "Expr.nan_max",
+    "Expr.nan_min",
+];
+
 /// The methods that read a time zone a `Datetime` has: Polars refuses the sample's `ts`, which has
 /// none, and the sample's `tz` is the column of the group they take.
 const ONLY_WITH_A_ZONE: [&str; 2] = ["Expr.dt.base_utc_offset", "Expr.dt.dst_offset"];
@@ -130,13 +141,17 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Expression(&[Dtypes::Integer]) if parameter.name() == "indices" => {
                     expression_arg(lit(0))
                 }
-                // The values `top_k` and `bottom_k` take are one count, and Polars refuses a column.
-                Kind::Expression(_) if matches!(parameter.name(), "k") => expression_arg(lit(1)),
+                // What Polars reads as one value, as the count of `top_k` and `bottom_k` and the offset
+                // and the length of `slice`, is one number, and Polars refuses a column. A quantile
+                // is a single share from 0 to 1.
+                Kind::Expression(_)
+                    if parameter.one_value().is_some() && parameter.name() == "quantile" =>
+                {
+                    expression_arg(lit(0.5))
+                }
+                Kind::Expression(_) if parameter.one_value().is_some() => expression_arg(lit(1)),
                 // The length or the count of characters of a method of text is a whole number.
                 Kind::Expression(_) if parameter.role().is_a_count() => expression_arg(col("i")),
-                // A quantile is a share from 0 to 1, and a single value, which Polars refuses a
-                // column of for the exact quantile and a column of whole numbers for any.
-                Kind::Expression(_) if parameter.name() == "quantile" => expression_arg(lit(0.5)),
                 Kind::Expression(_) if parameter.role() != Role::Plain => {
                     expression_arg(col(operand))
                 }
@@ -289,10 +304,11 @@ fn polars_refuses_each_method_on_a_dtype_it_does_not_accept() {
         .filter(|entry| entry.applies() == Applies::Expression)
     {
         // One dtype the entry does not claim, where there is one in the table.
-        let Some((column, _)) = columns()
-            .into_iter()
-            .find(|(_, groups)| !accepted(entry.accepts(), groups))
-        else {
+        let Some((column, _)) = columns().into_iter().find(|(column, groups)| {
+            !accepted(entry.accepts(), groups)
+                && !(TAKEN_OF_NESTED_VALUES.contains(&entry.id().as_str())
+                    && matches!(*column, "l" | "ar"))
+        }) else {
             continue;
         };
         for operand in operands(entry, column) {

@@ -88,7 +88,7 @@ impl ParquetTable {
                     .collect::<Vec<_>>(),
             );
         }
-        write_block(&frame.slice(offset, length).collect().map_err(reading)?)
+        write_block(&frame.slice((offset, length)).collect().map_err(reading)?)
     }
 }
 

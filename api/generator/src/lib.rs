@@ -82,6 +82,16 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 reason: PYTHON_GLUE,
             },
             LeftOutFeature {
+                krate: "polars-io",
+                feature: "parquet_kms",
+                reason: "Parquet encryption with a key management client written in Python",
+            },
+            LeftOutFeature {
+                krate: "polars-io",
+                feature: "io_plugin_ffi",
+                reason: IO_PLUGINS,
+            },
+            LeftOutFeature {
                 krate: "polars-lazy",
                 feature: "pyo3",
                 reason: PYTHON_GLUE,
@@ -107,6 +117,16 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 reason: PYTHON_GLUE,
             },
             LeftOutFeature {
+                krate: "polars-plan",
+                feature: "io_plugin_ffi",
+                reason: IO_PLUGINS,
+            },
+            LeftOutFeature {
+                krate: "polars-stream",
+                feature: "io_plugin_ffi",
+                reason: IO_PLUGINS,
+            },
+            LeftOutFeature {
                 krate: "polars-stream",
                 feature: "pyo3",
                 reason: PYTHON_GLUE,
@@ -129,7 +149,11 @@ pub const DAGEIST: Workspace<'static> = Workspace {
             },
             Listed {
                 name: "polars-io-ext-ffi",
-                reason: "used only by the Python binding, to hand Iceberg reads to Python",
+                reason: "used only by the I/O plugin support the engine leaves out",
+            },
+            Listed {
+                name: "polars-testing",
+                reason: "used only by the Python binding, for its frame and series assertions",
             },
         ],
         extra_packages: &[Listed {
@@ -193,9 +217,9 @@ pub const DAGEIST: Workspace<'static> = Workspace {
             },
             ExpectedFeatures {
                 package: "serde_json",
-                only_here: &["alloc", "raw_value"],
+                only_here: &["alloc"],
                 only_in_release: &[],
-                reason: "Tauri's tauri and serialize-to-javascript turn on raw_value, and its jsonptr alloc",
+                reason: "Tauri's jsonptr turns on alloc",
             },
             ExpectedFeatures {
                 package: "simd-adler32",
@@ -221,6 +245,11 @@ pub const DAGEIST: Workspace<'static> = Workspace {
         ],
     }),
 };
+
+/// Why the engine leaves out the I/O plugin support.
+const IO_PLUGINS: &str = "only connects Polars to Python: the I/O plugins that hand Iceberg and \
+     database reads to Python are found through their Python packages, and the engine has no locator \
+     for them";
 
 /// Why the release compiles some numeric crates with more features.
 const NUMPY: &str = "numpy, which Polars' Python glue uses, takes ndarray's default features, \

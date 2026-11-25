@@ -1,6 +1,6 @@
 # Allowed combinations of options
 #
-# Polars: the release py-2.1.0 at the commit 7f902bd3ffd27ff82d14278a09a295ff2f7aed92 of vendor/polars.
+# Polars: the release py-2.2.0 at the commit 08b2814ce6386c0efe0fea512912353f42a8b7b6 of vendor/polars.
 # Generated from the catalogue and Polars by the engine test
 # `allowed::tests::artifacts::the_committed_tables_are_what_polars_gives`, with Polars on
 # one thread, so that a reason that depends on which of two failures comes first is the
@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13778 combinations: 6644 allowed; 4595 refused when Polars resolved the schema, 2539 when it ran the rows, 0 when it ran the empty table.
+# 13868 combinations: 6806 allowed; 4545 refused when Polars resolved the schema, 2517 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -138,16 +138,66 @@ Expr.any | UInt64 | ignore_nulls=false | allowed Boolean one
 Expr.any | UInt64 | ignore_nulls=true | allowed Boolean one
 Expr.any | UInt8 | ignore_nulls=false | allowed Boolean one
 Expr.any | UInt8 | ignore_nulls=true | allowed Boolean one
-Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Boolean, 2) | method=auto, error_tightness=empirical | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=auto, error_tightness=formal | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=kll, error_tightness=empirical | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=kll, error_tightness=formal | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_both, error_tightness=empirical | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_both, error_tightness=formal | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_hi, error_tightness=empirical | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_hi, error_tightness=formal | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_lo, error_tightness=empirical | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Boolean, 2) | method=req_lo, error_tightness=formal | allowed Array(Boolean, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=auto, error_tightness=empirical | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=auto, error_tightness=formal | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=kll, error_tightness=empirical | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=kll, error_tightness=formal | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_both, error_tightness=empirical | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_both, error_tightness=formal | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_hi, error_tightness=empirical | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_hi, error_tightness=formal | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_lo, error_tightness=empirical | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Date, 2) | method=req_lo, error_tightness=formal | allowed Array(Date, 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=auto, error_tightness=empirical | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=auto, error_tightness=formal | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=kll, error_tightness=empirical | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=kll, error_tightness=formal | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_both, error_tightness=empirical | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_both, error_tightness=formal | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_hi, error_tightness=empirical | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_hi, error_tightness=formal | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_lo, error_tightness=empirical | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Datetime(us), 2) | method=req_lo, error_tightness=formal | allowed Array(Datetime(us), 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=auto, error_tightness=empirical | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=auto, error_tightness=formal | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=kll, error_tightness=empirical | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=kll, error_tightness=formal | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_both, error_tightness=empirical | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_both, error_tightness=formal | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_hi, error_tightness=empirical | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_hi, error_tightness=formal | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_lo, error_tightness=empirical | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Float64, 2) | method=req_lo, error_tightness=formal | allowed Array(Float64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=empirical | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=formal | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=empirical | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=formal | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=empirical | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=formal | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=empirical | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=formal | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=empirical | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=formal | allowed Array(Int64, 2) one
+Expr.approx_quantile | Array(String, 2) | method=auto, error_tightness=empirical | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=auto, error_tightness=formal | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=kll, error_tightness=empirical | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=kll, error_tightness=formal | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_both, error_tightness=empirical | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_both, error_tightness=formal | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_hi, error_tightness=empirical | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_hi, error_tightness=formal | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_lo, error_tightness=empirical | allowed Array(String, 2) one
+Expr.approx_quantile | Array(String, 2) | method=req_lo, error_tightness=formal | allowed Array(String, 2) one
 Expr.approx_quantile | Boolean | method=auto, error_tightness=empirical | allowed Boolean one
 Expr.approx_quantile | Boolean | method=auto, error_tightness=formal | allowed Boolean one
 Expr.approx_quantile | Boolean | method=kll, error_tightness=empirical | allowed Boolean one
@@ -288,36 +338,76 @@ Expr.approx_quantile | Int8 | method=req_hi, error_tightness=empirical | allowed
 Expr.approx_quantile | Int8 | method=req_hi, error_tightness=formal | allowed Int8 one
 Expr.approx_quantile | Int8 | method=req_lo, error_tightness=empirical | allowed Int8 one
 Expr.approx_quantile | Int8 | method=req_lo, error_tightness=formal | allowed Int8 one
-Expr.approx_quantile | List(Int64) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=auto, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=kll, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=auto, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=kll, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | List(String) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.approx_quantile | Null | method=auto, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=auto, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=kll, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=kll, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_both, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_both, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_hi, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_hi, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_lo, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.approx_quantile | Null | method=req_lo, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | List(Boolean) | method=auto, error_tightness=empirical | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=auto, error_tightness=formal | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=kll, error_tightness=empirical | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=kll, error_tightness=formal | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_both, error_tightness=empirical | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_both, error_tightness=formal | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_hi, error_tightness=empirical | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_hi, error_tightness=formal | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_lo, error_tightness=empirical | allowed List(Boolean) one
+Expr.approx_quantile | List(Boolean) | method=req_lo, error_tightness=formal | allowed List(Boolean) one
+Expr.approx_quantile | List(Date) | method=auto, error_tightness=empirical | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=auto, error_tightness=formal | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=kll, error_tightness=empirical | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=kll, error_tightness=formal | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_both, error_tightness=empirical | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_both, error_tightness=formal | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_hi, error_tightness=empirical | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_hi, error_tightness=formal | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_lo, error_tightness=empirical | allowed List(Date) one
+Expr.approx_quantile | List(Date) | method=req_lo, error_tightness=formal | allowed List(Date) one
+Expr.approx_quantile | List(Datetime(us)) | method=auto, error_tightness=empirical | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=auto, error_tightness=formal | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=kll, error_tightness=empirical | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=kll, error_tightness=formal | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_both, error_tightness=empirical | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_both, error_tightness=formal | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_hi, error_tightness=empirical | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_hi, error_tightness=formal | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_lo, error_tightness=empirical | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Datetime(us)) | method=req_lo, error_tightness=formal | allowed List(Datetime(us)) one
+Expr.approx_quantile | List(Float64) | method=auto, error_tightness=empirical | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=auto, error_tightness=formal | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=kll, error_tightness=empirical | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=kll, error_tightness=formal | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_both, error_tightness=empirical | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_both, error_tightness=formal | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_hi, error_tightness=empirical | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_hi, error_tightness=formal | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_lo, error_tightness=empirical | allowed List(Float64) one
+Expr.approx_quantile | List(Float64) | method=req_lo, error_tightness=formal | allowed List(Float64) one
+Expr.approx_quantile | List(Int64) | method=auto, error_tightness=empirical | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=auto, error_tightness=formal | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=kll, error_tightness=empirical | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=kll, error_tightness=formal | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=empirical | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=formal | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=empirical | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=formal | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=empirical | allowed List(Int64) one
+Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=formal | allowed List(Int64) one
+Expr.approx_quantile | List(String) | method=auto, error_tightness=empirical | allowed List(String) one
+Expr.approx_quantile | List(String) | method=auto, error_tightness=formal | allowed List(String) one
+Expr.approx_quantile | List(String) | method=kll, error_tightness=empirical | allowed List(String) one
+Expr.approx_quantile | List(String) | method=kll, error_tightness=formal | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_both, error_tightness=empirical | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_both, error_tightness=formal | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_hi, error_tightness=empirical | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_hi, error_tightness=formal | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_lo, error_tightness=empirical | allowed List(String) one
+Expr.approx_quantile | List(String) | method=req_lo, error_tightness=formal | allowed List(String) one
+Expr.approx_quantile | Null | method=auto, error_tightness=empirical | allowed Null one
+Expr.approx_quantile | Null | method=auto, error_tightness=formal | allowed Null one
+Expr.approx_quantile | Null | method=kll, error_tightness=empirical | allowed Null one
+Expr.approx_quantile | Null | method=kll, error_tightness=formal | allowed Null one
+Expr.approx_quantile | Null | method=req_both, error_tightness=empirical | allowed Null one
+Expr.approx_quantile | Null | method=req_both, error_tightness=formal | allowed Null one
+Expr.approx_quantile | Null | method=req_hi, error_tightness=empirical | allowed Null one
+Expr.approx_quantile | Null | method=req_hi, error_tightness=formal | allowed Null one
+Expr.approx_quantile | Null | method=req_lo, error_tightness=empirical | allowed Null one
+Expr.approx_quantile | Null | method=req_lo, error_tightness=formal | allowed Null one
 Expr.approx_quantile | String | method=auto, error_tightness=empirical | allowed String one
 Expr.approx_quantile | String | method=auto, error_tightness=formal | allowed String one
 Expr.approx_quantile | String | method=kll, error_tightness=empirical | allowed String one
@@ -328,16 +418,16 @@ Expr.approx_quantile | String | method=req_hi, error_tightness=empirical | allow
 Expr.approx_quantile | String | method=req_hi, error_tightness=formal | allowed String one
 Expr.approx_quantile | String | method=req_lo, error_tightness=empirical | allowed String one
 Expr.approx_quantile | String | method=req_lo, error_tightness=formal | allowed String one
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=empirical | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=formal | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=empirical | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=formal | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=empirical | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=formal | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=empirical | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=formal | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=empirical | refused schema: must specify one field in the struct
-Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=empirical | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=formal | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=empirical | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=formal | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=empirical | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=formal | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=empirical | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=formal | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=empirical | allowed Struct(x: Int64, y: String) one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=formal | allowed Struct(x: Int64, y: String) one
 Expr.approx_quantile | Time | method=auto, error_tightness=empirical | allowed Time one
 Expr.approx_quantile | Time | method=auto, error_tightness=formal | allowed Time one
 Expr.approx_quantile | Time | method=kll, error_tightness=empirical | allowed Time one
@@ -3785,8 +3875,8 @@ Expr.cum_prod | Struct(x: Int64, y: String) | reverse=false | refused rows: `cum
 Expr.cum_prod | Struct(x: Int64, y: String) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `struct[2]`
 Expr.cum_prod | Time | reverse=false | refused rows: `cum_prod` operation not supported for dtype `time`
 Expr.cum_prod | Time | reverse=true | refused rows: `cum_prod` operation not supported for dtype `time`
-Expr.cum_prod | UInt128 | reverse=false | refused rows: the schema says Int64 and the rows give UInt128
-Expr.cum_prod | UInt128 | reverse=true | refused rows: the schema says Int64 and the rows give UInt128
+Expr.cum_prod | UInt128 | reverse=false | allowed UInt128 many
+Expr.cum_prod | UInt128 | reverse=true | allowed UInt128 many
 Expr.cum_prod | UInt16 | reverse=false | allowed Int64 many
 Expr.cum_prod | UInt16 | reverse=true | allowed Int64 many
 Expr.cum_prod | UInt32 | reverse=false | allowed Int64 many
@@ -3837,8 +3927,8 @@ Expr.cum_sum | Struct(x: Int64, y: String) | reverse=false | refused rows: `cum_
 Expr.cum_sum | Struct(x: Int64, y: String) | reverse=true | refused rows: `cum_sum` operation not supported for dtype `struct[2]`
 Expr.cum_sum | Time | reverse=false | refused rows: `cum_sum` operation not supported for dtype `time`
 Expr.cum_sum | Time | reverse=true | refused rows: `cum_sum` operation not supported for dtype `time`
-Expr.cum_sum | UInt128 | reverse=false | refused rows: the schema says Int64 and the rows give UInt128
-Expr.cum_sum | UInt128 | reverse=true | refused rows: the schema says Int64 and the rows give UInt128
+Expr.cum_sum | UInt128 | reverse=false | allowed UInt128 many
+Expr.cum_sum | UInt128 | reverse=true | allowed UInt128 many
 Expr.cum_sum | UInt16 | reverse=false | allowed Int64 many
 Expr.cum_sum | UInt16 | reverse=true | allowed Int64 many
 Expr.cum_sum | UInt32 | reverse=false | allowed UInt32 many
@@ -6902,18 +6992,18 @@ Expr.quantile | Array(Int64, 2) | interpolation=linear | refused schema: casting
 Expr.quantile | Array(Int64, 2) | interpolation=lower | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
 Expr.quantile | Array(Int64, 2) | interpolation=midpoint | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
 Expr.quantile | Array(Int64, 2) | interpolation=nearest | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
-Expr.quantile | Boolean | interpolation=equiprobable | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Boolean | interpolation=higher | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Boolean | interpolation=linear | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Boolean | interpolation=lower | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Boolean | interpolation=midpoint | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Boolean | interpolation=nearest | refused rows: `quantile` operation not supported for dtype `bool`
-Expr.quantile | Date | interpolation=equiprobable | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
-Expr.quantile | Date | interpolation=higher | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
-Expr.quantile | Date | interpolation=linear | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
-Expr.quantile | Date | interpolation=lower | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
-Expr.quantile | Date | interpolation=midpoint | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
-Expr.quantile | Date | interpolation=nearest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Boolean | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Boolean | interpolation=higher | allowed Float64 one
+Expr.quantile | Boolean | interpolation=linear | allowed Float64 one
+Expr.quantile | Boolean | interpolation=lower | allowed Float64 one
+Expr.quantile | Boolean | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Boolean | interpolation=nearest | allowed Float64 one
+Expr.quantile | Date | interpolation=equiprobable | allowed Datetime(us) one
+Expr.quantile | Date | interpolation=higher | allowed Datetime(us) one
+Expr.quantile | Date | interpolation=linear | allowed Datetime(us) one
+Expr.quantile | Date | interpolation=lower | allowed Datetime(us) one
+Expr.quantile | Date | interpolation=midpoint | allowed Datetime(us) one
+Expr.quantile | Date | interpolation=nearest | allowed Datetime(us) one
 Expr.quantile | Datetime(us) | interpolation=equiprobable | allowed Datetime(us) one
 Expr.quantile | Datetime(us) | interpolation=higher | allowed Datetime(us) one
 Expr.quantile | Datetime(us) | interpolation=linear | allowed Datetime(us) one
@@ -6998,18 +7088,18 @@ Expr.quantile | List(String) | interpolation=linear | refused schema: casting fr
 Expr.quantile | List(String) | interpolation=lower | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
 Expr.quantile | List(String) | interpolation=midpoint | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
 Expr.quantile | List(String) | interpolation=nearest | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
-Expr.quantile | Null | interpolation=equiprobable | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | Null | interpolation=higher | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | Null | interpolation=linear | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | Null | interpolation=lower | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | Null | interpolation=midpoint | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | Null | interpolation=nearest | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
-Expr.quantile | String | interpolation=equiprobable | refused rows: `quantile` operation not supported for dtype `str`
-Expr.quantile | String | interpolation=higher | refused rows: `quantile` operation not supported for dtype `str`
-Expr.quantile | String | interpolation=linear | refused rows: `quantile` operation not supported for dtype `str`
-Expr.quantile | String | interpolation=lower | refused rows: `quantile` operation not supported for dtype `str`
-Expr.quantile | String | interpolation=midpoint | refused rows: `quantile` operation not supported for dtype `str`
-Expr.quantile | String | interpolation=nearest | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | Null | interpolation=equiprobable | allowed Null one
+Expr.quantile | Null | interpolation=higher | allowed Null one
+Expr.quantile | Null | interpolation=linear | allowed Null one
+Expr.quantile | Null | interpolation=lower | allowed Null one
+Expr.quantile | Null | interpolation=midpoint | allowed Null one
+Expr.quantile | Null | interpolation=nearest | allowed Null one
+Expr.quantile | String | interpolation=equiprobable | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
+Expr.quantile | String | interpolation=higher | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
+Expr.quantile | String | interpolation=linear | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
+Expr.quantile | String | interpolation=lower | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
+Expr.quantile | String | interpolation=midpoint | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
+Expr.quantile | String | interpolation=nearest | refused schema: expected expression of dtype 'numeric' for quantile, got 'str'
 Expr.quantile | Struct(x: Int64, y: String) | interpolation=equiprobable | refused schema: must specify one field in the struct
 Expr.quantile | Struct(x: Int64, y: String) | interpolation=higher | refused schema: must specify one field in the struct
 Expr.quantile | Struct(x: Int64, y: String) | interpolation=linear | refused schema: must specify one field in the struct
