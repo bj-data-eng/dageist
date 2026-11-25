@@ -26,4 +26,7 @@ tauri = "=2.12.5"
 tauri-build = "=2.7.4"
 
 [dev-dependencies]
+# The corpus of step documents builds the tables it runs them on, which the engine's public API
+# does not hand out. The engine builds Polars with its features; this adds none.
+polars = { path = "../../vendor/polars/crates/polars", default-features = false }
 tauri = { version = "=2.12.5", features = ["test"] }

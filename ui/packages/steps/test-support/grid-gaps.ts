@@ -231,7 +231,7 @@ export function entryOf(id: string): EntryView {
 }
 
 /** Returns a description of a parameter's control that is not drawn, as a kind of parameter. */
-function undrawnKind(parameter: ParameterView): string {
+export function undrawnKind(parameter: ParameterView): string {
   return `${parameter.shape.shape} of ${parameter.kind.kind}`;
 }
 

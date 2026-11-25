@@ -64,6 +64,7 @@ and current source establishes behavior.
 | The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
+| The corpus of step documents the host writes for the view's tests, and how it is made | [crates/dageist-tauri/src/corpus/](crates/dageist-tauri/src/corpus/mod.rs), [the explanation](docs/explanation.md#the-corpus-of-step-documents) |
 | The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
 | The view's bundler and design tokens | [ui/apps/desktop/vite.config.ts](ui/apps/desktop/vite.config.ts), [ui/apps/desktop/src/styles.css](ui/apps/desktop/src/styles.css) |
 | View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/tsconfig.node.json](ui/tsconfig.node.json) |
@@ -139,6 +140,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/packages/host/fixtures/{edit-edited,edit-refused}.json` | the host's answers to an edit that was made and one the engine refused, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-edit-snapshots) |
 | `ui/packages/host/fixtures/{offers-start,offers-value,offers-condition,fits-start,fits-argument,options,offers-grid}.json` | the host's offers commands' views, and the grid of every call at every place from which the view lists what it cannot offer, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-offers-snapshots) |
 | `ui/packages/host/fixtures/census.json` | the host's census of every variant the step editor has to handle, written from the Rust types by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-census-snapshot) |
+| `ui/packages/host/fixtures/corpus-{starts,methods,parameters,steps,refused}.json` | the corpus of step documents the engine made by its own edits, each with the report the host gives it, written by the host's snapshot test; [refresh procedure](docs/how-to.md#refresh-the-corpus-snapshot) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |
 | `api/catalogue/*.txt` | The engine test that runs the catalogue in Polars; [refresh procedure](docs/how-to.md#refresh-the-tables-of-allowed-combinations) |

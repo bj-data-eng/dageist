@@ -17,6 +17,8 @@ mod block;
 mod bridge;
 mod catalogue;
 mod cli;
+#[cfg(test)]
+mod corpus;
 mod document;
 mod figures;
 mod identity;
