@@ -4,7 +4,8 @@
 License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml),
-[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) and
+[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml),
+[crates/dageist-pack/Cargo.toml](crates/dageist-pack/Cargo.toml) and
 [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml), including the
 fuzz framework's optional dependencies, and the crates patched in the root
 [Cargo.toml](Cargo.toml), at the versions resolved by [Cargo.lock](Cargo.lock),
@@ -213,6 +214,14 @@ Project Authors:
 
 * License: [SIL Open Font License 1.1](licenses/jetbrains-mono/OFL.txt)
 * Homepage: [JetBrains Mono](https://www.jetbrains.com/lp/mono/)
+
+This product depends on gix-pack 0.77.0, gix-hash 0.28.1, gix-object 0.66.1,
+gix-utils 0.5.3 and gix-zlib 0.4.1 from the gitoxide project, distributed by
+Sebastian Thiel, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/gitoxide/LICENSE-APACHE)
+* License: [MIT License](licenses/gitoxide/LICENSE-MIT)
+* Homepage: [gitoxide](https://github.com/GitoxideLabs/gitoxide)
 
 This product depends on hashbrown 0.17.1, as patched by the Polars project at
 revision `d76a6f81abd8f388676aff15068236a8d21c7e1a` of

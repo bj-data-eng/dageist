@@ -160,6 +160,29 @@ The host reports the worked-out graph as one view. For each node it gives:
 The step editor edits the transform the canvas chose, by its id, and its
 working rows are the first rows of the table that transform starts from.
 
+## Versions Stored As Deltas
+
+A workspace will keep its files in a git repository and commit every edit, so
+that saving and committing are the same act and each node's history is the
+commits that touched its file. A history of many small edits is small only when
+each version is stored as a delta against the one before it.
+
+gix, the Rust implementation of git the workspace will use, writes packs but
+makes no deltas: an object that is not already in a pack is stored whole.
+**`dageist-pack`** makes them. Its caller lists the objects of a pack and names,
+for each, an earlier object of the same kind as its base, usually the previous
+version of the same file. The crate stores an object as a delta against its base
+when that is smaller than storing it whole, starts a chain again whole once it
+reaches the depth its options set, and writes the pack and its index through
+gix's own writer. Because the caller names the bases, no search for a similar
+object is made, and each base is in the same pack, as git's packs on disk
+require.
+
+Its tests read every object back through gix and through git itself, have git
+verify the pack, and compare its size with the pack `git pack-objects` makes of
+the same history. A fuzz target checks that every delta rebuilds its target
+from its base.
+
 ## Polars Is Set Up As The Release Sets It Up
 
 The Python Polars release in `vendor/polars` runs a start-up function when its
