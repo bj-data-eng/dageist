@@ -1107,3 +1107,51 @@ fn a_struct_column_that_holds_an_array_is_written_with_its_width() {
         "one name for an array of three in a struct column",
     );
 }
+
+// ---------------------------------------------------------------------------
+// Arithmetic on a struct
+
+/// What Polars does of arithmetic on a struct depends on its fields, one by one, by the dtype of
+/// each and of what meets it: a struct of numbers is added to a number, a field of text refuses it,
+/// a list field is added as a list, and the others differ for each operation. The walk does not say.
+fn assert_the_walk_cannot_tell(found: &Found, what: &str) {
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses {what}: {:?}",
+        found.walk_refusal
+    );
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what {what} gives: {:?}",
+        found.walked_name
+    );
+}
+
+#[test]
+fn arithmetic_on_a_struct_of_numbers_is_not_said_by_the_walk_where_polars_does_it() {
+    for operation in ["Expr.add", "Expr.sub", "Expr.mul", "Expr.truediv"] {
+        let found = ask("s_xz", vec![call(operation, json!({ "other": whole(2) }))]);
+        assert_eq!(found.polars, Said::Accepts, "Polars refuses {operation}");
+        assert_the_walk_cannot_tell(&found, operation);
+    }
+}
+
+#[test]
+fn arithmetic_on_a_struct_with_a_field_of_text_is_not_said_by_the_walk_where_polars_refuses_it() {
+    let found = ask("s_xy", vec![call("Expr.add", json!({ "other": whole(2) }))]);
+    assert!(
+        matches!(found.polars, Said::Refuses(_)),
+        "{:?}",
+        found.polars
+    );
+    assert_the_walk_cannot_tell(&found, "a sum of a struct with a field of text");
+}
+
+#[test]
+fn arithmetic_given_a_struct_to_meet_is_not_said_by_the_walk() {
+    let found = ask(
+        "n",
+        vec![call("Expr.add", json!({ "other": field("s_xz") }))],
+    );
+    assert_the_walk_cannot_tell(&found, "a sum of a number and a struct");
+}
