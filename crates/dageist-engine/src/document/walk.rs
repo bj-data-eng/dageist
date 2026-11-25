@@ -341,6 +341,9 @@ struct Around {
     widened: bool,
     /// The zone of the moment the link follows, where it is known.
     zone: Option<Zone>,
+    /// Whether the link is the first of a chain that starts from a number typed in that has a
+    /// fraction, which Polars compares as it compares one on the other side.
+    starts_from_a_fraction: bool,
 }
 
 /// What a chain has so far.
@@ -1852,6 +1855,8 @@ impl Walker<'_> {
                     width,
                     widened,
                     zone,
+                    starts_from_a_fraction: at == 0
+                        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start)),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2074,6 +2079,7 @@ impl Walker<'_> {
             width,
             widened,
             zone,
+            starts_from_a_fraction,
         } = around;
         let entry = link.entry();
         // A window is refused a value of one row that a part widened, whose output is longer than
@@ -2095,6 +2101,32 @@ impl Walker<'_> {
         // the value and its dtype are, so it is said first.
         if let Some(said) = cut_below_nothing(link)
             && let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(&said)
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // Polars decides a comparison of missing values of whole numbers with a number that has a
+        // fraction at once, for no whole number is it, and refuses the join whose key that leaves
+        // with no value for each row, as not elementwise. A key that is one value, as the count of
+        // a column is, is taken whole.
+        if matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
+            && is_a_comparison_of_missing_values(link)
+            && (matches!(&cur, Cur::Value { dtype: Some(dtype), shape: Shape::Many, .. } if is_a_whole_number(*dtype))
+                && operands(link).into_iter().any(is_a_number_with_a_fraction)
+                || starts_from_a_fraction
+                    && arguments.iter().any(|(name, operand)| {
+                        name == "other"
+                            && operand.known
+                            && operand.shape == Shape::Many
+                            && operand.dtype.is_some_and(is_a_whole_number)
+                    }))
+            && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
         {
             self.refuse(&refusal, false);
             return (
@@ -3752,6 +3784,47 @@ fn is_a_number_some_dtype_lacks(expression: &Expression) -> bool {
         && matches!(expression.start(), Start::Call(start)
             if start.entry().id().as_str() == "polars.lit"
                 && matches!(start.argument("value"), Some(Value::Integer(number)) if some_dtype_lacks(*number)))
+}
+
+/// Whether a dtype holds whole numbers only.
+const fn is_a_whole_number(dtype: Representative) -> bool {
+    matches!(
+        dtype,
+        Representative::Int8
+            | Representative::Int16
+            | Representative::Int32
+            | Representative::Int64
+            | Representative::Int128
+            | Representative::UInt8
+            | Representative::UInt16
+            | Representative::UInt32
+            | Representative::UInt64
+            | Representative::UInt128
+    )
+}
+
+/// Whether an expression is a number typed in that has a fraction, and no more.
+fn is_a_number_with_a_fraction(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start))
+}
+
+/// Whether a call is `lit` of a number that has a fraction and is no whole number's: it is given no
+/// dtype or one of floats, for Polars makes the number the whole number it is cut to where it is
+/// given the dtype of whole numbers.
+fn is_a_fraction(call: &Call) -> bool {
+    call.entry().id().as_str() == "polars.lit"
+        && matches!(call.argument("value"), Some(Value::Float(number)) if number.is_finite() && number.fract() != 0.0)
+        && match call.argument("dtype") {
+            None => true,
+            Some(Value::Dtype(dtype)) => matches!(
+                dtype.as_polars(),
+                polars::prelude::DataType::Float16
+                    | polars::prelude::DataType::Float32
+                    | polars::prelude::DataType::Float64
+            ),
+            Some(_) => false,
+        }
 }
 
 /// Whether an expression is a whole number below zero and no more.
