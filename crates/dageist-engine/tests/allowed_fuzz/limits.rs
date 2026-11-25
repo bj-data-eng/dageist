@@ -337,11 +337,12 @@ pub enum Limit {
     /// A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the
     /// sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum
     /// and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone,
-    /// are one null, where those of the sample's rows are a value. Polars refusing the rows or
-    /// the empty table with the refusal that a strategy of a fill is not supported for a struct,
-    /// which has no place, in a case with a fill by a strategy that follows one of the five: the
-    /// case run again with each of the five made a fill of nulls forward, which leaves the nulls
-    /// of the column and no more, is not refused for it. Inside a condition Polars refuses the
+    /// are one null, where those of the sample's rows are a value, and a struct made of a list or
+    /// an array is null where the list is, which the sample's lists hold. Polars refusing the rows
+    /// or the empty table with the refusal that a strategy of a fill is not supported for a
+    /// struct, which has no place, in a case with a fill by a strategy that follows one of the
+    /// six: the case run again with each of the six made a fill of nulls forward, which leaves
+    /// the nulls of the column and no more, is not refused for a struct. Inside a condition Polars refuses the
     /// strategy for a struct where it fills nothing, which it runs in a plain select: the case
     /// with a condition and a fill by a strategy, run again with each fill a fill forward, is
     /// not refused for it.
@@ -519,11 +520,17 @@ pub enum Limit {
     /// unnest of a struct the walk knows to have no field, at a place that holds the unnest or is
     /// the step.
     AnUnnestOfNoFields,
+    /// Polars counts the names given to an array against the array's width, which a struct that
+    /// holds the array has in its dtype, and the walk carries no width for a field of a struct. The
+    /// tables measured an array that a column is. Polars refusing the plan with the refusal that
+    /// the number of names does not match the width of the input, at an array made a struct whose
+    /// chain read a field of a struct before it.
+    AnArrayWidthAStructFieldHolds,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 44] = [
+    pub const ALL: [Self; 45] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -568,6 +575,7 @@ impl Limit {
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
         Self::AnUnnestOfNoFields,
+        Self::AnArrayWidthAStructFieldHolds,
     ];
 
     /// The name a kept case is filed under.
@@ -629,6 +637,7 @@ impl Limit {
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
             Self::AnUnnestOfNoFields => "an-unnest-of-no-fields",
+            Self::AnArrayWidthAStructFieldHolds => "an-array-width-a-struct-field-holds",
         }
     }
 
@@ -722,6 +731,9 @@ impl Limit {
             Self::SeveralCountsInOneItem => {
                 "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
             }
+            Self::AnArrayWidthAStructFieldHolds => {
+                "Polars counts the names given to an array against its width, which a struct that holds the array has in its dtype, where the walk carries no width for the field of a struct that it read"
+            }
             Self::AnUnnestOfNoFields => {
                 "an unnest of a struct that has no field gives no expression, which Polars leaves out of what holds it, where the tables judged what it follows as written"
             }
@@ -759,7 +771,7 @@ impl Limit {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
             }
             Self::ANullStructToFill => {
-                "a shift, and the first, the last, the minimum and the maximum of nothing, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
+                "a shift, and the first, the last, the minimum and the maximum of nothing, and a struct made of a list or an array, which is null where the list is, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
             }
             Self::AReplacementOfColumnsInAWindow => {
                 "a window gives a replacement of columns a list of values for each group, which Polars refuses as a pattern per row, where the tables measured it in select"
@@ -3253,7 +3265,15 @@ fn case_without_windows(case: &Case) -> Option<Case> {
 fn makes_a_null(call: &Call) -> bool {
     matches!(
         call.entry().id().as_str(),
-        "Expr.shift" | "Expr.first" | "Expr.last" | "Expr.min" | "Expr.max"
+        "Expr.shift"
+            | "Expr.first"
+            | "Expr.last"
+            | "Expr.min"
+            | "Expr.max"
+            // A struct made of a list or an array is null where the list is, and the sample's
+            // lists hold a null.
+            | "Expr.list.to_struct"
+            | "Expr.arr.to_struct"
     )
 }
 
@@ -3330,7 +3350,7 @@ fn refused_for_a_strategy_without_nulls_made(case: &Case) -> Option<bool> {
             observe(&control).refusal.is_some_and(|refusal| {
                 refusal
                     .reason
-                    .contains("fill null strategy not yet supported")
+                    .contains("fill null strategy not yet supported for dtype: struct[")
             })
         })
     })
@@ -4549,6 +4569,20 @@ fn applies(
             Limit::AnUnnestOfNoFields,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => holds_an_unnest_of_no_field(case, refused.place.path()),
+        (Limit::AnArrayWidthAStructFieldHolds, Disagreement::PolarsRefuses(refusal)) => {
+            refusal.reason.contains("number of field names provided")
+                && refusal.place.as_ref().is_some_and(|place| {
+                    let locus = locate(case, place);
+                    locus
+                        .call
+                        .is_some_and(|call| is(call, "Expr.arr.to_struct"))
+                        && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                            chain.links()[..at]
+                                .iter()
+                                .any(|link| is(link, "Expr.struct.field"))
+                        })
+                })
+        }
         (Limit::AnUnnestOfNoFields, Disagreement::PolarsRefuses(refusal)) => {
             holds_an_unnest_of_no_field(
                 case,
@@ -11897,6 +11931,39 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn a_struct_made_of_a_list_is_null_where_the_list_is_and_a_fill_by_a_strategy_refuses_it() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-null-struct-to-fill--a-struct-made-of-a-list.case"),
+            vec![Limit::ANullStructToFill]
+        );
+    }
+
+    #[test]
+    fn the_names_given_to_an_array_a_struct_holds_are_counted_by_polars_against_its_width() {
+        assert_eq!(
+            excused_by_kept("uncovered-an-array-width-a-struct-field-holds.case"),
+            vec![Limit::AnArrayWidthAStructFieldHolds]
+        );
+        // An array of a column has its width in the walk, which refuses names of another number
+        // by a rule, so no limit has a part in it.
+        let names = Value::Many(vec![Value::String("y".to_owned())]);
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![call("Expr.arr.to_struct", vec![("fields", names)])],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Schema,
+                "arr.to_struct() number of field names provided (1) does not match width of input (2).",
+                Vec::new()
+            ),
+            vec![]
+        );
     }
 
     #[test]
