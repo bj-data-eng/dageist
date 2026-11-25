@@ -841,7 +841,8 @@ fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_a
     // operands when it coerces them, so `lit(1.5).ne_missing(k)` is decided the same way. A number
     // with no fraction is held by whole numbers, so the comparison is kept and the key is taken, and
     // so is a number given the dtype of whole numbers, which makes `1.5` the whole number 1, and a
-    // key that is one value, as the count of a column is, and the same comparison in no join.
+    // key that is one value, as the count of a column or an aggregate of the comparison is, and the
+    // same comparison in no join.
     let number = |value: f64, whole_dtype: Option<&str>| {
         let mut arguments = json!({ "value": { "float": value } });
         if let Some(name) = whole_dtype {
@@ -914,6 +915,27 @@ fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_a
         taken(
             &format!("{method} beside k, no fraction"),
             &join_on(swapped(method, number(2.0, None))),
+        );
+        // An aggregate that follows leaves a key of one value, which is taken whole.
+        taken(
+            &format!("{method} of k, summed"),
+            &join_on(chain(
+                col_call("k"),
+                vec![
+                    call(method, json!({ "other": number(1.5, None) })),
+                    call("Expr.sum", json!({})),
+                ],
+            )),
+        );
+        taken(
+            &format!("{method} beside k, summed"),
+            &join_on(chain(
+                number(1.5, None)["expression"]["start"].clone(),
+                vec![
+                    call(method, json!({ "other": field("k") })),
+                    call("Expr.sum", json!({})),
+                ],
+            )),
         );
         taken(
             &format!("{method} of k, whole numbers given"),
