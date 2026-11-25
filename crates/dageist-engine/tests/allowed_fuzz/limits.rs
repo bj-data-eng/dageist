@@ -174,6 +174,9 @@ pub enum Limit {
     /// `explode`, or one that Polars refuses for lengths still when each `explode`
     /// is undone.
     TheLengthsOfTheRows,
+    /// A debug build of Polars panics where an arithmetic overflow wraps in a
+    /// release build, on keys the tables did not measure.
+    AnOverflow,
     /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
     /// it refuses a negative whole number as the exponent of an integer when the rows
     /// run: the number is a value, which the tables measured as the dtype and the
@@ -454,7 +457,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 35] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -462,6 +465,7 @@ impl Limit {
         Self::ANullComparisonInAKey,
         Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
+        Self::AnOverflow,
         Self::ANegativeExponent,
         Self::ABitwiseCallOnANull,
         Self::ADivisionByZero,
@@ -501,6 +505,7 @@ impl Limit {
             Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
+            Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::ADivisionByZero => "a-division-by-zero",
@@ -549,6 +554,9 @@ impl Limit {
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
             Self::TheLengthsOfTheRows => {
                 "whether values of different lengths combine depends on the rows, which the tables measured on one sample"
+            }
+            Self::AnOverflow => {
+                "a debug build of Polars panics on an overflow of the values, which the tables measured on one sample"
             }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
@@ -4225,6 +4233,9 @@ fn applies(
                         && wholly_single(top, top.links().len(), true)
                 })
         }
+        (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
+            unplaced(refusal) && refusal.reason.contains("with overflow")
+        }
         (Limit::ANegativeExponent, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the number; a table with no rows holds none to convert.
             unplaced(refusal)
@@ -6387,6 +6398,45 @@ mod tests {
                 Vec::new()
             ),
             vec![]
+        );
+    }
+
+    #[test]
+    fn an_overflow_is_not_a_panic_and_a_panic_is_not_an_overflow() {
+        let case = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "Polars panicked: attempt to add with overflow",
+                Vec::new()
+            ),
+            vec![Limit::AnOverflow]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "Polars panicked: assertion failed: i < self.len()",
+                Vec::new()
+            ),
+            vec![Limit::APanic]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, "refused", Vec::new()),
+            vec![]
+        );
+        // The tables recording a panic, where Polars allows the case.
+        assert_eq!(
+            tables_refuse(
+                &case,
+                link_of("exprs", 0, 0),
+                ROWS,
+                "Polars panicked: should not fail"
+            ),
+            vec![Limit::APanic]
         );
     }
 
