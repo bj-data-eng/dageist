@@ -656,7 +656,9 @@ identifier, `polars.date`. A function that takes none, `col` and `lit`, is no fo
 the target draws for itself, as it holds no chain (`reverse`, `head`, `limit`, `tail`, `slice`, `first`,
 `last`, `gather_every`, `drop`, `drop_nulls`, `drop_nans`, `fill_nan` and `with_row_index`), is named by
 its identifier, `LazyFrame.head`, and `LazyFrame.` names all of them, for a name such as `reverse` is that
-of the method of an expression. A campaign focused on steps draws one of them for six cases of ten.
+of the method of an expression. The pivot, whose aggregate is evaluated against the values of a group and so
+starts from `element` most of the time, is named by `LazyFrame.pivot` alone. A campaign focused on steps draws one
+of them for six cases of ten.
 
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the
