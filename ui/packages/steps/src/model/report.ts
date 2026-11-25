@@ -285,6 +285,11 @@ export function prepareRun(steps: readonly DocumentStepView[], run: RunView): Pr
   return { source, steps: prepared };
 }
 
+/** Returns whether the step changed the column `name`: it added it or replaced it, as the engine reports. */
+export function isChanged(changes: readonly ColumnChangeView[], name: string): boolean {
+  return changes.some((change) => change.name === name);
+}
+
 /** What the editor says of a step beside its row. */
 export type Saying =
   /** The engine ran the step on the rows and counted them, so the rows say what it did. */

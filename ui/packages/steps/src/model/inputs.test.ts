@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeNode } from '@dageist/host';
 
 import nodeFixture from '../../../host/fixtures/node-inputs.json';
-import { findInput, inputLines, originWords, sourceLines } from './inputs';
+import { findInput, inputDetail, inputLines, originWords, sourceLines } from './inputs';
 
 // What the host writes of the claim-timing node.
 const node = decodeNode(nodeFixture);
@@ -87,5 +87,13 @@ describe('the lines that describe the node’s inputs', () => {
       'owner · String',
       'row_days · Int64',
     ]);
+  });
+});
+
+describe('the short description beside an input’s name', () => {
+  it('is the number of columns of a table, the dtype of a value and the element dtype of a list', () => {
+    expect(inputDetail(inputNamed('step_sla'))).toBe('2 columns');
+    expect(inputDetail(inputNamed('as_of'))).toBe('Date');
+    expect(inputDetail(inputNamed('holidays'))).toBe('list of Date');
   });
 });

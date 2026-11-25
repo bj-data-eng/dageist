@@ -9,7 +9,7 @@
 
 import type { ChoiceView, EntryView, KindView, NoneView, ParameterView } from '@dageist/host';
 
-import { argumentOf } from './catalogue';
+import { CONDITION_TESTS, argumentOf } from './catalogue';
 
 /**
  * What is typed into a literal: a number of a stated type, text, a duration, a pattern, a path or
@@ -133,9 +133,9 @@ const SET_BY_THE_ENTRY: Readonly<Record<string, readonly string[]>> = {
   // A number or text is typed in; a literal of a given dtype is not drawn.
   'polars.lit': ['value'],
   // A condition is its predicates; keyword constraints are not drawn.
-  'polars.when': ['predicates'],
-  'Then.when': ['predicates'],
-  'ChainedThen.when': ['predicates'],
+  'polars.when': [CONDITION_TESTS],
+  'Then.when': [CONDITION_TESTS],
+  'ChainedThen.when': [CONDITION_TESTS],
 };
 
 /** How the editor gives one parameter of an entry its value. */
@@ -173,4 +173,20 @@ export function settingOf(entry: EntryView, parameter: ParameterView): Setting {
 export function methodOptionParameters(entry: EntryView | null): readonly ParameterView[] {
   if (entry === null) return [];
   return entry.parameters.filter((parameter) => settingOf(entry, parameter).by === 'option');
+}
+
+/** Returns the word between the key and the value of an entry of pairs: `=` for keyword arguments, which are named, `→` for a dictionary. */
+export function pairsJoiner(parameter: ParameterView): '=' | '→' {
+  return parameter.default.kind === 'empty' ? '=' : '→';
+}
+
+/**
+ * Returns what a parameter that is not given holds, as a word the controls hold it as: `true` or
+ * `false` for a flag, the word of a choice, a dtype, a column or a table, and the empty text for
+ * any other setting or none.
+ */
+export function defaultWordOf(parameter: ParameterView): string {
+  const held = parameter.defaultSetting;
+  if (held?.kind === 'flag') return String(held.value);
+  return held?.kind === 'word' ? held.value : '';
 }

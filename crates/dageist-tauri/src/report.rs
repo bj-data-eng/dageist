@@ -688,4 +688,6 @@ impl RunView {
 }
 
 #[cfg(test)]
+mod census;
+#[cfg(test)]
 pub(crate) mod fixtures;

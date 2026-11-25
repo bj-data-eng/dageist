@@ -203,6 +203,18 @@ export const HEAD = {
   pivot: { on: 'on', index: 'index', values: 'values', aggregate: 'aggregate_function' },
 } as const satisfies Readonly<Record<Verb, Readonly<Record<string, string>>>>;
 
+/** The name of a parameter a step's head draws: one of the names `HEAD` gives. */
+export type HeadName = {
+  readonly [Step in Verb]: (typeof HEAD)[Step][keyof (typeof HEAD)[Step]];
+}[Verb];
+
+/**
+ * The parameter that holds the tests of a condition. A filter's head and a `when` draw the same
+ * blocks of conditions and name the parameter alike, so `when` reads the name from the one `HEAD`
+ * gives the filter, and the two cannot come apart.
+ */
+export const CONDITION_TESTS: HeadName = HEAD.filter.predicates;
+
 /**
  * The parameters a step's head does not draw and that are not offered as options either: the
  * fields to order by are one list, so a second one for more fields is not offered, and the keys of

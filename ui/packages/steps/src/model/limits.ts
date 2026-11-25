@@ -1,10 +1,14 @@
 /**
  * @file The one list of what the step editor does not yet express of what the engine allows. Each
- * declared gap names what it covers, an entry, a place, a start, a parameter or a state of a
- * report, and says why. The grid test finds every gap by running the model's functions for every
- * place the engine was asked about and fails on a gap that is found and not declared, and on a gap
- * that is declared and not found. A change of the engine or of the catalogue that adds something
- * the editor cannot draw, or a change of the editor that draws it, changes this list.
+ * declared gap names what it covers, an entry, a place, a start, a parameter, a state of a report,
+ * a kind of value typed in, or something a document or a report holds that the editor does not
+ * show, and says why. Three tests find the gaps, each of the kinds that
+ * `FOUND_BY` names for it, and fail on a gap that is found and not declared, and on a gap that is
+ * declared and not found. The grid test runs the model's functions for every place the engine was
+ * asked about; the test of states does the same for every state of a step's report; and the census
+ * test holds every variant the host lists against what the editor can draw. A change of the engine
+ * or of the catalogue that adds something the editor cannot draw, or a change of the editor that
+ * draws it, changes this list.
  *
  * A list shows an entry that is declared here as disabled, with the reason, where it lists the
  * entry at all.
@@ -26,6 +30,8 @@ export type StartKind =
   | 'typedFloat'
   /** Text typed in. */
   | 'typedText'
+  /** A flag, which a document may hold typed in. */
+  | 'typedFlag'
   /** A function that starts a chain. */
   | 'function';
 
@@ -47,7 +53,23 @@ export type Cover =
   /** A kind of parameter that has no drawing, by the shape and kind that make it up. */
   | { readonly kind: 'parameterKind'; readonly of: string }
   /** A state of a step's report that says nothing. */
-  | { readonly kind: 'report'; readonly state: ReportState };
+  | { readonly kind: 'report'; readonly state: ReportState }
+  /** A kind of number, text or flag a document holds typed in, which the editor has no way to type. */
+  | { readonly kind: 'typed'; readonly literal: string }
+  /** What a document or a report holds that the editor does not show, by what it is. */
+  | { readonly kind: 'shown'; readonly what: string };
+
+/** What finds the gaps of each kind of cover: the grid test, the test of states, or the census test. */
+export const FOUND_BY = {
+  entry: 'grid',
+  place: 'grid',
+  start: 'grid',
+  parameter: 'grid',
+  parameterKind: 'grid',
+  report: 'states',
+  typed: 'census',
+  shown: 'census',
+} as const satisfies Readonly<Record<Cover['kind'], 'grid' | 'states' | 'census'>>;
 
 /** One declared gap: what it covers and why. */
 export interface Gap {
@@ -70,6 +92,10 @@ export function coverKey(cover: Cover): string {
       return `parameterKind ${cover.of}`;
     case 'report':
       return `report ${cover.state}`;
+    case 'typed':
+      return `typed ${cover.literal}`;
+    case 'shown':
+      return `shown ${cover.what}`;
     default:
       return cover satisfies never;
   }
@@ -85,6 +111,18 @@ const NOT_A_START =
 /** Why nothing is added after a connected input or a typed value. */
 const NOTHING_AFTER_A_WORD =
   'a connected input or a typed value is drawn as one word that offers no method after it, though the engine allows methods there (#171)';
+
+/** Why no flag can be typed in. */
+const NO_TYPED_FLAG =
+  'a document may hold a flag typed in as the value of lit, which the engine allows, but the host reads typed text as a number or as text and never as a flag, so the editor has no way to type one (#177)';
+
+/** Why a flag a document holds is not shown. */
+const FLAG_NOT_SHOWN =
+  'a flag a document holds typed in as the value of lit is drawn as a function whose value is the literal control, which shows a number or text and no flag, so the value is drawn as its empty label, marked wrong (#177)';
+
+/** Why the dtypes of an expression that gives several columns are not shown. */
+const SEVERAL_NOT_SHOWN =
+  'the editor shows the dtype after a chain only where it gives one column; the dtypes of a chain that gives several are not shown (#177)';
 
 /** Declares the entry `entry`, which the editor cannot pick or make, for `reason`. */
 function entryGap(entry: string, reason: string): Gap {
@@ -147,6 +185,9 @@ export const GAPS: readonly Gap[] = [
   startGap('typedInteger'),
   startGap('typedFloat'),
   startGap('typedText'),
+  { cover: { kind: 'typed', literal: 'flag' }, reason: NO_TYPED_FLAG },
+  { cover: { kind: 'shown', what: 'literal flag' }, reason: FLAG_NOT_SHOWN },
+  { cover: { kind: 'shown', what: 'resolution several' }, reason: SEVERAL_NOT_SHOWN },
   {
     cover: { kind: 'report', state: 'notCountedAfterRowsFailure' },
     reason:

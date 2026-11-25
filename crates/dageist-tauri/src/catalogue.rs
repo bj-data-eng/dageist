@@ -98,7 +98,7 @@ enum KindView {
 /// default.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-enum DefaultView {
+pub(crate) enum DefaultView {
     /// It must be given.
     Required,
     /// Python's `None`: unset, which leaves the choice to Polars.

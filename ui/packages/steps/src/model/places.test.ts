@@ -28,6 +28,11 @@ const START = { context: SELECT, after: { kind: 'start' } } as const;
 const VALUE = { context: SELECT, after: { kind: 'value', dtype: 'Int64', shape: 'many' } } as const;
 const CONDITION = { context: SELECT, after: { kind: 'condition', state: 'then' } } as const;
 
+/** Whether an argument stands where an expression starts at the context `outer` and `nested`. */
+function holds(outer: ContextView['outer'], nested: ContextView['nested']): boolean {
+  return wordsAt(catalogue, { outer, nested }, 'start').some((word) => word.word === 'argument');
+}
+
 describe('the words that stand at a place', () => {
   it('are a value slot, the start of a chain and an argument where an expression starts', () => {
     expect(wordsAt(catalogue, SELECT, 'start')).toEqual([
@@ -72,14 +77,48 @@ describe('the words that stand at a place', () => {
     expect(wordsAt(without, { outer: 'select', nested: 'over.order_by' }, 'start')).toEqual([]);
   });
 
-  it('leave out the argument where no method takes an expression as its argument', () => {
-    const without = {
-      ...catalogue,
-      entries: new Map(
-        [...catalogue.entries].filter(([, entry]) => entry.applies !== 'expression'),
-      ),
+  it('give the argument only where the position that holds the expression is held by an argument', () => {
+    // The first parameter of a step is its argument: select's expressions, a filter's predicates and
+    // the keys of a sort. A join's keys come after the table it joins, and a pivot's aggregate after
+    // its columns, so they are options.
+    expect([holds('select', null), holds('filter', null), holds('sort', null)]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([
+      holds('join_left', null),
+      holds('join_right', null),
+      holds('pivot_aggregate', null),
+    ]).toEqual([false, false, false]);
+    // Inside an expression the keys of a window and the value of a case of a condition are
+    // arguments; how a window is ordered is an option, and a condition's predicates are its own.
+    expect(holds('select', 'over.partition_by')).toBe(true);
+    expect(holds('select', 'condition.value')).toBe(true);
+    expect(holds('select', 'over.order_by')).toBe(false);
+    expect(holds('select', 'condition.predicate')).toBe(false);
+  });
+
+  it('leave out the argument where no entry holds the position with its first parameter', () => {
+    // A step whose first parameter is not the expressions it takes, as select's would be after a
+    // flag, holds its position with an option, and so does the one that shares the position.
+    const flag = entryOf('LazyFrame.sort').parameters.find(
+      (parameter) => parameter.kind.kind === 'flag',
+    );
+    if (flag === undefined) throw new Error('sort has no flag');
+    const reorder = (id: string): [string, EntryView] => {
+      const entry = entryOf(id);
+      return [id, { ...entry, parameters: [flag, ...entry.parameters] }];
     };
-    expect(wordsAt(without, SELECT, 'start').map((word) => word.word)).toEqual([
+    const reordered = {
+      ...catalogue,
+      entries: new Map([
+        ...catalogue.entries,
+        reorder('LazyFrame.select'),
+        reorder('LazyFrame.with_columns'),
+      ]),
+    };
+    expect(wordsAt(reordered, SELECT, 'start').map((word) => word.word)).toEqual([
       'value',
       'chainStart',
     ]);

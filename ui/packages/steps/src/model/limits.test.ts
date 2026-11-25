@@ -12,7 +12,7 @@ import { GAPS, coverKey, editorLimit } from './limits';
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 
 describe('the declared gaps', () => {
-  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, and a report that says nothing', () => {
+  it('are a further case of a condition, the functions that do not start a chain, what a field, a typed value and a condition leave unset, what cannot follow a word, a report that says nothing, a flag that cannot be typed and a flag and several dtypes that are not shown', () => {
     expect(sorted(GAPS.map((gap) => coverKey(gap.cover)))).toEqual(
       sorted([
         'entry ChainedThen.otherwise',
@@ -35,11 +35,14 @@ describe('the declared gaps', () => {
         'parameter polars.lit dtype',
         'parameter polars.when constraints',
         'report notCountedAfterRowsFailure',
+        'shown literal flag',
+        'shown resolution several',
         'start connectedList',
         'start connectedValue',
         'start typedFloat',
         'start typedInteger',
         'start typedText',
+        'typed flag',
       ]),
     );
   });
@@ -58,6 +61,14 @@ describe('the declared gaps', () => {
         expect(gap.reason, coverKey(gap.cover)).toContain('#171');
       }
     }
+  });
+
+  it('name the issue that is to show a flag a document holds, to type one and to show the dtypes of several columns', () => {
+    const keys = ['typed flag', 'shown literal flag', 'shown resolution several'];
+    for (const gap of GAPS.filter((held) => keys.includes(coverKey(held.cover)))) {
+      expect(gap.reason, coverKey(gap.cover)).toContain('#177');
+    }
+    expect(GAPS.filter((gap) => keys.includes(coverKey(gap.cover)))).toHaveLength(3);
   });
 
   it('are keyed by what they cover, so that two places or two parameters are two gaps', () => {

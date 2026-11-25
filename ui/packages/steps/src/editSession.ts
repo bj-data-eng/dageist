@@ -12,6 +12,8 @@
 import type { DocumentStateView, EditAnswerView, EditRequest, ProblemView } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
+import { handlingOf } from './model/edits';
+
 /** What an action came to, for the part of the editor that did it. */
 export type Sent =
   /** The edits were made, and this is the document the last of them gave. */
@@ -120,7 +122,7 @@ export function createSession(port: SessionPort, listener: SessionListener): Ses
         const answer = await port.edit(against, edit);
         if (answer.status === 'refused') {
           // An option that starts with nothing is not a mistake: the editor asks for its value.
-          if (answer.problem.kind !== 'needsValue') tell(answer.message);
+          if (handlingOf(answer.problem) === 'tell') tell(answer.message);
           return { status: 'refused', problem: answer.problem, message: answer.message };
         }
         stamp += 1;

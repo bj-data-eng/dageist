@@ -94,7 +94,7 @@ function leadsTo(kind: string, dtype: string, shape: 'one' | 'many'): boolean {
 }
 
 describe('the starts that are run', () => {
-  it('are a field, a connected value, a connected list, a typed value of each kind, and each function that starts a chain', () => {
+  it('are a field, a connected value, a connected list, a typed value of each kind a document holds, and each function that starts a chain', () => {
     expect(STARTS.map((start) => start.kind)).toEqual([
       'field',
       'connectedValue',
@@ -102,6 +102,7 @@ describe('the starts that are run', () => {
       'typedInteger',
       'typedFloat',
       'typedText',
+      'typedFlag',
       ...FUNCTIONS.map(() => 'function'),
       'function',
     ]);
@@ -122,6 +123,12 @@ describe('the starts that are run', () => {
     expect(leadsTo('typedText', 'String', 'one')).toBe(true);
     expect(leadsTo('typedText', 'Date', 'one')).toBe(true);
     expect(leadsTo('typedText', 'Int32', 'one')).toBe(false);
+  });
+
+  it('lead to the Boolean places of one value for a flag a document holds typed in, as the census gives it', () => {
+    expect(leadsTo('typedFlag', 'Boolean', 'one')).toBe(true);
+    expect(leadsTo('typedFlag', 'String', 'one')).toBe(false);
+    expect(leadsTo('typedFlag', 'Boolean', 'many')).toBe(false);
   });
 
   it('lead to the places of one value for a connected value and a typed value, and of many for a field and a list', () => {

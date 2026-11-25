@@ -9,7 +9,8 @@ import { cx } from '@dageist/design';
 import type { ColumnChangeView } from '@dageist/host';
 
 import type { RowsDisplay } from './model/report';
-import { NULL_DASH } from './model/values';
+import { isChanged } from './model/report';
+import { cellText } from './model/values';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
@@ -40,7 +41,7 @@ export function RowsPreview({ display, changes, settled }: RowsPreviewProps): Re
                 key={column.name}
                 className={cx(
                   'border-b border-line px-2.5 py-1.5 text-left whitespace-nowrap',
-                  changes.some((change) => change.name === column.name) && 'bg-fresh',
+                  isChanged(changes, column.name) && 'bg-fresh',
                 )}
               >
                 <span className="block text-muted">{column.name}</span>
@@ -59,10 +60,10 @@ export function RowsPreview({ display, changes, settled }: RowsPreviewProps): Re
                   key={column.name}
                   className={cx(
                     'border-b border-line px-2.5 py-1.5 whitespace-nowrap',
-                    changes.some((change) => change.name === column.name) && 'bg-fresh',
+                    isChanged(changes, column.name) && 'bg-fresh',
                   )}
                 >
-                  {cells[at] ?? NULL_DASH}
+                  {cellText(cells[at] ?? null)}
                 </td>
               ))}
             </tr>

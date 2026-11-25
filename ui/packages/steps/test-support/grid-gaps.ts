@@ -17,12 +17,14 @@ import type {
 import { decodeCatalogue, decodeNode, decodeReadings } from '@dageist/host';
 
 import catalogueFixture from '../../host/fixtures/catalogue.json';
+import censusFixture from '../../host/fixtures/census.json';
 import gridFixture from '../../host/fixtures/offers-grid.json';
 import nodeInputsFixture from '../../host/fixtures/node-inputs.json';
 import typedDateFixture from '../../host/fixtures/typed-date.json';
 import typedExpressionFixture from '../../host/fixtures/typed-expression.json';
 import typedSampleValuesFixture from '../../host/fixtures/typed-sample-values.json';
 import typedWholeFixture from '../../host/fixtures/typed-whole.json';
+import { decodeCensus } from '../../host/test-support/census';
 import { allowedAt, decodeGrid } from '../../host/test-support/grid';
 import type { Grid } from '../../host/test-support/grid';
 import { indexCatalogue } from '../src/model/catalogue';
@@ -30,7 +32,7 @@ import type { Catalogue } from '../src/model/catalogue';
 import { settingOf } from '../src/model/controls';
 import type { ExpressionView } from '../src/model/doc';
 import type { Cover, Gap, StartKind } from '../src/model/limits';
-import { coverKey } from '../src/model/limits';
+import { FOUND_BY, coverKey } from '../src/model/limits';
 import { methodFamilies, startOffers } from '../src/model/offers';
 import { valueDrawing } from '../src/model/words';
 import { bare, calls, chain, col, input, lit } from './expressions';
@@ -38,6 +40,7 @@ import { actionsOfSlot, canPick, isDrawn, routeOf, wordsAt } from './places';
 import { sorted } from './sorted';
 
 export const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
+export const census = decodeCensus(censusFixture);
 export const grid = decodeGrid(gridFixture);
 const node = decodeNode(nodeInputsFixture);
 
@@ -124,6 +127,23 @@ function typedStart(kind: StartKind): Start {
   };
 }
 
+/**
+ * The start that holds a flag typed in, which the host reads no typed text as: the class of dtype
+ * it leads to is the one the census gives a flag a document holds.
+ */
+function typedFlagStart(): Start {
+  const flag = census.typedValues.find((value) => value.literal === 'flag');
+  if (flag === undefined || flag.dtype === null) {
+    throw new Error('the census holds no flag typed in, or gives it no dtype');
+  }
+  return {
+    kind: 'typedFlag',
+    name: 'true',
+    expression: chain(calls(lit({ kind: 'flag', value: true }))),
+    leads: valueAfter(new Set([flag.dtype]), 'one'),
+  };
+}
+
 /** The first field of the table the steps start from, the connected single value and the connected list. */
 const FIELD = node.source.columns[0];
 const VALUE = node.inputs.find((connected) => connected.kind === 'value');
@@ -160,6 +180,7 @@ export const STARTS: readonly Start[] = [
   typedStart('typedInteger'),
   typedStart('typedFloat'),
   typedStart('typedText'),
+  typedFlagStart(),
   // What a function gives is the engine's to say, so a function leads to every value place.
   ...FUNCTIONS.map((entry): Start => ({
     kind: 'function',
@@ -306,14 +327,15 @@ export function findGaps(
 
 /**
  * Returns the gaps found that `declared` lacks, and the gaps declared that were not found, by cover
- * key. The grid finds every kind of gap but the states of a report, which another test finds.
+ * key. The grid finds the gaps of an entry, a place, a start, a parameter and a kind of parameter;
+ * the other kinds are found by the tests that name them in `FOUND_BY`.
  */
 export function compare(
   discovered: Found,
   declared: readonly Gap[],
 ): { readonly undeclared: string[]; readonly stale: string[] } {
   const declaredKeys = new Set(
-    declared.filter((gap) => gap.cover.kind !== 'report').map((gap) => coverKey(gap.cover)),
+    declared.filter((gap) => FOUND_BY[gap.cover.kind] === 'grid').map((gap) => coverKey(gap.cover)),
   );
   return {
     undeclared: sorted([...discovered.gaps.keys()].filter((key) => !declaredKeys.has(key))),

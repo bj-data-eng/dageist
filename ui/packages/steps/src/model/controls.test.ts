@@ -6,8 +6,10 @@ import { decodeCatalogue } from '@dageist/host';
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import {
   controlOf,
+  defaultWordOf,
   methodOptionParameters,
   oneControlOf,
+  pairsJoiner,
   settingOf,
   startsWithEngineWord,
 } from './controls';
@@ -198,5 +200,25 @@ describe('the parameters of a method that are added as options', () => {
 
   it('are none for a method that is not in the catalogue', () => {
     expect(methodOptionParameters(null)).toEqual([]);
+  });
+});
+
+describe('the words drawn from what a parameter holds by default', () => {
+  const descending = parameterOf('LazyFrame.sort', 'descending');
+
+  it('is a flag’s word for a parameter whose default is a flag, and none for one that is not a word', () => {
+    expect(defaultWordOf(descending)).toBe('false');
+    expect(defaultWordOf({ ...descending, defaultSetting: null })).toBe('');
+    expect(defaultWordOf({ ...descending, defaultSetting: { kind: 'word', value: 'max' } })).toBe(
+      'max',
+    );
+    expect(
+      defaultWordOf({ ...descending, defaultSetting: { kind: 'integer', value: 1, shown: '1' } }),
+    ).toBe('');
+  });
+
+  it('joins the key and the value of pairs with = for keyword arguments and → for a dictionary', () => {
+    expect(pairsJoiner({ ...descending, default: { kind: 'empty' } })).toBe('=');
+    expect(pairsJoiner({ ...descending, default: { kind: 'none' } })).toBe('→');
   });
 });
