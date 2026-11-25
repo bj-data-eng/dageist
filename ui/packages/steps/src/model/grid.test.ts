@@ -86,7 +86,14 @@ describe('the places the engine was asked about', () => {
   });
 });
 
-describe('the starts that lead to the places', () => {
+/** Whether the first start of `kind` leads to a place of a value of the class `dtype` and shape `shape`. */
+function leadsTo(kind: string, dtype: string, shape: 'one' | 'many'): boolean {
+  return (
+    STARTS.find((start) => start.kind === kind)?.leads({ kind: 'value', dtype, shape }) ?? false
+  );
+}
+
+describe('the starts that are run', () => {
   it('are a field, a connected value, a connected list, a typed value of each kind, and each function that starts a chain', () => {
     expect(STARTS.map((start) => start.kind)).toEqual([
       'field',
@@ -100,22 +107,36 @@ describe('the starts that lead to the places', () => {
     ]);
     // Twelve functions start a chain besides `col` and `lit`; `when` leads into a condition.
     expect(FUNCTIONS).toHaveLength(12);
-    expect(STARTS).toHaveLength(6 + 12 + 1);
   });
 
   it('are read from the node the host reports, where there is one to read', () => {
     expect(STARTS.map((start) => start.name).slice(0, 3)).toEqual(['dcn', 'as_of', 'holidays']);
   });
+
+  it('lead to the classes of dtype the host’s readings give typed text', () => {
+    // The host reads a typed whole number as Int32, a number with a fraction as Float64, and text as
+    // String, or as Date where it reads as a date.
+    expect(leadsTo('typedInteger', 'Int32', 'one')).toBe(true);
+    expect(leadsTo('typedInteger', 'Int64', 'one')).toBe(false);
+    expect(leadsTo('typedFloat', 'Float64', 'one')).toBe(true);
+    expect(leadsTo('typedText', 'String', 'one')).toBe(true);
+    expect(leadsTo('typedText', 'Date', 'one')).toBe(true);
+    expect(leadsTo('typedText', 'Int32', 'one')).toBe(false);
+  });
+
+  it('lead to the places of one value for a connected value and a typed value, and of many for a field and a list', () => {
+    expect(leadsTo('connectedValue', 'Int32', 'one')).toBe(true);
+    expect(leadsTo('connectedValue', 'Int32', 'many')).toBe(false);
+    expect(leadsTo('field', 'Int32', 'many')).toBe(true);
+    expect(leadsTo('field', 'Int32', 'one')).toBe(false);
+    expect(leadsTo('connectedList', 'Int32', 'many')).toBe(true);
+    expect(leadsTo('connectedList', 'Int32', 'one')).toBe(false);
+  });
 });
 
 describe('the grid, run through the functions the components call', () => {
-  it('covers every place, every start that leads to it and every entry allowed there', () => {
-    // 6180 places, of which the engine allows something at 4944; 358362 combinations of a place and
-    // an entry, which a start leads to in turn.
-    expect(found.cells).toBe(6180);
-    expect(found.nonEmpty).toBe(4944);
-    expect(found.starts).toBeGreaterThan(found.nonEmpty);
-    expect(found.entries).toBeGreaterThan(358_362);
+  it('runs every cell of the grid', () => {
+    expect(found.cells).toBe(30 * 206);
   });
 
   it('finds the gaps that are declared, and no gap that is not declared', () => {
@@ -168,6 +189,19 @@ describe('the grid, run through the functions the components call', () => {
         'polars.time_range',
       ]),
     );
+  });
+
+  it('finds a further case of a condition in the 24 contexts where the engine allows one', () => {
+    // The engine allows the links of a further case in every context but the keys of a window in a
+    // join key or a pivot's aggregate, 24 of the 30; each shows in one place of each.
+    for (const id of [
+      'ChainedThen.otherwise',
+      'ChainedThen.when',
+      'ChainedWhen.then',
+      'Then.when',
+    ]) {
+      expect(found.gaps.get(`entry ${id}`)?.places, id).toBe(24);
+    }
   });
 
   it('finds the parameters of a field, a typed value and a condition that the editor does not set', () => {

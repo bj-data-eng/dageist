@@ -6,17 +6,23 @@
 
 import type {
   AfterView,
+  ArgumentView,
   ContextView,
   EntryView,
+  LiteralView,
   OfferPlaceView,
   OffersView,
   ParameterView,
 } from '@dageist/host';
-import { decodeCatalogue, decodeNode } from '@dageist/host';
+import { decodeCatalogue, decodeNode, decodeReadings } from '@dageist/host';
 
 import catalogueFixture from '../../host/fixtures/catalogue.json';
 import gridFixture from '../../host/fixtures/offers-grid.json';
 import nodeInputsFixture from '../../host/fixtures/node-inputs.json';
+import typedDateFixture from '../../host/fixtures/typed-date.json';
+import typedExpressionFixture from '../../host/fixtures/typed-expression.json';
+import typedSampleValuesFixture from '../../host/fixtures/typed-sample-values.json';
+import typedWholeFixture from '../../host/fixtures/typed-whole.json';
 import { allowedAt, decodeGrid } from '../../host/test-support/grid';
 import type { Grid } from '../../host/test-support/grid';
 import { indexCatalogue } from '../src/model/catalogue';
@@ -44,10 +50,78 @@ export interface Start {
   readonly leads: (after: AfterView) => boolean;
 }
 
-/** A value place of the class `dtype` and shape `shape`, or any class where `dtype` is `null`. */
-function valueAfter(dtype: string | null, shape: 'one' | 'many'): (after: AfterView) => boolean {
+/** A value place of one of the classes `dtypes` and of shape `shape`, or of any class where `dtypes` is `null`. */
+function valueAfter(
+  dtypes: ReadonlySet<string> | null,
+  shape: 'one' | 'many',
+): (after: AfterView) => boolean {
   return (after) =>
-    after.kind === 'value' && after.shape === shape && (dtype === null || after.dtype === dtype);
+    after.kind === 'value' && after.shape === shape && (dtypes === null || dtypes.has(after.dtype));
+}
+
+/**
+ * What the engine reads typed text as, by the kind of start it makes: the readings the host wrote
+ * for a whole number, for a number with a fraction, for text and for a date, each with the class of
+ * dtype the engine gave it and the text typed to make it.
+ */
+const TYPED: ReadonlyMap<
+  StartKind,
+  { readonly literal: LiteralView; readonly dtypes: ReadonlySet<string> }
+> = typedReadings();
+
+/** Reads the readings of every `typed-*.json` the host wrote, by the kind of start each makes. */
+function typedReadings(): ReadonlyMap<
+  StartKind,
+  { readonly literal: LiteralView; readonly dtypes: ReadonlySet<string> }
+> {
+  const made = new Map<StartKind, { literal: LiteralView; dtypes: Set<string> }>();
+  const fixtures: unknown[] = [
+    typedWholeFixture,
+    typedExpressionFixture,
+    typedDateFixture,
+    ...Object.values(typedSampleValuesFixture),
+  ];
+  for (const fixture of fixtures) {
+    for (const reading of decodeReadings(fixture).readings) {
+      if (reading.kind !== 'read' || reading.dtype === null) continue;
+      const kind = typedStartOf(reading.literal);
+      const held = made.get(kind) ?? { literal: reading.literal, dtypes: new Set<string>() };
+      held.dtypes.add(reading.dtype);
+      made.set(kind, held);
+    }
+  }
+  return made;
+}
+
+/** Returns the kind of start a typed number or text makes. */
+function typedStartOf(literal: LiteralView): StartKind {
+  switch (literal.kind) {
+    case 'integer':
+      return 'typedInteger';
+    case 'float':
+      return 'typedFloat';
+    case 'text':
+      return 'typedText';
+    default:
+      return literal satisfies never;
+  }
+}
+
+/** Returns the start that holds what was typed as `kind` reads, which the host's readings say. */
+function typedStart(kind: StartKind): Start {
+  const found = TYPED.get(kind);
+  if (found === undefined) throw new Error(`the host wrote no reading of ${kind}`);
+  const { literal, dtypes } = found;
+  const value: ArgumentView =
+    literal.kind === 'text'
+      ? { kind: 'string', value: literal.value }
+      : { kind: literal.kind, shown: literal.shown };
+  return {
+    kind,
+    name: literal.shown,
+    expression: chain(calls(lit(value))),
+    leads: valueAfter(dtypes, 'one'),
+  };
 }
 
 /** The first field of the table the steps start from, the connected single value and the connected list. */
@@ -83,24 +157,9 @@ export const STARTS: readonly Start[] = [
     expression: chain(input(LIST.name)),
     leads: valueAfter(null, 'many'),
   },
-  {
-    kind: 'typedInteger',
-    name: '5',
-    expression: chain(calls(lit({ kind: 'integer', shown: '5' }))),
-    leads: valueAfter('Int64', 'one'),
-  },
-  {
-    kind: 'typedFloat',
-    name: '1.5',
-    expression: chain(calls(lit({ kind: 'float', shown: '1.5' }))),
-    leads: valueAfter('Float64', 'one'),
-  },
-  {
-    kind: 'typedText',
-    name: 'text',
-    expression: chain(calls(lit({ kind: 'string', value: 'text' }))),
-    leads: valueAfter('String', 'one'),
-  },
+  typedStart('typedInteger'),
+  typedStart('typedFloat'),
+  typedStart('typedText'),
   // What a function gives is the engine's to say, so a function leads to every value place.
   ...FUNCTIONS.map((entry): Start => ({
     kind: 'function',
@@ -116,17 +175,12 @@ export const STARTS: readonly Start[] = [
   },
 ];
 
-/** What a run of the model over the grid found, and how large the grid was. */
+/** What a run of the model over the grid found. */
 export interface Found {
   /** The gaps found, by cover key, each with how many places showed it. */
   readonly gaps: ReadonlyMap<string, { readonly cover: Cover; readonly places: number }>;
+  /** How many places the grid holds. */
   readonly cells: number;
-  /** The cells where the engine allows at least one entry. */
-  readonly nonEmpty: number;
-  /** Each start that leads to a cell, counted for every such cell. */
-  readonly starts: number;
-  /** Each entry the engine allows at a cell, counted for every start that leads to it. */
-  readonly entries: number;
 }
 
 /** The engine's answer to `place` as far as the grid says: every entry of `allowed` is allowed. */
@@ -176,9 +230,6 @@ export function findGaps(
     gaps.set(key, { cover, places: (gaps.get(key)?.places ?? 0) + 1 });
   };
   let cells = 0;
-  let nonEmpty = 0;
-  let startsRun = 0;
-  let entriesRun = 0;
 
   // A place no word of the editor stands at.
   for (const context of contexts) {
@@ -193,7 +244,6 @@ export function findGaps(
       cells += 1;
       const allowed = allowedAt(over, at, kind);
       if (allowed.length === 0) continue;
-      nonEmpty += 1;
       const place: OfferPlaceView = { context, after };
       // Which entries a list has a row for here, which the engine allows.
       const view = offersAt(place, allowed);
@@ -213,8 +263,6 @@ export function findGaps(
           note({ kind: 'start', start: start.kind });
         }
       }
-      startsRun += after.kind === 'start' ? 1 : leading.length;
-      entriesRun += allowed.length * (after.kind === 'start' ? 1 : leading.length);
 
       // Every entry the engine allows must be one that can be picked, or made, here.
       for (const id of allowed) {
@@ -253,7 +301,7 @@ export function findGaps(
       }
     }
   }
-  return { gaps, cells, nonEmpty, starts: startsRun, entries: entriesRun };
+  return { gaps, cells };
 }
 
 /**

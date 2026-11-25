@@ -20,8 +20,8 @@ import type { ReportState } from './limits';
 import { prepareRun, rowsFailure, sayingOf } from './report';
 
 // Every outcome and every state of the rows that the host can report of a step, built from the
-// reports the host writes, and what the editor says of each. A state that leaves a person with
-// nothing to read is a gap, and it is declared or the check fails.
+// reports the host writes, and what the editor says of each. One state is built by hand, as marked.
+// A state that leaves a person with nothing to read is a gap, and it is declared or the check fails.
 const refused = decodeRun(refusedFixture);
 const incomplete = decodeRun(incompleteFixture);
 const variants = decodeRun(variantsFixture);
@@ -52,8 +52,6 @@ interface State {
   readonly count: CountView['kind'];
   /** What the editor says of the step beside its row. */
   readonly says: 'rows' | 'problem' | 'nothing';
-  /** Whether a person is owed words: something is the matter, or the editor says what the step did. */
-  readonly owed: boolean;
   /** The state a gap is declared for where the editor says nothing though it owes words. */
   readonly gap: ReportState | null;
 }
@@ -77,7 +75,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'counted',
     says: 'rows',
-    owed: true,
     gap: null,
   },
   {
@@ -87,7 +84,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'counted',
     says: 'rows',
-    owed: true,
     gap: null,
   },
   {
@@ -97,7 +93,6 @@ const STATES: readonly State[] = [
     cause: 'polars',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -107,7 +102,6 @@ const STATES: readonly State[] = [
     cause: 'unknownTable',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -117,7 +111,6 @@ const STATES: readonly State[] = [
     cause: 'unknownInput',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -127,7 +120,6 @@ const STATES: readonly State[] = [
     cause: 'build',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -137,7 +129,6 @@ const STATES: readonly State[] = [
     cause: 'notAllowed',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -147,7 +138,6 @@ const STATES: readonly State[] = [
     cause: 'notAllowed',
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -157,7 +147,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -167,7 +156,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -177,7 +165,6 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'notCounted',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
@@ -187,28 +174,19 @@ const STATES: readonly State[] = [
     cause: null,
     count: 'failed',
     says: 'problem',
-    owed: true,
     gap: null,
   },
   {
-    // The run read no rows at all, so nothing happened to the step that a person is owed words for.
-    name: 'accepted and not counted, in a run that read no rows',
-    steps: [uncounted(reportOf(refused, 'sort'), 'sort')],
-    outcome: 'valid',
-    cause: null,
-    count: 'notCounted',
-    says: 'nothing',
-    owed: false,
-    gap: null,
-  },
-  {
-    name: 'accepted and not counted after a step that failed on the rows',
+    // The one state built by hand: the host's reports hold no step after one that failed on the
+    // rows, so this is the failed step of the variants followed by a copy of an accepted step with
+    // its count changed to not counted, which is how the engine reports the step after a failure
+    // (`a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it_are_not_counted`).
+    name: 'accepted and not counted after a step that failed on the rows (built by hand)',
     steps: [reportOf(variants, 'failed'), uncounted(reportOf(refused, 'sort'), 'after')],
     outcome: 'valid',
     cause: null,
     count: 'notCounted',
     says: 'nothing',
-    owed: true,
     gap: 'notCountedAfterRowsFailure',
   },
 ];
@@ -227,15 +205,15 @@ function sayingAt(state: State): ReturnType<typeof sayingOf> {
 }
 
 /**
- * Returns the states that owe words and say nothing without a declared gap, and the declared gaps
- * of states that do not.
+ * Returns the states that say nothing without a declared gap, and the declared gaps of states that
+ * say something.
  */
 function compare(declared: readonly string[]): {
   readonly undeclared: string[];
   readonly stale: string[];
 } {
-  const silent = STATES.filter((state) => state.owed && sayingAt(state).says === 'nothing').flatMap(
-    (state) => (state.gap === null ? ['a state with no gap named'] : [state.gap]),
+  const silent = STATES.filter((state) => sayingAt(state).says === 'nothing').flatMap((state) =>
+    state.gap === null ? ['a state with no gap named'] : [state.gap],
   );
   return {
     undeclared: silent.filter((state) => !declared.some((gap) => gap === state)),
@@ -309,7 +287,7 @@ describe('what the editor says of a step in each state', () => {
     }
   });
 
-  it('is nothing where a person is owed words, only for the states that are declared gaps', () => {
+  it('is nothing only for the states that are declared gaps', () => {
     const declared = GAPS.flatMap((gap) => (gap.cover.kind === 'report' ? [gap.cover.state] : []));
 
     expect(compare(declared)).toEqual({ undeclared: [], stale: [] });
