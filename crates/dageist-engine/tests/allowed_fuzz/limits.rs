@@ -492,11 +492,31 @@ pub enum Limit {
     /// pivot that holds a `struct.json_encode`, with the refusal that text cannot be converted to a
     /// number, which Polars allows.
     AJsonOfANumberInAPivot,
+    /// A list or an array made a struct of names, two of them alike, gives a struct whose dtype
+    /// has one field of that name and whose series has two, so its fields read differently by
+    /// each call that reads them, and an unnest of it is refused. The rule that the names of a
+    /// struct's fields be no two alike refuses them, as Polars does where a struct is renamed or
+    /// made of columns. The rule refusing, with the refusal that two fields would be named alike,
+    /// the call that makes a struct of a list or an array.
+    AToStructGivenNamesAlike,
+    /// A control makes every count of an item another at once: the rows and the numbers that
+    /// decide each of them. Where the item holds a count in more than one place, Polars refusing
+    /// it for lengths then shows that a count is the rows by chance, and not that the one the
+    /// tables refused is. The tables refusing a count, or a rule about counts doing so, in a case
+    /// that holds a count in more than one place of the item the refusal is in, which Polars
+    /// allows on the sample's rows and refuses for lengths once the counts are made another.
+    SeveralCountsInOneItem,
+    /// Polars does not run the key of the left table in an inner join where every key of the
+    /// other table is null, which no key can match: it gives no rows, and a key it would refuse is
+    /// never met. The tables measured the keys of a join with its columns of nulls on the other
+    /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
+    /// reason the tables gave of a key of the join, where it allows the inner join.
+    AJoinKeyPolarsDoesNotRun,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 43] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -537,6 +557,9 @@ impl Limit {
         Self::AStructMetByAStructOfOtherFields,
         Self::ACountNoRowsChange,
         Self::AJsonOfANumberInAPivot,
+        Self::AToStructGivenNamesAlike,
+        Self::SeveralCountsInOneItem,
+        Self::AJoinKeyPolarsDoesNotRun,
     ];
 
     /// The name a kept case is filed under.
@@ -594,6 +617,9 @@ impl Limit {
             Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
             Self::ACountNoRowsChange => "a-count-no-rows-change",
             Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
+            Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
+            Self::SeveralCountsInOneItem => "several-counts-in-one-item",
+            Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
         }
     }
 
@@ -681,11 +707,20 @@ impl Limit {
             Self::AJsonOfANumberInAPivot => {
                 "a number written as json text is read as the number again, where the tables measured the call on the sample's text, which is no number"
             }
+            Self::AToStructGivenNamesAlike => {
+                "a struct made of a list or an array given two names alike has one field in its dtype and two in its series, which Polars allows, where the tables refuse names alike as Polars does for a struct renamed or made of columns"
+            }
+            Self::SeveralCountsInOneItem => {
+                "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
+            }
+            Self::AJoinKeyPolarsDoesNotRun => {
+                "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
+            }
             Self::ACountNoRowsChange => {
                 "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
             }
             Self::ArithmeticOnAStructOfNumbers => {
-                "Polars does arithmetic on a struct field by field, each field by its own dtype and the other value's, where the tables measured a struct of a whole number and text: it refuses a text field, and a field that is a list of text, which the tables do not say of the fields a struct has"
+                "Polars does arithmetic on a struct field by field, each field by its own dtype and the other value's, where the tables measured a struct of a whole number and text: it refuses a text field, a field that is a list of text, and a struct met by a struct of other fields or of other lengths, which the tables do not say of the fields a struct has"
             }
             Self::AStructMetByAStructOfOtherFields => {
                 "Polars refuses to meet two structs of other fields, which it casts to one another, where the tables measured a struct met by the struct measured"
@@ -4446,6 +4481,24 @@ fn applies(
             Limit::ACountNoRowsChange,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_no_rows_change(case, refused, prediction, observed),
+        (Limit::AToStructGivenNamesAlike, Disagreement::RuleRefuses(refused)) => {
+            matches!(refused.source, Source::Rule("field-names-fit-the-struct"))
+                && refused.reason.contains("two fields would be named")
+                && locate(case, &refused.place).call.is_some_and(|call| {
+                    is(call, "Expr.list.to_struct") || is(call, "Expr.arr.to_struct")
+                })
+        }
+        (
+            Limit::SeveralCountsInOneItem,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => super::counts::is_a_count_among_counts(case, refused),
+        (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
+            is(step, "LazyFrame.join")
+                && matches!(refused.source, Source::Polars)
+                && matches!(refused.place.path().first(),
+                    Some(Segment::Parameter(name)) if ["on", "left_on", "right_on"].contains(&name.as_str()))
+                && refused_when_the_join_keeps_the_left_rows(case, refused) == Some(true)
+        }
         (Limit::AJsonOfANumberInAPivot, Disagreement::PolarsAllows(refused)) => {
             pivot
                 && matches!(refused.source, Source::Polars)
@@ -4463,6 +4516,9 @@ fn applies(
                     "multiple fields with name",
                     "failed to determine supertype",
                     "cannot add two list columns with non-numeric inner types",
+                    "operation not supported for dtype `struct",
+                    "must specify one field in the struct",
+                    "expected struct fields to have given length",
                 ]
                 .iter()
                 .any(|said| refusal.reason.contains(said))
@@ -4638,6 +4694,49 @@ fn applies(
         }
         _ => false,
     }
+}
+
+/// The case with its join made a left join, which runs the keys of the left table where an inner
+/// join with only null keys on the other side does not. `None` where the join is no inner join.
+fn case_with_a_left_join(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is(call, "LazyFrame.join")
+            || call
+                .argument("how")
+                .is_some_and(|how| !matches!(how, Value::Choice(word) if word == "inner"))
+        {
+            return None;
+        }
+        let mut given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != "how")
+            .map(|given| (given.parameter(), given.value().clone()))
+            .collect();
+        given.push(("how", Value::Choice("left".to_owned())));
+        Call::new(catalog::entry("LazyFrame.join")?, given).ok()
+    })
+}
+
+/// Whether two refusals say the same of a call and differ in the dtype they name of what it met,
+/// which the tables measured on the sample's column and the control runs on the case's own: the
+/// words before the dtype met are the same.
+fn is_refused_for_what_it_met_alike(tables: &str, control: &str) -> bool {
+    let objection = |reason: &str| reason.split(", got ").next().map(str::to_owned);
+    tables.contains(", got ") && objection(tables) == objection(control)
+}
+
+/// Whether Polars refuses the case, run as a left join, for the reason the tables gave of its
+/// keys: the join is then why it allows the case. `None` where the join is no inner join.
+fn refused_when_the_join_keeps_the_left_rows(case: &Case, refused: &Refused) -> Option<bool> {
+    changed(case_with_a_left_join(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    || is_refused_for_what_it_met_alike(&refused.reason, &refusal.reason)
+            })
+        })
+    })
 }
 
 /// What Polars refuses a gather with when a place is beyond what it follows.
@@ -11654,6 +11753,33 @@ mod tests {
         assert_eq!(
             polars_refuses(&case, None, Stage::Rows, reason, traced),
             vec![Limit::ArithmeticOnAStructOfNumbers]
+        );
+    }
+
+    #[test]
+    fn names_alike_given_to_a_struct_made_of_a_list_are_excused_and_those_of_a_rename_are_not() {
+        let reason = "two fields would be named \"y\"";
+        let names = Value::Many(vec![
+            Value::String("y".to_owned()),
+            Value::String("y".to_owned()),
+        ]);
+        let made = select(vec![chain_of(
+            column("a"),
+            vec![call("Expr.list.to_struct", vec![("fields", names.clone())])],
+        )]);
+        let place = link_of("exprs", 0, 0);
+        assert_eq!(
+            rule_refuses(&made, place.clone(), "field-names-fit-the-struct", reason),
+            vec![Limit::AToStructGivenNamesAlike]
+        );
+        // Polars refuses the names of a rename alike, so the rule is right there.
+        let renamed = select(vec![chain_of(
+            column("a"),
+            vec![call("Expr.struct.rename_fields", vec![("names", names)])],
+        )]);
+        assert_eq!(
+            rule_refuses(&renamed, place, "field-names-fit-the-struct", reason),
+            vec![]
         );
     }
 

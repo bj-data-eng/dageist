@@ -366,6 +366,23 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         })
 }
 
+/// Whether the tables' refusal of a count that Polars allows is in an item that holds a count in
+/// more than one place, where Polars refuses the item for lengths once its counts are made another:
+/// a count is then the rows by chance, and no control tells which. `false` where the tables'
+/// refusal is not of a count, the item holds a count in one place, or Polars refuses it on the
+/// sample's rows or does not on any control.
+pub fn is_a_count_among_counts(case: &Case, refused: &Refused) -> bool {
+    if !is_a_count_refusal(refused) {
+        return false;
+    }
+    only_the_item(case, refused).is_some_and(|item| {
+        counting_places(&item) >= 2
+            && observe(&item).refusal.is_none()
+            && matches!(&predict(&item).verdict, Verdict::Refuses(said) if is_a_count_refusal(said))
+            && refused_for_lengths_once_the_count_is_another(&item).is_some()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use dageist_engine::document::{Place, Segment, StepId};
@@ -403,6 +420,26 @@ mod tests {
                 "{name}: {settled:?}"
             );
         }
+    }
+
+    #[test]
+    fn counts_in_more_than_one_place_of_an_item_are_not_told_apart_by_a_control() {
+        // Each control makes every count of the item another, so what is shown is that a count is
+        // the rows by chance, and not the refused one.
+        for name in [
+            "uncovered-several-counts-in-one-item.case",
+            "uncovered-several-counts-in-one-item--a-count-in-a-sort-key.case",
+        ] {
+            let case = kept(name);
+            let refused = refusal(&case);
+            assert_eq!(settle(&case, &refused), None, "{name}");
+            assert!(is_a_count_among_counts(&case, &refused), "{name}");
+        }
+        // A count in one place is settled by a control, and is no count among counts.
+        let case = kept("by-design-a-count-of-one-by-chance-as-a-sort-key.case");
+        let refused = refusal(&case);
+        assert!(settle(&case, &refused).is_some());
+        assert!(!is_a_count_among_counts(&case, &refused));
     }
 
     #[test]
