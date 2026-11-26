@@ -32,13 +32,13 @@ interface ModeInfo {
 const MODES: Readonly<Record<Mode, ModeInfo>> = {
   window: {
     label: 'Working window',
-    title: 'Sample claims · working window',
+    title: 'Sample documents · working window',
     source: `${String(WINDOW_KEYS)} whole keys held in memory`,
     open: async (host) => host.openSampleWindow(WINDOW_KEYS),
   },
   result: {
     label: 'Whole result',
-    title: 'Sample claims · whole result',
+    title: 'Sample documents · whole result',
     source: 'read from Parquet as you scroll',
     open: async (host) => host.openSampleResult(),
   },

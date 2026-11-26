@@ -9,7 +9,7 @@ import { NEW_INPUT_PIN, canvasGraph, connectEdit, guessedHeight, placesOf } from
 const graph = canvasGraph(decodeGraph(graphFixture));
 
 // The ids the host gives the starting graph's nodes, in the order it adds them.
-const CLAIMS = '00000000-0000-7000-8000-000000000001';
+const DOCUMENTS = '00000000-0000-7000-8000-000000000001';
 const SLA = '00000000-0000-7000-8000-000000000002';
 const NAMES = '00000000-0000-7000-8000-000000000003';
 const CALENDAR = '00000000-0000-7000-8000-000000000004';
@@ -20,7 +20,7 @@ const OUTPUT = '00000000-0000-7000-8000-000000000007';
 describe('the graph the application opens on', () => {
   it('has one box for each node, each after the boxes it reads', () => {
     expect(graph.boxes.map((box) => box.id)).toEqual([
-      CLAIMS,
+      DOCUMENTS,
       SLA,
       NAMES,
       CALENDAR,
@@ -138,7 +138,7 @@ describe('a dragged connection', () => {
 
   it('is nothing while either end is missing', () => {
     expect(
-      connectEdit(graph, { source: null, sourcePin: null, target: CLAIMS, targetPin: 'start' }),
+      connectEdit(graph, { source: null, sourcePin: null, target: DOCUMENTS, targetPin: 'start' }),
     ).toBeNull();
   });
 });
@@ -146,7 +146,7 @@ describe('a dragged connection', () => {
 describe('where the boxes stand', () => {
   it('puts each box no further left than the boxes it reads, in columns by depth', () => {
     const places = placesOf(graph, () => 100);
-    expect(places.get(CLAIMS)).toEqual({ x: 0, y: 0 });
+    expect(places.get(DOCUMENTS)).toEqual({ x: 0, y: 0 });
     expect(places.get(SLA)).toEqual({ x: 0, y: 132 });
     expect(places.get(TIMING)).toEqual({ x: 400, y: 0 });
     expect(places.get(OUTPUT)).toEqual({ x: 800, y: 0 });
@@ -157,18 +157,18 @@ describe('where the boxes stand', () => {
     const placed = canvasGraph({
       ...view,
       nodes: view.nodes.map((node) =>
-        node.id === CLAIMS
+        node.id === DOCUMENTS
           ? { ...node, frame: { x: -40, y: 12, width: null, height: null } }
           : node,
       ),
     });
-    expect(placesOf(placed, () => 100).get(CLAIMS)).toEqual({ x: -40, y: 12 });
+    expect(placesOf(placed, () => 100).get(DOCUMENTS)).toEqual({ x: -40, y: 12 });
   });
 
   it('guesses a taller box for more lines', () => {
-    const [claims, calendar] = graph.boxes;
-    expect(claims !== undefined && calendar !== undefined).toBe(true);
-    if (claims === undefined || calendar === undefined) return;
-    expect(guessedHeight(claims)).toBeGreaterThan(guessedHeight(calendar));
+    const [documents, calendar] = graph.boxes;
+    expect(documents !== undefined && calendar !== undefined).toBe(true);
+    if (documents === undefined || calendar === undefined) return;
+    expect(guessedHeight(documents)).toBeGreaterThan(guessedHeight(calendar));
   });
 });

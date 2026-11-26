@@ -4,7 +4,7 @@ use dageist_engine::catalog::entry;
 use dageist_engine::document::{Call, Document, Expression, Start, Step, StepId, Value};
 use serde_json::Value as Json;
 
-use crate::claims::storyboard_text;
+use crate::documents::storyboard_text;
 
 /// A document in the text `write` gives: compact, each object's fields in the
 /// order of the format, each call's arguments in the order given. It has an
@@ -72,7 +72,7 @@ fn a_document_made_in_code_is_written_in_the_format() {
         Expression::new(
             Start::Call(call(
                 "polars.col",
-                vec![("name", Value::Columns(vec!["dcn".into()]))],
+                vec![("name", Value::Columns(vec!["document_id".into()]))],
             )),
             vec![],
         )
@@ -87,7 +87,7 @@ fn a_document_made_in_code_is_written_in_the_format() {
     let expected = concat!(
         r#"{"version":1,"steps":[{"id":"by_key","call":{"entry":"LazyFrame.sort","arguments":{"#,
         r#""by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"#,
-        r#""name":{"columns":["dcn"]}}},"then":[]}}]}}}}]}"#,
+        r#""name":{"columns":["document_id"]}}},"then":[]}}]}}}}]}"#,
     );
     assert_eq!(document.write(), expected);
     assert_eq!(Document::read(expected).expect("a document"), document);

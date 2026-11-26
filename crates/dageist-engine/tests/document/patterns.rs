@@ -1,4 +1,4 @@
-//! What the walk and a run say of the methods that take a pattern, on the claim-timing sample,
+//! What the walk and a run say of the methods that take a pattern, on the document-timing sample,
 //! whose `owner` column holds `Company A` and `Company B`: the expected cells are worked out by
 //! hand from the seven rows, and the reasons are Polars' own.
 
@@ -6,7 +6,7 @@ use dageist_engine::allowed::{After, RefusalSource, Representative, Rule};
 use dageist_engine::document::{Document, Outcome, Report, RunCause, Segment, StepId, StepRows};
 use serde_json::{Value, json};
 
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, document, field_then, named, pattern, step, text};
 
 /// The one-step document that selects `expression` as the column `out`.
@@ -21,8 +21,8 @@ fn selecting(expression: Value) -> String {
 fn report_of(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 /// The owners with one method of a pattern after them.
@@ -33,7 +33,12 @@ fn owner_then(id: &str, arguments: Value) -> Value {
 fn cells(written: &str) -> Vec<Option<String>> {
     Document::read(written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows")
         .rows()
         .iter()
@@ -190,8 +195,8 @@ fn a_replacement_of_a_literal_text_by_many_values_runs_and_polars_refuses_it_for
     assert_eq!(report.steps()[0].walk().refusal(), None);
     let no_rows = Document::read(&written)
         .expect("a document")
-        .run_on(&inputs(), &claims().clear())
-        .expect("the claims have a schema");
+        .run_on(&inputs(), &documents().clear())
+        .expect("the documents have a schema");
     let StepRows::Failed(error) = no_rows.steps()[0].rows() else {
         panic!("{:?}", no_rows.steps()[0].rows());
     };
@@ -231,8 +236,8 @@ fn a_replacement_of_an_aggregate_by_many_values_is_met_by_each_as_polars_meets_i
     assert_eq!(cells[2].as_deref(), Some("Company Company B"));
     let no_rows = Document::read(&written)
         .expect("a document")
-        .run_on(&inputs(), &claims().clear())
-        .expect("the claims have a schema");
+        .run_on(&inputs(), &documents().clear())
+        .expect("the documents have a schema");
     assert!(
         matches!(no_rows.steps()[0].rows(), StepRows::Counted(_)),
         "{:?}",

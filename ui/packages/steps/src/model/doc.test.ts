@@ -23,7 +23,7 @@ import {
 
 const held = decodeDocumentState(documentFixture);
 
-/** The call of the step `id` of the claim-timing document. */
+/** The call of the step `id` of the document-timing steps. */
 function callOf(id: string): CallView {
   const found = held.document.steps.find((step) => step.id === id);
   if (found === undefined) throw new Error(`no step ${id}`);
@@ -63,9 +63,9 @@ describe('what an expression is, as the editor draws it', () => {
   });
 
   it('is a column for the one field read alone', () => {
-    expect(shapeOf(chain({ kind: 'call', call: col('dcn') }))).toEqual({
+    expect(shapeOf(chain({ kind: 'call', call: col('document_id') }))).toEqual({
       kind: 'column',
-      name: 'dcn',
+      name: 'document_id',
     });
   });
 
@@ -121,7 +121,7 @@ describe('what an expression is, as the editor draws it', () => {
     ).toEqual({ kind: 'chain' });
   });
 
-  it('is read off the claim-timing document the same way', () => {
+  it('is read off the document-timing steps the same way', () => {
     expect(shapeOf(columnOf('received_at'))).toEqual({ kind: 'column', name: 'timestamp' });
     expect(shapeOf(columnOf('step_index'))).toEqual({ kind: 'chain' });
   });

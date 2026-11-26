@@ -1,13 +1,13 @@
 //! The step document through its public interface: reading and writing it,
-//! and running it on a small claims table.
+//! and running it on a small documents table.
 
 #[path = "../ask_polars/mod.rs"]
 mod ask_polars;
-mod claims;
 mod counted;
 mod counts;
 mod dates;
 mod defaults;
+mod documents;
 mod dtypes;
 mod edits;
 mod floats;

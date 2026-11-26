@@ -9,7 +9,7 @@ import reportFixture from '../fixtures/step-report.json';
 import variantsFixture from '../fixtures/step-report-variants.json';
 import { replaced, withField, without } from '../test-support/tamper';
 
-// The fixtures are what the report of the host's `node_document` command holds for the claim-timing steps,
+// The fixtures are what the report of the host's `node_document` command holds for the document-timing steps,
 // for a document with a step Polars refuses, and for one with a step still to be picked, written
 // from Rust by its snapshot test. They are read as `unknown`, as the host's answer is, and the
 // decoder is what says what they are.
@@ -53,7 +53,7 @@ function refusal(value: unknown): DecodeError {
   throw new Error('the value was not refused');
 }
 
-describe('the report of running the claim-timing steps', () => {
+describe('the report of running the document-timing steps', () => {
   const run = decodeRun(report);
 
   it('has a step for each of the twelve, valid, and only the pivot collects', () => {
@@ -79,7 +79,7 @@ describe('the report of running the claim-timing steps', () => {
 
   it('gives the columns each step leaves, by the engine short dtype', () => {
     expect(run.source.map((column) => column.name)).toEqual([
-      'dcn',
+      'document_id',
       'timestamp',
       'step_to',
       'owner',
@@ -89,7 +89,7 @@ describe('the report of running the claim-timing steps', () => {
     expect(pivot).toEqual({
       status: 'valid',
       columns: [
-        { name: 'dcn', dtype: 'String' },
+        { name: 'document_id', dtype: 'String' },
         { name: 'Intake', dtype: 'Int64' },
         { name: 'Review', dtype: 'Int64' },
         { name: 'Pending', dtype: 'Int64' },
@@ -128,7 +128,7 @@ describe('the report of running the claim-timing steps', () => {
         },
       ],
     });
-    // Two claims are what the seven rows make of the pivot.
+    // Two documents are what the seven rows make of the pivot.
     const pivot = stepNamed(run, 'pivot').count;
     expect(pivot.kind === 'counted' && [pivot.received, pivot.kept]).toEqual([7, 2]);
   });
@@ -221,7 +221,7 @@ describe('the summary of each step', () => {
   const run = decodeRun(report);
 
   it('gives each step what it works on, as the engine wrote it', () => {
-    expect(stepNamed(run, 'sort')).toMatchObject({ summary: 'by dcn, timestamp' });
+    expect(stepNamed(run, 'sort')).toMatchObject({ summary: 'by document_id, timestamp' });
     expect(stepNamed(run, 'step_index')).toMatchObject({ summary: 'step_index' });
     expect(stepNamed(run, 'join')).toMatchObject({ summary: 'step_sla on step_to' });
     expect(stepNamed(run, 'pivot')).toMatchObject({ summary: 'on step_to' });

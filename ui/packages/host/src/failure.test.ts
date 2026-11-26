@@ -53,7 +53,7 @@ describe.each(KINDS)('a command that fails with the kind %s', (kind) => {
   it('rejects through the bridge with that kind and the message, under its name', async () => {
     bridgeAnswers(() => jsonResponse({ kind, message: 'the reason' }, 422));
 
-    const error = await rejection(bridgeHost().rowsAfterStep('claim-timing', 1, 'a', 5));
+    const error = await rejection(bridgeHost().rowsAfterStep('document-timing', 1, 'a', 5));
 
     expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
@@ -67,7 +67,7 @@ describe.each(KINDS)('a command that fails with the kind %s', (kind) => {
     const host = tauriHost();
 
     const error = await rejection(
-      host?.rowsAfterStep('claim-timing', 1, 'a', 5) ?? Promise.resolve(),
+      host?.rowsAfterStep('document-timing', 1, 'a', 5) ?? Promise.resolve(),
     );
 
     expect(error).toBeInstanceOf(Error);
@@ -82,7 +82,7 @@ describe('a failure whose kind is not one the contract names', () => {
   it('is a failed command through the bridge, and says what was wrong with it', async () => {
     bridgeAnswers(() => jsonResponse({ kind: 'exploded', message: 'the reason' }, 422));
 
-    const error = await rejection(bridgeHost().rowsAfterStep('claim-timing', 1, 'a', 5));
+    const error = await rejection(bridgeHost().rowsAfterStep('document-timing', 1, 'a', 5));
 
     expect(error).toMatchObject({ kind: 'failed' });
     expect(String(error instanceof Error ? error.message : error)).toContain('exploded');
@@ -92,7 +92,7 @@ describe('a failure whose kind is not one the contract names', () => {
     tauriRejects({ kind: 'exploded', message: 'the reason' });
 
     const error = await rejection(
-      tauriHost()?.rowsAfterStep('claim-timing', 1, 'a', 5) ?? Promise.resolve(),
+      tauriHost()?.rowsAfterStep('document-timing', 1, 'a', 5) ?? Promise.resolve(),
     );
 
     expect(error).toMatchObject({ kind: 'failed' });
@@ -105,7 +105,7 @@ describe('a failure that Tauri words itself', () => {
     tauriRejects('invalid args `limit` for command `rows_after_step`');
 
     const error = await rejection(
-      tauriHost()?.rowsAfterStep('claim-timing', 1, 'a', 5) ?? Promise.resolve(),
+      tauriHost()?.rowsAfterStep('document-timing', 1, 'a', 5) ?? Promise.resolve(),
     );
 
     expect(error).toMatchObject({

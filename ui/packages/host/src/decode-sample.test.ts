@@ -45,7 +45,7 @@ describe('the shape of an opened table', () => {
       figures: { rows: '46 rows', columns: '12 columns', opened: '12.0 ms' },
     });
     expect(window.columns).toHaveLength(12);
-    expect(window.columns[0]).toEqual({ name: 'dcn', dataType: 'str', numeric: false });
+    expect(window.columns[0]).toEqual({ name: 'document_id', dataType: 'str', numeric: false });
     expect(window.columns[1]).toEqual({
       name: 'timestamp',
       dataType: 'datetime[μs]',

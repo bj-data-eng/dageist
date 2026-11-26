@@ -376,7 +376,7 @@ edit the files by hand.
 
 ## Open The Sample Table
 
-The `Table` workspace shows a generated claims table of about two million rows
+The `Table` workspace shows a generated documents table of about two million rows
 and 300 columns. Build the view, then run the application optimised, because
 an unoptimised Polars is many times slower:
 
@@ -386,7 +386,7 @@ cargo run --release --offline --locked -p dageist-tauri
 ```
 
 The first time the workspace opens, the host writes the sample, about 2 GB of
-Parquet, into a `claims-…` folder in the application cache
+Parquet, into a `documents-…` folder in the application cache
 (`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later runs reuse
 it. Delete the folder to reclaim the space; it is generated again when needed.
 

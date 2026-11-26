@@ -220,8 +220,8 @@ document written as the engine writes it. The host keeps the workspace beside
 the session and saves after every edit of the graph, every box moved and every
 edit of a transform's steps, before it lets the session go, so the commits come
 in the order the edits were made. Each commit says what its edit did in the
-names the canvas shows, such as "Rename Claims to Documents" or "Connect Claims
-to the start of Claim timing". Until a developer signs into GitHub in the
+names the canvas shows, such as "Rename Documents to Records" or "Connect Documents
+to the start of Document timing". Until a developer signs into GitHub in the
 application, the commits are made by `dageist <workspace@dageist.invalid>`; the
 `.invalid` domain can never be registered, so no account is credited with them.
 A save that fails is reported as the edit's failure, but the edit is made: the
@@ -2080,7 +2080,7 @@ its aggregate, it refuses the step, not the expression. The contexts the tables
 are measured in also say which table a join's `right_on` is read against.
 
 Each step is also said as a short summary by the engine; the view composes none.
-A summary is what the step works on, such as `by dcn, timestamp` or
+A summary is what the step works on, such as `by document_id, timestamp` or
 `step_sla on step_to`; its words are in the language file's `summary` table, and
 what is worked out is `…`. A name is written as the document holds it, and a typed
 value as Python writes it, as above. The report of each step carries its summary,
@@ -2090,7 +2090,7 @@ a Python rendering of every step would either not run as written or give slightl
 different results, so the blocks, the summaries and the previews are what say what
 a step does.
 
-The claim-timing steps, the seven claim rows they run on and the tables
+The document-timing steps, the seven document rows they run on and the tables
 connected to them are test data, not code: the engine's tests read them from
 the timing corpus in `crates/dageist-engine/tests/corpus/timing`, and the host's
 tests from the same graph as a workspace's files in
@@ -2909,7 +2909,7 @@ engine. The decisions below are the ones the core is expected to carry.
 
 - **Two windows.** The table is the centre of the main window, and the steps
   are listed down its right side, each said by its head, such as "Sort table
-  by dcn" or "Add column step_index". Choosing a step there shows the rows
+  by document_id" or "Add column step_index". Choosing a step there shows the rows
   after it, so the table can be followed step by step, and a step is dragged
   to another place in the list. The steps themselves are edited in a window
   of their own, opened by a button or a double click on a step, which shows

@@ -1,9 +1,9 @@
-//! Generates a claims table shaped like a real workload, unless the directory
+//! Generates a documents table shaped like a real workload, unless the directory
 //! already holds one, and times the steps a live preview and a stored result
 //! depend on, with blocks of the size the grid asks for. Run it optimised:
 //!
 //! ```sh
-//! cargo run --release -p dageist-engine --example measure -- tmp/sample-claims
+//! cargo run --release -p dageist-engine --example measure -- tmp/sample-documents
 //! ```
 
 use std::env;
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use dageist_engine::{
-    EngineError, ParquetTable, SampleSpec, Table, claims_generated, generate_claims,
+    EngineError, ParquetTable, SampleSpec, Table, documents_generated, generate_documents,
 };
 
 const KEYS: u32 = 200_000;
@@ -24,13 +24,13 @@ const VISIBLE_COLUMNS: usize = 17;
 fn main() -> Result<(), EngineError> {
     let directory = env::args()
         .nth(1)
-        .map_or_else(|| PathBuf::from("tmp/sample-claims"), PathBuf::from);
+        .map_or_else(|| PathBuf::from("tmp/sample-documents"), PathBuf::from);
 
-    if claims_generated(&directory) {
+    if documents_generated(&directory) {
         println!("using the table in {}", directory.display());
     } else {
         let started = Instant::now();
-        let files = generate_claims(
+        let files = generate_documents(
             &directory,
             SampleSpec {
                 keys: KEYS,
@@ -45,7 +45,7 @@ fn main() -> Result<(), EngineError> {
     }
 
     let started = Instant::now();
-    let table = Table::load_keys(&directory, "dcn", WINDOW_KEYS)?;
+    let table = Table::load_keys(&directory, "document_id", WINDOW_KEYS)?;
     let columns = table.columns();
     println!(
         "loaded a window of {WINDOW_KEYS} keys: {} rows x {} columns in {:.1?}",

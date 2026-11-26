@@ -163,7 +163,7 @@ mod tests {
                 let chosen = match request.pick {
                     Pick::File(Purpose::Save) => Some("/data/out.csv".into()),
                     Pick::File(Purpose::Open) => None,
-                    Pick::Folder => Some("/work/claims".into()),
+                    Pick::Folder => Some("/work/documents".into()),
                 };
                 request.answer.send(chosen).expect("the asker waits");
             }
@@ -174,7 +174,7 @@ mod tests {
             Some(FileView::chosen(Path::new("/data/out.csv")))
         );
         assert_eq!(dialogs.choose(Purpose::Open), None);
-        assert_eq!(dialogs.choose_folder().as_deref(), Some("/work/claims"));
+        assert_eq!(dialogs.choose_folder().as_deref(), Some("/work/documents"));
         drop(dialogs);
         runner.join().expect("the runner ends once no one can ask");
     }

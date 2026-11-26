@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(NodeId::new(text).unwrap().as_str(), text);
         for refused in [
             "",
-            "claims",
+            "documents",
             "0197A3C2-5E10-7D4B-9C1E-2B6F0A8D4E31",
             "0197a3c25e107d4b9c1e2b6f0a8d4e31",
             "{0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31}",
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn names_are_kept_trimmed_and_refused_when_empty_or_long() {
-        assert_eq!(Name::new("  Claims ").unwrap().as_str(), "Claims");
+        assert_eq!(Name::new("  Documents ").unwrap().as_str(), "Documents");
         assert!(Name::new("   ").is_err());
         assert!(Name::new(&"x".repeat(81)).is_err());
         assert!(Name::new(&"x".repeat(80)).is_ok());
@@ -284,9 +284,9 @@ mod tests {
 
     #[test]
     fn names_that_differ_only_in_case_are_the_same() {
-        let one = Name::new("Claims").unwrap();
-        assert!(one.same_as(&Name::new("CLAIMS").unwrap()));
-        assert!(!one.same_as(&Name::new("Claims 2").unwrap()));
+        let one = Name::new("Documents").unwrap();
+        assert!(one.same_as(&Name::new("DOCUMENTS").unwrap()));
+        assert!(!one.same_as(&Name::new("Documents 2").unwrap()));
     }
 
     #[test]

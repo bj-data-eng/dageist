@@ -24,7 +24,7 @@
                             "parameter": "name",
                             "value": {
                               "kind": "columns",
-                              "names": ["dcn"]
+                              "names": ["document_id"]
                             }
                           }
                         ]
@@ -131,7 +131,7 @@
   "run": {
     "source": [
       {
-        "name": "dcn",
+        "name": "document_id",
         "dtype": "String"
       },
       {
@@ -154,13 +154,13 @@
     "steps": [
       {
         "id": "sort",
-        "summary": "by dcn",
+        "summary": "by document_id",
         "lazy": true,
         "outcome": {
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -290,7 +290,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -334,7 +334,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {

@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use dageist_engine::{
-    Block, ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated,
-    generate_claims,
+    Block, ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, documents_generated,
+    generate_documents,
 };
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -34,7 +34,7 @@ const SAMPLE: SampleSpec = SampleSpec {
     filler_columns: 292,
 };
 /// The column whose values are kept whole in a working window.
-const KEY_COLUMN: &str = "dcn";
+const KEY_COLUMN: &str = "document_id";
 /// The most keys a working window may hold. A window lives in memory, so it
 /// has to stay a sample.
 const MAX_WINDOW_KEYS: u32 = 50_000;
@@ -234,8 +234,8 @@ impl SampleGate {
             .generating
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        if !claims_generated(directory) {
-            generate_claims(directory, spec)?;
+        if !documents_generated(directory) {
+            generate_documents(directory, spec)?;
         }
         Ok(())
     }
@@ -278,8 +278,8 @@ impl Sample {
     /// The sample the application serves, kept in the folder of `cache` that its
     /// size names, so that a different size gets its own folder.
     pub fn in_cache(cache: &Path) -> Self {
-        let columns = SampleSpec::CLAIM_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
-        let name = format!("claims-{}-keys-{columns}-columns", SAMPLE.keys);
+        let columns = SampleSpec::DOCUMENT_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
+        let name = format!("documents-{}-keys-{columns}-columns", SAMPLE.keys);
         Self::new(cache.join(name), SAMPLE)
     }
 
@@ -430,7 +430,7 @@ mod tests {
         keys: 40,
         filler_columns: 4,
     };
-    const SMALL_COLUMNS: usize = SampleSpec::CLAIM_COLUMNS.len() + 4;
+    const SMALL_COLUMNS: usize = SampleSpec::DOCUMENT_COLUMNS.len() + 4;
 
     struct SampleDirectory {
         path: PathBuf,
@@ -497,7 +497,7 @@ mod tests {
         assert_eq!(columns.len(), SMALL_COLUMNS);
         assert_eq!(
             columns[0],
-            serde_json::json!({ "name": "dcn", "dataType": "str", "numeric": false })
+            serde_json::json!({ "name": "document_id", "dataType": "str", "numeric": false })
         );
         // Ten keys of two to eight step rows each.
         assert!((20..=80).contains(&rows), "{rows} rows for ten keys");
@@ -521,7 +521,7 @@ mod tests {
         let sample = SampleDirectory::empty("reuse");
         open_window(&SampleGate::default(), &sample.path, SMALL, 5)
             .expect("the sample is generated");
-        let file = sample.path.join("claims-0000.parquet");
+        let file = sample.path.join("documents-0000.parquet");
         let written = fs::metadata(&file)
             .and_then(|metadata| metadata.modified())
             .expect("the sample file has a modification time");
@@ -591,7 +591,7 @@ mod tests {
         let sample = SampleDirectory::empty("window-block");
         let table =
             open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
-        let columns = ["dcn".to_owned(), "timestamp".to_owned()];
+        let columns = ["document_id".to_owned(), "timestamp".to_owned()];
         let expected = table.block(3, 7, &columns).expect("the engine slices");
 
         let response = tauri::test::get_ipc_response(
@@ -620,7 +620,7 @@ mod tests {
         let sample = SampleDirectory::empty("stored-block");
         let table =
             open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
-        let columns = ["dcn".to_owned(), "measure_002".to_owned()];
+        let columns = ["document_id".to_owned(), "measure_002".to_owned()];
         let expected = table.block(50, 12, &columns).expect("the engine reads");
 
         let response = tauri::test::get_ipc_response(
@@ -646,7 +646,7 @@ mod tests {
         let table =
             open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
         let rows = rows_and_columns(&table).0;
-        let columns = ["dcn".to_owned()];
+        let columns = ["document_id".to_owned()];
         let webview = webview(Some(table));
 
         let last = block_of(tauri::test::get_ipc_response(
@@ -775,7 +775,7 @@ mod tests {
         let stored = open_stored(&gate, &sample.path, SMALL).expect("the result opens");
         let opened = Duration::from_millis(12);
         let columns = [
-            "dcn",
+            "document_id",
             "timestamp",
             "date_of_receipt",
             "measure_001",

@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use dageist_engine::{Block, ParquetTable, SampleSpec, generate_claims};
+use dageist_engine::{Block, ParquetTable, SampleSpec, generate_documents};
 use polars::prelude::*;
 
 /// Enough keys to need a second file, so blocks can cross a file boundary.
@@ -25,7 +25,7 @@ impl StoredSample {
     fn generate(name: &str) -> Self {
         let path =
             std::env::temp_dir().join(format!("dageist-stored-{}-{name}", std::process::id()));
-        let files = generate_claims(&path, SPEC).expect("the sample is generated");
+        let files = generate_documents(&path, SPEC).expect("the sample is generated");
         assert_eq!(files.len(), 2, "the sample spans two files");
         let mut frames = files.iter().map(|file| {
             LazyFrame::scan_parquet(
@@ -90,14 +90,14 @@ fn stored_table_reports_the_rows_and_columns_of_every_file() {
         .iter()
         .map(|column| column.name.as_str())
         .collect();
-    assert_eq!(names, SampleSpec::CLAIM_COLUMNS);
+    assert_eq!(names, SampleSpec::DOCUMENT_COLUMNS);
 }
 
 #[test]
 fn block_across_a_file_boundary_matches_the_rows_read_whole() {
     let sample = StoredSample::generate("boundary");
     let table = ParquetTable::open(&sample.path).expect("the table opens");
-    let columns = ["dcn", "timestamp", "step_to"];
+    let columns = ["document_id", "timestamp", "step_to"];
     let offset = sample.first_file_rows - 6;
 
     let block = read_ipc(
@@ -129,7 +129,7 @@ fn block_with_no_columns_named_holds_every_column() {
 fn block_past_the_end_holds_only_the_rows_that_exist() {
     let sample = StoredSample::generate("end");
     let table = ParquetTable::open(&sample.path).expect("the table opens");
-    let columns = ["dcn".to_owned()];
+    let columns = ["document_id".to_owned()];
 
     let last = read_ipc(
         table
@@ -165,7 +165,7 @@ fn column_named_twice_is_an_invalid_request() {
     let table = ParquetTable::open(&sample.path).expect("the table opens");
 
     let error = table
-        .block(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .block(0, 10, &["document_id".to_owned(), "document_id".to_owned()])
         .expect_err("a repeated column is refused");
 
     assert!(error.is_invalid_request());

@@ -1,5 +1,5 @@
 //! The node commands through Tauri's IPC layer, and the snapshots of what they
-//! return. Every expected value is written out by hand from the claim-timing
+//! return. Every expected value is written out by hand from the document-timing
 //! sample's seven rows and its steps.
 
 use serde_json::{Value, json};
@@ -112,7 +112,7 @@ pub(crate) fn steps_text() -> &'static str {
     TEXT.get_or_init(crate::graph::tests::corpus_steps)
 }
 
-/// The claims sorted by key, then a column whose sum Polars refuses, then a
+/// The documents sorted by key, then a column whose sum Polars refuses, then a
 /// step that is never run.
 fn refused_text() -> String {
     let column = |name: &str| {
@@ -123,14 +123,14 @@ fn refused_text() -> String {
     };
     json!({ "version": 1, "steps": [
         { "id": "sort", "call": { "entry": "LazyFrame.sort", "arguments": {
-            "by": { "many": [column("dcn")] }
+            "by": { "many": [column("document_id")] }
         } } },
         { "id": "total", "call": { "entry": "LazyFrame.with_columns", "arguments": {
             "named_exprs": { "pairs": [[
                 { "columns": ["total"] },
                 { "expression": { "start": {
                     "entry": "polars.col",
-                    "arguments": { "name": { "columns": ["dcn"] } }
+                    "arguments": { "name": { "columns": ["document_id"] } }
                 }, "then": [{ "entry": "Expr.sum", "arguments": {} }] } }
             ]] }
         } } },
@@ -154,7 +154,7 @@ fn incomplete_text() -> String {
     };
     json!({ "version": 1, "steps": [
         { "id": "sort", "call": { "entry": "LazyFrame.sort", "arguments": {
-            "by": { "many": [column("dcn")] }
+            "by": { "many": [column("document_id")] }
         } } },
         { "id": "later", "call": { "entry": "LazyFrame.with_columns", "arguments": {
             "named_exprs": { "pairs": [[
@@ -180,9 +180,9 @@ fn the_field(name: &str, dtype: &str) -> Value {
     json!({ "name": name, "dtype": dtype })
 }
 
-fn claim_columns() -> Value {
+fn document_columns() -> Value {
     json!([
-        the_field("dcn", "String"),
+        the_field("document_id", "String"),
         the_field("timestamp", "Datetime(us)"),
         the_field("step_to", "String"),
         the_field("owner", "String"),
@@ -205,9 +205,9 @@ fn the_inputs_command_reports_the_source_and_every_input_by_name_with_what_suppl
         answer,
         json!({
             "source": {
-                "name": "claims",
-                "from": from_node("Claims"),
-                "columns": claim_columns()
+                "name": "documents",
+                "from": from_node("Documents"),
+                "columns": document_columns()
             },
             "inputs": [
                 { "kind": "value", "name": "as_of", "from": parameter(),
@@ -242,7 +242,7 @@ fn counted(received: usize, kept: usize, first: Value) -> Value {
     json!({ "kind": "counted", "received": received, "kept": kept, "first": first })
 }
 
-/// The claims kept where their days are over one, then a step that writes `owner` as it was
+/// The documents kept where their days are over one, then a step that writes `owner` as it was
 /// and adds a column of the same test.
 fn filter_text() -> String {
     let column = |name: &str| {
@@ -284,7 +284,7 @@ fn failing_text() -> String {
                 }, "then": [{ "entry": "Expr.dt.offset_by", "arguments": {
                     "by": { "expression": { "start": {
                         "entry": "polars.col",
-                        "arguments": { "name": { "columns": ["dcn"] } }
+                        "arguments": { "name": { "columns": ["document_id"] } }
                     }, "then": [] } }
                 } }] } }
             ]] }
@@ -340,7 +340,7 @@ fn the_run_command_reports_the_rows_each_step_kept_with_the_first_values_it_adde
     let answer = run_text(steps_text());
     let steps = &answer["steps"];
     assert_eq!(steps[0]["count"], counted(7, 7, json!([])));
-    // After the sort A-1001 has four rows. The step before the first in a claim has none.
+    // After the sort A-1001 has four rows. The step before the first in a document has none.
     assert_eq!(
         steps[1]["count"],
         counted(
@@ -369,7 +369,7 @@ fn the_run_command_reports_the_rows_each_step_kept_with_the_first_values_it_adde
             json!([values("sla_days", json!(["1", "1", "2", "3"]), 3)])
         )
     );
-    // Seven rows of two claims make a pivot of two rows, A-1001 first.
+    // Seven rows of two documents make a pivot of two rows, A-1001 first.
     let pivot = &steps[11]["count"];
     assert_eq!((&pivot["received"], &pivot["kept"]), (&json!(7), &json!(2)));
     assert_eq!(pivot["first"][2], values("Pending", json!(["2", null]), 0));
@@ -432,7 +432,7 @@ fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_name_
 #[test]
 fn the_run_command_reports_each_step_with_its_columns_and_laziness() {
     let answer = run_text(steps_text());
-    assert_eq!(answer["source"], claim_columns());
+    assert_eq!(answer["source"], document_columns());
     let steps = answer["steps"].as_array().expect("steps");
     let ids: Vec<&str> = steps
         .iter()
@@ -460,12 +460,12 @@ fn the_run_command_reports_each_step_with_its_columns_and_laziness() {
         // Only the pivot needs a collect.
         assert_eq!(step["lazy"], step["id"] != "pivot", "{}", step["id"]);
     }
-    assert_eq!(steps[0]["outcome"]["columns"], claim_columns());
+    assert_eq!(steps[0]["outcome"]["columns"], document_columns());
     // A pivot has the index, then a column for each step name it was given.
     assert_eq!(
         steps[11]["outcome"]["columns"],
         json!([
-            the_field("dcn", "String"),
+            the_field("document_id", "String"),
             the_field("Intake", "Int64"),
             the_field("Review", "Int64"),
             the_field("Pending", "Int64"),
@@ -612,7 +612,7 @@ fn the_walk_reports_the_fields_of_the_struct_each_place_follows() {
         { "id": "counts", "call": { "entry": "LazyFrame.select", "arguments": {
             "exprs": { "many": [{ "expression": { "start": {
                 "entry": "polars.col",
-                "arguments": { "name": { "columns": ["dcn"] } }
+                "arguments": { "name": { "columns": ["document_id"] } }
             }, "then": [{ "entry": "Expr.value_counts", "arguments": {} }] } }] }
         } } }
     ] })
@@ -635,9 +635,9 @@ fn the_walk_reports_the_fields_of_the_struct_each_place_follows() {
     assert_eq!(
         item["fields"][1],
         json!({
-            "dtype": "Struct(dcn: String, count: UInt32)",
+            "dtype": "Struct(document_id: String, count: UInt32)",
             "fields": [
-                { "name": "dcn", "dtype": "String" },
+                { "name": "document_id", "dtype": "String" },
                 { "name": "count", "dtype": "UInt32" }
             ]
         })
@@ -678,7 +678,7 @@ fn the_rows_command_gives_cells_as_text_and_a_null_as_null() {
     let rows = answer["rows"].as_array().expect("rows");
     assert_eq!(rows.len(), 2);
     // Sorted by key then time, the first row of A-1001 has no row before it.
-    assert_eq!(rows[0][position("dcn")], "A-1001");
+    assert_eq!(rows[0][position("document_id")], "A-1001");
     assert_eq!(rows[0][position("timestamp")], "2026-03-02 09:15:00");
     assert_eq!(rows[0][position("resolved_day")], Value::Null);
     assert_eq!(rows[1][position("resolved_day")], "2026-03-02");
@@ -706,8 +706,8 @@ fn a_step_is_refused_for_what_is_not_connected_or_not_allowed_where_it_stands() 
     };
     let join = json!({ "id": "join", "call": { "entry": "LazyFrame.join", "arguments": {
         "other": { "table": "nope" },
-        "left_on": { "many": [column("dcn")] },
-        "right_on": { "many": [column("dcn")] },
+        "left_on": { "many": [column("document_id")] },
+        "right_on": { "many": [column("document_id")] },
     } } });
     assert_eq!(
         cause_of(join),
@@ -815,7 +815,7 @@ fn a_run_reports_the_summary_of_each_step() {
             .to_owned()
     };
     // Worked out by hand from the sample's steps: what each works on.
-    assert_eq!(said("sort"), "by dcn, timestamp");
+    assert_eq!(said("sort"), "by document_id, timestamp");
     assert_eq!(said("step_index"), "step_index");
     assert_eq!(said("join"), "step_sla on step_to");
     assert_eq!(said("pivot"), "on step_to");

@@ -1,7 +1,7 @@
 {
   "source": [
     {
-      "name": "dcn",
+      "name": "document_id",
       "dtype": "String"
     },
     {
@@ -24,13 +24,13 @@
   "steps": [
     {
       "id": "sort",
-      "summary": "by dcn",
+      "summary": "by document_id",
       "lazy": true,
       "outcome": {
         "status": "valid",
         "columns": [
           {
-            "name": "dcn",
+            "name": "document_id",
             "dtype": "String"
           },
           {

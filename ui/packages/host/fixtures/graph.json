@@ -4,14 +4,14 @@
   "nodes": [
     {
       "id": "00000000-0000-7000-8000-000000000001",
-      "name": "Claims",
+      "name": "Documents",
       "kind": "source",
-      "summary": "claims.parquet",
+      "summary": "documents.parquet",
       "slots": [],
       "newInput": null,
       "columns": [
         {
-          "name": "dcn",
+          "name": "document_id",
           "dtype": "String"
         },
         {
@@ -33,7 +33,7 @@
       ],
       "parameters": [],
       "file": {
-        "path": "/sample/claims.parquet",
+        "path": "/sample/documents.parquet",
         "format": "parquet"
       },
       "problems": [],
@@ -132,7 +132,7 @@
     },
     {
       "id": "00000000-0000-7000-8000-000000000006",
-      "name": "Claim timing",
+      "name": "Document timing",
       "kind": "transform",
       "summary": "12 steps",
       "slots": [
@@ -331,7 +331,7 @@
       ],
       "columns": [
         {
-          "name": "dcn",
+          "name": "document_id",
           "dtype": "String"
         },
         {
@@ -358,7 +358,7 @@
     },
     {
       "id": "00000000-0000-7000-8000-000000000007",
-      "name": "Claim timing output",
+      "name": "Document timing output",
       "kind": "output",
       "summary": "No file chosen",
       "slots": [
@@ -398,7 +398,7 @@
       "newInput": null,
       "columns": [
         {
-          "name": "dcn",
+          "name": "document_id",
           "dtype": "String"
         },
         {

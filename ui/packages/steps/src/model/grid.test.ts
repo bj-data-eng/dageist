@@ -114,7 +114,11 @@ describe('the starts that are run', () => {
   });
 
   it('are read from the node the host reports, where there is one to read', () => {
-    expect(STARTS.map((start) => start.name).slice(0, 3)).toEqual(['dcn', 'as_of', 'holidays']);
+    expect(STARTS.map((start) => start.name).slice(0, 3)).toEqual([
+      'document_id',
+      'as_of',
+      'holidays',
+    ]);
   });
 
   it('lead to the classes of dtype the host’s readings give typed text', () => {

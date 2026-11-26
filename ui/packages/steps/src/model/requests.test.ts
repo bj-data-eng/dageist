@@ -134,7 +134,10 @@ describe('a picked word as the argument of a parameter', () => {
       word: 'left',
     });
     expect(wordArgument({ kind: 'dtype' }, 'Int8')).toEqual({ kind: 'dtype', name: 'Int8' });
-    expect(wordArgument({ kind: 'column' }, 'dcn')).toEqual({ kind: 'columns', names: ['dcn'] });
+    expect(wordArgument({ kind: 'column' }, 'document_id')).toEqual({
+      kind: 'columns',
+      names: ['document_id'],
+    });
     expect(wordArgument({ kind: 'table' }, 'step_sla')).toEqual({
       kind: 'table',
       name: 'step_sla',
@@ -153,9 +156,9 @@ describe('a picked word as the argument of a parameter', () => {
 describe('the other arguments the editor builds', () => {
   it('are a hole, a field, an input, a flag and lists', () => {
     expect(HOLE).toEqual({ kind: 'expression', expression: { kind: 'hole' } });
-    expect(fieldArgument('dcn')).toEqual({
+    expect(fieldArgument('document_id')).toEqual({
       kind: 'expression',
-      expression: { kind: 'field', name: 'dcn' },
+      expression: { kind: 'field', name: 'document_id' },
     });
     expect(inputArgument('holidays')).toEqual({
       kind: 'expression',

@@ -23,7 +23,7 @@ import { prepareRun, rowsFailure, sayingOf } from './report';
 const refused = decodeRun(refusedFixture);
 const incomplete = decodeRun(incompleteFixture);
 const variants = decodeRun(variantsFixture);
-const claims = decodeRun(reportFixture);
+const documents = decodeRun(reportFixture);
 
 /** Steps with these names, which is all a report of them needs of the document. */
 function named(run: RunView): DocumentStepView[] {
@@ -74,7 +74,7 @@ const STATES: readonly State[] = [
   },
   {
     name: 'accepted, counted, and collected the rows to be built',
-    steps: alone(claims, 'pivot'),
+    steps: alone(documents, 'pivot'),
     outcome: 'valid',
     cause: null,
     count: 'counted',
@@ -180,7 +180,7 @@ const STATES: readonly State[] = [
 
 /** The run a state stands in, which is built from the steps that make it up. */
 function runOf(state: State): RunView {
-  return { source: claims.source, steps: state.steps };
+  return { source: documents.source, steps: state.steps };
 }
 
 /** What the editor says of the last step of the state `state`. */

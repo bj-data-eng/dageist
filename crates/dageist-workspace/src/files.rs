@@ -695,7 +695,7 @@ mod tests {
     fn files() -> Files {
         let mut graph = Graph::new();
         for (text, kind, name) in [
-            (SOURCE, Kind::Source, "Claims"),
+            (SOURCE, Kind::Source, "Documents"),
             (TRANSFORM, Kind::Transform, "Timing"),
         ] {
             graph = graph
@@ -743,7 +743,10 @@ mod tests {
 
     #[test]
     fn a_value_written_as_null_is_read_and_one_left_out_is_refused() {
-        let missing = with(&node(SOURCE), r#"{ "kind": "source", "name": "Claims" }"#);
+        let missing = with(
+            &node(SOURCE),
+            r#"{ "kind": "source", "name": "Documents" }"#,
+        );
         let (path, message) = refusal(&missing);
         assert_eq!(path, node(SOURCE));
         assert!(message.contains("missing field `file`"), "{message}");
@@ -753,7 +756,7 @@ mod tests {
     fn a_field_or_a_file_the_format_lacks_is_refused() {
         let field = with(
             &node(SOURCE),
-            r#"{ "kind": "source", "name": "Claims", "file": null, "colour": "red" }"#,
+            r#"{ "kind": "source", "name": "Documents", "file": null, "colour": "red" }"#,
         );
         assert!(refusal(&field).1.contains("unknown field `colour`"));
         let file = with("notes.txt", "mine");
@@ -777,7 +780,7 @@ mod tests {
     fn a_path_that_leaves_the_workspace_is_refused_and_one_inside_is_read_against_it() {
         let leaves = with(
             &node(SOURCE),
-            r#"{ "kind": "source", "name": "Claims", "file": { "path": "../x.csv", "format": "csv" } }"#,
+            r#"{ "kind": "source", "name": "Documents", "file": { "path": "../x.csv", "format": "csv" } }"#,
         );
         assert!(
             refusal(&leaves)
@@ -786,7 +789,7 @@ mod tests {
         );
         let inside = with(
             &node(SOURCE),
-            r#"{ "kind": "source", "name": "Claims", "file": { "path": "data/x.csv", "format": "csv" } }"#,
+            r#"{ "kind": "source", "name": "Documents", "file": { "path": "data/x.csv", "format": "csv" } }"#,
         );
         let saved = saved_of(&inside, Path::new(ROOT)).unwrap();
         let dageist_graph::Body::Source { file: Some(file) } =
@@ -814,12 +817,12 @@ mod tests {
         assert!(message.contains("there is no node"), "{message}");
         let same_name = with(
             &node(TRANSFORM),
-            r#"{ "kind": "transform", "name": "claims", "start": null, "inputs": {} }"#,
+            r#"{ "kind": "transform", "name": "documents", "start": null, "inputs": {} }"#,
         );
         assert!(refusal(&same_name).1.contains("another node is named"));
         let spaced = with(
             &node(SOURCE),
-            r#"{ "kind": "source", "name": " Claims", "file": null }"#,
+            r#"{ "kind": "source", "name": " Documents", "file": null }"#,
         );
         assert_eq!(refusal(&spaced).0, node(SOURCE));
     }
@@ -883,7 +886,7 @@ mod tests {
         assert!(refusal(&inputs).1.contains("\"a\" is written twice"));
         let values = with(
             &node(SOURCE),
-            r#"{ "kind": "parameters", "name": "Claims", "values": {
+            r#"{ "kind": "parameters", "name": "Documents", "values": {
                 "x": { "dtype": "Int64", "text": "1" },
                 "x": { "dtype": "Int64", "text": "2" } } }"#,
         );

@@ -148,7 +148,7 @@ mod tests {
 
     use super::{graph_message, place_message, steps_message};
 
-    const CLAIMS: &str = "0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31";
+    const DOCUMENTS: &str = "0197a3c2-5e10-7d4b-9c1e-2b6f0a8d4e31";
     const TIMING: &str = "0197a3c2-7a44-7f02-8b3d-91c5e7f2a610";
     const VALUES: &str = "0197a3c3-0b19-7c88-a4e2-5d7f3b9c1e02";
 
@@ -159,8 +159,8 @@ mod tests {
     fn graph() -> Graph {
         let mut graph = Graph::new();
         for (text, kind, name) in [
-            (CLAIMS, Kind::Source, "Claims"),
-            (TIMING, Kind::Transform, "Claim timing"),
+            (DOCUMENTS, Kind::Source, "Documents"),
+            (TIMING, Kind::Transform, "Document timing"),
             (VALUES, Kind::Parameters, "Parameters"),
         ] {
             graph = graph
@@ -197,41 +197,48 @@ mod tests {
                 },
                 "Add Output",
             ),
-            (Edit::Remove { node: id(CLAIMS) }, "Remove Claims"),
+            (
+                Edit::Remove {
+                    node: id(DOCUMENTS),
+                },
+                "Remove Documents",
+            ),
             (
                 Edit::Rename {
                     node: id(TIMING),
-                    name: Name::new("Document timing").unwrap(),
+                    name: Name::new("Step timing").unwrap(),
                 },
-                "Rename Claim timing to Document timing",
+                "Rename Document timing to Step timing",
             ),
             (
                 Edit::SetFile {
-                    node: id(CLAIMS),
+                    node: id(DOCUMENTS),
                     file: Some(File {
-                        path: "/data/claims.parquet".to_owned(),
+                        path: "/data/documents.parquet".to_owned(),
                         format: Format::Parquet,
                     }),
                 },
-                "Set the file of Claims to claims.parquet",
+                "Set the file of Documents to documents.parquet",
             ),
             (
                 Edit::Connect {
                     node: id(TIMING),
                     slot: Slot::Start,
-                    from: Reference::Table { node: id(CLAIMS) },
+                    from: Reference::Table {
+                        node: id(DOCUMENTS),
+                    },
                 },
-                "Connect Claims to the start of Claim timing",
+                "Connect Documents to the start of Document timing",
             ),
             (
                 Edit::ConnectNew {
                     node: id(TIMING),
                     from: Reference::Column {
-                        node: id(CLAIMS),
+                        node: id(DOCUMENTS),
                         column: "date".to_owned(),
                     },
                 },
-                "Connect the column date of Claims to a new input of Claim timing",
+                "Connect the column date of Documents to a new input of Document timing",
             ),
             (
                 Edit::AddInput {
@@ -239,7 +246,7 @@ mod tests {
                     name: holidays.clone(),
                     kind: InputKind::List,
                 },
-                "Add the input holidays to Claim timing",
+                "Add the input holidays to Document timing",
             ),
             (
                 Edit::SetParameter {
@@ -257,7 +264,7 @@ mod tests {
         }
     }
 
-    /// The sample graph with a transform reading the claims and an input `holidays`, and a value
+    /// The sample graph with a transform reading the documents and an input `holidays`, and a value
     /// `cutoff`.
     fn connected() -> Graph {
         let mut graph = graph();
@@ -278,7 +285,9 @@ mod tests {
             Edit::Connect {
                 node: id(TIMING),
                 slot: Slot::Start,
-                from: Reference::Table { node: id(CLAIMS) },
+                from: Reference::Table {
+                    node: id(DOCUMENTS),
+                },
             },
         ] {
             graph = graph.edit(&edit).unwrap().graph;
@@ -297,7 +306,7 @@ mod tests {
                     node: id(TIMING),
                     slot: Slot::Start,
                 },
-                "Disconnect the start of Claim timing",
+                "Disconnect the start of Document timing",
             ),
             (
                 Edit::Connect {
@@ -308,14 +317,14 @@ mod tests {
                         name: cutoff.clone(),
                     },
                 },
-                "Connect cutoff of Parameters to the input holidays of Claim timing",
+                "Connect cutoff of Parameters to the input holidays of Document timing",
             ),
             (
                 Edit::RemoveInput {
                     node: id(TIMING),
                     name: holidays,
                 },
-                "Remove the input holidays from Claim timing",
+                "Remove the input holidays from Document timing",
             ),
             (
                 Edit::RemoveParameter {
@@ -326,10 +335,10 @@ mod tests {
             ),
             (
                 Edit::SetFile {
-                    node: id(CLAIMS),
+                    node: id(DOCUMENTS),
                     file: None,
                 },
-                "Clear the file of Claims",
+                "Clear the file of Documents",
             ),
         ] {
             let after = before.edit(&edit).unwrap().graph;
@@ -360,10 +369,10 @@ mod tests {
 
     #[test]
     fn a_box_moved_and_steps_changed_are_saved_with_the_node_they_belong_to() {
-        assert_eq!(place_message(&graph(), &id(TIMING)), "Move Claim timing");
+        assert_eq!(place_message(&graph(), &id(TIMING)), "Move Document timing");
         assert_eq!(
             steps_message(&graph(), &id(TIMING)),
-            "Change the steps of Claim timing"
+            "Change the steps of Document timing"
         );
     }
 }

@@ -24,7 +24,7 @@ const REFRESH: &str = "DAGEIST_REFRESH_GRAPH";
 const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri graph::tests::the_snapshot_is_what_the_command_returns";
 
 /// The ids of the corpus's nodes, in the order of their ids, as the view sends them.
-const CLAIMS: &str = "00000000-0000-7000-8000-000000000001";
+const DOCUMENTS: &str = "00000000-0000-7000-8000-000000000001";
 const SLA: &str = "00000000-0000-7000-8000-000000000002";
 const NAMES: &str = "00000000-0000-7000-8000-000000000003";
 const CALENDAR: &str = "00000000-0000-7000-8000-000000000004";
@@ -193,7 +193,7 @@ fn the_starting_graph_lists_every_node_after_the_nodes_it_reads() {
         .collect();
     assert_eq!(
         order,
-        [CLAIMS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT]
+        [DOCUMENTS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT]
     );
     let transform = node(&graph, NODE);
     assert_eq!(transform["kind"], "transform");
@@ -204,9 +204,9 @@ fn the_starting_graph_lists_every_node_after_the_nodes_it_reads() {
         json!({
             "slot": { "kind": "start" },
             "takes": "table",
-            "from": { "kind": "table", "node": CLAIMS },
+            "from": { "kind": "table", "node": DOCUMENTS },
             "fits": [
-                { "kind": "table", "node": CLAIMS },
+                { "kind": "table", "node": DOCUMENTS },
                 { "kind": "table", "node": SLA },
                 { "kind": "table", "node": NAMES },
                 { "kind": "table", "node": CALENDAR },
@@ -217,7 +217,7 @@ fn the_starting_graph_lists_every_node_after_the_nodes_it_reads() {
     assert_eq!(output["problems"], json!(["no file is chosen"]));
     assert_eq!(
         output["columns"][0],
-        json!({ "name": "dcn", "dtype": "String" })
+        json!({ "name": "document_id", "dtype": "String" })
     );
 }
 
@@ -228,18 +228,18 @@ fn an_edit_answers_with_the_edited_graph_and_a_refusal_with_why() {
     let added = invoke(
         workspace,
         "edit_graph",
-        json!({ "revision": revision, "edit": { "edit": "add", "kind": "transform", "follows": CLAIMS } }),
+        json!({ "revision": revision, "edit": { "edit": "add", "kind": "transform", "follows": DOCUMENTS } }),
     )
     .expect("an answer");
     assert_eq!(added["graph"]["revision"], revision + 1);
     assert_eq!(added["kind"], "edited");
     // The host mints the new node's id.
     let id = added["added"].as_str().expect("the id of the node added");
-    assert!(![CLAIMS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT].contains(&id));
+    assert!(![DOCUMENTS, SLA, NAMES, CALENDAR, PARAMETERS, NODE, OUTPUT].contains(&id));
     assert_eq!(node(&added["graph"], id)["name"], "Transform");
     assert_eq!(
         node(&added["graph"], id)["slots"][0]["from"],
-        json!({ "kind": "table", "node": CLAIMS })
+        json!({ "kind": "table", "node": DOCUMENTS })
     );
     let workspace = sample();
     let revision = graph_view(&workspace).revision;
@@ -247,7 +247,7 @@ fn an_edit_answers_with_the_edited_graph_and_a_refusal_with_why() {
         workspace,
         "edit_graph",
         json!({ "revision": revision, "edit": {
-            "edit": "connect", "node": CLAIMS, "slot": { "kind": "start" },
+            "edit": "connect", "node": DOCUMENTS, "slot": { "kind": "start" },
             "from": { "kind": "table", "node": NODE },
         } }),
     )
@@ -261,7 +261,7 @@ fn an_edit_against_another_revision_is_stale_and_an_id_that_is_not_one_is_unknow
     let stale = invoke(
         sample(),
         "edit_graph",
-        json!({ "revision": 99_999, "edit": { "edit": "remove", "node": CLAIMS } }),
+        json!({ "revision": 99_999, "edit": { "edit": "remove", "node": DOCUMENTS } }),
     )
     .expect_err("a rejection");
     assert_eq!(stale["kind"], "stale");
@@ -388,10 +388,9 @@ fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_
     let kept = folder.join("workspace");
     let subjects = || git(&kept, &["log", "--format=%s"]);
     assert_eq!(subjects(), "Make the workspace\n");
-    let rename: super::GraphEditRequest = serde_json::from_value(
-        json!({ "edit": "rename", "node": NODE, "name": "Document timing" }),
-    )
-    .expect("a request");
+    let rename: super::GraphEditRequest =
+        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Step timing" }))
+            .expect("a request");
     let revision = graph_view(&workspace).revision;
     super::edit_graph_view(&workspace, revision, &rename).expect("renamed");
     let layout = graph_view(&workspace).layout_revision;
@@ -404,7 +403,7 @@ fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_
     super::place_view(&workspace, layout, NODE, frame).expect("placed");
     // A refused edit makes no commit.
     let refused: super::GraphEditRequest =
-        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Claims" }))
+        serde_json::from_value(json!({ "edit": "rename", "node": NODE, "name": "Documents" }))
             .expect("a request");
     let revision = graph_view(&workspace).revision;
     super::edit_graph_view(&workspace, revision, &refused).expect("an answer");
@@ -418,8 +417,8 @@ fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_
     crate::document::edit_view(&workspace, NODE, 1, &remove).expect("removed");
     assert_eq!(
         subjects(),
-        "Change the steps of Document timing\nMove Document timing\n\
-         Rename Claim timing to Document timing\nMake the workspace\n"
+        "Change the steps of Step timing\nMove Step timing\n\
+         Rename Document timing to Step timing\nMake the workspace\n"
     );
     let steps =
         std::fs::read_to_string(kept.join(format!("nodes/{NODE}/steps.json"))).expect("the steps");
@@ -574,7 +573,7 @@ fn a_folder_that_holds_no_workspace_is_not_opened_and_leaves_the_one_held() {
     super::edit_graph_view(&workspace, revision, &rename).expect("renamed");
     assert_eq!(
         git(&folder.join("workspace"), &["log", "-1", "--format=%s"]).trim(),
-        "Rename Claim timing to Still here"
+        "Rename Document timing to Still here"
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
