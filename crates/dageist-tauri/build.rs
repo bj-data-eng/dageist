@@ -16,7 +16,8 @@ fn sample_folder() -> PathBuf {
 }
 
 /// Every file under `folder`, by its path in it with `/` between folders, in the order of the
-/// paths.
+/// paths. A file or folder whose name starts with `.`, such as one a file browser leaves, is no
+/// file of the sample and is left out.
 fn files_under(folder: &Path) -> Vec<(String, PathBuf)> {
     let mut found = Vec::new();
     let mut folders = vec![(folder.to_path_buf(), String::new())];
@@ -26,6 +27,9 @@ fn files_under(folder: &Path) -> Vec<(String, PathBuf)> {
         for entry in entries {
             let entry = entry.unwrap_or_else(|error| panic!("reading {}: {error}", at.display()));
             let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                continue;
+            }
             let inside = if path.is_empty() {
                 name
             } else {

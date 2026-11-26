@@ -244,7 +244,26 @@ The host's build embeds the folder in the application. The first start unpacks
 it into the application's data folder, the one Tauri keeps for the
 application's identifier, and makes it a workspace there; every later start
 opens that workspace as it was left, so edits to the sample and their history
-are kept. The window and the bridge share it.
+are kept. A release that ships a changed sample leaves a copy already unpacked
+as it is; to see the shipped sample again, remove `samples/orders` from the
+application's data folder, and the next start unpacks it anew. The application
+and the bridge each run on the real data folder, so running either from a
+checkout unpacks the sample there.
+
+The workspace is made whole in a folder of its own beside its place and moved
+into place by one rename, so two first starts at once leave one whole sample,
+and a start that stops part way leaves nothing in its place. While a workspace
+is open, it holds a lock on `.dageist/lock` in its folder, so the window and the
+bridge cannot hold the sample at once: the second to start is refused, saying
+the workspace is open in another dageist, until the first closes it.
+
+The sample's data is small and written by hand: `orders.parquet` holds twelve
+orders (`order_id`, `customer_id`, `product_id`, `quantity` as Int64 and
+`ordered_at` as Datetime in microseconds), `products.parquet` six products
+(`product_id`, `product`, `category` and `unit_price` as Float64), and the CSV
+files four customers with their regions and three categories. The Parquet files
+are written by [samples/write_orders_data.py](../samples/write_orders_data.py)
+with Python Polars of the release in `vendor/polars`.
 
 Its transforms are chained, each starting from the table of the one before:
 *Order lines* joins each order to its product, works out the line's total and

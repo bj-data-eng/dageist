@@ -608,3 +608,73 @@ fn a_sample_folder_with_files_but_no_workspace_is_not_overwritten() {
     assert_eq!(left, ["orders"], "the files unpacked beside it are removed");
     let _ = std::fs::remove_dir_all(&data);
 }
+
+#[test]
+fn two_starts_that_unpack_the_sample_at_once_leave_one_whole_sample() {
+    let data = folder();
+    let root = crate::sample_workspace::sample_root(&data);
+    // An empty folder in the sample's place is no sample.
+    std::fs::create_dir_all(&root).expect("a folder");
+    let starts: Vec<_> = (0..4)
+        .map(|_| {
+            let root = root.clone();
+            std::thread::spawn(move || crate::sample_workspace::unpack(&root))
+        })
+        .collect();
+    for start in starts {
+        start.join().expect("the start ends").expect("unpacked");
+    }
+    let sample = Workspace::sample(&data, 0).expect("the sample opens");
+    assert_eq!(git(&root, &["log", "--format=%s"]), "Make the workspace\n");
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    let left: Vec<_> = std::fs::read_dir(data.join("samples"))
+        .expect("the folder")
+        .map(|entry| entry.expect("an entry").file_name())
+        .collect();
+    assert_eq!(left, ["orders"], "what each start unpacked into is removed");
+    drop(sample);
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn a_second_host_on_the_sample_is_refused_while_the_first_holds_it() {
+    let data = folder();
+    let first = Workspace::sample(&data, 0).expect("the sample");
+    let refused = Workspace::sample(&data, 1).expect_err("held");
+    let message = serde_json::to_value(&refused).expect("a view")["message"]
+        .as_str()
+        .expect("a message")
+        .to_owned();
+    assert!(message.contains("open in another dageist"), "{message}");
+    // Opening the workspace held, in the host that holds it, keeps it as it is.
+    let root = crate::sample_workspace::sample_root(&data);
+    let before = graph_view(&first).revision;
+    first.open(&root, 99).expect("the same workspace");
+    assert_eq!(graph_view(&first).revision, before);
+    first.close().expect("closed");
+    Workspace::sample(&data, 2).expect("the sample once it is closed");
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+// A folder is opened to set its time, which Unix allows.
+#[cfg(unix)]
+#[test]
+fn what_a_start_that_stopped_left_beside_the_sample_is_removed_once_it_is_old() {
+    let data = folder();
+    let samples = data.join("samples");
+    let left = samples.join(".unpacking-files-1-1");
+    let recent = samples.join(".unpacking-files-2-2");
+    for folder in [&left, &recent] {
+        std::fs::create_dir_all(folder).expect("a folder");
+    }
+    // A folder's age is its last change: the one left was changed two hours ago.
+    let two_hours_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 60 * 60);
+    std::fs::File::open(&left)
+        .expect("the folder")
+        .set_modified(two_hours_ago)
+        .expect("aged");
+    Workspace::sample(&data, 0).expect("the sample");
+    assert!(!left.exists(), "the old folder is removed");
+    assert!(recent.exists(), "a recent one may be another start's");
+    let _ = std::fs::remove_dir_all(&data);
+}

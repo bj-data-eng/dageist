@@ -145,27 +145,52 @@ impl Workspace {
     /// Opens the workspace on disk in `folder` in place of the one held, with every revision of
     /// its session starting at `first_revision`, and closes the one held, packing it whole. The
     /// workspace is read before anything is let go, so one that cannot be opened leaves the one
-    /// held as it was.
+    /// held as it was. Opening the workspace held keeps it as it is.
     ///
     /// # Errors
     ///
     /// When `folder` holds no workspace this application reads, or the application is closing.
     pub(crate) fn open(&self, folder: &Path, first_revision: u64) -> Result<(), ErrorView> {
-        let mut session = self.lock();
-        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
-        if matches!(*kept, Keeping::Closed) {
-            return Err(ErrorView::new(
-                "the application is closing, so no workspace is opened",
-            ));
+        let closing = || ErrorView::new("the application is closing, so no workspace is opened");
+        {
+            let kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+            if matches!(*kept, Keeping::Closed) {
+                return Err(closing());
+            }
+            // The workspace held is open already: opening it again keeps it as it is.
+            if let (Keeping::In(held), Ok(asked)) = (&*kept, folder.canonicalize())
+                && held.root() == asked
+            {
+                return Ok(());
+            }
         }
-        let (opened, saved) = dageist::workspace::Workspace::open(
+        // The workspace asked for is read with nothing of the host's locked, so other commands go
+        // on while it waits on a lock another process holds.
+        let (opened, saved) = match dageist::workspace::Workspace::open(
             folder,
             dageist::unsigned_author(),
             dageist::workspace::Options::default(),
-        )
-        .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        ) {
+            Ok(opened) => opened,
+            // An opening of the same folder made at the same time took it first, so it is the
+            // workspace held now, which opening again keeps as it is.
+            Err(dageist::workspace::WorkspaceError::Held(_)) if self.holds(folder) => {
+                return Ok(());
+            }
+            Err(error) => {
+                return Err(ErrorView::new(format!(
+                    "opening {}: {error}",
+                    folder.display()
+                )));
+            }
+        };
         let read = Session::from_saved(saved, first_revision)
             .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        let mut session = self.lock();
+        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        if matches!(*kept, Keeping::Closed) {
+            return Err(closing());
+        }
         *session = read;
         let held = std::mem::replace(&mut *kept, Keeping::In(Box::new(opened)));
         if let Keeping::In(held) = held {
@@ -177,6 +202,12 @@ impl Workspace {
             }
         }
         Ok(())
+    }
+
+    /// Whether the workspace held is the one in `folder`.
+    fn holds(&self, folder: &Path) -> bool {
+        let kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        matches!((&*kept, folder.canonicalize()), (Keeping::In(held), Ok(asked)) if held.root() == asked)
     }
 
     /// Closes the workspace on disk, packing it whole, once the edit being made is done. An edit

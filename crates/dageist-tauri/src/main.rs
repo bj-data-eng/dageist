@@ -97,7 +97,8 @@ fn main() -> ExitCode {
         }
     };
     // The context is built here and used by either job: the application runs on it, and the
-    // bridge reads the application's identifier from it to find the application's cache.
+    // bridge reads the application's identifier from it to find the application's cache, and
+    // both find the application's data folder, where the sample workspace is kept, from it.
     let context = tauri::generate_context!();
     // Held until the job ends, whichever way `main` returns or a panic unwinds out of it.
     let _polars = PolarsSession::start();
