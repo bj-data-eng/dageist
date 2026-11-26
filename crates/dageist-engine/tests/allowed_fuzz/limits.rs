@@ -486,11 +486,11 @@ pub enum Limit {
     /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
     /// reason the tables gave of a key of the join, where it allows the inner join.
     AJoinKeyPolarsDoesNotRun,
-    /// Polars compares a struct with a value field by field and gives a struct, not a Boolean, which
-    /// a condition takes for its predicate and runs neither branch for, so a part in a branch is
-    /// never met. The tables measured a comparison as giving a Boolean, and judged the branches. The
-    /// tables refusing a part of a branch of a condition whose predicate compares a struct, which
-    /// Polars allows, where the case run again with each predicate a flag that is true is refused
+    /// Polars takes a struct for a condition's predicate, where a comparison with one, or a method
+    /// of text on one, gives a struct and not a Boolean, and runs neither branch, so a part in a
+    /// branch is never met. The tables measured a comparison as giving a Boolean, and judged the
+    /// branches. The tables refusing a part of a branch of a condition whose predicate holds a struct
+    /// or a call that makes one, which Polars allows, where the case run again with each predicate a flag that is true is refused
     /// for the same reason: the predicate is then why Polars allows it.
     AStructTakenForAPredicate,
 }
@@ -4537,22 +4537,26 @@ fn applies(
     }
 }
 
-/// Whether the call is a condition with a predicate that compares a struct: one that starts from
-/// `polars.struct` and goes on to a comparison, or is compared with one.
+/// Whether the call is a condition with a predicate that holds a struct: one `polars.struct` makes,
+/// or a call that gives one of text, a list, an array or a count, which a comparison or a method
+/// then takes field by field, so the predicate is none that is a Boolean.
 fn is_a_condition_of_a_compared_struct(call: &Call) -> bool {
-    let compares_a_struct = |predicate: &Expression| {
-        predicate.links().iter().any(|link| {
-            link.entry().family() == catalog::Family::Compare
-                && (matches!(predicate.start(), Start::Call(start) if is(start, "polars.struct"))
-                    || operands(link).into_iter().any(|(_, operand)| {
-                        any_call(operand, &|inside| is(inside, "polars.struct"))
-                    }))
-        })
-    };
+    const MAKERS: [&str; 7] = [
+        "polars.struct",
+        "Expr.value_counts",
+        "Expr.list.to_struct",
+        "Expr.arr.to_struct",
+        "Expr.str.split_exact",
+        "Expr.str.splitn",
+        "Expr.str.extract_groups",
+    ];
     (is(call, "polars.when") || is(call, "Then.when"))
-        && operands(call)
-            .into_iter()
-            .any(|(parameter, predicate)| parameter == "predicates" && compares_a_struct(predicate))
+        && operands(call).into_iter().any(|(parameter, predicate)| {
+            parameter == "predicates"
+                && any_call(predicate, &|inside| {
+                    MAKERS.iter().any(|maker| is(inside, maker))
+                })
+        })
 }
 
 /// The case with the predicates of each condition made a flag that is true, which a branch is run

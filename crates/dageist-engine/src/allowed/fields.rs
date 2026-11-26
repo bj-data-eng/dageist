@@ -189,7 +189,9 @@ impl Fields {
 
     /// Whether a field was made of a number typed without a dtype, which stays open.
     pub(super) fn has_a_loose_field(&self) -> bool {
-        self.0.iter().any(Field::is_loose)
+        self.0.iter().any(|field| {
+            field.is_loose() || field.fields.as_ref().is_some_and(Fields::has_a_loose_field)
+        })
     }
 
     /// The names of the fields, in order.
@@ -265,9 +267,9 @@ impl<'a> Input<'a> {
         self
     }
 
-    /// Whether the input is a number typed without a dtype.
-    pub(super) const fn is_loose(&self) -> bool {
-        self.loose
+    /// Whether the input is a number typed without a dtype, or a struct that holds one.
+    pub(super) fn is_loose(&self) -> bool {
+        self.loose || self.fields.is_some_and(Fields::has_a_loose_field)
     }
 
     /// The same input, which is a number typed without a dtype where `loose`.
@@ -483,8 +485,18 @@ pub(super) fn gives(
                 Some(Ok(fields)) => Ok(Gives::Struct(Some(fields))),
                 Some(Err(error)) => Err(repeated(error.name())),
                 // A value whose name the chain does not know, as the columns an unnest writes,
-                // may be named as another is, which Polars refuses.
-                None => Ok(Gives::Undecided),
+                // may be named as another is, which Polars refuses; two whose names are known and
+                // alike are refused whatever it is named.
+                None => {
+                    let mut seen: Vec<&str> = Vec::new();
+                    for name in chosen.inputs.iter().filter_map(|input| input.name) {
+                        if seen.contains(&name) {
+                            return Err(repeated(name));
+                        }
+                        seen.push(name);
+                    }
+                    Ok(Gives::Undecided)
+                }
             }
         }
         "Expr.str.extract_groups" => {
