@@ -1641,3 +1641,24 @@ fn structs_of_other_fields_that_meet_are_not_said_by_the_walk() {
         );
     }
 }
+
+#[test]
+fn an_unnest_of_one_value_beside_a_flag_is_not_refused_for_what_it_is_though_it_is_no_flag() {
+    // The counts of one value are one row, which Polars takes beside a flag without asking
+    // whether each of the fields it expands to is a flag.
+    let counted = chain(
+        call("polars.lit", json!({ "value": { "integer": 1 } })),
+        vec![call("Expr.value_counts", json!({})), unnest()],
+    );
+    let found = ask_step(step(
+        "s",
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![counted, field("f")]) }),
+    ));
+    assert_eq!(found.polars, Said::Accepts, "{:?}", found.polars);
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+}

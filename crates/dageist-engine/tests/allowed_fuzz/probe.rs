@@ -2683,6 +2683,24 @@ mod tests {
     }
 
     #[test]
+    fn the_rule_for_struct_arithmetic_is_met_by_polars_refusing_the_operation_or_the_field() {
+        let rule = Source::Rule("struct-arithmetic-needs-numbers");
+        let said = "`abs` is not done on a struct, whatever its fields are";
+        assert!(same_reason(
+            &rule,
+            said,
+            "`abs` operation not supported for dtype `struct[1]`"
+        ));
+        assert!(same_reason(
+            &rule,
+            "cannot - a struct with non-numeric field: (field: y, dtype: String)",
+            "cannot - a struct with non-numeric field: (field: y, dtype: str)"
+        ));
+        assert!(!same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
+    }
+
+    #[test]
     fn the_rule_that_names_fit_the_struct_is_met_by_polars_refusing_a_name_twice_or_another_number()
     {
         let rule = Source::Rule("field-names-fit-the-struct");
