@@ -1387,6 +1387,37 @@ fn a_missing_comparison_that_polars_decides_in_what_a_joins_key_holds_is_no_elem
 }
 
 #[test]
+fn a_decided_comparison_that_an_aggregate_of_a_joins_key_is_given_leaves_the_key_one_value() {
+    // The constant repeated to the length of the column is no elementwise key beside a column, but a
+    // key that is wholly one value is taken whole, whatever the aggregate that makes it is given.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let fraction = chain(
+        call("polars.lit", json!({ "value": { "float": 1.5 } })),
+        Vec::new(),
+    );
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        let key = chain(
+            col_call("x"),
+            vec![
+                call(
+                    "Expr.eq_missing",
+                    json!({ "other": chain(
+                        col_call("x"),
+                        vec![call(method, json!({ "other": fraction.clone() }))],
+                    ) }),
+                ),
+                call("Expr.null_count", json!({})),
+                cast(),
+            ],
+        );
+        assert_taken_by_both(
+            &format!("the count of nulls of a column compared with {method} of a fraction"),
+            &join_on_a_column_of(&DataType::Int64, key),
+        );
+    }
+}
+
+#[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
     // what its other bound reads is not met, where the interval of a count and a column bounded
