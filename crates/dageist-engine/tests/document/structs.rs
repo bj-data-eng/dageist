@@ -1233,3 +1233,63 @@ fn a_struct_is_filled_forward_or_backward_and_by_no_other_strategy() {
         );
     }
 }
+
+#[test]
+fn a_struct_of_an_untyped_number_that_a_call_keeps_is_as_open_as_the_struct_as_a_key() {
+    // The struct stays open through the calls that keep it, as the largest of one does.
+    for link in ["Expr.max", "Expr.last"] {
+        let kept = chain(
+            call(
+                "polars.struct",
+                json!({ "exprs": many(vec![chain(call("polars.lit", json!({ "value": { "float": 1.5 } })), vec![])]) }),
+            ),
+            vec![call(link, json!({}))],
+        );
+        let held = step(
+            "s",
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "other" },
+                "left_on": many(vec![field("rk")]),
+                "right_on": many(vec![kept]),
+            }),
+        );
+        let found = ask_step(held);
+        assert!(
+            found.walk_refusal.is_none(),
+            "{link}: {:?}",
+            found.walk_refusal
+        );
+        assert!(
+            found.walk_knows_nothing_of_it.is_some(),
+            "{link}: the walk says what the key gives: {:?}",
+            found.walked_name
+        );
+    }
+}
+
+#[test]
+fn an_unnest_of_a_struct_with_no_field_is_a_predicate_of_nothing_that_the_walk_cannot_tell() {
+    // A condition whose predicate expands to no expression is made as Polars makes it.
+    let predicate = chain(col_call("s_one"), unnest_of_none());
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![predicate]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": whole(1) })),
+            call("Then.otherwise", json!({ "statement": whole(2) })),
+        ],
+    );
+    let found = ask_step(step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![condition]) }),
+    ));
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+}
