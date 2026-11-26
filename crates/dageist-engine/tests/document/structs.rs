@@ -1616,3 +1616,28 @@ fn a_condition_whose_value_is_an_unnest_is_named_by_the_fields_not_by_the_column
         found.walk_refusal
     );
 }
+
+#[test]
+fn structs_of_other_fields_that_meet_are_not_said_by_the_walk() {
+    // Polars casts the old and the new values of a replacement to what they replace, field by
+    // field, and refuses or not by what the fields are, which the tables measured for one struct.
+    for (old, new) in [("s_xy", "s_xz"), ("s_xz", "s_abc"), ("s_one", "s_xz")] {
+        let found = ask(
+            "s_xy",
+            vec![call(
+                "Expr.replace",
+                json!({ "old": field(old), "new": field(new) }),
+            )],
+        );
+        assert!(
+            found.walk_refusal.is_none(),
+            "the walk refuses {old} then {new}: {:?}",
+            found.walk_refusal
+        );
+        assert!(
+            found.walk_knows_nothing_of_it.is_some(),
+            "the walk says what {old} then {new} gives: {:?}",
+            found.walked_name
+        );
+    }
+}
