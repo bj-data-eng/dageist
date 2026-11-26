@@ -24,7 +24,9 @@
                             "parameter": "name",
                             "value": {
                               "kind": "columns",
-                              "names": ["dcn"]
+                              "names": [
+                                "dcn"
+                              ]
                             }
                           }
                         ]
@@ -70,7 +72,9 @@
                   {
                     "key": {
                       "kind": "columns",
-                      "names": ["earlier"]
+                      "names": [
+                        "earlier"
+                      ]
                     },
                     "value": {
                       "kind": "expression",
@@ -83,7 +87,9 @@
                               "parameter": "name",
                               "value": {
                                 "kind": "columns",
-                                "names": ["timestamp"]
+                                "names": [
+                                  "timestamp"
+                                ]
                               }
                             }
                           ]
@@ -260,7 +266,9 @@
                   }
                 }
               ],
-              "fields": [null],
+              "fields": [
+                null
+              ],
               "ending": {
                 "kind": "allowed"
               }
@@ -498,7 +506,9 @@
                   }
                 }
               ],
-              "fields": [null],
+              "fields": [
+                null
+              ],
               "ending": null
             },
             {
@@ -574,7 +584,10 @@
                   }
                 }
               ],
-              "fields": [null, null],
+              "fields": [
+                null,
+                null
+              ],
               "ending": {
                 "kind": "allowed"
               }

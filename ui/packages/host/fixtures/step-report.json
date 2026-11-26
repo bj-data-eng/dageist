@@ -151,7 +151,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -203,7 +205,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -261,7 +265,12 @@
           {
             "name": "step_index",
             "values": {
-              "shown": ["1", "2", "3", "4"],
+              "shown": [
+                "1",
+                "2",
+                "3",
+                "4"
+              ],
               "more": 3
             }
           }
@@ -393,7 +402,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -497,7 +508,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -559,7 +574,12 @@
           {
             "name": "resolved_at",
             "values": {
-              "shown": [null, "2026-03-02 09:15:00", "2026-03-03 16:40:00", "2026-03-05 07:50:00"],
+              "shown": [
+                null,
+                "2026-03-02 09:15:00",
+                "2026-03-03 16:40:00",
+                "2026-03-05 07:50:00"
+              ],
               "more": 3
             }
           }
@@ -716,7 +736,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -778,7 +800,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -882,7 +906,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -1054,7 +1082,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -1124,7 +1154,12 @@
           {
             "name": "resolved_day",
             "values": {
-              "shown": [null, "2026-03-02", "2026-03-03", "2026-03-05"],
+              "shown": [
+                null,
+                "2026-03-02",
+                "2026-03-03",
+                "2026-03-05"
+              ],
               "more": 3
             }
           }
@@ -1233,7 +1268,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -1307,7 +1345,12 @@
           {
             "name": "days_open",
             "values": {
-              "shown": [null, "1", "1", "4"],
+              "shown": [
+                null,
+                "1",
+                "1",
+                "4"
+              ],
               "more": 3
             }
           }
@@ -1431,7 +1474,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -1533,7 +1578,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -1611,7 +1660,12 @@
           {
             "name": "a_days",
             "values": {
-              "shown": ["0", "0", "2", "2"],
+              "shown": [
+                "0",
+                "0",
+                "2",
+                "2"
+              ],
               "more": 3
             }
           }
@@ -1899,7 +1953,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -1993,7 +2049,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2053,7 +2112,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2113,7 +2174,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2177,7 +2240,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2329,7 +2394,13 @@
                 }
               }
             ],
-            "fields": [null, null, null, null, null],
+            "fields": [
+              null,
+              null,
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2411,7 +2482,12 @@
           {
             "name": "sla_days",
             "values": {
-              "shown": ["1", "1", "2", "3"],
+              "shown": [
+                "1",
+                "1",
+                "2",
+                "3"
+              ],
               "more": 3
             }
           }
@@ -2510,7 +2586,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2562,7 +2640,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -2648,7 +2728,12 @@
           {
             "name": "sla_status",
             "values": {
-              "shown": ["within", "within", "within", "within"],
+              "shown": [
+                "within",
+                "within",
+                "within",
+                "within"
+              ],
               "more": 3
             }
           }
@@ -2895,7 +2980,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -2989,7 +3076,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3049,7 +3139,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3109,7 +3201,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3209,7 +3303,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3299,7 +3397,12 @@
           {
             "name": "flag",
             "values": {
-              "shown": ["holiday", "ok", "over", "over"],
+              "shown": [
+                "holiday",
+                "ok",
+                "over",
+                "over"
+              ],
               "more": 3
             }
           }
@@ -3725,7 +3828,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -3852,7 +3957,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3912,7 +4021,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -3998,7 +4109,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": null
           },
           {
@@ -4100,7 +4213,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4168,7 +4284,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4236,7 +4354,9 @@
                 }
               }
             ],
-            "fields": [null],
+            "fields": [
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4344,7 +4464,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4444,7 +4568,11 @@
                 }
               }
             ],
-            "fields": [null, null, null],
+            "fields": [
+              null,
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4538,7 +4666,12 @@
           {
             "name": "holiday_count",
             "values": {
-              "shown": ["2", "2", "2", "2"],
+              "shown": [
+                "2",
+                "2",
+                "2",
+                "2"
+              ],
               "more": 3
             }
           }
@@ -4647,7 +4780,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -4713,28 +4849,40 @@
           {
             "name": "Intake",
             "values": {
-              "shown": ["0", "0"],
+              "shown": [
+                "0",
+                "0"
+              ],
               "more": 0
             }
           },
           {
             "name": "Review",
             "values": {
-              "shown": ["1", "2"],
+              "shown": [
+                "1",
+                "2"
+              ],
               "more": 0
             }
           },
           {
             "name": "Pending",
             "values": {
-              "shown": ["2", null],
+              "shown": [
+                "2",
+                null
+              ],
               "more": 0
             }
           },
           {
             "name": "Complete",
             "values": {
-              "shown": ["2", "2"],
+              "shown": [
+                "2",
+                "2"
+              ],
               "more": 0
             }
           }
@@ -4840,7 +4988,10 @@
                 }
               }
             ],
-            "fields": [null, null],
+            "fields": [
+              null,
+              null
+            ],
             "ending": {
               "kind": "allowed"
             }

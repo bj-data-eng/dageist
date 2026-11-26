@@ -252,8 +252,18 @@
     "path",
     "pairs"
   ],
-  "valueTypes": ["integer", "float", "string", "date", "any"],
-  "parameterShapes": ["one", "many", "perItem"],
+  "valueTypes": [
+    "integer",
+    "float",
+    "string",
+    "date",
+    "any"
+  ],
+  "parameterShapes": [
+    "one",
+    "many",
+    "perItem"
+  ],
   "parameterForms": [
     {
       "shape": "many",
@@ -400,8 +410,20 @@
       }
     }
   ],
-  "optionKinds": ["flag", "choice"],
-  "defaultKinds": ["required", "none", "flag", "integer", "float", "text", "empty", "other"],
+  "optionKinds": [
+    "flag",
+    "choice"
+  ],
+  "defaultKinds": [
+    "required",
+    "none",
+    "flag",
+    "integer",
+    "float",
+    "text",
+    "empty",
+    "other"
+  ],
   "settingKinds": [
     "unset",
     "flag",
@@ -484,13 +506,46 @@
     "Array(Null, 2)",
     "Array(Decimal(10, 2), 2)"
   ],
-  "valueShapes": ["one", "many", "counted"],
-  "afterKinds": ["start", "value", "condition"],
-  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
-  "resolutions": ["dtype", "several", "unfinished", "noContext", "refused"],
-  "causes": ["unknownTable", "unknownInput", "build", "notAllowed", "polars"],
-  "refusalSources": ["polars", "rule", "structure"],
-  "stages": ["schema", "rows", "empty"],
+  "valueShapes": [
+    "one",
+    "many",
+    "counted"
+  ],
+  "afterKinds": [
+    "start",
+    "value",
+    "condition"
+  ],
+  "conditionStates": [
+    "when",
+    "then",
+    "chainedWhen",
+    "chainedThen"
+  ],
+  "resolutions": [
+    "dtype",
+    "several",
+    "unfinished",
+    "noContext",
+    "refused"
+  ],
+  "causes": [
+    "unknownTable",
+    "unknownInput",
+    "build",
+    "notAllowed",
+    "polars"
+  ],
+  "refusalSources": [
+    "polars",
+    "rule",
+    "structure"
+  ],
+  "stages": [
+    "schema",
+    "rows",
+    "empty"
+  ],
   "rules": [
     {
       "name": "arrays-meet-at-one-width",
@@ -593,9 +648,60 @@
       "statement": "the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name"
     }
   ],
-  "outcomes": ["valid", "refused", "incomplete", "notRun"],
-  "rowsStates": ["notCounted", "notReached", "counted", "failed"],
-  "changes": ["added", "replaced"],
+  "notKnown": [
+    {
+      "name": "the-starts-dtype",
+      "because": "the dtype of the start is not given"
+    },
+    {
+      "name": "the-results-dtype",
+      "because": "the dtype that the arguments decide is not known"
+    },
+    {
+      "name": "the-fields-of-a-struct",
+      "because": "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said"
+    },
+    {
+      "name": "an-unnest-as-a-key",
+      "because": "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known"
+    },
+    {
+      "name": "an-unnest-of-no-field",
+      "because": "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings"
+    },
+    {
+      "name": "an-open-number-in-a-key",
+      "because": "a number typed without a dtype stays open in a struct that is a join's key, and Polars does not match it with the other table's key as its dtype resolves (Polars issue draft 23)"
+    },
+    {
+      "name": "several-columns-of-a-field-read",
+      "because": "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort"
+    },
+    {
+      "name": "arithmetic-on-a-struct",
+      "because": "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly"
+    },
+    {
+      "name": "structs-of-other-fields-meet",
+      "because": "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are"
+    }
+  ],
+  "outcomes": [
+    "valid",
+    "refused",
+    "incomplete",
+    "notRun"
+  ],
+  "rowsStates": [
+    "notCounted",
+    "notReached",
+    "counted",
+    "failed"
+  ],
+  "changes": [
+    "added",
+    "replaced"
+  ],
   "states": [
     {
       "outcome": "valid",
@@ -712,7 +818,10 @@
       "after": "notRun"
     }
   ],
-  "editAnswers": ["edited", "refused"],
+  "editAnswers": [
+    "edited",
+    "refused"
+  ],
   "problemKinds": [
     "noStep",
     "stepChanged",
@@ -770,7 +879,18 @@
     "pairs",
     "partOfStep"
   ],
-  "inputKinds": ["table", "value", "list"],
-  "origins": ["node", "column", "parameter"],
-  "cells": ["text", "null"]
+  "inputKinds": [
+    "table",
+    "value",
+    "list"
+  ],
+  "origins": [
+    "node",
+    "column",
+    "parameter"
+  ],
+  "cells": [
+    "text",
+    "null"
+  ]
 }

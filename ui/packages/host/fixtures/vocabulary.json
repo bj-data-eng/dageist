@@ -1,6 +1,18 @@
 {
-  "outer": ["select", "filter", "sort", "join_left", "join_right", "pivot_aggregate"],
-  "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
+  "outer": [
+    "select",
+    "filter",
+    "sort",
+    "join_left",
+    "join_right",
+    "pivot_aggregate"
+  ],
+  "nested": [
+    "over.partition_by",
+    "over.order_by",
+    "condition.predicate",
+    "condition.value"
+  ],
   "rules": [
     "arrays-meet-at-one-width",
     "condition-predicate-is-boolean",
@@ -28,13 +40,48 @@
     "window-input-is-not-widened",
     "written-names-are-distinct"
   ],
-  "stages": ["schema", "rows", "empty"],
-  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
-  "valueShapes": ["one", "many", "counted"],
-  "changes": ["added", "replaced"],
-  "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "stale", "unknownName", "failed"],
-  "applies": ["expression", "frame", "function", "condition"],
-  "valueTypes": ["integer", "float", "string", "date", "any"],
+  "stages": [
+    "schema",
+    "rows",
+    "empty"
+  ],
+  "conditionStates": [
+    "when",
+    "then",
+    "chainedWhen",
+    "chainedThen"
+  ],
+  "valueShapes": [
+    "one",
+    "many",
+    "counted"
+  ],
+  "changes": [
+    "added",
+    "replaced"
+  ],
+  "errorKinds": [
+    "noSuchStep",
+    "notRun",
+    "refused",
+    "limit",
+    "stale",
+    "unknownName",
+    "failed"
+  ],
+  "applies": [
+    "expression",
+    "frame",
+    "function",
+    "condition"
+  ],
+  "valueTypes": [
+    "integer",
+    "float",
+    "string",
+    "date",
+    "any"
+  ],
   "settings": [
     "unset",
     "flag",
