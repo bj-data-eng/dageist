@@ -28,6 +28,9 @@ pub(crate) const LAYOUT: &str = "layout.json";
 pub(crate) const IGNORE: &str = ".gitignore";
 /// The folder of the application's own state for this workspace, which is never committed.
 pub(crate) const LOCAL: &str = ".dageist";
+/// The folder of data files a workspace's sources read and outputs write, which is never
+/// committed: a workspace's history holds its graph, not its data.
+pub(crate) const DATA: &str = "data";
 /// The folder that holds a folder for each node.
 const NODES: &str = "nodes";
 /// A node's own file, in its folder.
@@ -37,7 +40,7 @@ pub(crate) const STEPS: &str = "steps.json";
 
 /// The text of the `.gitignore` a workspace holds.
 pub(crate) fn ignore_text() -> String {
-    format!("{LOCAL}/\n")
+    format!("{LOCAL}/\n{DATA}/\n")
 }
 
 /// Every file of a workspace, by its path in the workspace with `/` between folders.

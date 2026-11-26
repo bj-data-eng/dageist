@@ -41,6 +41,7 @@ pub struct dageist_workspace::Workspace
 impl dageist_workspace::Workspace
 pub fn dageist_workspace::Workspace::close(self) -> core::result::Result<(), dageist_workspace::WorkspaceError>
 pub fn dageist_workspace::Workspace::create(root: &std::path::Path, saved: &dageist_workspace::Saved, author: dageist_workspace::Author, options: dageist_workspace::Options) -> core::result::Result<Self, dageist_workspace::WorkspaceError>
+pub fn dageist_workspace::Workspace::create_from_folder(source: &std::path::Path, root: &std::path::Path, author: dageist_workspace::Author, options: dageist_workspace::Options) -> core::result::Result<(Self, dageist_workspace::Saved), dageist_workspace::WorkspaceError>
 pub fn dageist_workspace::Workspace::history(&self, node: &dageist_graph::names::NodeId) -> core::result::Result<alloc::vec::Vec<dageist_workspace::Change>, dageist_workspace::WorkspaceError>
 pub fn dageist_workspace::Workspace::open(root: &std::path::Path, author: dageist_workspace::Author, options: dageist_workspace::Options) -> core::result::Result<(Self, dageist_workspace::Saved), dageist_workspace::WorkspaceError>
 pub fn dageist_workspace::Workspace::repack(&mut self) -> core::result::Result<(), dageist_workspace::WorkspaceError>
