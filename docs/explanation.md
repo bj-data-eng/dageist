@@ -226,16 +226,54 @@ application, the commits are made by `dageist <workspace@dageist.invalid>`; the
 `.invalid` domain can never be registered, so no account is credited with them.
 A save that fails is reported as the edit's failure, but the edit is made: the
 session holds it, and the next save commits it with that save's own message.
-The application starts on the sample, kept in a workspace made for each run in
-the run's temporary folder. "Open workspace…" in the side panel picks another
-workspace's folder in the system's dialog: the host reads its latest commit,
-holds it in place of the one it held, and closes that one, packing it whole. A
-folder that holds no workspace is refused, and the one held stays.
+The application starts on [the sample workspace](#the-sample-workspace). "Open
+workspace…" in the side panel picks another workspace's folder in the system's
+dialog: the host reads its latest commit, holds it in place of the one it held,
+and closes that one, packing it whole. A folder that holds no workspace is
+refused, and the one held stays.
 
-The window packs the workspace it holds whole as it exits, and the run then
-removes its temporary folder. The bridge is stopped by a signal, so it packs its
-workspace only every 100 commits and leaves the temporary folder for the system
-to clear.
+The window packs the workspace it holds whole as it exits. The bridge is
+stopped by a signal, so it packs its workspace only every 100 commits.
+
+### The Sample Workspace
+
+The sample the application opens on is a workspace's files in the repository,
+in [samples/orders](../samples/orders/), with its data under `data/`: orders
+and products as Parquet files, customers and product categories as CSV files.
+The host's build embeds the folder in the application. The first start unpacks
+it into the application's data folder, the one Tauri keeps for the
+application's identifier, and makes it a workspace there; every later start
+opens that workspace as it was left, so edits to the sample and their history
+are kept. A release that ships a changed sample leaves a copy already unpacked
+as it is; to see the shipped sample again, remove `samples/orders` from the
+application's data folder, and the next start unpacks it anew. The application
+and the bridge each run on the real data folder, so running either from a
+checkout unpacks the sample there.
+
+The workspace is made whole in a folder of its own beside its place and moved
+into place by one rename, so two first starts at once leave one whole sample,
+and a start that stops part way leaves nothing in its place. While a workspace
+is open, it holds a lock on `.dageist/lock` in its folder, so the window and the
+bridge cannot hold the sample at once: the second to start is refused, saying
+the workspace is open in another dageist, until the first closes it.
+
+The sample's data is small and written by hand: `orders.parquet` holds twelve
+orders (`order_id`, `customer_id`, `product_id`, `quantity` as Int64 and
+`ordered_at` as Datetime in microseconds), `products.parquet` six products
+(`product_id`, `product`, `category` and `unit_price` as Float64), and the CSV
+files four customers with their regions and three categories. The Parquet files
+are written by [samples/write_orders_data.py](../samples/write_orders_data.py)
+with Python Polars of the release in `vendor/polars`.
+
+Its transforms are chained, each starting from the table of the one before:
+*Order lines* joins each order to its product, works out the line's total and
+keeps the lines of at least the Parameters node's `min_quantity`; *Customer
+lines* starts from them and joins each customer's region; *Region summary*
+starts from those and pivots the totals into a column for each category, named
+from the table *Category names* gives. A test in the core works the sample out
+and checks the totals it gives against totals worked out by hand from its rows.
+The sample's files are the ones a save writes, so saving it unchanged makes no
+commit.
 
 A node's history is the commits that changed its folder, read from the branch's
 one line of commits; moving its box is in the history of the layout, not of the
@@ -2053,12 +2091,11 @@ a Python rendering of every step would either not run as written or give slightl
 different results, so the blocks, the summaries and the previews are what say what
 a step does.
 
-The claim-timing steps the step editor opens with, the seven claim rows they run
-on and the inputs connected to them are one sample in the engine,
-`dageist_engine::claim_timing`. The engine's and the host's tests run it, so there
-is one copy. The application opens on it as a graph: its tables are written as
-Parquet files for the run and read by sources, its two values are a Parameters
-node, and its steps are a transform's.
+The claim-timing steps, the seven claim rows they run on and the inputs
+connected to them are one sample in the engine, `dageist_engine::claim_timing`,
+which the engine's and the host's tests still run, and from which the host's
+snapshots for the view are written. The application no longer opens on it: it
+opens on [the sample workspace](#the-sample-workspace).
 
 ## Which Combinations Polars Allows
 

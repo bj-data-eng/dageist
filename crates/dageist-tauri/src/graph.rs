@@ -15,7 +15,9 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use dageist::{Problem, Session, Workings};
+#[cfg(test)]
 use dageist_engine::claim_timing::ClaimTiming;
+#[cfg(test)]
 use dageist_engine::document::Document;
 use dageist_graph::{
     Body, Edit, File, Fit, Format, Frame, InputKind, InputName, Kind, Name, NodeId, Parameter,
@@ -69,14 +71,36 @@ impl Workspace {
         }
     }
 
-    /// The workspace the application opens on: the claim-timing sample as a graph, its tables
-    /// written as Parquet files in `tables` under `directory`, kept in a new workspace on disk in
+    /// The workspace the application opens on: the sample workspace in the data folder `data`,
+    /// made there from the files the application carries the first time, and opened as it was
+    /// left after that. Every revision of its session starts at `first_revision`.
+    ///
+    /// # Errors
+    ///
+    /// When the sample cannot be made, or the workspace in its folder cannot be opened.
+    pub fn sample(data: &Path, first_revision: u64) -> Result<Self, ErrorView> {
+        let root = crate::sample_workspace::sample_root(data);
+        crate::sample_workspace::unpack(&root)?;
+        let (kept, saved) = dageist::workspace::Workspace::open(
+            &root,
+            dageist::unsigned_author(),
+            dageist::workspace::Options::default(),
+        )
+        .map_err(|error| ErrorView::new(format!("opening {}: {error}", root.display())))?;
+        let session = Session::from_saved(saved, first_revision)
+            .map_err(|error| ErrorView::new(format!("opening {}: {error}", root.display())))?;
+        Ok(Self::kept(session, kept))
+    }
+
+    /// The claim-timing sample as a graph, which the tests still use: its tables written as
+    /// Parquet files in `tables` under `directory`, kept in a new workspace on disk in
     /// `workspace` under it, with every revision starting at `revision`.
     ///
     /// # Errors
     ///
     /// When the tables cannot be written, the sample's steps cannot be read, or the workspace
     /// cannot be made.
+    #[cfg(test)]
     pub fn starting(revision: u64, directory: &Path) -> Result<Self, ErrorView> {
         let steps = Document::read(ClaimTiming::STEPS_JSON)
             .map_err(|error| ErrorView::new(format!("reading the sample steps: {error}")))?;
@@ -121,27 +145,52 @@ impl Workspace {
     /// Opens the workspace on disk in `folder` in place of the one held, with every revision of
     /// its session starting at `first_revision`, and closes the one held, packing it whole. The
     /// workspace is read before anything is let go, so one that cannot be opened leaves the one
-    /// held as it was.
+    /// held as it was. Opening the workspace held keeps it as it is.
     ///
     /// # Errors
     ///
     /// When `folder` holds no workspace this application reads, or the application is closing.
     pub(crate) fn open(&self, folder: &Path, first_revision: u64) -> Result<(), ErrorView> {
-        let mut session = self.lock();
-        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
-        if matches!(*kept, Keeping::Closed) {
-            return Err(ErrorView::new(
-                "the application is closing, so no workspace is opened",
-            ));
+        let closing = || ErrorView::new("the application is closing, so no workspace is opened");
+        {
+            let kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+            if matches!(*kept, Keeping::Closed) {
+                return Err(closing());
+            }
+            // The workspace held is open already: opening it again keeps it as it is.
+            if let (Keeping::In(held), Ok(asked)) = (&*kept, folder.canonicalize())
+                && held.root() == asked
+            {
+                return Ok(());
+            }
         }
-        let (opened, saved) = dageist::workspace::Workspace::open(
+        // The workspace asked for is read with nothing of the host's locked, so other commands go
+        // on while it waits on a lock another process holds.
+        let (opened, saved) = match dageist::workspace::Workspace::open(
             folder,
             dageist::unsigned_author(),
             dageist::workspace::Options::default(),
-        )
-        .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        ) {
+            Ok(opened) => opened,
+            // An opening of the same folder made at the same time took it first, so it is the
+            // workspace held now, which opening again keeps as it is.
+            Err(dageist::workspace::WorkspaceError::Held(_)) if self.holds(folder) => {
+                return Ok(());
+            }
+            Err(error) => {
+                return Err(ErrorView::new(format!(
+                    "opening {}: {error}",
+                    folder.display()
+                )));
+            }
+        };
         let read = Session::from_saved(saved, first_revision)
             .map_err(|error| ErrorView::new(format!("opening {}: {error}", folder.display())))?;
+        let mut session = self.lock();
+        let mut kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        if matches!(*kept, Keeping::Closed) {
+            return Err(closing());
+        }
         *session = read;
         let held = std::mem::replace(&mut *kept, Keeping::In(Box::new(opened)));
         if let Keeping::In(held) = held {
@@ -153,6 +202,12 @@ impl Workspace {
             }
         }
         Ok(())
+    }
+
+    /// Whether the workspace held is the one in `folder`.
+    fn holds(&self, folder: &Path) -> bool {
+        let kept = self.kept.lock().unwrap_or_else(PoisonError::into_inner);
+        matches!((&*kept, folder.canonicalize()), (Keeping::In(held), Ok(asked)) if held.root() == asked)
     }
 
     /// Closes the workspace on disk, packing it whole, once the edit being made is done. An edit
@@ -193,6 +248,7 @@ impl Workspace {
 // -- The starting graph -------------------------------------------------------------------
 
 /// Makes `edit` on `session`, which the starting graph is built so that every edit is made.
+#[cfg(test)]
 fn make(session: &mut Session, edit: &Edit) -> Result<Option<NodeId>, ErrorView> {
     let revision = session.graph_revision();
     session
@@ -203,11 +259,13 @@ fn make(session: &mut Session, edit: &Edit) -> Result<Option<NodeId>, ErrorView>
 
 /// The id of the starting graph's node added `number`th. The starting graph's ids are fixed, so
 /// that its views are the same on every run, and sort in the order the nodes are added.
+#[cfg(test)]
 fn starting_id(number: u8) -> NodeId {
     NodeId::new(format!("00000000-0000-7000-8000-{number:012}"))
         .unwrap_or_else(|error| unreachable!("a starting id: {error}"))
 }
 
+#[cfg(test)]
 fn add_named(
     session: &mut Session,
     number: u8,
@@ -228,6 +286,7 @@ fn add_named(
     .ok_or_else(|| ErrorView::new("building the starting graph: a node was not added"))
 }
 
+#[cfg(test)]
 fn add_source(
     session: &mut Session,
     number: u8,
@@ -248,16 +307,19 @@ fn add_source(
     Ok(node)
 }
 
+#[cfg(test)]
 fn input(text: &str) -> InputName {
     InputName::new(text).unwrap_or_else(|error| unreachable!("a starting input: {error}"))
 }
 
+#[cfg(test)]
 fn parameter(text: &str) -> ParameterName {
     ParameterName::new(text).unwrap_or_else(|error| unreachable!("a starting parameter: {error}"))
 }
 
 /// The claim-timing sample as a graph: a source for each of its tables, a Parameters node with
 /// its two values, the transform with `steps`, and an output with no file.
+#[cfg(test)]
 pub(crate) fn starting_session(
     revision: u64,
     directory: &Path,

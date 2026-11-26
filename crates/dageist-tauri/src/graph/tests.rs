@@ -512,3 +512,169 @@ fn a_folder_that_holds_no_workspace_is_not_opened_and_leaves_the_one_held() {
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// The names of the nodes of `view`, in its order.
+fn names(view: &Value) -> Vec<String> {
+    view["nodes"]
+        .as_array()
+        .expect("nodes")
+        .iter()
+        .map(|node| node["name"].as_str().expect("a name").to_owned())
+        .collect()
+}
+
+#[test]
+fn the_application_starts_on_the_sample_workspace_and_keeps_it_from_one_start_to_the_next() {
+    let data = folder();
+    let first = Workspace::sample(&data, 0).expect("the sample");
+    let root = data.join("samples").join("orders");
+    let view = serde_json::to_value(graph_view(&first)).expect("a view");
+    let mut shown = names(&view);
+    shown.sort();
+    assert_eq!(
+        shown,
+        [
+            "Categories",
+            "Category names",
+            "Customer lines",
+            "Customers",
+            "Order lines",
+            "Orders",
+            "Parameters",
+            "Products",
+            "Region summary",
+            "Region summary output",
+        ]
+    );
+    for node in view["nodes"].as_array().expect("nodes") {
+        if node["kind"] != "output" {
+            assert_eq!(node["problems"], json!([]), "{}", node["name"]);
+        }
+    }
+    // The data was unpacked beside the graph, where git does not see it.
+    for file in [
+        "orders.parquet",
+        "products.parquet",
+        "customers.csv",
+        "categories.csv",
+    ] {
+        assert!(root.join("data").join(file).is_file(), "{file}");
+    }
+    assert_eq!(git(&root, &["log", "--format=%s"]), "Make the workspace\n");
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+
+    let summary = view["nodes"]
+        .as_array()
+        .expect("nodes")
+        .iter()
+        .find(|node| node["name"] == "Region summary")
+        .expect("the summary")["id"]
+        .as_str()
+        .expect("an id")
+        .to_owned();
+    let rename: super::GraphEditRequest = serde_json::from_value(
+        json!({ "edit": "rename", "node": summary, "name": "Totals by region" }),
+    )
+    .expect("a request");
+    super::edit_graph_view(&first, graph_view(&first).revision, &rename).expect("renamed");
+    first.close().expect("closed");
+
+    // The next start opens the sample as it was left, and makes no new one.
+    let second = Workspace::sample(&data, 1).expect("the sample again");
+    let again = names(&serde_json::to_value(graph_view(&second)).expect("a view"));
+    assert!(again.contains(&"Totals by region".to_owned()), "{again:?}");
+    assert_eq!(
+        git(&root, &["log", "--format=%s"]),
+        "Rename Region summary to Totals by region\nMake the workspace\n"
+    );
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn a_sample_folder_with_files_but_no_workspace_is_not_overwritten() {
+    let data = folder();
+    let root = data.join("samples").join("orders");
+    std::fs::create_dir_all(&root).expect("a folder");
+    std::fs::write(root.join("notes.txt"), b"mine").expect("written");
+    Workspace::sample(&data, 0).expect_err("not a workspace");
+    assert_eq!(
+        std::fs::read(root.join("notes.txt")).expect("kept"),
+        b"mine"
+    );
+    let left: Vec<_> = std::fs::read_dir(data.join("samples"))
+        .expect("the folder")
+        .map(|entry| entry.expect("an entry").file_name())
+        .collect();
+    assert_eq!(left, ["orders"], "the files unpacked beside it are removed");
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn two_starts_that_unpack_the_sample_at_once_leave_one_whole_sample() {
+    let data = folder();
+    let root = crate::sample_workspace::sample_root(&data);
+    // An empty folder in the sample's place is no sample.
+    std::fs::create_dir_all(&root).expect("a folder");
+    let starts: Vec<_> = (0..4)
+        .map(|_| {
+            let root = root.clone();
+            std::thread::spawn(move || crate::sample_workspace::unpack(&root))
+        })
+        .collect();
+    for start in starts {
+        start.join().expect("the start ends").expect("unpacked");
+    }
+    let sample = Workspace::sample(&data, 0).expect("the sample opens");
+    assert_eq!(git(&root, &["log", "--format=%s"]), "Make the workspace\n");
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    let left: Vec<_> = std::fs::read_dir(data.join("samples"))
+        .expect("the folder")
+        .map(|entry| entry.expect("an entry").file_name())
+        .collect();
+    assert_eq!(left, ["orders"], "what each start unpacked into is removed");
+    drop(sample);
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn a_second_host_on_the_sample_is_refused_while_the_first_holds_it() {
+    let data = folder();
+    let first = Workspace::sample(&data, 0).expect("the sample");
+    let refused = Workspace::sample(&data, 1).expect_err("held");
+    let message = serde_json::to_value(&refused).expect("a view")["message"]
+        .as_str()
+        .expect("a message")
+        .to_owned();
+    assert!(message.contains("open in another dageist"), "{message}");
+    // Opening the workspace held, in the host that holds it, keeps it as it is.
+    let root = crate::sample_workspace::sample_root(&data);
+    let before = graph_view(&first).revision;
+    first.open(&root, 99).expect("the same workspace");
+    assert_eq!(graph_view(&first).revision, before);
+    first.close().expect("closed");
+    Workspace::sample(&data, 2).expect("the sample once it is closed");
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+// A folder is opened to set its time, which Unix allows.
+#[cfg(unix)]
+#[test]
+fn what_a_start_that_stopped_left_beside_the_sample_is_removed_once_it_is_old() {
+    let data = folder();
+    let samples = data.join("samples");
+    let left = samples.join(".unpacking-files-1-1");
+    let recent = samples.join(".unpacking-files-2-2");
+    for folder in [&left, &recent] {
+        std::fs::create_dir_all(folder).expect("a folder");
+    }
+    // A folder's age is its last change: the one left was changed two hours ago.
+    let two_hours_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 60 * 60);
+    std::fs::File::open(&left)
+        .expect("the folder")
+        .set_modified(two_hours_ago)
+        .expect("aged");
+    Workspace::sample(&data, 0).expect("the sample");
+    assert!(!left.exists(), "the old folder is removed");
+    assert!(recent.exists(), "a recent one may be another start's");
+    let _ = std::fs::remove_dir_all(&data);
+}

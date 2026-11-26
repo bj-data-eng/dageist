@@ -5,8 +5,10 @@
 //! of every node, and a folder for each node under `nodes/`, named by the node's id, which holds
 //! `node.json` and, for a transform, `steps.json`, its step document. Its `.dageist/` folder holds
 //! the application's own state, and its `data/` folder the data files its sources read; neither is
-//! committed. [`Workspace::create_from_folder`] makes a workspace from such files in a folder that
-//! is not a repository, such as a sample shipped with the application.
+//! committed. While a workspace is open, it holds a lock on `.dageist/lock`, so another opening
+//! of it, here or in another process, is refused until it is closed.
+//! [`Workspace::create_from_folder`] makes a workspace from such files in a folder that is not a
+//! repository, such as a sample shipped with the application.
 //!
 //! [`Workspace::save`] writes a graph, its layout and its documents as those files and commits
 //! them as one commit on the branch, then makes the files on disk match it. Saving and committing
@@ -16,8 +18,8 @@
 //!
 //! git keeps each new object as a file of its own until it is packed. A workspace packs the
 //! objects of every so many commits as it goes, each file's version a delta against the version
-//! before it, and [`Workspace::close`] packs what the refs, git's index, the pseudo refs and the reflogs reach into one
-//! pack.
+//! before it, and [`Workspace::close`] packs what the refs, git's index, the pseudo refs and the
+//! reflogs reach into one pack.
 //!
 //! A node's [history](Workspace::history) is the commits that changed its folder, read from the
 //! branch's one line of commits.
@@ -52,6 +54,8 @@ pub struct Saved {
 pub enum WorkspaceError {
     /// The folder a workspace is made in already holds something.
     NotEmpty(PathBuf),
+    /// The workspace in this folder is open already, in this application or another.
+    Held(PathBuf),
     /// A file on disk could not be read or written.
     Io {
         /// The file or folder.
@@ -94,6 +98,11 @@ impl fmt::Display for WorkspaceError {
             Self::NotEmpty(path) => write!(
                 formatter,
                 "{} already holds files, so no workspace is made there",
+                path.display()
+            ),
+            Self::Held(path) => write!(
+                formatter,
+                "the workspace in {} is open in another dageist; close it there to open it here",
                 path.display()
             ),
             Self::Io { path, message } => write!(formatter, "{}: {message}", path.display()),

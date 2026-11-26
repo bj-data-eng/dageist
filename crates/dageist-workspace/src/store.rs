@@ -82,6 +82,10 @@ pub struct Workspace {
     /// Whether the files on disk and git's index match the latest commit; not while a save that
     /// failed after its commit is still to be finished.
     in_step: bool,
+    /// The file in the workspace's `.dageist/` folder whose lock says the workspace is open here.
+    /// The system lets the lock go when the file is closed, as the workspace is dropped or the
+    /// process ends however it ends.
+    _held: std::fs::File,
 }
 
 impl std::fmt::Debug for Workspace {
@@ -113,6 +117,7 @@ impl Workspace {
         // What is saved is checked before the repository is made, so a refusal leaves the
         // folder empty.
         files::files_of(saved, &root)?;
+        let held = hold(&root)?;
         let repo = gix::init(&root).map_err(|error| git("making the repository")(&error))?;
         let mut workspace = Self {
             root,
@@ -124,6 +129,7 @@ impl Workspace {
             written: Vec::new(),
             since_pack: 0,
             in_step: true,
+            _held: held,
         };
         workspace.save(saved, "Make the workspace")?;
         Ok(workspace)
@@ -180,36 +186,53 @@ impl Workspace {
     /// # Errors
     ///
     /// When `root` is not a repository, its branch has no commit, or the commit's files are not
-    /// of the format or describe a graph no edit could make.
+    /// of the format or describe a graph no edit could make; or when the workspace is open
+    /// already, here or in another process ([`Held`]).
+    ///
+    /// [`Held`]: WorkspaceError::Held
     pub fn open(
         root: &Path,
         author: Author,
         options: Options,
     ) -> Result<(Self, Saved), WorkspaceError> {
         let root = root.canonicalize().map_err(io(root))?;
-        let repo = gix::open(&root).map_err(|error| git("opening the repository")(&error))?;
-        let head = repo
-            .head_id()
-            .map_err(|_| WorkspaceError::NoCommit)?
-            .detach();
-        let mut workspace = Self {
-            root,
-            repo,
-            author,
-            options,
-            head: Some(head),
-            tree: BTreeMap::new(),
-            written: Vec::new(),
-            since_pack: 0,
-            in_step: true,
-        };
-        let tree_id = workspace.commit_tree(head)?;
-        workspace.tree = workspace.read_tree(tree_id)?;
-        let files = workspace.files()?;
-        let saved = files::saved_of(&files, &workspace.root)?;
-        workspace.restore(&files)?;
-        workspace.write_index(tree_id)?;
-        Ok((workspace, saved))
+        // The lock is taken before the branch is read, so that what is read is not changed by a
+        // process that held it. A refusal removes the `.dageist` folder when the lock made it,
+        // so a folder that is no workspace is left as it was.
+        let local = root.join(files::LOCAL);
+        let made_local = !local.exists();
+        let held = hold(&root)?;
+        let opened = (|| {
+            let repo = gix::open(&root).map_err(|error| git("opening the repository")(&error))?;
+            let head = repo
+                .head_id()
+                .map_err(|_| WorkspaceError::NoCommit)?
+                .detach();
+            let mut workspace = Self {
+                root: root.clone(),
+                repo,
+                author,
+                options,
+                head: Some(head),
+                tree: BTreeMap::new(),
+                written: Vec::new(),
+                since_pack: 0,
+                in_step: true,
+                _held: held,
+            };
+            let tree_id = workspace.commit_tree(head)?;
+            workspace.tree = workspace.read_tree(tree_id)?;
+            let files = workspace.files()?;
+            let saved = files::saved_of(&files, &workspace.root)?;
+            workspace.restore(&files)?;
+            workspace.write_index(tree_id)?;
+            Ok((workspace, saved))
+        })();
+        // The workspace, and the lock with it, is let go on a refusal before its folder goes.
+        if opened.is_err() && made_local {
+            let _ = std::fs::remove_dir_all(&local);
+        }
+        opened
     }
 
     /// The folder the workspace is in.
@@ -879,6 +902,43 @@ impl Workspace {
         Ok(())
     }
 }
+
+/// Takes the lock that says the workspace in `root` is open here, in the file `.dageist/lock`.
+///
+/// # Errors
+///
+/// When another workspace holds it, in this process or another, or the file cannot be made.
+fn hold(root: &Path) -> Result<std::fs::File, WorkspaceError> {
+    let folder = root.join(files::LOCAL);
+    std::fs::create_dir_all(&folder).map_err(io(&folder))?;
+    let path = folder.join("lock");
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .map_err(io(&path))?;
+    // A lock let go can stay held for a moment: a process being started holds a copy of every
+    // open file until it runs its program. So a lock held is asked for again for a while before
+    // the workspace is taken to be open elsewhere.
+    let deadline = std::time::Instant::now() + HOLD_WAIT;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(std::fs::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(WorkspaceError::Held(root.to_path_buf()));
+            }
+            Err(std::fs::TryLockError::Error(error)) => return Err(io(&path)(error)),
+        }
+    }
+}
+
+/// How long a lock held by something else is asked for again before the workspace is taken to be
+/// open elsewhere.
+const HOLD_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Refuses `root` when it holds anything; a folder that is missing or empty is one a workspace
 /// can be made in.

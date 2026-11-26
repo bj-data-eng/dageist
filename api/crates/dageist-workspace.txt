@@ -9,6 +9,7 @@ pub dageist_workspace::WorkspaceError::Format::path: alloc::string::String
 pub dageist_workspace::WorkspaceError::Git
 pub dageist_workspace::WorkspaceError::Git::context: &'static str
 pub dageist_workspace::WorkspaceError::Git::message: alloc::string::String
+pub dageist_workspace::WorkspaceError::Held(std::path::PathBuf)
 pub dageist_workspace::WorkspaceError::Io
 pub dageist_workspace::WorkspaceError::Io::message: alloc::string::String
 pub dageist_workspace::WorkspaceError::Io::path: std::path::PathBuf

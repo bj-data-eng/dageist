@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "Customers",
+  "file": {
+    "path": "data/customers.csv",
+    "format": "csv"
+  }
+}

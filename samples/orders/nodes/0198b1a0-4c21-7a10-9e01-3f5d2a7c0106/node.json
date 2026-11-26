@@ -1,0 +1,25 @@
+{
+  "kind": "transform",
+  "name": "Order lines",
+  "start": {
+    "kind": "table",
+    "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0101"
+  },
+  "inputs": {
+    "min_quantity": {
+      "takes": "value",
+      "from": {
+        "kind": "parameter",
+        "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0105",
+        "name": "min_quantity"
+      }
+    },
+    "products": {
+      "takes": "table",
+      "from": {
+        "kind": "table",
+        "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0102"
+      }
+    }
+  }
+}

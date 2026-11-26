@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "products",
+      "call": {
+        "entry": "LazyFrame.join",
+        "arguments": {
+          "other": {
+            "table": "products"
+          },
+          "left_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "product_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "right_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "product_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "how": {
+            "choice": "left"
+          },
+          "maintain_order": {
+            "choice": "left"
+          }
+        }
+      }
+    },
+    {
+      "id": "line_total",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": [
+                    "line_total"
+                  ]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": [
+                            "quantity"
+                          ]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.mul",
+                        "arguments": {
+                          "other": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.col",
+                                "arguments": {
+                                  "name": {
+                                    "columns": [
+                                      "unit_price"
+                                    ]
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "enough",
+      "call": {
+        "entry": "LazyFrame.filter",
+        "arguments": {
+          "predicates": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "quantity"
+                        ]
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "entry": "Expr.ge",
+                      "arguments": {
+                        "other": {
+                          "expression": {
+                            "start": {
+                              "input": "min_quantity"
+                            },
+                            "then": []
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

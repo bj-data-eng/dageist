@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "Orders",
+  "file": {
+    "path": "data/orders.parquet",
+    "format": "parquet"
+  }
+}

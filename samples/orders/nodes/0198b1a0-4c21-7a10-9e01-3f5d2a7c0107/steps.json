@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "customers",
+      "call": {
+        "entry": "LazyFrame.join",
+        "arguments": {
+          "other": {
+            "table": "customers"
+          },
+          "left_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "customer_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "right_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "customer_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "how": {
+            "choice": "left"
+          },
+          "maintain_order": {
+            "choice": "left"
+          }
+        }
+      }
+    },
+    {
+      "id": "by_region",
+      "call": {
+        "entry": "LazyFrame.sort",
+        "arguments": {
+          "by": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "region"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              },
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": [
+                          "order_id"
+                        ]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

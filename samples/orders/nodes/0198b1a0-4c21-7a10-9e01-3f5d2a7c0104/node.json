@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "Categories",
+  "file": {
+    "path": "data/categories.csv",
+    "format": "csv"
+  }
+}

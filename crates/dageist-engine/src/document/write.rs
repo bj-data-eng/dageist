@@ -14,6 +14,22 @@ impl Document {
     /// gives the same text.
     #[must_use]
     pub fn write(&self) -> String {
+        self.json().to_text()
+    }
+
+    /// The document as JSON text laid out two spaces deep, as a file holds it: the fields of
+    /// [`Document::write`] in the same order, each on a line of its own, and a new line at the
+    /// end. A change to one argument changes the lines that hold it, so the file diffs cleanly.
+    ///
+    /// Reading the text gives a document equal to this one, and writing that gives the same text.
+    #[must_use]
+    pub fn write_indented(&self) -> String {
+        let mut text = self.json().to_indented_text();
+        text.push('\n');
+        text
+    }
+
+    fn json(&self) -> Json {
         Json::Object(vec![
             ("version".to_owned(), Json::integer(VERSION.into())),
             (
@@ -21,7 +37,6 @@ impl Document {
                 Json::Array(self.steps().iter().map(step).collect()),
             ),
         ])
-        .to_text()
     }
 }
 

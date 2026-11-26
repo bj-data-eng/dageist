@@ -233,7 +233,7 @@ impl Session {
     }
 
     /// What a workspace saves of the session: the graph, the layout, and each transform's
-    /// document as the text [`Document::write`] gives.
+    /// document as the text [`Document::write_indented`] gives, which diffs line by line.
     #[must_use]
     pub fn saved(&self) -> Saved {
         Saved {
@@ -242,7 +242,7 @@ impl Session {
             documents: self
                 .documents
                 .iter()
-                .map(|(node, held)| (node.clone(), held.document.write()))
+                .map(|(node, held)| (node.clone(), held.document.write_indented()))
                 .collect(),
         }
     }

@@ -334,6 +334,7 @@ fn each_save_is_one_commit_and_a_save_that_changes_nothing_makes_none() {
         commit.expect("a commit")
     );
     assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    drop(workspace);
     let (_, opened) = Workspace::open(&root, author(), Options::default()).expect("opens");
     assert_eq!(
         opened
@@ -374,6 +375,7 @@ fn removing_a_node_removes_its_folder_from_the_commit_and_the_disk() {
     let tracked = git(&root, &["ls-tree", "-r", "--name-only", "HEAD"]);
     assert!(!tracked.contains(nodes.timing.as_str()), "{tracked}");
     assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    drop(workspace);
     let (_, opened) = Workspace::open(&root, author(), Options::default()).expect("opens");
     assert_eq!(opened, removed);
 }
@@ -761,7 +763,7 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
         std::fs::read(copy.join("data").join("more").join("notes.csv")).expect("copied"),
         b"a\n"
     );
-    assert!(!copy.join(".dageist").exists());
+    assert!(!copy.join(".dageist").join("state").exists());
     assert_eq!(
         git(&copy, &["show", "HEAD:.gitignore"]),
         ".dageist/\ndata/\n"
@@ -778,7 +780,7 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
     assert_eq!(git(&copy, &["status", "--porcelain", "--ignored=no"]), "");
     assert_eq!(
         git(&copy, &["status", "--porcelain", "--ignored"]).trim(),
-        "!! data/"
+        "!! .dageist/\n!! data/"
     );
     // A folder holding something else is refused, and so is making a copy where files are.
     std::fs::write(plain.join("notes.txt"), b"mine").expect("written");
@@ -806,4 +808,62 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
         Workspace::create_from_folder(&plain, &copy, author(), Options::default()),
         Err(WorkspaceError::NotEmpty(_))
     ));
+}
+
+#[test]
+fn a_workspace_open_is_not_opened_again_until_it_is_closed() {
+    let root = folder("held");
+    let (saved, _) = sample(&root);
+    let first = Workspace::create(&root, &saved, author(), Options::default()).expect("made");
+    assert!(matches!(
+        Workspace::open(&root, author(), Options::default()),
+        Err(WorkspaceError::Held(path)) if path == *root
+    ));
+    // The lock is in the workspace's own folder, which git does not see.
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    first.close().expect("closed");
+    Workspace::open(&root, author(), Options::default()).expect("opens once it is closed");
+}
+
+#[test]
+fn a_repository_that_is_no_workspace_is_refused_and_left_as_it_was() {
+    let root = folder("not-a-workspace");
+    git(&root, &["init", "-q"]);
+    std::fs::write(root.join("notes.txt"), b"mine").expect("written");
+    git(&root, &["add", "notes.txt"]);
+    git(
+        &root,
+        &[
+            "-c",
+            "user.name=P",
+            "-c",
+            "user.email=p@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "Notes",
+        ],
+    );
+    assert!(matches!(
+        Workspace::open(&root, author(), Options::default()),
+        Err(WorkspaceError::Format { path, .. }) if path == "workspace.json"
+    ));
+    assert!(!root.join(".dageist").exists());
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+}
+
+#[test]
+fn a_workspace_whose_files_were_removed_on_disk_opens_from_its_commit() {
+    let root = folder("removed-on-disk");
+    let (saved, nodes) = sample(&root);
+    Workspace::create(&root, &saved, author(), Options::default())
+        .expect("made")
+        .close()
+        .expect("closed");
+    std::fs::remove_file(root.join("workspace.json")).expect("removed");
+    std::fs::remove_file(root.join(format!("nodes/{}/node.json", nodes.claims))).expect("removed");
+    let (_, opened) = Workspace::open(&root, author(), Options::default()).expect("opens");
+    assert_eq!(opened, saved);
+    assert!(root.join("workspace.json").is_file());
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
 }
