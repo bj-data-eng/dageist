@@ -1256,6 +1256,268 @@ fn a_missing_comparison_of_a_field_read_from_a_struct_or_with_a_number_given_its
     }
 }
 
+/// A literal of `value` (`{"integer": n}` or `{"float": f}`), given the dtype `word` where it is
+/// one.
+fn literal_of(value: Value, word: Option<&str>) -> Value {
+    let mut arguments = json!({ "value": value });
+    if let Some(word) = word {
+        arguments["dtype"] = dtype(word);
+    }
+    call("polars.lit", arguments)
+}
+
+/// A key that compares the column `x` with the literal, or the literal with the column, by `method`.
+fn compared_with_a_literal(method: &str, literal: &Value, swapped: bool) -> Value {
+    let cast = call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    if swapped {
+        chain(
+            literal.clone(),
+            vec![call(method, json!({ "other": field("x") })), cast],
+        )
+    } else {
+        chain(
+            col_call("x"),
+            vec![
+                call(
+                    method,
+                    json!({ "other": chain(literal.clone(), Vec::new()) }),
+                ),
+                cast,
+            ],
+        )
+    }
+}
+
+#[test]
+fn a_number_given_a_dtype_is_decided_as_polars_coerces_it_for_a_column_of_whole_numbers() {
+    // Polars rounds a literal of 32 or 64 bit floats to the whole number it is, where that number
+    // casts exactly (below 2^24 for 32 bit floats beside the 8 and 16 bit whole numbers, which it
+    // meets in 32 bit floats, and below 2^53 otherwise), and decides the comparison where the column
+    // cannot hold it. It leaves a literal of 16 bit floats or of `Boolean` as it is, and a number
+    // that casts inexactly. A number with no dtype and a whole value is the whole number it is, as a
+    // fraction is no whole number's.
+    let integer = |number: i64| json!({ "integer": number });
+    let float = |number: f64| json!({ "float": number });
+    // The column, the literal, and whether Polars refuses the key.
+    let cases: Vec<(DataType, Value, bool)> = vec![
+        // Whole numbers that no longer cast exactly are kept.
+        (
+            DataType::Int8,
+            literal_of(integer(1_152_921_504_606_846_976), Some("Float64")),
+            false,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(100_000_000), Some("Float32")),
+            false,
+        ),
+        // A 16 bit float and a flag are not rewritten.
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Boolean")),
+            false,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(integer(-1), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(integer(-1), Some("Boolean")),
+            false,
+        ),
+        // Floats that are whole numbers the column cannot hold are decided, typed or not.
+        (DataType::Int8, literal_of(float(300.0), None), true),
+        (DataType::UInt8, literal_of(float(-1.0), None), true),
+        (DataType::UInt64, literal_of(float(-1.0), None), true),
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Float64")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(integer(-1), Some("Float32")),
+            true,
+        ),
+        // And are kept where it can.
+        (DataType::Int16, literal_of(float(300.0), None), false),
+        (DataType::Int8, literal_of(float(100.0), None), false),
+        (DataType::UInt8, literal_of(float(0.0), None), false),
+        // A fraction is decided for the floats that Polars rounds.
+        (DataType::Int8, literal_of(float(1.5), None), true),
+        (
+            DataType::Int8,
+            literal_of(float(1.5), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(float(1.5), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(float(-1.5), Some("Float64")),
+            true,
+        ),
+    ];
+    for (held, literal, refused) in cases {
+        for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+            for swapped in [false, true] {
+                let said = format!("{method} {literal} of a column of {held}, swapped: {swapped}");
+                let report =
+                    join_on_a_column_of(&held, compared_with_a_literal(method, &literal, swapped));
+                if refused {
+                    assert_refused_by_both(&said, &report);
+                } else {
+                    assert_taken_by_both(&said, &report);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_refuses_it_for() {
+    // Every whole-number column, every kind of literal and the numbers around each limit, both
+    // methods and both orders, with the verdict of Polars as the oracle. A literal that cannot be
+    // made of its value and dtype is none that Polars says anything of, and is passed over.
+    let columns = [
+        DataType::Int8,
+        DataType::Int16,
+        DataType::Int32,
+        DataType::Int64,
+        DataType::Int128,
+        DataType::UInt8,
+        DataType::UInt16,
+        DataType::UInt32,
+        DataType::UInt64,
+        DataType::UInt128,
+    ];
+    let integers: [i64; 20] = [
+        -1,
+        0,
+        1,
+        127,
+        128,
+        255,
+        256,
+        300,
+        65_536,
+        70_000,
+        (1 << 24) - 1,
+        1 << 24,
+        100_000_000,
+        1 << 31,
+        (1 << 53) - 1,
+        1 << 53,
+        1 << 60,
+        i64::MIN,
+        i64::MAX,
+        -129,
+    ];
+    let floats: [f64; 10] = [
+        -1.0,
+        0.0,
+        100.0,
+        300.0,
+        1.5,
+        -1.5,
+        16_777_216.0,
+        16_777_217.5,
+        9_007_199_254_740_992.0,
+        1e18,
+    ];
+    let dtypes = [
+        None,
+        Some("Float64"),
+        Some("Float32"),
+        Some("Float16"),
+        Some("Boolean"),
+        Some("Int8"),
+        Some("Int16"),
+        Some("Int64"),
+        Some("UInt8"),
+        Some("UInt32"),
+        Some("UInt64"),
+    ];
+    let mut literals: Vec<Value> = Vec::new();
+    for number in integers {
+        for word in dtypes {
+            literals.push(literal_of(json!({ "integer": number }), word));
+        }
+    }
+    for number in floats {
+        for word in [None, Some("Float64"), Some("Float32"), Some("Float16")] {
+            literals.push(literal_of(json!({ "float": number }), word));
+        }
+    }
+    let mut differences: Vec<String> = Vec::new();
+    let mut compared = 0;
+    for held in &columns {
+        for literal in &literals {
+            for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+                for swapped in [false, true] {
+                    let report = join_on_a_column_of(
+                        held,
+                        compared_with_a_literal(method, literal, swapped),
+                    );
+                    let said = polars_says(&report);
+                    if said
+                        .as_ref()
+                        .is_some_and(|reason| !reason.contains("elementwise"))
+                    {
+                        continue;
+                    }
+                    compared += 1;
+                    let refused_by_polars = said.is_some();
+                    let refused_by_the_walk = walk(&report).refusal().is_some_and(|refusal| {
+                        matches!(
+                            refusal.refusal().source(),
+                            RefusalSource::Rule(Rule::KeyIsElementwise)
+                        )
+                    });
+                    if refused_by_polars != refused_by_the_walk {
+                        differences.push(format!(
+                            "{method} {literal} of a column of {held}, swapped: {swapped}: \
+                             Polars refuses: {refused_by_polars}, the walk: {refused_by_the_walk}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(compared > 5_000, "only {compared} keys were compared");
+    assert!(
+        differences.is_empty(),
+        "{} of {compared} differ:\n{}",
+        differences.len(),
+        differences
+            .iter()
+            .take(40)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
 #[test]
 fn a_missing_comparison_of_a_column_whose_dtype_is_not_known_is_not_judged_in_a_joins_key() {
     // A list of lists is no representative dtype, so the dtype of what a cast to it gives is not

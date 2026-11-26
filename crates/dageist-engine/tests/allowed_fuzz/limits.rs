@@ -8322,6 +8322,48 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_comparison_of_one_value_with_a_float_that_is_whole_is_excused_when_no_dtype_holds_it()
+     {
+        let reason = "all join key expressions must be elementwise.";
+        let refused_for = |literal: Expression| {
+            polars_refuses(
+                &join(
+                    chain_of(
+                        column("rb"),
+                        vec![
+                            call("Expr.max", Vec::new()),
+                            compared_with("Expr.ne_missing", literal),
+                            call(
+                                "Expr.sub",
+                                vec![("other", Value::Expression(chain(column("rk"), &[])))],
+                            ),
+                        ],
+                    ),
+                    chain(column("key"), &[]),
+                ),
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new(),
+            )
+        };
+        let float = |number: f64| {
+            chain(
+                call("polars.lit", vec![("value", Value::Float(number))]),
+                &[],
+            )
+        };
+        // A float that is a whole number some dtype lacks is decided for it, as an integer is.
+        assert_eq!(
+            refused_for(float(300.0)),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        assert_eq!(refused_for(float(-1.0)), vec![Limit::ANullComparisonInAKey]);
+        // One that every dtype holds is not.
+        assert_eq!(refused_for(float(100.0)), vec![]);
+    }
+
+    #[test]
     fn shifts_that_total_the_sample_excuse_the_tables_refusing_what_follows_them() {
         let shift = |rows: Option<i64>| {
             call(
