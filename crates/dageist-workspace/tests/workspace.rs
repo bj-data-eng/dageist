@@ -812,6 +812,78 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
 }
 
 #[test]
+fn a_workspace_is_made_from_a_folder_that_holds_the_files_an_operating_system_writes() {
+    let base = folder("system-files");
+    let first = base.join("first");
+    let (saved, nodes) = sample(&first);
+    Workspace::create(&first, &saved, author(), Options::default()).expect("made");
+    let plain = base.join("plain");
+    copy_without_git(&first, &plain);
+    let node = plain.join(format!("nodes/{}", nodes.timing));
+    std::fs::create_dir_all(plain.join("data").join("more")).expect("a folder");
+    // The files macOS and Windows write into a folder a person browses, at the top, in nodes/,
+    // in a node's folder and in the data.
+    for file in [
+        plain.join(".DS_Store"),
+        plain.join("desktop.ini"),
+        plain.join("nodes").join(".DS_Store"),
+        plain.join("nodes").join("Thumbs.db"),
+        node.join(".DS_Store"),
+        node.join("._steps.json"),
+        node.join("Desktop.ini"),
+        plain.join("data").join(".DS_Store"),
+        plain.join("data").join("more").join("thumbs.db"),
+    ] {
+        std::fs::write(file, b"system").expect("written");
+    }
+    std::fs::write(plain.join("data").join("more").join("notes.csv"), b"a\n").expect("written");
+    std::fs::create_dir_all(plain.join("data").join("._cache")).expect("a folder");
+    std::fs::write(plain.join("data").join("._cache").join("rows.csv"), b"b\n").expect("written");
+
+    let copy = base.join("copy");
+    let (_, opened) =
+        Workspace::create_from_folder(&plain, &copy, author(), Options::default()).expect("made");
+    // A folder in the data named as one of those files is copied with what it holds.
+    assert_eq!(
+        std::fs::read(copy.join("data").join("._cache").join("rows.csv")).expect("copied"),
+        b"b\n"
+    );
+    // The same graph, but for the data files' paths, which are read against the copy.
+    assert_eq!(opened.graph.len(), saved.graph.len());
+    assert_eq!(opened.layout, saved.layout);
+    assert_eq!(opened.documents, saved.documents);
+    // The data is copied without them, and git sees none of them.
+    assert_eq!(
+        std::fs::read(copy.join("data").join("more").join("notes.csv")).expect("copied"),
+        b"a\n"
+    );
+    assert!(!copy.join("data").join(".DS_Store").exists());
+    assert!(!copy.join("data").join("more").join("thumbs.db").exists());
+    let tracked = git(&copy, &["ls-tree", "-r", "--name-only", "HEAD"]);
+    assert!(
+        !tracked.contains("DS_Store") && !tracked.contains(".ini") && !tracked.contains(".db"),
+        "{tracked}"
+    );
+
+    // Any other file the format does not have is still refused, a hidden one as well.
+    let stray = format!("nodes/{}/.notes", nodes.timing);
+    std::fs::write(plain.join(&stray), b"mine").expect("written");
+    assert!(matches!(
+        Workspace::create_from_folder(&plain, &base.join("again"), author(), Options::default()),
+        Err(WorkspaceError::Format { path, .. }) if path == stray
+    ));
+    std::fs::remove_file(plain.join(&stray)).expect("removed");
+    // A folder named as one of those files is no file the system writes: what it holds is read.
+    let inside = format!("nodes/{}/Thumbs.db/notes", nodes.timing);
+    std::fs::create_dir_all(plain.join(&inside).parent().expect("a parent")).expect("a folder");
+    std::fs::write(plain.join(&inside), b"mine").expect("written");
+    assert!(matches!(
+        Workspace::create_from_folder(&plain, &base.join("again"), author(), Options::default()),
+        Err(WorkspaceError::Format { path, .. }) if path == inside
+    ));
+}
+
+#[test]
 fn a_workspace_open_is_not_opened_again_until_it_is_closed() {
     let root = folder("held");
     let (saved, _) = sample(&root);
