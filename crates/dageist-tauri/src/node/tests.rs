@@ -2,7 +2,6 @@
 //! return. Every expected value is written out by hand from the claim-timing
 //! sample's seven rows and its steps.
 
-use dageist_engine::claim_timing::ClaimTiming;
 use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody, InvokeResponseBody};
 use tauri::test::{INVOKE_KEY, MockRuntime, mock_builder, mock_context, noop_assets};
@@ -107,8 +106,10 @@ fn vocabulary() -> Value {
     Value::Object(words.clone())
 }
 
+/// The text of the timing corpus's steps.
 pub(crate) fn steps_text() -> &'static str {
-    ClaimTiming::STEPS_JSON
+    static TEXT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TEXT.get_or_init(crate::graph::tests::corpus_steps)
 }
 
 /// The claims sorted by key, then a column whose sum Polars refuses, then a

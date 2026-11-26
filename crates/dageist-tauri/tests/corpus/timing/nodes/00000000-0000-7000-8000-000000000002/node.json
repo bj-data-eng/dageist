@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "SLA by step",
+  "file": {
+    "path": "data/step_sla.parquet",
+    "format": "parquet"
+  }
+}

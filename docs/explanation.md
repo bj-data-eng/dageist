@@ -1854,7 +1854,7 @@ report depends on the process: Polars numbers the temporary columns it makes by 
 has made, and a reason that quotes one, as the plan of a failure on the rows does, would
 differ with what else the process has run, so the writer sets that number to 0.
 
-The documents run on one node, which is not the claim-timing sample, whose five
+The documents run on one node, which is not the timing corpus's, whose five
 columns reach few of the places the engine allows an entry at: a table with a column
 of each of the 67 classes of dtype, named for its class, of three rows of nulls; a second
 table of the same for a join's right keys; the table that gives a pivot its columns; a
@@ -2091,11 +2091,13 @@ a Python rendering of every step would either not run as written or give slightl
 different results, so the blocks, the summaries and the previews are what say what
 a step does.
 
-The claim-timing steps, the seven claim rows they run on and the inputs
-connected to them are one sample in the engine, `dageist_engine::claim_timing`,
-which the engine's and the host's tests still run, and from which the host's
-snapshots for the view are written. The application no longer opens on it: it
-opens on [the sample workspace](#the-sample-workspace).
+The claim-timing steps, the seven claim rows they run on and the tables
+connected to them are test data, not code: the engine's tests read them from
+the timing corpus in `crates/dageist-engine/tests/corpus/timing`, and the host's
+tests from the same graph as a workspace's files in
+`crates/dageist-tauri/tests/corpus/timing`, from which the host's snapshots for
+the view are written. The application opens on
+[the sample workspace](#the-sample-workspace).
 
 ## Which Combinations Polars Allows
 

@@ -769,25 +769,6 @@ pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static
 pub fn dageist_engine::catalog::groups_dtype(text: &str) -> core::result::Result<polars_core::datatypes::dtype::DataType, dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
 pub fn dageist_engine::catalog::start_step(entry: &dageist_engine::catalog::Entry, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::option::Option<dageist_engine::catalog::StepStart>
-pub mod dageist_engine::claim_timing
-pub struct dageist_engine::claim_timing::ClaimTiming
-impl dageist_engine::claim_timing::ClaimTiming
-pub const dageist_engine::claim_timing::ClaimTiming::SOURCE_NAME: &'static str
-pub const dageist_engine::claim_timing::ClaimTiming::STEPS_JSON: &'static str
-pub const fn dageist_engine::claim_timing::ClaimTiming::inputs(&self) -> &dageist_engine::document::Inputs
-pub fn dageist_engine::claim_timing::ClaimTiming::new() -> core::result::Result<Self, dageist_engine::EngineError>
-pub fn dageist_engine::claim_timing::ClaimTiming::preview(&self, document: &dageist_engine::document::Document, through: &dageist_engine::document::StepId, limit: usize) -> core::result::Result<dageist_engine::document::Preview, dageist_engine::document::RowsError>
-pub fn dageist_engine::claim_timing::ClaimTiming::run(&self, document: &dageist_engine::document::Document) -> polars_error::PolarsResult<dageist_engine::document::Report>
-pub const fn dageist_engine::claim_timing::ClaimTiming::source(&self) -> &polars_core::frame::dataframe::DataFrame
-pub fn dageist_engine::claim_timing::ClaimTiming::source_columns(&self) -> alloc::vec::Vec<dageist_engine::document::ColumnDescription>
-pub const fn dageist_engine::claim_timing::ClaimTiming::source_origin(&self) -> &dageist_engine::document::Origin
-pub const fn dageist_engine::claim_timing::ClaimTiming::steps(&self) -> &dageist_engine::document::Document
-pub fn dageist_engine::claim_timing::ClaimTiming::write_tables(directory: &std::path::Path) -> core::result::Result<dageist_engine::claim_timing::SampleFiles, dageist_engine::EngineError>
-pub struct dageist_engine::claim_timing::SampleFiles
-pub dageist_engine::claim_timing::SampleFiles::claims: std::path::PathBuf
-pub dageist_engine::claim_timing::SampleFiles::holidays: std::path::PathBuf
-pub dageist_engine::claim_timing::SampleFiles::step_names: std::path::PathBuf
-pub dageist_engine::claim_timing::SampleFiles::step_sla: std::path::PathBuf
 pub mod dageist_engine::document
 pub enum dageist_engine::document::Cause
 pub dageist_engine::document::Cause::ArgumentKeys(usize)

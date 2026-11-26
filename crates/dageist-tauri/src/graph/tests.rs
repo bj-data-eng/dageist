@@ -1,20 +1,21 @@
 //! The graph commands through Tauri's IPC layer and the snapshot of the graph view, on the
-//! starting graph: the claim-timing sample's tables, its two parameters, its transform and an
-//! output. The expected values are written out by hand from that graph.
+//! timing corpus in `tests/corpus/timing`: a graph of four tables, two parameters, a transform and
+//! an output, as a workspace's files. The expected values are written out by hand from that
+//! graph.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use dageist::Bindings;
-use dageist_engine::claim_timing::ClaimTiming;
+use dageist::{Bindings, Session};
 use dageist_engine::document::Document;
+use dageist_graph::NodeId;
 use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody, InvokeResponseBody};
 use tauri::test::{INVOKE_KEY, MockRuntime, mock_builder, mock_context, noop_assets};
 use tauri::webview::InvokeRequest;
 use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-use super::{Workspace, graph_view, starting_session, starting_transform};
+use super::{Workspace, graph_view};
 
 /// Set to rewrite the snapshot instead of checking it.
 const REFRESH: &str = "DAGEIST_REFRESH_GRAPH";
@@ -22,13 +23,13 @@ const REFRESH: &str = "DAGEIST_REFRESH_GRAPH";
 /// The command that refreshes the snapshot.
 const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri graph::tests::the_snapshot_is_what_the_command_returns";
 
-/// The ids of the starting graph's nodes, in the order they are added, as the view sends them.
+/// The ids of the corpus's nodes, in the order of their ids, as the view sends them.
 const CLAIMS: &str = "00000000-0000-7000-8000-000000000001";
 const SLA: &str = "00000000-0000-7000-8000-000000000002";
 const NAMES: &str = "00000000-0000-7000-8000-000000000003";
 const CALENDAR: &str = "00000000-0000-7000-8000-000000000004";
 const PARAMETERS: &str = "00000000-0000-7000-8000-000000000005";
-/// The id of the starting graph's transform.
+/// The id of the corpus's transform.
 pub(crate) const NODE: &str = "00000000-0000-7000-8000-000000000006";
 const OUTPUT: &str = "00000000-0000-7000-8000-000000000007";
 
@@ -43,18 +44,83 @@ fn folder() -> PathBuf {
     ))
 }
 
-/// The starting graph with `steps` as its transform's document. Every revision starts at 0, so
-/// the document, set once, is at revision 1.
+/// The host's timing corpus: a workspace's files, with its tables under `data/`.
+fn corpus() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("corpus")
+        .join("timing")
+}
+
+/// The id of the corpus's transform.
+pub(crate) fn starting_transform() -> NodeId {
+    NodeId::new(NODE).expect("an id")
+}
+
+/// The corpus's steps, as the text of its file.
+pub(crate) fn corpus_steps() -> String {
+    std::fs::read_to_string(corpus().join("nodes").join(NODE).join("steps.json"))
+        .expect("the corpus's steps")
+}
+
+/// The corpus made a workspace in `root`, and the session it holds, with every revision
+/// starting at `first_revision`.
+fn corpus_in(root: &Path, first_revision: u64) -> (dageist::workspace::Workspace, Session) {
+    let (kept, saved) = dageist::workspace::Workspace::create_from_folder(
+        &corpus(),
+        root,
+        dageist::unsigned_author(),
+        dageist::workspace::Options::default(),
+    )
+    .expect("the corpus is a workspace");
+    let session = Session::from_saved(saved, first_revision).expect("the corpus's steps read");
+    (kept, session)
+}
+
+/// The corpus kept in a workspace on disk in `workspace` under `folder`, as the application keeps
+/// the workspace it opens, with every revision starting at `first_revision`.
+pub(crate) fn kept_corpus(folder: &Path, first_revision: u64) -> Workspace {
+    let (kept, session) = corpus_in(&folder.join("workspace"), first_revision);
+    Workspace::kept(session, kept)
+}
+
+/// What the corpus holds, made a workspace once in each run of the tests, in a folder the run's
+/// tests share: they read its tables and write nothing there.
+fn shared_corpus() -> &'static dageist::workspace::Saved {
+    static SHARED: std::sync::OnceLock<dageist::workspace::Saved> = std::sync::OnceLock::new();
+    SHARED.get_or_init(|| {
+        let root =
+            std::env::temp_dir().join(format!("dageist-graph-corpus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (_, saved) = dageist::workspace::Workspace::create_from_folder(
+            &corpus(),
+            &root,
+            dageist::unsigned_author(),
+            dageist::workspace::Options::default(),
+        )
+        .expect("the corpus is a workspace");
+        saved
+    })
+}
+
+/// The corpus with `steps` as its transform's document, saved nowhere. Every revision starts at
+/// 0, and the document, set once, is at revision 1.
 pub(crate) fn sample_of(steps: Document) -> Workspace {
-    Workspace::of(starting_session(0, &folder(), steps).expect("the starting graph"))
+    let mut session =
+        Session::from_saved(shared_corpus().clone(), 0).expect("the corpus's steps read");
+    session
+        .edit_document(&starting_transform(), 0, |_| Ok::<_, ()>(steps))
+        .expect("the transform's document")
+        .expect("set");
+    Workspace::of(session)
 }
 
-/// The starting graph with the sample's own steps.
+/// The corpus with its own steps.
 pub(crate) fn sample() -> Workspace {
-    sample_of(Document::read(ClaimTiming::STEPS_JSON).expect("the sample's steps"))
+    sample_of(Document::read(&corpus_steps()).expect("the corpus's steps"))
 }
 
-/// What the starting graph's transform runs on.
+/// What the corpus's transform runs on.
 pub(crate) fn sample_bindings() -> Bindings {
     crate::node::bindings_of(&sample().lock(), &starting_transform()).expect("the bindings")
 }
@@ -318,7 +384,7 @@ fn git(repository: &std::path::Path, arguments: &[&str]) -> String {
 #[test]
 fn every_edit_the_host_makes_is_saved_as_a_commit_and_the_workspace_opens_as_it_was() {
     let folder = folder();
-    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let workspace = kept_corpus(&folder, 1);
     let kept = folder.join("workspace");
     let subjects = || git(&kept, &["log", "--format=%s"]);
     assert_eq!(subjects(), "Make the workspace\n");
@@ -422,7 +488,7 @@ pub(crate) fn other_workspace(folder: &std::path::Path) -> dageist_graph::NodeId
 #[test]
 fn opening_a_workspace_holds_its_graph_saves_edits_to_it_and_packs_the_one_let_go() {
     let folder = folder();
-    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let workspace = kept_corpus(&folder, 1);
     let first = folder.join("workspace");
     let other = folder.join("other");
     let elsewhere = other_workspace(&other);
@@ -472,7 +538,7 @@ fn opening_a_workspace_holds_its_graph_saves_edits_to_it_and_packs_the_one_let_g
 #[test]
 fn no_workspace_is_opened_once_the_one_held_is_closed() {
     let folder = folder();
-    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let workspace = kept_corpus(&folder, 1);
     let other = folder.join("other");
     other_workspace(&other);
     workspace.close().expect("closed");
@@ -490,7 +556,7 @@ fn no_workspace_is_opened_once_the_one_held_is_closed() {
 #[test]
 fn a_folder_that_holds_no_workspace_is_not_opened_and_leaves_the_one_held() {
     let folder = folder();
-    let workspace = Workspace::starting(0, &folder).expect("the starting workspace");
+    let workspace = kept_corpus(&folder, 1);
     let empty = folder.join("empty");
     std::fs::create_dir_all(&empty).expect("a folder");
     let before = serde_json::to_value(graph_view(&workspace)).expect("a view");

@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "Step names",
+  "file": {
+    "path": "data/step_names.parquet",
+    "format": "parquet"
+  }
+}

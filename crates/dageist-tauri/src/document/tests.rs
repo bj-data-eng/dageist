@@ -620,7 +620,7 @@ fn an_edit_whose_answer_cannot_be_given_is_not_made() {
     let failed =
         documents
             .lock()
-            .edit_document(&crate::graph::starting_transform(), 1, |document| {
+            .edit_document(&crate::graph::tests::starting_transform(), 1, |document| {
                 let _edited = request.make(document);
                 Err::<dageist_engine::document::Document, _>(ErrorView::of(
                     ErrorKind::Failed,
@@ -682,8 +682,10 @@ fn a_host_starts_at_a_revision_that_no_other_lifetime_of_it_does() {
             std::process::id(),
             std::time::SystemTime::now()
         ));
-        Workspace::starting(super::first_revision(std::time::SystemTime::now()), &folder)
-            .expect("the starting graph")
+        crate::graph::tests::kept_corpus(
+            &folder,
+            super::first_revision(std::time::SystemTime::now()),
+        )
     };
     let first = start();
     std::thread::sleep(std::time::Duration::from_millis(5));

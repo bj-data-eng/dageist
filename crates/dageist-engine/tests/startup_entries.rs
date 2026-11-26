@@ -15,7 +15,6 @@ use std::path::PathBuf;
 
 use dageist_engine::allowed::Literal;
 use dageist_engine::catalog::{self, Argument, Build};
-use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::{Document, Inputs, StepId};
 use dageist_engine::{ParquetTable, SampleSpec, Table, generate_claims};
 use polars::prelude::*;
@@ -154,18 +153,6 @@ fn opening_a_stored_table_starts_polars() {
         || directory.variables_with_sample(),
         || {
             ParquetTable::open(&directory_given()).expect("the table opens");
-            sql_resolves();
-        },
-    );
-}
-
-#[test]
-fn building_the_claim_timing_node_starts_polars() {
-    in_fresh_process(
-        "building_the_claim_timing_node_starts_polars",
-        plan_variables,
-        || {
-            ClaimTiming::new().expect("the node builds");
             sql_resolves();
         },
     );

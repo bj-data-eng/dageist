@@ -175,9 +175,10 @@ They also prove the `operation_catalogue` command's view of the catalogue,
 and that `ui/packages/host/fixtures/catalogue.json`, the copy of that view the
 view's tests decode and the bridge's tests compare its answers with, is current.
 
-The node commands are tested through the same IPC layer, on the claim-timing
-sample node: `node_inputs` gives the table the steps start from and each
-other input with its columns or dtype; `node_document` gives the document the
+The node commands are tested through the same IPC layer, on the transform of
+the host's timing corpus (`crates/dageist-tauri/tests/corpus/timing`):
+`node_inputs` gives the table the steps start from and each other input with
+its columns or dtype; `node_document` gives the document the
 host holds, its revision and the report of each step, whether valid, refused at
 the link Polars names, incomplete, or not run behind a refused one, with the
 dtype after each link and what the tables of allowed combinations say of each
@@ -235,13 +236,13 @@ Never edit the files by hand.
 
 ### Refresh The Step Report Snapshots
 
-After a change to the sample node, the step document or its running, the walk
+After a change to the timing corpus, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
 snapshot test fails and names the file that differs. Eight files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
-`node_inputs`, `node-document.json` from `node_document`, the claim-timing
-sample's own steps as the host holds them with the report of running them,
-`step-report.json` from running the claim-timing steps,
+`node_inputs`, `node-document.json` from `node_document`, the corpus's own
+steps as the host holds them with the report of running them,
+`step-report.json` from running the corpus's steps,
 `step-report-refused.json` from a document whose second step the tables refuse, with
 the words they recorded of Polars, and whose third is not run, `step-report-incomplete.json` from one whose second step
 holds something still to be picked, which the third waits for,
@@ -266,10 +267,10 @@ contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
 ### Refresh The Graph Snapshot
 
-`ui/packages/host/fixtures/graph.json` is the graph view of the claim-timing
-graph the host's tests build, as the `graph` command reports it. Each file's folder is
+`ui/packages/host/fixtures/graph.json` is the graph view of the host's timing
+corpus, as the `graph` command reports it. Each file's folder is
 written as `/sample`, so the snapshot does not hold the folder of the machine
-it was written on. After a change to the starting graph, to working a graph out
+it was written on. After a change to the corpus, to working a graph out
 or to the graph view, the host's snapshot test fails. Write the file again,
 format it, and run the view's tests, whose decoder and canvas tests read it:
 

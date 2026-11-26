@@ -7,8 +7,7 @@
 //! write them. It also owns the catalogue of Polars operations the step
 //! editor offers, and the step document built from it: its reader, its writer
 //! and running it, and the tables of which combinations of its entries Polars
-//! allows. It serves the claim-timing sample node the step editor opens with.
-//! It has no dependency on any host.
+//! allows. It has no dependency on any host.
 //!
 //! Polars is set up as the Python Polars release sets it up, for the parts of
 //! that set-up that are not about Python: see [`PolarsSession`], and
@@ -21,7 +20,6 @@
 pub mod allowed;
 mod block;
 pub mod catalog;
-pub mod claim_timing;
 pub mod document;
 mod error;
 pub mod frame;
