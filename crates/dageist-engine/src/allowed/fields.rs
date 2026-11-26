@@ -592,6 +592,97 @@ pub(super) fn gives(
     }
 }
 
+/// Why Polars always refuses a call of arithmetic that follows a struct, or is given one, from what
+/// the walk carries: the five calls it does not do on a struct at all, and the operators on a struct
+/// that has a field that is no number. `None` for the rest, which it does irregularly, field by field.
+pub(super) fn arithmetic_refused(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    chosen: &Chosen<'_>,
+) -> Option<String> {
+    let id = entry.id().as_str();
+    let struct_receiver = receiver == Some(Representative::Struct);
+    let struct_argument = chosen
+        .arguments
+        .iter()
+        .any(|(_, class)| *class == Representative::Struct);
+    let symbol = match id {
+        "Expr.add" => "+",
+        "Expr.sub" => "-",
+        "Expr.mul" => "*",
+        "Expr.truediv" => "/",
+        "Expr.floordiv" => "//",
+        "Expr.mod" => "%",
+        "Expr.abs" | "Expr.neg" | "Expr.sign" | "Expr.clip" if struct_receiver => {
+            return Some(format!(
+                "`{}` is not done on a struct, whatever its fields are",
+                id.trim_start_matches("Expr.")
+            ));
+        }
+        "Expr.pow" if struct_receiver || struct_argument => {
+            return Some("a struct is neither raised to a power nor a power of one".to_owned());
+        }
+        _ => return None,
+    };
+    // A struct that meets a struct is done field by field, and a sum with a text is one Polars does.
+    if struct_receiver && struct_argument {
+        return None;
+    }
+    // Only a number meeting it is a case Polars refuses always: a text, a null and the rest are
+    // met field by field, which it does irregularly.
+    let is_a_number = |class: &Representative| {
+        matches!(
+            class,
+            Representative::Int8
+                | Representative::Int16
+                | Representative::Int32
+                | Representative::Int64
+                | Representative::Int128
+                | Representative::UInt8
+                | Representative::UInt16
+                | Representative::UInt32
+                | Representative::UInt64
+                | Representative::UInt128
+                | Representative::Float16
+                | Representative::Float32
+                | Representative::Float64
+                | Representative::Decimal
+                | Representative::Boolean
+        )
+    };
+    let met_by_a_number = chosen.arguments.iter().any(|(_, class)| is_a_number(class))
+        || !chosen.open_numbers.is_empty()
+        || (!struct_receiver && struct_argument && receiver.as_ref().is_some_and(is_a_number));
+    if !met_by_a_number {
+        return None;
+    }
+    let sides = chosen
+        .fields
+        .filter(|_| struct_receiver)
+        .into_iter()
+        .chain(chosen.argument_fields.iter().map(|(_, fields)| *fields));
+    sides
+        .flat_map(Fields::iter)
+        .find(|field| {
+            matches!(
+                field.class,
+                Some(
+                    Representative::String
+                        | Representative::Date
+                        | Representative::Time
+                        | Representative::Datetime
+                        | Representative::DatetimeZoned
+                )
+            )
+        })
+        .map(|field| {
+            format!(
+                "cannot {symbol} a struct with non-numeric field: (field: {}, dtype: {})",
+                field.name, field.written
+            )
+        })
+}
+
 /// The refusal of a name that is no field of `fields`.
 fn not_a_field(name: &str, fields: &Fields) -> Said {
     (

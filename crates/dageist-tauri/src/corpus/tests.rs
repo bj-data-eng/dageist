@@ -379,6 +379,10 @@ const NOT_HELD: &[(&str, &str)] = &[
         "no document the corpus plans unnests a struct of several fields where a filter needs one column; one was not tried, and may be built",
     ),
     (
+        "struct-arithmetic-needs-numbers",
+        "no document the corpus plans calculates with a struct; one was not tried, and may be built",
+    ),
+    (
         "struct-is-filled-forward-or-backward",
         "no document the corpus plans fills a struct by a strategy; one was not tried, and may be built",
     ),

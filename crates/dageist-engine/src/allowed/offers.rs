@@ -83,7 +83,7 @@ impl ConditionState {
 /// then judged for any dtype of argument that fits.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Chosen<'a> {
-    arguments: &'a [(&'a str, Representative)],
+    pub(super) arguments: &'a [(&'a str, Representative)],
     pub(super) options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
     pub(super) patterns: &'a [(&'a str, &'a str)],
@@ -97,6 +97,11 @@ pub struct Chosen<'a> {
     shape: Option<Shape>,
     /// The fields of the struct the call follows, where the chain knows them.
     pub(super) fields: Option<&'a Fields>,
+    /// The fields of each argument that is a struct whose fields the chain knows, by the parameter
+    /// that holds it.
+    pub(super) argument_fields: &'a [(&'a str, &'a Fields)],
+    /// The arguments that are a number typed without a dtype, which adapts to what it meets.
+    pub(super) open_numbers: &'a [&'a str],
     /// The names the call is given, each by the parameter that holds it: the name of a field to read
     /// or drop, the new names of the fields, the name of a count.
     pub(super) names: &'a [(&'a str, &'a str)],
@@ -194,9 +199,22 @@ impl<'a> Chosen<'a> {
         self
     }
 
-    /// The fields of the struct the method follows, where the chain knows them: what a call that
-    /// reads, drops or renames a field says depends on them, and a struct the call keeps is written
-    /// with them.
+    /// The arguments that are a number typed without a dtype, by the parameter that holds each.
+    #[must_use]
+    pub const fn with_open_numbers(mut self, numbers: &'a [&'a str]) -> Self {
+        self.open_numbers = numbers;
+        self
+    }
+
+    /// The fields of each argument that is a struct whose fields the chain knows, by the parameter
+    /// that holds it.
+    #[must_use]
+    pub const fn with_argument_fields(mut self, fields: &'a [(&'a str, &'a Fields)]) -> Self {
+        self.argument_fields = fields;
+        self
+    }
+
+    /// The fields of the struct the call follows, where the chain knows them.
     #[must_use]
     pub const fn following_fields(mut self, fields: Option<&'a Fields>) -> Self {
         self.fields = fields;
@@ -1109,6 +1127,15 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 .arguments
                 .iter()
                 .any(|(_, class)| *class == Representative::Struct));
+    // What Polars always refuses of it is refused, in its words.
+    if struct_arithmetic
+        && let Some(said) = fields::arithmetic_refused(entry, receiver_class, chosen)
+    {
+        return Err(Refusal::rule_because(
+            Rule::StructArithmeticNeedsNumbers,
+            &said,
+        ));
+    }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {

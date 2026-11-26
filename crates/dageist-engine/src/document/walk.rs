@@ -2825,10 +2825,27 @@ impl Walker<'_> {
                 .map(|(name, _)| name.as_str())
                 .filter(|name| !judged.iter().any(|(judged, _)| judged == name))
                 .collect();
+            let held_by_arguments: Vec<(&str, Fields)> = arguments
+                .iter()
+                .filter_map(|(name, operand)| {
+                    Some((name.as_str(), self.fieldsets[operand.fields?.0].clone()))
+                })
+                .collect();
+            let argument_fields: Vec<(&str, &Fields)> = held_by_arguments
+                .iter()
+                .map(|(name, fields)| (*name, fields))
+                .collect();
+            let open_numbers: Vec<&str> = resolved
+                .iter()
+                .filter(|(_, _, number)| number.is_some())
+                .map(|(name, _, _)| *name)
+                .collect();
             let verdict = allowed::offer(
                 entry,
                 &place,
                 &Chosen::default()
+                    .with_open_numbers(&open_numbers)
+                    .with_argument_fields(&argument_fields)
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
                     .with_options(&words)
@@ -2937,7 +2954,24 @@ impl Walker<'_> {
             .map(|(name, _)| name.as_str())
             .filter(|name| !given.iter().any(|(given, _)| given == name))
             .collect();
+        let held_by_arguments: Vec<(&str, Fields)> = arguments
+            .iter()
+            .filter_map(|(name, operand)| {
+                Some((name.as_str(), self.fieldsets[operand.fields?.0].clone()))
+            })
+            .collect();
+        let argument_fields: Vec<(&str, &Fields)> = held_by_arguments
+            .iter()
+            .map(|(name, fields)| (*name, fields))
+            .collect();
+        let open_numbers: Vec<&str> = resolved
+            .iter()
+            .filter(|(_, _, number)| number.is_some())
+            .map(|(name, _, _)| *name)
+            .collect();
         let chosen = Chosen::default()
+            .with_open_numbers(&open_numbers)
+            .with_argument_fields(&argument_fields)
             .with_arguments(&given)
             .with_unclassed(&unclassed)
             .with_options(&words)
