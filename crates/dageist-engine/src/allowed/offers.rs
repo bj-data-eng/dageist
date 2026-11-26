@@ -1045,27 +1045,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // and differs for each call: a struct of numbers is added to a number, a field of text refuses
     // it, a list field is added as a list. The tables measured one struct, of a whole number and
     // text, so they say nothing of the others.
-    if is_method(entry)
+    let struct_arithmetic = is_method(entry)
         && entry.family() == catalog::Family::Arithmetic
         && (receiver_class == Some(Representative::Struct)
             || chosen
                 .arguments
                 .iter()
-                .any(|(_, class)| *class == Representative::Struct))
-    {
-        let shape = match place.after {
-            After::Value { shape, .. } => shape,
-            _ => Shape::Many,
-        };
-        return Ok(Allowance {
-            result: None,
-            shape,
-            ending: Ending::NotKnown(Unknown::TheResultsDtype),
-            fields: None,
-            columns: None,
-            width: None,
-        });
-    }
+                .any(|(_, class)| *class == Representative::Struct));
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
@@ -1115,7 +1101,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         ));
     }
     // What the options set are refused for, on the dtype of the value the method follows.
-    if is_method(entry) {
+    if is_method(entry) && !struct_arithmetic {
         let receiver = match place.after {
             After::Value { dtype, .. } => Some(dtype),
             _ => None,
@@ -1192,7 +1178,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             shape: receiver_shape,
         },
         true,
-    ) = (place.after, is_method(entry))
+    ) = (place.after, is_method(entry) && !struct_arithmetic)
     {
         let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
@@ -1301,6 +1287,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         {
             result = None;
         }
+    }
+    // What follows a struct by arithmetic keeps its shape and has no dtype the tables say.
+    if struct_arithmetic && let After::Value { shape: kept, .. } = place.after {
+        shape = kept;
     }
     // What the call says of what it gives, where the tables do not.
     if result.is_none() && !is_method(entry) {
@@ -1479,6 +1469,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         result = Some(found.of_width(width));
     }
     let width = struct_gives.width();
+    if struct_arithmetic {
+        result = None;
+        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+    }
     Ok(Allowance {
         result,
         shape,
