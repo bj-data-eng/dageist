@@ -755,14 +755,84 @@ fn a_list_made_a_struct_has_the_fields_it_is_given_of_its_element() {
 }
 
 #[test]
-fn a_list_made_a_struct_of_a_name_given_twice_is_refused_by_a_rule() {
-    let found = ask("l", vec![list_to_struct(&["a", "a"])]);
+fn a_list_or_an_array_made_a_struct_of_a_name_given_twice_is_refused_by_a_rule_of_its_own() {
+    let list = ask("l", vec![list_to_struct(&["a", "a"])]);
     assert_refused_by(
-        &found,
-        "field-names-fit-the-struct",
+        &list,
+        "to-struct-names-are-distinct",
         &["a"],
         "a list as a struct of a twice",
     );
+    let array = ask("raw", vec![array_to_struct(Some(&["a", "a"]))]);
+    assert_refused_by(
+        &array,
+        "to-struct-names-are-distinct",
+        &["a"],
+        "an array as a struct of a twice",
+    );
+    // A struct made of columns, or renamed, is refused by Polars, and by the rule about names.
+    let renamed = ask("s_xy", vec![rename(&["a", "a"])]);
+    assert_refused_by(
+        &renamed,
+        "field-names-fit-the-struct",
+        &["a"],
+        "a struct renamed to a twice",
+    );
+}
+
+#[test]
+fn polars_accepts_a_list_made_a_struct_of_a_name_given_twice_and_builds_one_that_disagrees_with_itself()
+ {
+    // This is why the rule above refuses it, and the rule can go once a Polars release refuses
+    // the names itself (pola-rs/polars#30725). `polars.struct` and `struct.rename_fields` refuse
+    // the same names, which the test above holds.
+    let names = ["y", "y"];
+    let made = col("l").list().to_struct(
+        names
+            .iter()
+            .map(|name| PlSmallStr::from(*name))
+            .collect::<Vec<_>>()
+            .into(),
+    );
+    let lazy = frame().lazy().select([made.alias("s")]);
+    // The plan accepts it, and gives a struct of two fields named alike.
+    let schema = lazy
+        .clone()
+        .collect_schema()
+        .expect("Polars accepts the names");
+    let DataType::Struct(in_the_dtype) = schema.get("s").expect("a column s") else {
+        panic!("a struct");
+    };
+    assert_eq!(
+        in_the_dtype
+            .iter()
+            .map(|field| field.name().as_str())
+            .collect::<Vec<_>>(),
+        ["y", "y"]
+    );
+    let collected = lazy.clone().collect().expect("Polars runs it");
+    let series = collected
+        .column("s")
+        .expect("a column s")
+        .as_materialized_series();
+    let held = series.struct_().expect("a struct");
+    // A field read of the name gives the first of the two, where the value of a row holds both.
+    let read = held.field_by_name("y").expect("a field y");
+    assert_eq!(read.get(0).expect("a value"), AnyValue::Int64(1));
+    let second = &held.fields_as_series()[1];
+    assert_eq!(second.get(0).expect("a value"), AnyValue::Int64(2));
+    // The unnest of the column is refused, as the names are, after the plan accepted them.
+    let unnested = lazy.clone().unnest(cols(["s"]), None).collect();
+    assert!(
+        unnested
+            .expect_err("a column named twice")
+            .to_string()
+            .contains("more than one occurrence")
+    );
+    // And `clear` of a frame that holds it panics, so the panic is caught, not let to abort.
+    let cleared =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| collected.clear().height()));
+    assert!(cleared.is_err(), "clearing a frame that holds it panics");
 }
 
 #[test]
