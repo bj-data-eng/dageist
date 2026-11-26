@@ -4433,10 +4433,10 @@ enum Fold {
     /// Polars decides the comparison for a value in each row of a column of whole numbers, none of
     /// which is the number: the number has a fraction, or the dtype of the column cannot hold it.
     Repeats,
-    /// A whole number that some dtype cannot hold, where what is compared is not a value for each
-    /// row of a dtype that is known: if it is one value, the dtype of the value decides whether Polars
-    /// keeps the comparison or leaves a plain constant, which the walk does not follow, and a limit
-    /// of the fuzz tests covers it.
+    /// A whole number that some dtype cannot hold, or a number with a fraction, where what is
+    /// compared is not a value for each row of a dtype that is known: if it is one value, the dtype
+    /// of the value decides whether Polars keeps the comparison or leaves a plain constant, which the
+    /// walk does not follow, and a limit of the fuzz tests covers it.
     Undecided,
 }
 
@@ -4491,7 +4491,14 @@ fn fold_of_a_missing_comparison(
                     }
                 }
                 _ => {
-                    if matches!(number, Number::Whole(number) if some_dtype_lacks(number)) {
+                    let lacks = match number {
+                        Number::Whole(number) => some_dtype_lacks(number),
+                        // No whole number is it, but where the value is of a dtype that has fractions
+                        // Polars keeps the comparison, so it is one value that is not known to be
+                        // decided unless the dtype is of a column, which the walk follows.
+                        Number::Fraction => shape != Shape::Many,
+                    };
+                    if lacks {
                         fold = Fold::Undecided;
                     }
                 }

@@ -135,8 +135,8 @@ pub enum Limit {
     /// where that is one value: a column compared with a null is refused by the rule, and an
     /// aggregate compared with a null, or a comparison that follows one, is found by running. An
     /// `eq_missing` or an `ne_missing` of a value and a whole number that some dtype cannot
-    /// hold, below zero or above 127, is decided the same way where the dtype of the value cannot
-    /// hold the number, and kept where it can. The rule refuses it where the value is a column of
+    /// hold, below zero or above 127, or a number with a fraction, is decided the same way where the
+    /// dtype of the value cannot hold the number, and kept where it can. The rule refuses it where the value is a column of
     /// a dtype it knows, which is a constant repeated to the length of the column; it does not
     /// where the value is one value, as an aggregate is, for Polars gives a plain constant that a
     /// key may be where the dtype cannot hold the number, as an unsigned count cannot, and keeps
@@ -1468,16 +1468,21 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
     // A whole number that some dtype cannot hold, below zero or above what an `Int8` holds, is
     // one that Polars decides at once for a comparison of missing values where the dtype of what
     // it is compared with cannot hold it, as it decides a comparison with a null.
+    // A number with a fraction is one that no whole number is, which Polars decides at once for
+    // what it compares as it does a number that the dtype cannot hold.
     let is_a_number_some_dtype_lacks = |expression: &Expression| {
         expression.links().is_empty()
             && matches!(expression.start(), Start::Call(start)
-                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number)))
+                if is(start, "polars.lit")
+                    && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
+                        || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0)))
     };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
         let number_start = matches!(expression.start(), Start::Call(start)
-            if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number)));
+            if is(start, "polars.lit") && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
+                || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0)));
         expression.links().iter().enumerate().any(|(at, link)| {
             let id = link.entry().id().as_str();
             // `is_between` compares each of its bounds with what it follows, so a bound that is
