@@ -1137,14 +1137,88 @@ fn arithmetic_on_a_struct_of_numbers_is_not_said_by_the_walk_where_polars_does_i
 }
 
 #[test]
-fn arithmetic_on_a_struct_with_a_field_of_text_is_not_said_by_the_walk_where_polars_refuses_it() {
-    let found = ask("s_xy", vec![call("Expr.add", json!({ "other": whole(2) }))]);
-    assert!(
-        matches!(found.polars, Said::Refuses(_)),
-        "{:?}",
-        found.polars
+fn arithmetic_that_polars_always_refuses_a_struct_is_refused_by_a_rule() {
+    // `abs`, `neg`, `sign`, `clip` and `pow` of a struct, whatever its fields are.
+    for operation in ["Expr.abs", "Expr.neg", "Expr.sign"] {
+        let found = ask("s_xz", vec![call(operation, json!({}))]);
+        assert_refused_by(
+            &found,
+            "struct-arithmetic-needs-numbers",
+            &[],
+            &format!("{operation} of a struct"),
+        );
+    }
+    let clip = ask(
+        "s_xz",
+        vec![call("Expr.clip", json!({ "lower_bound": whole(0) }))],
     );
-    assert_the_walk_cannot_tell(&found, "a sum of a struct with a field of text");
+    assert_refused_by(
+        &clip,
+        "struct-arithmetic-needs-numbers",
+        &[],
+        "clip of a struct",
+    );
+    let base = ask(
+        "s_xz",
+        vec![call("Expr.pow", json!({ "exponent": whole(2) }))],
+    );
+    assert_refused_by(
+        &base,
+        "struct-arithmetic-needs-numbers",
+        &[],
+        "a struct to a power",
+    );
+    let exponent = ask(
+        "n",
+        vec![call("Expr.pow", json!({ "exponent": field("s_xz") }))],
+    );
+    assert_refused_by(
+        &exponent,
+        "struct-arithmetic-needs-numbers",
+        &[],
+        "a number to the power of a struct",
+    );
+}
+
+#[test]
+fn arithmetic_on_a_struct_with_a_field_that_is_no_number_is_refused_in_polars_words() {
+    // `s_xy` holds a field of text, `s_abc` one of a date.
+    for column in ["s_xy", "s_abc"] {
+        for operation in [
+            "Expr.add",
+            "Expr.sub",
+            "Expr.mul",
+            "Expr.truediv",
+            "Expr.floordiv",
+            "Expr.mod",
+        ] {
+            let found = ask(column, vec![call(operation, json!({ "other": whole(2) }))]);
+            assert_refused_by(
+                &found,
+                "struct-arithmetic-needs-numbers",
+                &["non-numeric field"],
+                &format!("{operation} of {column}"),
+            );
+        }
+    }
+    // A number that meets such a struct, on either side.
+    let met = ask(
+        "n",
+        vec![call("Expr.sub", json!({ "other": field("s_xy") }))],
+    );
+    assert_refused_by(
+        &met,
+        "struct-arithmetic-needs-numbers",
+        &["non-numeric field"],
+        "a number less a struct of text",
+    );
+    // A sum with a text is one Polars does, and the walk cannot tell what it gives.
+    let text = ask(
+        "s_xy",
+        vec![call("Expr.add", json!({ "other": text("a") }))],
+    );
+    assert_eq!(text.polars, Said::Accepts, "{:?}", text.polars);
+    assert_the_walk_cannot_tell(&text, "a sum of a struct and a text");
 }
 
 #[test]
