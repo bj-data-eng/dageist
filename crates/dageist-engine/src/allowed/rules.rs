@@ -77,8 +77,8 @@ pub enum Rule {
     ArraysMeetAtOneWidth,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, no comparison of missing values of a column of whole numbers
-    /// with a number that has a fraction or that its dtype cannot hold, and no replacement of values
-    /// that are not literals.
+    /// with a literal that is a number with a fraction or a whole number that its dtype cannot hold,
+    /// as Polars reads the literal, and no replacement of values that are not literals.
     KeyIsElementwise,
     /// A parameter that Polars reads as one value is given one: not the rows, not a count of values
     /// that the data or the arguments decide, and, for the places a shift and a difference look back
@@ -230,7 +230,7 @@ impl Rule {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a number that has a fraction or that its dtype cannot hold, nor a replacement take a value that reads a column"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::ElementDtypeIsImplemented => {
