@@ -142,7 +142,10 @@ impl Workspace {
     /// missing and must be empty.
     ///
     /// `source`'s own `.gitignore` is not read: the workspace made has the one every workspace
-    /// has. Its `.git` and `.dageist` folders at the top are passed by. A path to a data file
+    /// has. Its `.git` and `.dageist` folders at the top are passed by, and so are the files an
+    /// operating system writes into a folder a person browses, wherever they are and in the data
+    /// too: `.DS_Store`, `._` files, and `Thumbs.db` and `desktop.ini` in any case. A folder of
+    /// one of those names is read as any other. A path to a data file
     /// outside its `data/` folder is read against `root` all the same, and finds no file there
     /// until one is put there. Symbolic links are refused, not followed.
     ///
@@ -966,7 +969,9 @@ fn refuse_link(kind: std::fs::FileType, path: &Path) -> Result<(), WorkspaceErro
 
 /// The files of the workspace written in `folder`, a folder that is not a repository, by their
 /// paths in it. Its `.git`, `.dageist` and `data` folders at the top hold no file of the format
-/// and are passed by; anywhere else, they are files the format has no place for.
+/// and are passed by; anywhere else, they are files the format has no place for. A file an
+/// operating system writes there ([`files::written_by_the_system`]) is passed by wherever it is;
+/// a folder of that name is read as any other.
 fn folder_files(folder: &Path) -> Result<Files, WorkspaceError> {
     let mut found = Files::new();
     let mut folders = vec![(folder.to_path_buf(), String::new())];
@@ -980,7 +985,9 @@ fn folder_files(folder: &Path) -> Result<Files, WorkspaceError> {
                 format!("{path}/{name}")
             };
             let kind = entry.file_type().map_err(io(&entry.path()))?;
-            if path.is_empty() && [".git", files::LOCAL, files::DATA].contains(&name.as_str()) {
+            if (path.is_empty() && [".git", files::LOCAL, files::DATA].contains(&name.as_str()))
+                || (!kind.is_dir() && files::written_by_the_system(&name))
+            {
                 continue;
             }
             refuse_link(kind, &entry.path())?;
@@ -997,7 +1004,8 @@ fn folder_files(folder: &Path) -> Result<Files, WorkspaceError> {
     Ok(found)
 }
 
-/// Copies every file under `from` to the same place under `to`; nothing when `from` is missing.
+/// Copies every file under `from` to the same place under `to`, but for the files an operating
+/// system writes ([`files::written_by_the_system`]); nothing when `from` is missing.
 fn copy_tree(from: &Path, to: &Path) -> Result<(), WorkspaceError> {
     if !from.is_dir() {
         return Ok(());
@@ -1005,8 +1013,11 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), WorkspaceError> {
     std::fs::create_dir_all(to).map_err(io(to))?;
     for entry in std::fs::read_dir(from).map_err(io(from))? {
         let entry = entry.map_err(io(from))?;
-        let target = to.join(entry.file_name());
         let kind = entry.file_type().map_err(io(&entry.path()))?;
+        if !kind.is_dir() && files::written_by_the_system(&entry.file_name().to_string_lossy()) {
+            continue;
+        }
+        let target = to.join(entry.file_name());
         refuse_link(kind, &entry.path())?;
         if kind.is_dir() {
             copy_tree(&entry.path(), &target)?;

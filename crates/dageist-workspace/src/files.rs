@@ -38,6 +38,17 @@ pub(crate) const NODE: &str = "node.json";
 /// A transform's step document, in its folder.
 pub(crate) const STEPS: &str = "steps.json";
 
+/// Whether a file named `name` is one an operating system writes into a folder a person browses,
+/// and so no file of a workspace: macOS's `.DS_Store` and the `._` files it writes on a volume that
+/// keeps no extended attributes, and Windows's `Thumbs.db` and `desktop.ini`, whose names Windows
+/// reads in any case.
+pub(crate) fn written_by_the_system(name: &str) -> bool {
+    name == ".DS_Store"
+        || name.starts_with("._")
+        || name.eq_ignore_ascii_case("Thumbs.db")
+        || name.eq_ignore_ascii_case("desktop.ini")
+}
+
 /// The text of the `.gitignore` a workspace holds.
 pub(crate) fn ignore_text() -> String {
     format!("{LOCAL}/\n{DATA}/\n")

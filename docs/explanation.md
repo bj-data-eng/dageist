@@ -200,7 +200,9 @@ git does not see: a workspace's history holds its graph, not its data. A
 workspace can be made from its files in a plain folder that is not a
 repository, such as a sample shipped with the application: its data is copied
 across, and the paths written relative to the folder are read against the
-copy. The files are JSON, laid out two
+copy. The files an operating system writes into a folder a person browses,
+`.DS_Store`, `._` files, `Thumbs.db` and `desktop.ini`, are passed by there
+and left out of the data copied. The files are JSON, laid out two
 spaces deep. They are read strictly: a field the format lacks, a value left out,
 a key written twice, or a file the format has no place for is refused, with the
 path of the file it was found in.
