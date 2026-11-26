@@ -659,6 +659,51 @@ fn enclosing_probe(found: &Found) -> Option<Probe> {
     })
 }
 
+/// The probe of a struct whose fields would be named alike: the struct made only of the inputs that
+/// write the name the rule says, a bare literal for `literal` and a bare column for any other.
+fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
+    if !matches!(found.rest, [] | [Segment::Start])
+        || !matches!(found.expression.start(), Start::Call(start)
+        if start.entry().id().as_str() == "polars.struct")
+    {
+        return None;
+    }
+    let name = refused.reason.split('"').nth(1)?;
+    let Start::Call(start) = found.expression.start() else {
+        return None;
+    };
+    let writes = |expression: &Expression| match (expression.start(), expression.links().is_empty())
+    {
+        (Start::Call(input), true) if name == "literal" => {
+            input.entry().id().as_str() == "polars.lit"
+        }
+        (Start::Call(input), true) => {
+            input.entry().id().as_str() == "polars.col"
+                && matches!(input.argument("name"), Some(Value::Columns(names)) if names.as_slice() == [name.to_owned()])
+        }
+        _ => false,
+    };
+    let kept: Vec<Value> = match start.argument("exprs")? {
+        Value::Many(items) => items
+            .iter()
+            .filter(|item| matches!(item, Value::Expression(expression) if writes(expression)))
+            .cloned()
+            .collect(),
+        _ => return None,
+    };
+    if kept.len() < 2 {
+        return None;
+    }
+    let only = call("polars.struct", vec![("exprs", Value::Many(kept))])?;
+    let held = place_of_the_part(found, false);
+    Some(Probe {
+        part: Expression::new(Start::Call(only), Vec::new()).ok()?,
+        filter: false,
+        before: None,
+        at: vec![held.clone(), held.then(Segment::Start)],
+    })
+}
+
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
@@ -806,6 +851,11 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     // takes it, beside its other operands, which a probe of the count alone does not hold.
     if matches!(refused.source, Source::Polars) && is_a_count_that_may_not_end(&refused.reason) {
         probes.push(enclosing_probe(&found));
+    }
+    // A struct that holds a part Polars refuses first is refused whole for that, and not for the
+    // names alike the rule found, which the inputs that write the name show alone.
+    if matches!(&refused.source, Source::Rule(rule) if *rule == FIELD_NAMES_RULE) {
+        probes.push(writers_of_a_name_probe(&found, refused));
     }
     let run = |part: Expression, filter: bool| {
         let document = document_of(case, &found, part, filter)?;
