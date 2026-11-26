@@ -665,9 +665,40 @@ fn enclosing_probe(found: &Found) -> Option<Probe> {
     })
 }
 
+/// The name an expression is written under where no call of it renames it: a literal is `literal`,
+/// a column is its own name, and a struct is named as its first input is.
+fn name_written(expression: &Expression) -> Option<String> {
+    // A chain keeps the name its start gives it unless a call renames it or reads a field.
+    let keeps_its_name = expression.links().iter().all(|link| {
+        let id = link.entry().id().as_str();
+        !id.starts_with("Expr.struct.") && !id.starts_with("Expr.name.") && id != "Expr.alias"
+    });
+    if !keeps_its_name {
+        return None;
+    }
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    match start.entry().id().as_str() {
+        "polars.lit" => Some("literal".to_owned()),
+        "polars.col" => match start.argument("name") {
+            Some(Value::Columns(names)) if names.len() == 1 => names.first().cloned(),
+            _ => None,
+        },
+        "polars.struct" => match start.argument("exprs") {
+            Some(Value::Many(items)) => match items.first() {
+                Some(Value::Expression(first)) => name_written(first),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// The probe of a struct whose fields would be named alike: the struct made only of the inputs that
-/// write the name the rule says, a literal for `literal` and a column for any other, that no call
-/// renames.
+/// write the name the rule says, those of its expressions that no call renames and that are written
+/// under it, and its named inputs of that name.
 fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
     if !matches!(found.rest, [] | [Segment::Start])
         || !matches!(found.expression.start(), Start::Call(start)
@@ -679,35 +710,40 @@ fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
     let Start::Call(start) = found.expression.start() else {
         return None;
     };
-    // A chain keeps the name its start gives it unless a call renames it or reads a field.
-    let keeps_its_name = |expression: &Expression| {
-        expression.links().iter().all(|link| {
-            let id = link.entry().id().as_str();
-            !id.starts_with("Expr.struct.") && !id.starts_with("Expr.name.") && id != "Expr.alias"
-        })
-    };
-    let writes = |expression: &Expression| match expression.start() {
-        Start::Call(input) if keeps_its_name(expression) && name == "literal" => {
-            input.entry().id().as_str() == "polars.lit"
-        }
-        Start::Call(input) if keeps_its_name(expression) => {
-            input.entry().id().as_str() == "polars.col"
-                && matches!(input.argument("name"), Some(Value::Columns(names)) if names.as_slice() == [name.to_owned()])
-        }
-        _ => false,
-    };
+    // Each writer stands as its start, which gives the name it writes, without the calls that go
+    // on from it and that Polars may refuse before it meets the names.
     let kept: Vec<Value> = match start.argument("exprs")? {
         Value::Many(items) => items
             .iter()
-            .filter(|item| matches!(item, Value::Expression(expression) if writes(expression)))
-            .cloned()
+            .filter_map(|item| match item {
+                Value::Expression(expression)
+                    if name_written(expression).as_deref() == Some(name) =>
+                {
+                    Expression::new(expression.start().clone(), Vec::new())
+                        .ok()
+                        .map(Value::Expression)
+                }
+                _ => None,
+            })
             .collect(),
         _ => return None,
     };
-    if kept.len() < 2 {
+    let named: Vec<(Value, Value)> = match start.argument("named_exprs") {
+        Some(Value::Pairs(pairs)) => pairs
+            .iter()
+            .filter(|(key, _)| matches!(key, Value::Columns(names) if names.as_slice() == [name.to_owned()]))
+            .cloned()
+            .collect(),
+        _ => Vec::new(),
+    };
+    if kept.len() + named.len() < 2 {
         return None;
     }
-    let only = call("polars.struct", vec![("exprs", Value::Many(kept))])?;
+    let mut given = vec![("exprs", Value::Many(kept))];
+    if !named.is_empty() {
+        given.push(("named_exprs", Value::Pairs(named)));
+    }
+    let only = call("polars.struct", given)?;
     let held = place_of_the_part(found, false);
     Some(Probe {
         part: Expression::new(Start::Call(only), Vec::new()).ok()?,
