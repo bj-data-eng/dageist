@@ -1598,21 +1598,20 @@ fn holds_a_null_comparison(key: &Expression, frames: &Frames) -> bool {
             && matches!(expression.start(), Start::Call(start)
                 if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0))
     };
-    // A whole number that some dtype cannot hold, below zero or above what an `Int8` holds, is
-    // one that Polars decides at once for a comparison of missing values where the dtype of what
-    // it is compared with cannot hold it, as it decides a comparison with a null.
-    // A number with a fraction is one that no whole number is, and a float that is a whole number
-    // some dtype cannot hold is one Polars rounds to it: it decides each at once for what it compares
-    // as it does a number that the dtype cannot hold.
-    let is_a_literal_some_dtype_lacks = |start: &Call| is_decided_for_a_column(frames, start);
-    let is_a_number_some_dtype_lacks = |expression: &Expression| {
+    // A literal that Polars decides a comparison of missing values with, for a column of some dtype
+    // of whole numbers, while it coerces the types, as it decides a comparison with a null: a
+    // number with a fraction, or a whole number that the dtype cannot hold, as the literal is cast
+    // to its dtype and rounded by Polars. Which literals those are is `is_decided_for_a_column`'s.
+    let is_decided_for_some_column = |start: &Call| is_decided_for_a_column(frames, start);
+    let is_such_a_literal_alone = |expression: &Expression| {
         expression.links().is_empty()
-            && matches!(expression.start(), Start::Call(start) if is_a_literal_some_dtype_lacks(start))
+            && matches!(expression.start(), Start::Call(start) if is_decided_for_some_column(start))
     };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
-        let number_start = matches!(expression.start(), Start::Call(start) if is_a_literal_some_dtype_lacks(start));
+        let number_start =
+            matches!(expression.start(), Start::Call(start) if is_decided_for_some_column(start));
         expression.links().iter().enumerate().any(|(at, link)| {
             let id = link.entry().id().as_str();
             // `is_between` compares each of its bounds with what it follows, so a bound that is
@@ -1640,7 +1639,7 @@ fn holds_a_null_comparison(key: &Expression, frames: &Frames) -> bool {
                     && ((wholly_single(expression, at, true)
                         && operands(link)
                             .into_iter()
-                            .any(|(_, operand)| is_a_number_some_dtype_lacks(operand)))
+                            .any(|(_, operand)| is_such_a_literal_alone(operand)))
                         || (number_start
                             && at == 0
                             && operands(link).into_iter().any(|(name, operand)| {
