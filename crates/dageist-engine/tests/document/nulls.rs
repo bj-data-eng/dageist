@@ -836,13 +836,14 @@ fn a_predicate_that_is_no_boolean_in_a_joins_key_is_refused_where_the_other_tabl
 #[test]
 fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_as_polars_takes_it()
 {
-    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers at once, for none is 1.5,
-    // and refuses the join for a key that is not elementwise, in both engines. Polars swaps the
-    // operands when it coerces them, so `lit(1.5).ne_missing(k)` is decided the same way. A number
-    // with no fraction is held by whole numbers, so the comparison is kept and the key is taken, and
-    // so is a number given the dtype of whole numbers, which makes `1.5` the whole number 1, and a
-    // key that is one value, as the count of a column or an aggregate of the comparison is, and the
-    // same comparison in no join.
+    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers while it coerces the types,
+    // for none is 1.5, and what it leaves is a constant repeated to the length of `k`, which the
+    // join refuses as not elementwise, in both engines. Polars swaps the operands when it coerces
+    // them, so `lit(1.5).ne_missing(k)` is decided the same way. A number with no fraction is held
+    // by whole numbers, so the comparison is kept and the key is taken, and so is a number given the
+    // dtype of whole numbers, which makes `1.5` the whole number 1, and a key that is one value, as
+    // the count of a column or an aggregate of the comparison is, for the constant is no longer
+    // repeated, and the same comparison in no join.
     let number = |value: f64, whole_dtype: Option<&str>| {
         let mut arguments = json!({ "value": { "float": value } });
         if let Some(name) = whole_dtype {
@@ -986,6 +987,792 @@ fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_a
         select(vec![beside("Expr.ne_missing", number(1.5, None))]),
     );
     taken("a select", &selected);
+}
+
+/// A join of the table `x` whose key is `key`, where `x` is one column of `dtype` holding 1, 1 and
+/// 2, with the key of the other table `rk`.
+fn join_on_a_column_of(dtype: &DataType, key: Value) -> Ran {
+    let working = df!("x" => [1_i64, 1, 2])
+        .expect("the table")
+        .lazy()
+        .select([col("x").cast(dtype.clone())])
+        .collect()
+        .expect("the column cast to its dtype");
+    let mut given = json!({ "left_on": many(vec![key]), "right_on": many(vec![field("rk")]) });
+    given["other"] = json!({ "table": "other" });
+    ran_on(
+        &Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document"),
+        &working,
+    )
+}
+
+/// What each report says of a key: that Polars and the walk both refuse it as not elementwise, or
+/// that neither refuses it.
+fn assert_refused_by_both(said: &str, report: &Ran) {
+    assert!(
+        polars_says(report).is_some_and(|reason| reason.contains("elementwise")),
+        "{said}: Polars says {:?}, the engine {:?}",
+        polars_says(report),
+        outcome(report)
+    );
+    assert!(
+        walk(report).refusal().is_some_and(|refusal| matches!(
+            refusal.refusal().source(),
+            RefusalSource::Rule(Rule::KeyIsElementwise)
+        )),
+        "{said}: {:?}",
+        walk(report).refusal()
+    );
+}
+
+fn assert_taken_by_both(said: &str, report: &Ran) {
+    assert!(
+        polars_says(report).is_none(),
+        "{said}: Polars says {:?}",
+        polars_says(report)
+    );
+    assert_eq!(walk(report).refusal(), None, "{said}");
+}
+
+#[test]
+fn a_missing_comparison_of_a_column_with_a_number_its_dtype_cannot_hold_is_no_elementwise_key_as_polars_takes_it()
+ {
+    // Python Polars 2.2.0 decides `x.eq_missing(300)` of an `Int8` column at once, for none of its
+    // values is 300, and the key it leaves is a constant repeated to the length of the column,
+    // which the join refuses as not elementwise, in both engines. It does the same for the number
+    // before the column, for `ne_missing`, and for a number below the lowest value or above the
+    // highest of any of the whole-number dtypes, and takes the number each of them holds, the
+    // lowest and the highest among them. The numbers are the ones a document can write, which
+    // are 64 bit, so every one of them is held by `Int64` and `Int128`; Polars decides none
+    // against a column of `UInt128`, not even a number below zero.
+    let bounds: [(DataType, i128, i128); 10] = [
+        (DataType::Int8, i128::from(i8::MIN), i128::from(i8::MAX)),
+        (DataType::Int16, i128::from(i16::MIN), i128::from(i16::MAX)),
+        (DataType::Int32, i128::from(i32::MIN), i128::from(i32::MAX)),
+        (DataType::Int64, i128::from(i64::MIN), i128::from(i64::MAX)),
+        (DataType::Int128, i128::MIN, i128::MAX),
+        (DataType::UInt8, 0, i128::from(u8::MAX)),
+        (DataType::UInt16, 0, i128::from(u16::MAX)),
+        (DataType::UInt32, 0, i128::from(u32::MAX)),
+        (DataType::UInt64, 0, i128::from(u64::MAX)),
+        (DataType::UInt128, i128::MIN, i128::MAX),
+    ];
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let beside = |method: &str, number: i64| {
+        chain(
+            col_call("x"),
+            vec![call(method, json!({ "other": whole(number) })), cast()],
+        )
+    };
+    let swapped = |method: &str, number: i64| {
+        chain(
+            call("polars.lit", json!({ "value": { "integer": number } })),
+            vec![call(method, json!({ "other": field("x") })), cast()],
+        )
+    };
+    for (held, lowest, highest) in bounds {
+        let mut numbers: Vec<i64> = vec![-1, 0, 1, 127, 128, 300, i64::MIN, i64::MAX];
+        for edge in [
+            lowest.checked_sub(1),
+            Some(lowest),
+            Some(highest),
+            highest.checked_add(1),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            numbers.extend(i64::try_from(edge));
+        }
+        numbers.sort_unstable();
+        numbers.dedup();
+        for number in numbers {
+            let holds = (lowest..=highest).contains(&i128::from(number));
+            for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+                for (form, key) in [
+                    ("beside", beside(method, number)),
+                    ("swapped", swapped(method, number)),
+                ] {
+                    let said = format!("{method} {form}, {number} and a column of {held}");
+                    let report = join_on_a_column_of(&held, key);
+                    if holds {
+                        assert_taken_by_both(&said, &report);
+                    } else {
+                        assert_refused_by_both(&said, &report);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_missing_comparison_with_a_number_that_the_dtype_of_what_is_compared_holds_is_taken_in_a_joins_key()
+ {
+    // The column is of the dtype it is cast to, so a cast that widens it holds the number that
+    // the column did not, and one that narrows it does not hold the number the column did.
+    let cast_to = |word: &str| call("Expr.cast", json!({ "dtype": dtype(word) }));
+    let compared = |casts: Vec<Value>, method: &str, other: Value| {
+        let mut then = casts;
+        then.push(call(method, json!({ "other": other })));
+        then.push(cast_to("Int64"));
+        chain(col_call("x"), then)
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        taken_cases(method, &compared);
+        // `x` is an `Int8` and a cast to `Int16` holds 300.
+        assert_taken_by_both(
+            &format!("{method}, widened"),
+            &join_on_a_column_of(
+                &DataType::Int8,
+                compared(vec![cast_to("Int16")], method, whole(300)),
+            ),
+        );
+        assert_taken_by_both(
+            &format!("{method}, widened to whole numbers with a sign"),
+            &join_on_a_column_of(
+                &DataType::UInt8,
+                compared(vec![cast_to("Int64")], method, whole(-1)),
+            ),
+        );
+        assert_refused_by_both(
+            &format!("{method}, narrowed"),
+            &join_on_a_column_of(
+                &DataType::Int64,
+                compared(vec![cast_to("Int8")], method, whole(300)),
+            ),
+        );
+        assert_refused_by_both(
+            &format!("{method}, narrowed to an unsigned dtype"),
+            &join_on_a_column_of(
+                &DataType::Int64,
+                compared(vec![cast_to("UInt16")], method, whole(-1)),
+            ),
+        );
+    }
+}
+
+/// The comparisons with a number that Polars takes as they are: a comparison that does not take a
+/// missing value as a value, whatever the number is, a number with no fraction, and what is one
+/// value, as the sum of the column is.
+fn taken_cases(method: &str, compared: &dyn Fn(Vec<Value>, &str, Value) -> Value) {
+    let none = Vec::new;
+    let float = |number: f64| {
+        chain(
+            call("polars.lit", json!({ "value": { "float": number } })),
+            Vec::new(),
+        )
+    };
+    assert_taken_by_both(
+        &format!("{method} of an Int8 and a number with no fraction"),
+        &join_on_a_column_of(&DataType::Int8, compared(none(), method, float(2.0))),
+    );
+    for other in [
+        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+    ] {
+        assert_taken_by_both(
+            &format!("{other} of an Int8 and 300"),
+            &join_on_a_column_of(&DataType::Int8, compared(none(), other, whole(300))),
+        );
+    }
+    let summed = chain(
+        col_call("x"),
+        vec![
+            call(method, json!({ "other": whole(300) })),
+            call("Expr.sum", json!({})),
+        ],
+    );
+    assert_taken_by_both(
+        &format!("{method} of an Int8 and 300, summed"),
+        &join_on_a_column_of(&DataType::Int8, summed),
+    );
+}
+
+#[test]
+fn a_missing_comparison_of_a_field_read_from_a_struct_or_with_a_number_given_its_dtype_is_judged_alike()
+ {
+    // What a struct holds in a field is a column of the dtype of the field, and a number given a
+    // dtype is the number it is, whichever dtype it is given: Polars decides the comparison for
+    // each as it does for a column, and so does the walk.
+    let cast = |word: &str| call("Expr.cast", json!({ "dtype": dtype(word) }));
+    let eq_missing = |other: Value| call("Expr.eq_missing", json!({ "other": other }));
+    let given = |number: i64, word: &str| {
+        chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "integer": number }, "dtype": dtype(word) }),
+            ),
+            Vec::new(),
+        )
+    };
+    let in_a_struct = |number: i64| {
+        chain(
+            call(
+                "polars.struct",
+                json!({ "exprs": many(vec![field_then("x", vec![cast("Int8")])]) }),
+            ),
+            vec![
+                call("Expr.struct.field", json!({ "name": { "field": "x" } })),
+                eq_missing(whole(number)),
+                cast("Int64"),
+            ],
+        )
+    };
+    assert_refused_by_both(
+        "a field of Int8 and 300",
+        &join_on_a_column_of(&DataType::Int64, in_a_struct(300)),
+    );
+    assert_taken_by_both(
+        "a field of Int8 and 1",
+        &join_on_a_column_of(&DataType::Int64, in_a_struct(1)),
+    );
+    let beside = |number: Value| chain(col_call("x"), vec![eq_missing(number), cast("Int64")]);
+    let swapped = |start: Value| {
+        chain(
+            start,
+            vec![
+                call("Expr.eq_missing", json!({ "other": field("x") })),
+                cast("Int64"),
+            ],
+        )
+    };
+    for (held, number, word, refused) in [
+        (DataType::Int8, 300, "Int16", true),
+        (DataType::Int8, 300, "Float64", true),
+        (DataType::UInt8, -1, "Int8", true),
+        (DataType::Int16, 300, "Int16", false),
+        (DataType::Int8, 100, "Int16", false),
+    ] {
+        let said = format!("{number} given {word} and a column of {held}");
+        let report = join_on_a_column_of(&held, beside(given(number, word)));
+        let start = given(number, word)["expression"]["start"].clone();
+        let reversed = join_on_a_column_of(&held, swapped(start));
+        if refused {
+            assert_refused_by_both(&said, &report);
+            assert_refused_by_both(&format!("{said}, swapped"), &reversed);
+        } else {
+            assert_taken_by_both(&said, &report);
+            assert_taken_by_both(&format!("{said}, swapped"), &reversed);
+        }
+    }
+}
+
+/// A literal of `value` (`{"integer": n}` or `{"float": f}`), given the dtype `word` where it is
+/// one.
+fn literal_of(value: Value, word: Option<&str>) -> Value {
+    let mut arguments = json!({ "value": value });
+    if let Some(word) = word {
+        arguments["dtype"] = dtype(word);
+    }
+    call("polars.lit", arguments)
+}
+
+/// A key that compares the column `x` with the literal, or the literal with the column, by `method`.
+fn compared_with_a_literal(method: &str, literal: &Value, swapped: bool) -> Value {
+    let cast = call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    if swapped {
+        chain(
+            literal.clone(),
+            vec![call(method, json!({ "other": field("x") })), cast],
+        )
+    } else {
+        chain(
+            col_call("x"),
+            vec![
+                call(
+                    method,
+                    json!({ "other": chain(literal.clone(), Vec::new()) }),
+                ),
+                cast,
+            ],
+        )
+    }
+}
+
+#[test]
+fn a_number_given_a_dtype_is_decided_as_polars_coerces_it_for_a_column_of_whole_numbers() {
+    // Polars rounds a literal of 32 or 64 bit floats to the whole number it is, where that number
+    // casts exactly (below 2^24 for 32 bit floats beside the 8 and 16 bit whole numbers, which it
+    // meets in 32 bit floats, and below 2^53 otherwise), and decides the comparison where the column
+    // cannot hold it. It leaves a literal of 16 bit floats or of `Boolean` as it is, and a number
+    // that casts inexactly. A number with no dtype and a whole value is the whole number it is, as a
+    // fraction is no whole number's.
+    let integer = |number: i64| json!({ "integer": number });
+    let float = |number: f64| json!({ "float": number });
+    // The column, the literal, and whether Polars refuses the key.
+    let cases: Vec<(DataType, Value, bool)> = vec![
+        // Whole numbers that no longer cast exactly are kept.
+        (
+            DataType::Int8,
+            literal_of(integer(1_152_921_504_606_846_976), Some("Float64")),
+            false,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(100_000_000), Some("Float32")),
+            false,
+        ),
+        // A 16 bit float and a flag are not rewritten.
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Boolean")),
+            false,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(integer(-1), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(integer(-1), Some("Boolean")),
+            false,
+        ),
+        // Floats that are whole numbers the column cannot hold are decided, typed or not.
+        (DataType::Int8, literal_of(float(300.0), None), true),
+        (DataType::UInt8, literal_of(float(-1.0), None), true),
+        (DataType::UInt64, literal_of(float(-1.0), None), true),
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Float64")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(integer(300), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(integer(-1), Some("Float32")),
+            true,
+        ),
+        // And are kept where it can.
+        (DataType::Int16, literal_of(float(300.0), None), false),
+        (DataType::Int8, literal_of(float(100.0), None), false),
+        (DataType::UInt8, literal_of(float(0.0), None), false),
+        // A fraction is decided for the floats that Polars rounds.
+        (DataType::Int8, literal_of(float(1.5), None), true),
+        (
+            DataType::Int8,
+            literal_of(float(1.5), Some("Float32")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(float(1.5), Some("Float16")),
+            false,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(float(-1.5), Some("Float64")),
+            true,
+        ),
+        // The literal is the value cast to its dtype, as the step engine makes it, so a float or a
+        // text that casts to whole numbers is a whole-number literal, and text that casts to a
+        // float is a float.
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Int16")),
+            true,
+        ),
+        (DataType::UInt8, literal_of(float(-1.0), Some("Int8")), true),
+        (
+            DataType::UInt64,
+            literal_of(float(-1.0), Some("Int8")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "300" }), Some("Int16")),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(json!({ "string": "-1" }), Some("Int8")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "1.5" }), Some("Float64")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "100" }), Some("Int16")),
+            false,
+        ),
+        // A whole number above what 128 bits of signed whole numbers hold is held by `UInt128`
+        // alone, so Polars decides it for the unsigned columns of 8 to 64 bits and keeps it for
+        // the others.
+        (
+            DataType::UInt8,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(
+                json!({ "string": "340282366920938463463374607431768211455" }),
+                Some("UInt128"),
+            ),
+            true,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(float(2e38), Some("UInt128")),
+            true,
+        ),
+        (
+            DataType::UInt128,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            false,
+        ),
+        (
+            DataType::Int64,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            false,
+        ),
+    ];
+    for (held, literal, refused) in cases {
+        for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+            for swapped in [false, true] {
+                let said = format!("{method} {literal} of a column of {held}, swapped: {swapped}");
+                let report =
+                    join_on_a_column_of(&held, compared_with_a_literal(method, &literal, swapped));
+                if refused {
+                    assert_refused_by_both(&said, &report);
+                } else {
+                    assert_taken_by_both(&said, &report);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_refuses_it_for() {
+    // Every whole-number column, every kind of literal and the numbers around each limit, both
+    // methods and both orders, with the verdict of Polars as the oracle. A literal that cannot be
+    // made of its value and dtype is none that Polars says anything of, and is passed over.
+    let columns = [
+        DataType::Int8,
+        DataType::Int16,
+        DataType::Int32,
+        DataType::Int64,
+        DataType::Int128,
+        DataType::UInt8,
+        DataType::UInt16,
+        DataType::UInt32,
+        DataType::UInt64,
+        DataType::UInt128,
+    ];
+    let integers: [i64; 20] = [
+        -1,
+        0,
+        1,
+        127,
+        128,
+        255,
+        256,
+        300,
+        65_536,
+        70_000,
+        (1 << 24) - 1,
+        1 << 24,
+        100_000_000,
+        1 << 31,
+        (1 << 53) - 1,
+        1 << 53,
+        1 << 60,
+        i64::MIN,
+        i64::MAX,
+        -129,
+    ];
+    let floats: [f64; 11] = [
+        -1.0,
+        0.0,
+        100.0,
+        300.0,
+        1.5,
+        -1.5,
+        16_777_216.0,
+        16_777_217.5,
+        9_007_199_254_740_992.0,
+        1e18,
+        2e38,
+    ];
+    // Numbers above 64 bits, which a text or a float can give: the greatest 128 bit whole number
+    // and the next, and the greatest unsigned one.
+    let texts = [
+        "300",
+        "-1",
+        "1.5",
+        "100000000",
+        "170141183460469231731687303715884105727",
+        "170141183460469231731687303715884105728",
+        "340282366920938463463374607431768211455",
+    ];
+    let dtypes = [
+        None,
+        Some("Float64"),
+        Some("Float32"),
+        Some("Float16"),
+        Some("Boolean"),
+        Some("Int8"),
+        Some("Int16"),
+        Some("Int32"),
+        Some("Int64"),
+        Some("Int128"),
+        Some("UInt8"),
+        Some("UInt16"),
+        Some("UInt32"),
+        Some("UInt64"),
+        Some("UInt128"),
+    ];
+    let mut literals: Vec<Value> = Vec::new();
+    for number in integers {
+        for word in dtypes {
+            literals.push(literal_of(json!({ "integer": number }), word));
+        }
+    }
+    for number in floats {
+        for word in dtypes {
+            literals.push(literal_of(json!({ "float": number }), word));
+        }
+    }
+    // Text only makes a literal where it casts to its dtype.
+    for text in texts {
+        for word in dtypes.into_iter().flatten() {
+            literals.push(literal_of(json!({ "string": text }), Some(word)));
+        }
+    }
+    let mut differences: Vec<String> = Vec::new();
+    let mut compared = 0;
+    for held in &columns {
+        for literal in &literals {
+            for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+                for swapped in [false, true] {
+                    let report = join_on_a_column_of(
+                        held,
+                        compared_with_a_literal(method, literal, swapped),
+                    );
+                    let said = polars_says(&report);
+                    if said
+                        .as_ref()
+                        .is_some_and(|reason| !reason.contains("elementwise"))
+                    {
+                        continue;
+                    }
+                    compared += 1;
+                    let refused_by_polars = said.is_some();
+                    let refused_by_the_walk = walk(&report).refusal().is_some_and(|refusal| {
+                        matches!(
+                            refusal.refusal().source(),
+                            RefusalSource::Rule(Rule::KeyIsElementwise)
+                        )
+                    });
+                    if refused_by_polars != refused_by_the_walk {
+                        differences.push(format!(
+                            "{method} {literal} of a column of {held}, swapped: {swapped}: \
+                             Polars refuses: {refused_by_polars}, the walk: {refused_by_the_walk}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(compared > 5_000, "only {compared} keys were compared");
+    assert!(
+        differences.is_empty(),
+        "{} of {compared} differ:\n{}",
+        differences.len(),
+        differences
+            .iter()
+            .take(40)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+#[test]
+fn a_missing_comparison_of_a_column_whose_dtype_is_not_known_is_not_judged_in_a_joins_key() {
+    // A list of lists is no representative dtype, so the dtype of what a cast to it gives is not
+    // known and whether it holds the number cannot be said: the walk neither refuses the key nor
+    // takes it, but says that it cannot tell.
+    let cast = || {
+        call(
+            "Expr.cast",
+            json!({ "dtype": dtype("List(List(Float64))") }),
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        let beside = chain(
+            col_call("x"),
+            vec![cast(), call(method, json!({ "other": whole(300) }))],
+        );
+        let swapped = chain(
+            call("polars.lit", json!({ "value": { "integer": 300 } })),
+            vec![call(
+                method,
+                json!({ "other": field_then("x", vec![cast()]) }),
+            )],
+        );
+        for (form, key) in [("beside", beside), ("swapped", swapped)] {
+            let report = join_on_a_column_of(&DataType::Int64, key);
+            assert_eq!(walk(&report).refusal(), None, "{method} {form}");
+            assert!(walk(&report).not_known().is_some(), "{method} {form}");
+        }
+    }
+}
+
+#[test]
+fn a_missing_comparison_that_polars_keeps_leaves_the_rest_of_a_joins_key_to_the_rules() {
+    // A column that holds the number is compared as it is, so an aggregate of the comparison beside
+    // a column makes the key not elementwise, as an aggregate of any other value does, and so does one
+    // of a comparison that Polars decides, for the aggregate is still beside a column.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let beside_the_column = |method: &str, number: Value| {
+        chain(
+            col_call("x"),
+            vec![
+                cast(),
+                call(
+                    "Expr.add",
+                    json!({ "other": chain(
+                        col_call("x"),
+                        vec![
+                            call(method, json!({ "other": number })),
+                            call("Expr.sum", json!({})),
+                            cast(),
+                        ],
+                    ) }),
+                ),
+            ],
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        for (held, number) in [
+            (DataType::Int16, 300),
+            (DataType::Int64, 70_000),
+            (DataType::UInt8, 200),
+            (DataType::Int8, 300),
+            (DataType::Int8, 100),
+        ] {
+            assert_refused_by_both(
+                &format!("{method} {number} of {held}, summed beside the column"),
+                &join_on_a_column_of(&held, beside_the_column(method, whole(number))),
+            );
+        }
+    }
+}
+
+#[test]
+fn a_missing_comparison_that_polars_decides_in_what_a_joins_key_holds_is_no_elementwise_key() {
+    // The constant repeated to the length of the column is no elementwise key wherever it stands
+    // in the key: as an operand of arithmetic, or as the predicate of a condition.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let compared = |method: &str, number: Value| {
+        chain(
+            col_call("x"),
+            vec![call(method, json!({ "other": number })), cast()],
+        )
+    };
+    let fraction = || {
+        chain(
+            call("polars.lit", json!({ "value": { "float": 1.5 } })),
+            Vec::new(),
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        for (said, held, number) in [
+            ("a number the dtype cannot hold", DataType::Int8, whole(300)),
+            ("a number with a fraction", DataType::Int64, fraction()),
+        ] {
+            let operand = join_on_a_column_of(
+                &held,
+                chain(
+                    col_call("x"),
+                    vec![
+                        cast(),
+                        call(
+                            "Expr.add",
+                            json!({ "other": compared(method, number.clone()) }),
+                        ),
+                    ],
+                ),
+            );
+            assert_refused_by_both(&format!("{method} with {said}, an operand"), &operand);
+            let predicate = join_on_a_column_of(
+                &held,
+                chain(
+                    call(
+                        "polars.when",
+                        json!({ "predicates": many(vec![chain(
+                            col_call("x"),
+                            vec![call(method, json!({ "other": number }))],
+                        )]) }),
+                    ),
+                    vec![
+                        call("When.then", json!({ "statement": whole(1) })),
+                        call("Then.otherwise", json!({ "statement": whole(0) })),
+                        cast(),
+                    ],
+                ),
+            );
+            assert_refused_by_both(&format!("{method} with {said}, a predicate"), &predicate);
+        }
+    }
+}
+
+#[test]
+fn a_decided_comparison_that_an_aggregate_of_a_joins_key_is_given_leaves_the_key_one_value() {
+    // The constant repeated to the length of the column is no elementwise key beside a column, but a
+    // key that is wholly one value is taken whole, whatever the aggregate that makes it is given.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let fraction = chain(
+        call("polars.lit", json!({ "value": { "float": 1.5 } })),
+        Vec::new(),
+    );
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        let key = chain(
+            col_call("x"),
+            vec![
+                call(
+                    "Expr.eq_missing",
+                    json!({ "other": chain(
+                        col_call("x"),
+                        vec![call(method, json!({ "other": fraction.clone() }))],
+                    ) }),
+                ),
+                call("Expr.null_count", json!({})),
+                cast(),
+            ],
+        );
+        assert_taken_by_both(
+            &format!("the count of nulls of a column compared with {method} of a fraction"),
+            &join_on_a_column_of(&DataType::Int64, key),
+        );
+    }
 }
 
 #[test]
@@ -1332,8 +2119,9 @@ fn a_count_compared_with(entry: &str, number: i64) -> Value {
 fn a_count_compared_as_a_value_with_a_number_no_dtype_holds_is_one_polars_may_fold_in_a_joins_key()
 {
     // Polars decides a comparison that takes a missing value as a value, of an unsigned count
-    // with a number below zero, at once, so what it follows is a literal and no aggregate, and the
-    // key is taken. It does not decide a comparison that is not of missing values so.
+    // with a number below zero, while it coerces the types. What is compared is one value, so it
+    // leaves a plain constant, with no length to repeat it to and no aggregate, and the key is
+    // taken. It does not decide a comparison that is not of missing values so.
     for entry in ["Expr.ne_missing", "Expr.eq_missing"] {
         let report = join_on(a_count_compared_with(entry, -1));
         assert!(
@@ -1343,6 +2131,47 @@ fn a_count_compared_as_a_value_with_a_number_no_dtype_holds_is_one_polars_may_fo
         );
         assert_eq!(walk(&report).refusal(), None, "{entry}");
     }
+}
+
+#[test]
+fn a_count_compared_as_a_value_with_a_number_that_has_a_fraction_is_one_polars_decides_in_a_joins_key()
+ {
+    // No count is 1.5, so Polars decides the comparison of the count while it coerces the types,
+    // and what it leaves, a plain constant, is no aggregate beside a column, as it is not for a
+    // number below zero. A comparison of the count that is not of missing values is kept.
+    let fraction = || {
+        chain(
+            call("polars.lit", json!({ "value": { "float": 1.5 } })),
+            Vec::new(),
+        )
+    };
+    let compared = |entry: &str| {
+        chain(
+            call("polars.lit", json!({ "value": { "integer": 1 } })),
+            vec![
+                call("Expr.len", json!({})),
+                call(entry, json!({ "other": fraction() })),
+                call("Expr.sub", json!({ "other": field("a") })),
+            ],
+        )
+    };
+    for entry in ["Expr.ne_missing", "Expr.eq_missing"] {
+        let report = join_on(compared(entry));
+        assert!(
+            polars_says(&report).is_none(),
+            "{entry}: {:?}",
+            outcome(&report)
+        );
+        assert_eq!(walk(&report).refusal(), None, "{entry}");
+    }
+    let report = join_on(compared("Expr.gt"));
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert_eq!(
+        walk(&report)
+            .refusal()
+            .map(|refusal| refusal.refusal().source()),
+        Some(RefusalSource::Rule(Rule::KeyIsElementwise))
+    );
 }
 
 #[test]

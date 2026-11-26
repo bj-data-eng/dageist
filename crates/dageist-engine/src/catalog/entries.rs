@@ -2188,7 +2188,13 @@ fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
     let Some(dtype) = dtype else {
         return untyped_literal("value", value);
     };
-    // With a dtype, Python casts a one-value series and makes a scalar of it.
+    Ok(lit(typed_literal(value, dtype)?))
+}
+
+/// The scalar that `polars.lit` makes of `value` given `dtype`: Python casts a one-value series
+/// of the value to the dtype, strictly, and makes a scalar of it. It is the one place a document's
+/// literal becomes a typed value of Polars, which the walk asks as the step engine does.
+pub(crate) fn typed_literal(value: &Argument, dtype: &DataType) -> Result<Scalar, BuildError> {
     let name = "literal".into();
     let series = match value {
         Argument::Integer(value) => Series::new(name, [*value]),
@@ -2199,10 +2205,10 @@ fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
         other => return Err(Arguments::wrong("value", "a number, text or a flag", other)),
     }
     .strict_cast(dtype)?;
-    Ok(lit(Scalar::new(
+    Ok(Scalar::new(
         series.dtype().clone(),
         series.get(0)?.into_static(),
-    )))
+    ))
 }
 
 /// A part of a date or a time that is not given, which Python makes the number 0.

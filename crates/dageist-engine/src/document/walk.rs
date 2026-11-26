@@ -232,6 +232,8 @@ impl Step {
             zones: Vec::new(),
             fieldsets: Vec::new(),
             gave_no_expression: 0,
+            undecided_folds: 0,
+            repeated_comparisons: 0,
             keyed_unnests: 0,
             names: Vec::new(),
             written: Vec::new(),
@@ -437,6 +439,14 @@ struct Walker<'a> {
     fieldsets: Vec<Fields>,
     /// How many expressions gave no expression: an unnest of a struct that has no field.
     gave_no_expression: usize,
+    /// How many comparisons of missing values with a number that some dtype cannot hold the walk met
+    /// whose dtype of what is compared it could not use, as that is one value, whose dtype decides
+    /// what Polars does and which a limit of the fuzz tests covers, or is not known.
+    undecided_folds: usize,
+    /// How many comparisons of missing values of a column the walk met that Polars decides for no
+    /// value of the column, and that end a chain of values for each row: what each leaves is a
+    /// constant repeated to the length of the column, wherever it stands in a key.
+    repeated_comparisons: usize,
     /// How many unnests stood in a join's key, whose columns are written by how many keys the other
     /// table expands to.
     keyed_unnests: usize,
@@ -1885,6 +1895,8 @@ impl Walker<'_> {
     /// the predicate there, and which is an argument of a call otherwise.
     fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
         let none_before = self.gave_no_expression;
+        let undecided_before = self.undecided_folds;
+        let repeated_before = self.repeated_comparisons;
         let keyed_before = self.keyed_unnests;
         // The values of a condition end the predicate where the condition is
         // all the expression is: a method that goes on from it is what ends it.
@@ -2217,7 +2229,7 @@ impl Walker<'_> {
             Start::Call(start) if start.entry().id().as_str() == "polars.struct" => start_given,
             start => start_name(start, expression.links()),
         };
-        let mut compares_with_a_fraction = false;
+        let mut folds_to_a_repeat = false;
         // Whether a link unnests a struct that has no field: it gives no expression, and what
         // follows it is none either.
         let mut gives_no_expression = false;
@@ -2256,22 +2268,19 @@ impl Walker<'_> {
                 Cur::Value { shape, .. } => Some(*shape),
                 _ => None,
             };
-            // Polars decides a comparison of missing values of whole numbers with a number that has
-            // a fraction at once, for no whole number is it, and refuses the join whose key that
-            // leaves with no value for each row, as not elementwise. Whether the key is one is
-            // for what ends the chain to say: a key that is one value, as the count or the sum of
-            // the comparison is, is taken whole.
-            compares_with_a_fraction |= is_a_comparison_of_missing_values(link)
-                && (matches!(&cur, Cur::Value { dtype: Some(dtype), shape: Shape::Many, .. } if is_a_whole_number(*dtype))
-                    && operands(link).into_iter().any(is_a_number_with_a_fraction)
-                    || at == 0
-                        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start))
-                        && arguments.iter().any(|(name, operand)| {
-                            name == "other"
-                                && operand.known
-                                && operand.shape == Shape::Many
-                                && operand.dtype.is_some_and(is_a_whole_number)
-                        }));
+            // Polars decides some comparisons of missing values of a column of whole numbers while it
+            // coerces the types, for no value of the column is the number: one with a number that has a
+            // fraction, or with a whole number that the dtype of the column cannot hold. What it
+            // leaves is a constant repeated to the length of the column, which a join refuses as not
+            // elementwise, for `repeat` is no elementwise call and the length is an aggregate. Whether
+            // the key is one is for what ends the chain to say: a key that is one value, as the count
+            // or the sum of the comparison is, is taken whole. Where the dtype of the column is not
+            // known the chain says so, and the walk does not judge the key.
+            match fold_of_a_missing_comparison(expression, at, &cur, &arguments) {
+                Fold::Repeats => folds_to_a_repeat = true,
+                Fold::Undecided => self.undecided_folds += 1,
+                Fold::Kept => {}
+            }
             let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
             gives_no_expression |= link.entry().id().as_str() == "Expr.struct.unnest"
                 && fields_followed.as_ref().is_some_and(Fields::is_empty);
@@ -2351,6 +2360,20 @@ impl Walker<'_> {
         if self.keyed_unnests > keyed_before && !matches!(last_end, Some(Ending::Refused(_))) {
             last_end = Some(Ending::NotKnown(Unknown::AnUnnestAsAKey));
         }
+        // What a comparison that Polars decides leaves, where the chain goes on to end with a value
+        // for each row, is as many constants as the column has values, which a key that holds one,
+        // at any depth, is not elementwise for.
+        if folds_to_a_repeat
+            && matches!(
+                &cur,
+                Cur::Value {
+                    shape: Shape::Many,
+                    ..
+                }
+            )
+        {
+            self.repeated_comparisons += 1;
+        }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
             // A value of a condition in a filter need be a Boolean only where
@@ -2380,20 +2403,23 @@ impl Walker<'_> {
             let as_read = self
                 .read_against()
                 .and_then(|schema| with_null_columns_as_literals(expression, schema));
-            let is_many = matches!(
-                &cur,
-                Cur::Value {
-                    shape: Shape::Many,
-                    ..
-                }
-            );
+            // A key that is wholly one value is taken whole, whatever the aggregate that makes it is
+            // given, as it is for the aggregate beside a column.
+            let repeats = self.repeated_comparisons > repeated_before
+                && !wholly_single(expression, expression.links().len(), true);
+            let comparisons = if self.undecided_folds > undecided_before {
+                Comparisons::SomeUndecided
+            } else {
+                Comparisons::AllJudged
+            };
             // An expression that holds what gives no expression is judged without it, which the
             // syntax of the whole does not show.
             if self.gave_no_expression == none_before
-                && (is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
-                    || compares_with_a_fraction
-                        && is_many
-                        && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight))
+                && (is_not_elementwise(
+                    expression,
+                    as_read.as_ref().unwrap_or(expression),
+                    comparisons,
+                ) || repeats)
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -2715,6 +2741,18 @@ impl Walker<'_> {
                             [dtype] => number.beside(*dtype),
                             _ => None,
                         })
+                };
+                // A number that stays no dtype beside values for each row is a value for each row
+                // with them, as it is where its dtype is known.
+                let shape = if dtype.is_none()
+                    && shape == Shape::One
+                    && meetings
+                        .iter()
+                        .any(|(_, operand)| operand.known && operand.shape == Shape::Many)
+                {
+                    Shape::Many
+                } else {
+                    shape
                 };
                 Cur::Value {
                     dtype,
@@ -4141,10 +4179,11 @@ fn starts_from_a_null(expression: &Expression) -> bool {
 }
 
 /// Whether an expression holds, at any depth, a comparison of a null literal
-/// with what reads a column and is not one value. Polars folds the comparison
-/// into a null, and a key with a null where a column was is not elementwise. A
-/// comparison with what an earlier one folded is left to a limit: what Polars
-/// does with it depends on dtypes that the document does not decide.
+/// with what reads a column and is not one value. Polars decides the comparison
+/// while it coerces the types, and leaves a null repeated to the length of what is compared, which
+/// is not elementwise, where that is many values, and the null alone where it is one value. A
+/// comparison with what an earlier one decided is left to a limit: what Polars does with it
+/// depends on dtypes that the document does not decide.
 fn holds_a_null_comparison(expression: &Expression) -> bool {
     let start = match expression.start() {
         Start::Call(call) => Some(call),
@@ -4224,15 +4263,31 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         })
 }
 
+/// What the walk found of the comparisons of missing values with a number that a key holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Comparisons {
+    /// Each is one the walk could judge, by the dtype of what is compared, or there is none.
+    AllJudged,
+    /// Some is one Polars may decide by a dtype that the walk does not follow: Polars may have
+    /// replaced it by a constant that hides what it is given, so the rest of the key is not judged
+    /// as it would be.
+    SomeUndecided,
+}
+
 /// Whether a key is not elementwise, as Polars takes it: it holds an aggregate
 /// beside what is not one value, or a column compared with a null. A key that is
 /// wholly one value is the whole key, which the tables measured, and Polars
 /// allows it. It takes the null literal beside a column as elementwise, and an
 /// aggregate as not. The second expression is the key with each column of the dtype Null made the
 /// null literal, which only the comparison with a null reads.
-fn is_not_elementwise(key: &Expression, with_nulls_for_null_columns: &Expression) -> bool {
+fn is_not_elementwise(
+    key: &Expression,
+    with_nulls_for_null_columns: &Expression,
+    comparisons: Comparisons,
+) -> bool {
     !wholly_single(key, key.links().len(), true)
         && !holds_a_comparison_that_polars_may_fold(key)
+        && comparisons == Comparisons::AllJudged
         && (holds_an_aggregate(key)
             || holds_what_polars_evaluates(key, &is_counting)
             || holds_a_null_comparison(with_nulls_for_null_columns)
@@ -4310,24 +4365,18 @@ fn with_null_columns_as_literals(expression: &Expression, schema: &Schema) -> Op
     changed.then_some(rebuilt)
 }
 
-/// Whether an expression holds, at any depth, a comparison that Polars may fold: an interval with
-/// a null bound of a dtype, which it folds into a null for some dtypes of what it bounds and not
-/// for others, or with a negative whole number as a bound, which it decides at once where what it
-/// bounds is unsigned, as a count is, and keeps where it is not; or an `eq_missing` or an
-/// `ne_missing` of a value and a whole number that some dtype cannot hold, which it decides at
-/// once where the value's dtype cannot hold it, as a count's cannot hold a number below zero, and
-/// keeps where it can. The other comparisons are kept whatever the number is. The fold leaves
-/// nothing in the key that is not elementwise. The document does not decide which dtype it is, so
-/// what a key that holds one is judged to be is left to a limit.
+/// Whether an expression holds, at any depth, an interval that Polars may decide while it coerces
+/// the types: one with a null bound of a dtype, which it decides for some dtypes of what it bounds
+/// and not for others, or with a negative whole number as a bound, which it decides at once where
+/// what it bounds is unsigned, as a count is, and keeps where it is not. What it leaves of a
+/// decided interval is a constant, which is one value where what is bounded is, and a constant
+/// repeated to the length of what is bounded where that is many values. The document does not
+/// decide which dtype it is, so the key that holds one is judged to be one value that is taken
+/// whole, and a limit of the fuzz tests holds the rest. A comparison of missing values with a
+/// number that some dtype cannot hold is found as the walk follows the chain, which knows what is
+/// compared.
 fn holds_a_comparison_that_polars_may_fold(expression: &Expression) -> bool {
-    let starts_from_a_number = matches!(expression.start(), Start::Call(start)
-        if start.entry().id().as_str() == "polars.lit"
-            && matches!(start.argument("value"), Some(Value::Integer(number)) if some_dtype_lacks(*number)));
-    expression.links().iter().enumerate().any(|(at, link)| {
-        is_a_comparison_of_missing_values(link)
-            && (operands(link).into_iter().any(is_a_number_some_dtype_lacks)
-                || (starts_from_a_number && follows_the_start(expression, at)))
-    }) || calls_of(expression).any(|call| {
+    calls_of(expression).any(|call| {
         (call.entry().id().as_str() == "Expr.is_between"
             && operands(call).into_iter().any(|operand| {
                 (is_a_null(operand)
@@ -4349,19 +4398,269 @@ fn is_a_comparison_of_missing_values(link: &Call) -> bool {
     )
 }
 
-/// Whether a whole number is one that some dtype cannot hold: one below zero, which no unsigned
-/// dtype holds, or above 127, which an `Int8` does not. A number from zero to 127 is held by
-/// every dtype, and Polars never decides a comparison with one at once.
-fn some_dtype_lacks(number: i64) -> bool {
-    !(0..=127).contains(&number)
+/// The whole-number dtypes a column may have, which a comparison of missing values with a literal
+/// is decided for or kept by their own bounds.
+const WHOLE_NUMBERS: [Representative; 10] = [
+    Representative::Int8,
+    Representative::Int16,
+    Representative::Int32,
+    Representative::Int64,
+    Representative::Int128,
+    Representative::UInt8,
+    Representative::UInt16,
+    Representative::UInt32,
+    Representative::UInt64,
+    Representative::UInt128,
+];
+
+/// Whether a dtype of whole numbers holds `number`: it casts to the dtype and keeps its value.
+/// `Int128` holds every whole number that fits 128 signed bits, and `UInt128` every one from zero
+/// up to that, the ones above it being [`Typed::AboveSigned`], which a text or a float given the
+/// dtype of `UInt128` can be.
+const fn holds_strictly(dtype: Representative, number: i128) -> bool {
+    match dtype {
+        Representative::Int8 => number >= i8::MIN as i128 && number <= i8::MAX as i128,
+        Representative::Int16 => number >= i16::MIN as i128 && number <= i16::MAX as i128,
+        Representative::Int32 => number >= i32::MIN as i128 && number <= i32::MAX as i128,
+        Representative::Int64 => number >= i64::MIN as i128 && number <= i64::MAX as i128,
+        Representative::UInt8 => number >= 0 && number <= u8::MAX as i128,
+        Representative::UInt16 => number >= 0 && number <= u16::MAX as i128,
+        Representative::UInt32 => number >= 0 && number <= u32::MAX as i128,
+        Representative::UInt64 => number >= 0 && number <= u64::MAX as i128,
+        Representative::UInt128 => number >= 0,
+        _ => true,
+    }
 }
 
-/// Whether an expression is a whole number that some dtype cannot hold and no more.
-fn is_a_number_some_dtype_lacks(expression: &Expression) -> bool {
-    expression.links().is_empty()
+/// A literal of a comparison of missing values, as the step engine makes it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Typed {
+    /// A whole number given no dtype, which adapts to what it meets.
+    UntypedWhole(i64),
+    /// A float given no dtype: a 64 bit float.
+    UntypedFloat(f64),
+    /// A 32 or 64 bit float, which is 32 bit where `narrow`.
+    Float { value: f64, narrow: bool },
+    /// A whole number of a dtype of its own.
+    Whole { dtype: Representative, value: i128 },
+    /// A whole number of `UInt128` above what `Int128` holds, which no signed dtype holds.
+    AboveSigned,
+    /// Any other: 16 bit floats, `Boolean`, text, or a value that does not cast to its dtype.
+    Other,
+}
+
+/// The literal that `call` makes, if it is `lit`. Given a dtype it is what the step engine makes,
+/// which is `typed_literal`: the value cast strictly to the dtype, so a float given a dtype of
+/// whole numbers is a whole number, and a text given a number's dtype is that number.
+fn literal_of(call: &Call) -> Option<Typed> {
+    use polars::prelude::{AnyValue, DataType as D};
+    if call.entry().id().as_str() != "polars.lit" {
+        return None;
+    }
+    let value = call.argument("value")?;
+    match call.argument("dtype") {
+        None => Some(match value {
+            Value::Integer(number) => Typed::UntypedWhole(*number),
+            Value::Float(number) => Typed::UntypedFloat(*number),
+            _ => Typed::Other,
+        }),
+        Some(Value::Dtype(dtype)) => {
+            let Ok(scalar) = catalog::typed_literal(&value.placeholder(), dtype.as_polars()) else {
+                return Some(Typed::Other);
+            };
+            Some(match (scalar.dtype(), scalar.value()) {
+                (D::Float64, AnyValue::Float64(value)) => Typed::Float {
+                    value: *value,
+                    narrow: false,
+                },
+                (D::Float32, AnyValue::Float32(value)) => Typed::Float {
+                    value: f64::from(*value),
+                    narrow: true,
+                },
+                (D::UInt128, AnyValue::UInt128(value)) if i128::try_from(*value).is_err() => {
+                    Typed::AboveSigned
+                }
+                (dtype, value) => match (Representative::of(dtype), whole_value(value)) {
+                    (Some(dtype), Some(value)) if is_a_whole_number(dtype) => {
+                        Typed::Whole { dtype, value }
+                    }
+                    _ => Typed::Other,
+                },
+            })
+        }
+        Some(_) => Some(Typed::Other),
+    }
+}
+
+/// The whole number that a value of Polars is, where it is one.
+fn whole_value(value: &polars::prelude::AnyValue) -> Option<i128> {
+    use polars::prelude::AnyValue as V;
+    Some(match *value {
+        V::Int8(value) => i128::from(value),
+        V::Int16(value) => i128::from(value),
+        V::Int32(value) => i128::from(value),
+        V::Int64(value) => i128::from(value),
+        V::Int128(value) => value,
+        V::UInt8(value) => i128::from(value),
+        V::UInt16(value) => i128::from(value),
+        V::UInt32(value) => i128::from(value),
+        V::UInt64(value) => i128::from(value),
+        V::UInt128(value) => i128::try_from(value).ok()?,
+        _ => return None,
+    })
+}
+
+/// Whether Polars decides a comparison of missing values of a column of `column`, a dtype of whole
+/// numbers, with `literal`, while it coerces the types, for no value of the column is the
+/// literal. It follows `coerce_comparison_literal` of Polars 2.2.0:
+///
+/// - A literal of 32 or 64 bit floats is read as the number it is, where that number casts to the
+///   float exactly: below 2^24 for 32 bit floats where the column meets them as 32 bit floats, which
+///   the 8 and 16 bit whole numbers do, and below 2^53 otherwise. A number with a fraction, or a
+///   whole number the column cannot hold, is decided. A number that casts inexactly is kept.
+/// - A literal of 16 bit floats or of `Boolean`, or of any dtype that is not a number, is kept.
+/// - A literal of whole numbers is decided where the column cannot hold it. It is never for a
+///   column of `UInt128`, which no signed literal meets, and not where it has the dtype of the
+///   column.
+/// - A literal that is no dtype of its own is the number it is: a whole number of a dtype that
+///   adapts to the column, or a float that is a 64 bit float.
+///
+/// A comparison with `UInt128` of a whole number typed as a float is decided where the number is
+/// below zero, as it is not where the number is typed as a whole number.
+fn decides(column: Representative, literal: Typed) -> bool {
+    if !is_a_whole_number(column) {
+        return false;
+    }
+    // The floats that Polars rounds to whole numbers: the value as the float holds it, and the
+    // number below which a whole number casts to the float exactly.
+    let rounded = |value: f64, exact_below: f64| {
+        if value.is_nan() || value.abs() >= exact_below {
+            return false;
+        }
+        let floor = value.floor();
+        floor != value || !holds_strictly(column, floor as i128)
+    };
+    match literal {
+        // `UInt128` holds every number a document can write, even one below zero.
+        Typed::UntypedWhole(number) => {
+            column != Representative::UInt128 && !holds_strictly(column, i128::from(number))
+        }
+        Typed::UntypedFloat(value) => rounded(value, 2f64.powi(53)),
+        Typed::Float { value, narrow } => {
+            let meets_as_float32 = matches!(
+                column,
+                Representative::Int8
+                    | Representative::Int16
+                    | Representative::UInt8
+                    | Representative::UInt16
+            );
+            rounded(
+                value,
+                if narrow && meets_as_float32 {
+                    2f64.powi(24)
+                } else {
+                    2f64.powi(53)
+                },
+            )
+        }
+        Typed::Whole { dtype, value } => {
+            dtype != column && column != Representative::UInt128 && !holds_strictly(column, value)
+        }
+        // Polars decides it for the unsigned columns of 8 to 64 bits, which the rest of the whole
+        // numbers meet in a dtype that holds it or in none.
+        Typed::AboveSigned => matches!(
+            column,
+            Representative::UInt8
+                | Representative::UInt16
+                | Representative::UInt32
+                | Representative::UInt64
+        ),
+        Typed::Other => false,
+    }
+}
+
+/// What the walk makes of a comparison of missing values with a number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fold {
+    /// Polars keeps the comparison, or it holds no number that Polars decides it for.
+    Kept,
+    /// Polars decides the comparison for a value in each row of a column of whole numbers, none of
+    /// which is the number: the number has a fraction, or the dtype of the column cannot hold it.
+    Repeats,
+    /// A whole number that some dtype cannot hold, or a number with a fraction, where what is
+    /// compared is not a value for each row of a dtype that is known: if it is one value, the dtype
+    /// of the value decides whether Polars keeps the comparison or leaves a plain constant, which the
+    /// walk does not follow, and a limit of the fuzz tests covers it.
+    Undecided,
+}
+
+/// What Polars makes of the comparison of missing values that is the link `at` of `expression`,
+/// where `receiver` is what the chain gives before it and `arguments` are what the link is given.
+/// The number is the operand of the link or, where the chain starts from the number, the start, and
+/// what is compared with it is the other of the two.
+fn fold_of_a_missing_comparison(
+    expression: &Expression,
+    at: usize,
+    receiver: &Cur,
+    arguments: &[(String, Operand)],
+) -> Fold {
+    let link = &expression.links()[at];
+    if !is_a_comparison_of_missing_values(link) {
+        return Fold::Kept;
+    }
+    // What is compared, and the literals it is compared with: the value the chain has come to with
+    // the operands of the link, and, where the chain starts from a literal, the operand it is given
+    // with the start.
+    let mut compared: Vec<(Option<Representative>, Shape, Vec<Typed>)> = Vec::new();
+    if let Cur::Value { dtype, shape, .. } = receiver {
+        let literals = operands(link)
+            .into_iter()
+            .filter(|operand| operand.links().is_empty())
+            .filter_map(|operand| match operand.start() {
+                Start::Call(call) => literal_of(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .collect();
+        compared.push((*dtype, *shape, literals));
+    }
+    if at == 0
+        && let Start::Call(start) = expression.start()
+        && let Some(literal) = literal_of(start)
+        && let Some((_, other)) = arguments.iter().find(|(name, _)| name == "other")
+    {
+        compared.push((other.dtype, other.shape, vec![literal]));
+    }
+    // A literal that some dtype of whole numbers is decided for.
+    let is_decided_for_some_dtype =
+        |literal: Typed| WHOLE_NUMBERS.iter().any(|dtype| decides(*dtype, literal));
+    let mut fold = Fold::Kept;
+    for (dtype, shape, literals) in compared {
+        for literal in literals {
+            match (dtype, shape) {
+                (Some(dtype), Shape::Many) => {
+                    if decides(dtype, literal) {
+                        return Fold::Repeats;
+                    }
+                }
+                _ => {
+                    if is_decided_for_some_dtype(literal) {
+                        fold = Fold::Undecided;
+                    }
+                }
+            }
+        }
+    }
+    // A literal that leads a chain which calls that leave it as it was follow: what is compared
+    // with it is not the first operand, and the dtype of it is not asked.
+    if fold == Fold::Kept
+        && at > 0
         && matches!(expression.start(), Start::Call(start)
-            if start.entry().id().as_str() == "polars.lit"
-                && matches!(start.argument("value"), Some(Value::Integer(number)) if some_dtype_lacks(*number)))
+            if literal_of(start).is_some_and(is_decided_for_some_dtype))
+        && follows_the_start(expression, at)
+    {
+        fold = Fold::Undecided;
+    }
+    fold
 }
 
 /// Whether a dtype holds whole numbers only.
@@ -4379,29 +4678,6 @@ const fn is_a_whole_number(dtype: Representative) -> bool {
             | Representative::UInt64
             | Representative::UInt128
     )
-}
-
-/// Whether an expression is a number typed in that has a fraction, and no more.
-fn is_a_number_with_a_fraction(expression: &Expression) -> bool {
-    expression.links().is_empty()
-        && matches!(expression.start(), Start::Call(start) if is_a_fraction(start))
-}
-
-/// Whether a call is `lit` of a number that has a fraction and is no whole number's: it is given no
-/// dtype or a 32 or 64 bit float, the two Polars rewrites the number of, for it makes the number the
-/// whole number it is cut to where it is given the dtype of whole numbers and does not rewrite one
-/// of 16 bits.
-fn is_a_fraction(call: &Call) -> bool {
-    call.entry().id().as_str() == "polars.lit"
-        && matches!(call.argument("value"), Some(Value::Float(number)) if number.is_finite() && number.fract() != 0.0)
-        && match call.argument("dtype") {
-            None => true,
-            Some(Value::Dtype(dtype)) => matches!(
-                dtype.as_polars(),
-                polars::prelude::DataType::Float32 | polars::prelude::DataType::Float64
-            ),
-            Some(_) => false,
-        }
 }
 
 /// Whether an expression is a whole number below zero and no more.
