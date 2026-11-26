@@ -583,9 +583,10 @@ pub(super) fn gives(
                     "count"
                 },
             );
-            // The values keep what the receiver is: the fields of a struct, with a number left open
-            // in it, and the width of an array.
+            // The values keep what the receiver is: a number left open, the fields of a struct, with
+            // a number left open in it, and the width of an array.
             let mut values = Field::of_class(name, receiver);
+            values.loose = chosen.follows_an_open_number;
             if receiver == Some(Representative::Struct)
                 && let Some(held) = chosen.fields
             {

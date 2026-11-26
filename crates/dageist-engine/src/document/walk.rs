@@ -2904,6 +2904,7 @@ impl Walker<'_> {
                 &place,
                 &Chosen::default()
                     .with_open_numbers(&open_numbers)
+                    .following_an_open_number(receiver_loose.is_some())
                     .among_others(self.siblings_of_the_item())
                     .with_argument_fields(&argument_fields)
                     .with_arguments(&judged)
@@ -3031,6 +3032,7 @@ impl Walker<'_> {
             .collect();
         let chosen = Chosen::default()
             .with_open_numbers(&open_numbers)
+            .following_an_open_number(receiver_loose.is_some())
             .among_others(self.siblings_of_the_item())
             .with_argument_fields(&argument_fields)
             .with_arguments(&given)

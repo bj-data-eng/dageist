@@ -102,6 +102,8 @@ pub struct Chosen<'a> {
     pub(super) argument_fields: &'a [(&'a str, &'a Fields)],
     /// The arguments that are a number typed without a dtype, which adapts to what it meets.
     pub(super) open_numbers: &'a [&'a str],
+    /// The call follows a number typed without a dtype, which it keeps open in what it makes.
+    pub(super) follows_an_open_number: bool,
     /// How many other expressions stand beside this one in the list it is an item of: the other
     /// predicates of a filter.
     pub(super) among_others: usize,
@@ -213,6 +215,14 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_open_numbers(mut self, numbers: &'a [&'a str]) -> Self {
         self.open_numbers = numbers;
+        self
+    }
+
+    /// That the call follows a number typed without a dtype, as the first call of an expression
+    /// that starts with one does.
+    #[must_use]
+    pub(crate) const fn following_an_open_number(mut self, open: bool) -> Self {
+        self.follows_an_open_number = open;
         self
     }
 
