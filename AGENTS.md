@@ -43,6 +43,13 @@ same features, crate patches, dependency versions and toolchain as that
 release, checked by the API generator's release check. Moving it to another
 release follows [the how-to](docs/how-to.md#move-polars-to-a-new-release).
 
+This repository is public, so an issue or pull request body that names
+another project's issue or pull request (`owner/repo#N` or its URL) adds an
+entry to that item's timeline, and the merge commit repeats the body as a
+second entry. Name it from the one dageist issue that tracks the matter, and
+from a pull request body only where it matters. Keep it out of commit messages
+and titles.
+
 ## Discover The Current Structure
 
 Read the relevant sources below; manifests establish package/dependency facts
