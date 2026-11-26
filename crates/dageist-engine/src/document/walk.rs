@@ -2168,7 +2168,18 @@ impl Walker<'_> {
         let mut gives_no_expression = false;
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
+            let none_before_the_arguments = self.gave_no_expression;
             let arguments = self.arguments(link, values_end);
+            // A call given what expands to no expression is made as if it were not there, so what
+            // it gives is not told, nor is what follows it.
+            if self.gave_no_expression > none_before_the_arguments {
+                gives_no_expression = true;
+                calls.push(Standing::not_asked());
+                held_fields.push(None);
+                cur = Cur::Dead;
+                self.path.pop();
+                continue;
+            }
             // The first link follows the start, which is a number typed without a dtype when
             // it is one.
             let receiver_loose = match expression.start() {
