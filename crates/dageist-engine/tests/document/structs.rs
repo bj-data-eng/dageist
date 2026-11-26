@@ -1343,3 +1343,22 @@ fn an_open_number_in_a_struct_in_a_struct_is_as_open_as_one_in_a_struct_as_a_key
         found.walked_name
     );
 }
+
+#[test]
+fn a_call_given_an_unnest_of_no_field_is_made_as_if_it_were_not_there_and_the_walk_cannot_tell() {
+    // Python Polars 2.2.0 makes `select("g", col("g").str.tail(z))` of three rows and one column,
+    // for `z` an unnest of a struct of no field: an expression given one expands to none. The
+    // walk does not judge what holds it, as it does not judge the call on a struct it is meant for.
+    let none = chain(col_call("s_one"), unnest_of_none());
+    let found = ask("s_xz", vec![call("Expr.str.tail", json!({ "n": none }))]);
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what it gives: {:?}",
+        found.walked_name
+    );
+}
