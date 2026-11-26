@@ -169,13 +169,14 @@ pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::RangeIsValid
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
+pub dageist_engine::allowed::Rule::StructIsFilledForwardOrBackward
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
 pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 24]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 25]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -233,6 +234,7 @@ pub const fn dageist_engine::allowed::Allowance::columns(&self) -> core::option:
 pub const fn dageist_engine::allowed::Allowance::fields(&self) -> core::option::Option<&dageist_engine::allowed::Fields>
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
+pub const fn dageist_engine::allowed::Allowance::width(&self) -> core::option::Option<usize>
 pub struct dageist_engine::allowed::ArgumentSlot<'a>
 impl<'a> dageist_engine::allowed::ArgumentSlot<'a>
 pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dageist_engine::catalog::Entry, parameter: &'a str, method_place: dageist_engine::allowed::Place) -> Self
@@ -281,6 +283,7 @@ pub const fn dageist_engine::allowed::Field::fields(&self) -> core::option::Opti
 pub fn dageist_engine::allowed::Field::name(&self) -> &str
 pub fn dageist_engine::allowed::Field::of_class(name: impl core::convert::Into<alloc::string::String>, class: core::option::Option<dageist_engine::allowed::Representative>) -> Self
 pub fn dageist_engine::allowed::Field::of_dtype(name: impl core::convert::Into<alloc::string::String>, dtype: &polars_core::datatypes::dtype::DataType) -> Self
+pub const fn dageist_engine::allowed::Field::width(&self) -> core::option::Option<usize>
 pub fn dageist_engine::allowed::Field::written(&self) -> &str
 pub struct dageist_engine::allowed::Fields(_)
 impl dageist_engine::allowed::Fields
@@ -305,6 +308,7 @@ pub struct dageist_engine::allowed::Input<'a>
 impl<'a> dageist_engine::allowed::Input<'a>
 pub const fn dageist_engine::allowed::Input<'a>::loose_if(self, loose: bool) -> Self
 pub const fn dageist_engine::allowed::Input<'a>::new(name: core::option::Option<&'a str>, class: core::option::Option<dageist_engine::allowed::Representative>, fields: core::option::Option<&'a dageist_engine::allowed::Fields>) -> Self
+pub const fn dageist_engine::allowed::Input<'a>::with_width(self, width: core::option::Option<usize>) -> Self
 pub struct dageist_engine::allowed::Offer
 impl dageist_engine::allowed::Offer
 pub const fn dageist_engine::allowed::Offer::entry(&self) -> &'static dageist_engine::catalog::Entry
