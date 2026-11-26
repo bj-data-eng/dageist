@@ -460,7 +460,12 @@ fn left_is_many(step: &Call, parameter: &str) -> bool {
 /// a hole. A key is never given a name by an alias, which Polars refuses in a
 /// join's key and the catalogue does not hold.
 fn key_name(key: &Expression) -> Option<String> {
-    start_name(key.start(), key.links())
+    // What a field read or an unnest of fields not known here names it by, as the walk does.
+    key.links()
+        .iter()
+        .fold(start_name(key.start(), key.links()), |name, link| {
+            name_after(link, name, None)
+        })
 }
 
 /// The name an expression is written under after `link`, which `before` is the name it was written
@@ -1760,6 +1765,26 @@ impl Walker<'_> {
             .collect()
     }
 
+    /// How many other expressions stand beside the one being walked in the list of items it is one
+    /// of: the other predicates and constraints of a filter, where it is an item of one.
+    fn siblings_of_the_item(&self) -> usize {
+        if self.step.entry().id().as_str() != "LazyFrame.filter" {
+            return 0;
+        }
+        if !matches!(
+            self.path.first(),
+            Some(Segment::Parameter(name)) if name == "predicates" || name == "constraints"
+        ) {
+            return 0;
+        }
+        let items = |name: &str| match self.step.argument(name) {
+            Some(Value::Many(items)) => items.len(),
+            Some(Value::Pairs(pairs)) => pairs.len(),
+            _ => 0,
+        };
+        (items("predicates") + items("constraints")).saturating_sub(1)
+    }
+
     /// The zone the walk holds under `name`.
     fn zone_named(&mut self, name: &str) -> Zone {
         let at = self
@@ -2845,6 +2870,7 @@ impl Walker<'_> {
                 &place,
                 &Chosen::default()
                     .with_open_numbers(&open_numbers)
+                    .among_others(self.siblings_of_the_item())
                     .with_argument_fields(&argument_fields)
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
@@ -2971,6 +2997,7 @@ impl Walker<'_> {
             .collect();
         let chosen = Chosen::default()
             .with_open_numbers(&open_numbers)
+            .among_others(self.siblings_of_the_item())
             .with_argument_fields(&argument_fields)
             .with_arguments(&given)
             .with_unclassed(&unclassed)

@@ -102,6 +102,9 @@ pub struct Chosen<'a> {
     pub(super) argument_fields: &'a [(&'a str, &'a Fields)],
     /// The arguments that are a number typed without a dtype, which adapts to what it meets.
     pub(super) open_numbers: &'a [&'a str],
+    /// How many other expressions stand beside this one in the list it is an item of: the other
+    /// predicates of a filter.
+    pub(super) among_others: usize,
     /// The names the call is given, each by the parameter that holds it: the name of a field to read
     /// or drop, the new names of the fields, the name of a count.
     pub(super) names: &'a [(&'a str, &'a str)],
@@ -196,6 +199,13 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
+        self
+    }
+
+    /// How many other expressions stand beside this one in the list of items it is one of.
+    #[must_use]
+    pub const fn among_others(mut self, others: usize) -> Self {
+        self.among_others = others;
         self
     }
 
@@ -444,6 +454,9 @@ pub enum Unknown {
     /// A field read by several names gives several columns, which are no value of one dtype outside
     /// a select or a sort.
     SeveralColumnsOfAFieldRead,
+    /// An unnest that is one of several predicates of a filter expands to a predicate for each field,
+    /// or to none, which Polars takes as they come.
+    AnUnnestAmongPredicates,
     /// Arithmetic on a struct is done field by field, and Polars does it irregularly.
     ArithmeticOnAStruct,
     /// Structs whose fields differ meet, which Polars casts field by field and refuses or not by
@@ -453,7 +466,7 @@ pub enum Unknown {
 
 impl Unknown {
     /// Every reason, in the order they are listed.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::TheStartsDtype,
         Self::TheResultsDtype,
         Self::TheFieldsOfAStruct,
@@ -461,6 +474,7 @@ impl Unknown {
         Self::AnUnnestOfNoField,
         Self::AnOpenNumberInAKey,
         Self::SeveralColumnsOfAFieldRead,
+        Self::AnUnnestAmongPredicates,
         Self::ArithmeticOnAStruct,
         Self::StructsOfOtherFieldsMeet,
     ];
@@ -476,6 +490,7 @@ impl Unknown {
             Self::AnUnnestOfNoField => "an-unnest-of-no-field",
             Self::AnOpenNumberInAKey => "an-open-number-in-a-key",
             Self::SeveralColumnsOfAFieldRead => "several-columns-of-a-field-read",
+            Self::AnUnnestAmongPredicates => "an-unnest-among-predicates",
             Self::ArithmeticOnAStruct => "arithmetic-on-a-struct",
             Self::StructsOfOtherFieldsMeet => "structs-of-other-fields-meet",
         }
@@ -492,6 +507,7 @@ impl fmt::Display for Unknown {
             Self::AnUnnestOfNoField => "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings",
             Self::AnOpenNumberInAKey => "a number typed without a dtype stays open in a struct that is a join's key, and Polars does not match it with the other table's key as its dtype resolves (Polars issue draft 23)",
             Self::SeveralColumnsOfAFieldRead => "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort",
+            Self::AnUnnestAmongPredicates => "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come",
             Self::ArithmeticOnAStruct => "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly",
             Self::StructsOfOtherFieldsMeet => "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are",
         })
@@ -1113,6 +1129,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         .is_some_and(|columns| columns.len() != 1)
         && place.context.outer() == Outer::Filter
         && place.context.nested().is_none()
+        && chosen.among_others == 0
     {
         return Err(Refusal::rule(Rule::OneColumnIsNeeded));
     }
@@ -1408,15 +1425,41 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         && struct_gives
             .columns()
             .is_some_and(|columns| columns.is_empty());
+    // Beside another predicate of a filter an unnest is taken, which the tables, measured with it as
+    // the only one, refuse.
+    let unnested_among_predicates = id == "Expr.struct.unnest"
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+        && chosen.among_others > 0;
+    // Each field is a predicate then, which must be a flag.
+    if unnested_among_predicates
+        && let Some(field) = struct_gives.columns().and_then(|columns| {
+            columns.iter().find(|field| {
+                field
+                    .class()
+                    .is_some_and(|class| class != Representative::Boolean)
+            })
+        })
+    {
+        return Err(Refusal::rule_because(
+            Rule::FilterPredicateIsBoolean,
+            &format!(
+                "the field {:?} is a predicate of the filter and is {}, not Boolean",
+                field.name(),
+                field.written()
+            ),
+        ));
+    }
+    let skipped = unnested_key || unnested_nothing || unnested_among_predicates;
     let cell = tables
         .contexts
         .get(&(measured_as, form, place.context))
-        .filter(|_| !unnested_key && !unnested_nothing)
+        .filter(|_| !skipped)
         .or_else(|| {
             tables
                 .contexts
                 .get(&(measured_as, Vec::new(), place.context))
-                .filter(|_| !unnested_key && !unnested_nothing)
+                .filter(|_| !skipped)
         });
     if let Some(cell) = cell {
         match &cell.continues {
@@ -1527,6 +1570,17 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     if unnested_nothing {
         ending = Ending::NotKnown(Unknown::AnUnnestOfNoField);
+    }
+    if id == "Expr.struct.unnest"
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+        && chosen.among_others > 0
+        && !unnested_nothing
+        && struct_gives
+            .columns()
+            .is_some_and(|columns| columns.len() >= 2)
+    {
+        ending = Ending::NotKnown(Unknown::AnUnnestAmongPredicates);
     }
     // Polars keeps a number typed without a dtype open in a struct that is a join's key, so the key
     // does not match the one the number is given its dtype in, though both resolve to one (Polars

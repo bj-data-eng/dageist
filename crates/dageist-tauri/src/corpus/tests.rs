@@ -498,6 +498,10 @@ const UNKNOWN_NOT_HELD: &[(&str, &str)] = &[
         "no document the corpus plans reads a struct by several names outside a select or a sort; one was not tried, and may be built",
     ),
     (
+        "an-unnest-among-predicates",
+        "no document the corpus plans unnests a struct beside another predicate of a filter; one was not tried, and may be built",
+    ),
+    (
         "arithmetic-on-a-struct",
         "no document the corpus plans calculates with a struct, whose fields it does not make; one was not tried, and may be built",
     ),

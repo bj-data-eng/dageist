@@ -11,7 +11,9 @@ use dageist_engine::document::{Document, Inputs, Outcome, Report, Resolution, Se
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, col_call, document, field, many, step, text, text_call, whole};
+use crate::support::{
+    call, chain, col_call, document, field, field_then, many, step, text, text_call, whole,
+};
 
 // ---------------------------------------------------------------------------
 // The table
@@ -1517,8 +1519,17 @@ fn a_filter_of_several_predicates_takes_an_unnest_beside_the_others_as_polars_do
             chain(col_call("s_one"), unnest_of_none()),
         ),
         (
-            "an unnest of several fields",
-            chain(col_call("s_abc"), vec![unnest()]),
+            "an unnest of two flags",
+            chain(
+                call(
+                    "polars.struct",
+                    json!({ "exprs": many(vec![
+                        field("f"),
+                        field_then("n", vec![call("Expr.gt", json!({ "other": whole(1) }))]),
+                    ]) }),
+                ),
+                vec![unnest()],
+            ),
         ),
     ] {
         let found = ask_step(step(
@@ -1537,6 +1548,18 @@ fn a_filter_of_several_predicates_takes_an_unnest_beside_the_others_as_polars_do
             found.walk_refusal
         );
     }
+    // Beside a flag a field that is no flag is refused, as a predicate of any other dtype is.
+    let found = ask_step(step(
+        "s",
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![field("f"), chain(col_call("s_abc"), vec![unnest()])]) }),
+    ));
+    assert_refused_by(
+        &found,
+        "filter-predicate-is-boolean",
+        &["Float64"],
+        "an unnest of a struct of a number beside a flag",
+    );
     // Alone they are refused, which the rule says and Polars does.
     for predicate in [
         chain(col_call("s_one"), unnest_of_none()),

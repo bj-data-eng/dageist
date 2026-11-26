@@ -761,6 +761,13 @@ impl Gen<'_> {
             Host::JoinLeft | Host::JoinRight | Host::JoinOn => {
                 self.join_keys(first, &mut slots, host == Host::JoinOn)
             }
+            // A filter may hold a predicate beside another, which Polars judges as it does not
+            // judge one alone.
+            Host::Filter if self.draw.chance(30) => {
+                self.budget = 6;
+                let second = self.chain(&mut slots, 0, goal).expression;
+                (vec![first.expression, second], Vec::new())
+            }
             _ => (vec![first.expression], Vec::new()),
         };
         let held_one = || held[0].clone();
@@ -776,7 +783,7 @@ impl Gen<'_> {
         };
         let mut given: Vec<(&str, Value)> = match host {
             Host::Select | Host::WithColumns => vec![("exprs", many(held.clone()))],
-            Host::Filter => vec![("predicates", as_list(held_one()))],
+            Host::Filter => vec![("predicates", many(held.clone()))],
             Host::Sort => vec![("by", as_list(held_one()))],
             Host::JoinLeft => vec![
                 ("other", Value::Table(OTHER.to_owned())),

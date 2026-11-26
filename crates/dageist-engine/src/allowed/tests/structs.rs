@@ -305,6 +305,7 @@ fn cannot_tell(verdict: &Verdict) -> String {
 fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
     let fields = xy();
     let none = Fields::of_dtype(&DataType::Struct(Vec::new())).expect("a struct");
+    let flags = a_struct_of(&[("p", DataType::Boolean), ("q", DataType::Boolean)]);
     let select = after_a_struct();
     let key = Place::new(
         Context::step(Outer::JoinLeft),
@@ -366,6 +367,23 @@ fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
                 .with_names(&[("name", "x"), ("more_names", "y")]),
         )),
         "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort"
+    );
+    // An unnest of several fields beside another predicate of a filter.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.struct.unnest"),
+            &Place::new(
+                Context::step(Outer::Filter),
+                After::Value {
+                    dtype: Representative::Struct,
+                    shape: Shape::Many,
+                },
+            ),
+            &Chosen::default()
+                .following_fields(Some(&flags))
+                .among_others(1),
+        )),
+        "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come"
     );
     // A struct met by a struct, which Polars does field by field.
     assert_eq!(
