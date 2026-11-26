@@ -1187,6 +1187,75 @@ fn taken_cases(method: &str, compared: &dyn Fn(Vec<Value>, &str, Value) -> Value
 }
 
 #[test]
+fn a_missing_comparison_of_a_field_read_from_a_struct_or_with_a_number_given_its_dtype_is_judged_alike()
+ {
+    // What a struct holds in a field is a column of the dtype of the field, and a number given a
+    // dtype is the number it is, whichever dtype it is given: Polars decides the comparison for
+    // each as it does for a column, and so does the walk.
+    let cast = |word: &str| call("Expr.cast", json!({ "dtype": dtype(word) }));
+    let eq_missing = |other: Value| call("Expr.eq_missing", json!({ "other": other }));
+    let given = |number: i64, word: &str| {
+        chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "integer": number }, "dtype": dtype(word) }),
+            ),
+            Vec::new(),
+        )
+    };
+    let in_a_struct = |number: i64| {
+        chain(
+            call(
+                "polars.struct",
+                json!({ "exprs": many(vec![field_then("x", vec![cast("Int8")])]) }),
+            ),
+            vec![
+                call("Expr.struct.field", json!({ "name": { "field": "x" } })),
+                eq_missing(whole(number)),
+                cast("Int64"),
+            ],
+        )
+    };
+    assert_refused_by_both(
+        "a field of Int8 and 300",
+        &join_on_a_column_of(&DataType::Int64, in_a_struct(300)),
+    );
+    assert_taken_by_both(
+        "a field of Int8 and 1",
+        &join_on_a_column_of(&DataType::Int64, in_a_struct(1)),
+    );
+    let beside = |number: Value| chain(col_call("x"), vec![eq_missing(number), cast("Int64")]);
+    let swapped = |start: Value| {
+        chain(
+            start,
+            vec![
+                call("Expr.eq_missing", json!({ "other": field("x") })),
+                cast("Int64"),
+            ],
+        )
+    };
+    for (held, number, word, refused) in [
+        (DataType::Int8, 300, "Int16", true),
+        (DataType::Int8, 300, "Float64", true),
+        (DataType::UInt8, -1, "Int8", true),
+        (DataType::Int16, 300, "Int16", false),
+        (DataType::Int8, 100, "Int16", false),
+    ] {
+        let said = format!("{number} given {word} and a column of {held}");
+        let report = join_on_a_column_of(&held, beside(given(number, word)));
+        let start = given(number, word)["expression"]["start"].clone();
+        let reversed = join_on_a_column_of(&held, swapped(start));
+        if refused {
+            assert_refused_by_both(&said, &report);
+            assert_refused_by_both(&format!("{said}, swapped"), &reversed);
+        } else {
+            assert_taken_by_both(&said, &report);
+            assert_taken_by_both(&format!("{said}, swapped"), &reversed);
+        }
+    }
+}
+
+#[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
     // what its other bound reads is not met, where the interval of a count and a column bounded
