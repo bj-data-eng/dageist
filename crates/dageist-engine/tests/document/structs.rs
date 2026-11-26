@@ -1506,3 +1506,52 @@ fn a_call_given_an_unnest_of_no_field_is_made_as_if_it_were_not_there_and_the_wa
         found.walked_name
     );
 }
+
+#[test]
+fn a_filter_of_several_predicates_takes_an_unnest_beside_the_others_as_polars_does() {
+    // Polars refuses an expression that expands to none or to several only as the sole predicate
+    // of a filter: beside another it is taken, each expression it expands to a predicate.
+    for (what, predicate) in [
+        (
+            "an unnest of no field",
+            chain(col_call("s_one"), unnest_of_none()),
+        ),
+        (
+            "an unnest of several fields",
+            chain(col_call("s_abc"), vec![unnest()]),
+        ),
+    ] {
+        let found = ask_step(step(
+            "s",
+            "LazyFrame.filter",
+            json!({ "predicates": many(vec![field("f"), predicate]) }),
+        ));
+        assert_eq!(
+            found.polars,
+            Said::Accepts,
+            "Polars refuses {what} beside a flag"
+        );
+        assert!(
+            found.walk_refusal.is_none(),
+            "the walk refuses {what} beside a flag: {:?}",
+            found.walk_refusal
+        );
+    }
+    // Alone they are refused, which the rule says and Polars does.
+    for predicate in [
+        chain(col_call("s_one"), unnest_of_none()),
+        chain(col_call("s_abc"), vec![unnest()]),
+    ] {
+        let found = ask_step(step(
+            "s",
+            "LazyFrame.filter",
+            json!({ "predicates": many(vec![predicate]) }),
+        ));
+        assert_refused_by(
+            &found,
+            "one-column-is-needed",
+            &[],
+            "an unnest alone in a filter",
+        );
+    }
+}

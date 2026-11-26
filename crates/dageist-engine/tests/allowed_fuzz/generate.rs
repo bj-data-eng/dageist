@@ -4196,4 +4196,28 @@ mod tests {
             cases.len()
         );
     }
+
+    #[test]
+    fn a_filter_is_drawn_with_several_predicates_where_polars_judges_them_beside_one_another() {
+        // Polars refuses an expression that expands to none or to several as the one predicate of
+        // a filter, and takes it beside others, so a campaign needs both kinds of filter.
+        let mut alone = 0;
+        let mut several = 0;
+        for offset in 0..3000 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let step = case.document.steps()[0].call();
+            if step.entry().id().as_str() != "LazyFrame.filter" {
+                continue;
+            }
+            match step.argument("predicates") {
+                Some(Value::Many(items)) if items.len() >= 2 => several += 1,
+                Some(Value::Many(_)) => alone += 1,
+                _ => {}
+            }
+        }
+        assert!(alone > 0, "a filter of one predicate is drawn");
+        assert!(several > 0, "a filter of several predicates is drawn");
+    }
 }
