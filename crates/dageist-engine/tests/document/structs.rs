@@ -6,7 +6,7 @@
 //! is asked. The dtype the walk writes after the last call is the dtype Polars gives, field by
 //! field, so a struct is written with the fields it holds.
 
-use dageist_engine::allowed::{RefusalSource, Representative, dtype_name};
+use dageist_engine::allowed::{RefusalSource, Representative, Unknown, dtype_name};
 use dageist_engine::document::{Document, Inputs, Outcome, Report, Resolution, Segment, StepRows};
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -1664,30 +1664,251 @@ fn an_unnest_of_one_value_beside_a_flag_is_not_refused_for_what_it_is_though_it_
     );
 }
 
-#[test]
-fn the_counts_of_a_struct_of_an_open_number_are_as_open_as_the_struct_as_a_key() {
-    // The number stays open in the field that `value_counts` writes of the struct it counts, so
-    // the key is not told, as the struct is not.
-    let counted = chain(
+/// A number typed without a dtype, or given the dtype that Polars gives it.
+fn a_float(typed: bool) -> Value {
+    if typed {
         call(
-            "polars.struct",
-            json!({ "exprs": many(vec![chain(call("polars.lit", json!({ "value": { "float": 1.5 } })), vec![])]) }),
-        ),
-        vec![
-            call("Expr.value_counts", json!({})),
-            call("Expr.max", json!({})),
-        ],
-    );
-    let held = step(
+            "polars.lit",
+            json!({ "value": { "float": 1e40 }, "dtype": { "dtype": "Float64" } }),
+        )
+    } else {
+        call("polars.lit", json!({ "value": { "float": 1e40 } }))
+    }
+}
+
+fn a_whole_number(typed: bool) -> Value {
+    if typed {
+        call(
+            "polars.lit",
+            json!({ "value": { "integer": 5 }, "dtype": { "dtype": "Int32" } }),
+        )
+    } else {
+        call("polars.lit", json!({ "value": { "integer": 5 } }))
+    }
+}
+
+fn counts() -> Value {
+    call("Expr.value_counts", json!({}))
+}
+
+fn largest() -> Value {
+    call("Expr.max", json!({}))
+}
+
+fn struct_of(item: Value) -> Value {
+    call("polars.struct", json!({ "exprs": many(vec![item]) }))
+}
+
+/// A join whose left key is `left` and whose right key is `right`, two expressions of one dtype
+/// where the number in one is open and in the other is typed.
+fn join_of(left: Value, right: Value) -> Found {
+    ask_step(step(
         "s",
         "LazyFrame.join",
         json!({
             "other": { "table": "other" },
-            "left_on": many(vec![counted]),
-            "right_on": many(vec![field("rk")]),
+            "left_on": many(vec![left]),
+            "right_on": many(vec![right]),
         }),
+    ))
+}
+
+/// Polars refuses the key that holds the open number, and the walk does not say that it may end
+/// there, for the words of `unknown`.
+fn assert_not_told_for(found: &Found, unknown: &Unknown, what: &str) {
+    assert!(
+        matches!(found.polars, Said::Refuses(_)),
+        "{what}: {:?}",
+        found.polars
     );
-    let found = ask_step(held);
+    assert!(
+        found.walk_refusal.is_none(),
+        "{what}: {:?}",
+        found.walk_refusal
+    );
+    let said = found
+        .walk_knows_nothing_of_it
+        .as_deref()
+        .unwrap_or_default();
+    assert!(
+        said.contains(&unknown.to_string()),
+        "{what}: the walk says {said:?}, not {unknown}"
+    );
+}
+
+#[test]
+fn the_counts_of_a_struct_of_an_open_number_are_as_open_as_the_struct_as_a_key() {
+    // The number stays open in the field that `value_counts` writes of the struct it counts, so
+    // the key is not told, as the struct is not.
+    let key = |typed: bool| {
+        chain(
+            struct_of(chain(a_float(typed), vec![])),
+            vec![counts(), largest()],
+        )
+    };
+    let found = join_of(key(false), key(true));
+    assert_not_told_for(
+        &found,
+        &Unknown::AnOpenNumberInAKey,
+        "the counts of a struct",
+    );
+    // With the number typed on both sides the keys are of one dtype, which the walk says.
+    let typed = join_of(key(true), key(true));
+    assert_eq!(typed.polars, Said::Accepts, "{:?}", typed.polars);
+    assert!(
+        typed.walk_knows_nothing_of_it.is_none(),
+        "{:?}",
+        typed.walk_knows_nothing_of_it
+    );
+}
+
+#[test]
+fn the_counts_of_an_open_number_are_as_open_as_the_number_in_a_struct_as_a_key() {
+    // `value_counts` of a number typed without a dtype writes it as the field of its values, open
+    // as it was, which Polars does not match with the dtype the other key resolves to, whichever
+    // side the key is on, whatever the number, and whatever goes on from the counts.
+    type Key = fn(bool) -> Value;
+    let cases: Vec<(&str, Key)> = vec![
+        ("the largest of the counts of a float", |typed| {
+            chain(a_float(typed), vec![counts(), largest()])
+        }),
+        ("the largest of the counts of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![counts(), largest()])
+        }),
+        ("the first of the counts of a float", |typed| {
+            chain(
+                a_float(typed),
+                vec![counts(), call("Expr.first", json!({}))],
+            )
+        }),
+        ("the proportions of a float", |typed| {
+            chain(
+                a_float(typed),
+                vec![
+                    call(
+                        "Expr.value_counts",
+                        json!({ "normalize": { "flag": true } }),
+                    ),
+                    largest(),
+                ],
+            )
+        }),
+        ("the counts of a float with its fields renamed", |typed| {
+            chain(
+                a_float(typed),
+                vec![counts(), rename(&["v", "n"]), largest()],
+            )
+        }),
+        ("the counts of a float without its counts", |typed| {
+            chain(
+                a_float(typed),
+                vec![counts(), drop_fields(&["count"], None), largest()],
+            )
+        }),
+        ("the counts of the counts of a float", |typed| {
+            chain(a_float(typed), vec![counts(), counts(), largest()])
+        }),
+        ("a struct of the counts of a float", |typed| {
+            chain(
+                struct_of(chain(a_float(typed), vec![counts()])),
+                vec![largest()],
+            )
+        }),
+    ];
+    for (what, key) in cases {
+        for open_on_the_left in [true, false] {
+            let (left, right) = if open_on_the_left {
+                (key(false), key(true))
+            } else {
+                (key(true), key(false))
+            };
+            let found = join_of(left, right);
+            // A key that is a struct is told as one, and one that is read on from it is not
+            // told, as the dtype of its value is no dtype the tables hold.
+            assert!(
+                matches!(found.polars, Said::Refuses(_)),
+                "{what}: {:?}",
+                found.polars
+            );
+            assert!(
+                found.walk_refusal.is_none(),
+                "{what}: {:?}",
+                found.walk_refusal
+            );
+            assert!(
+                found.walk_knows_nothing_of_it.is_some(),
+                "{what}: the walk says what the key gives: {:?}",
+                found.walked_name
+            );
+        }
+        let typed = join_of(key(true), key(true));
+        assert_eq!(typed.polars, Said::Accepts, "{what}: {:?}", typed.polars);
+        assert!(
+            typed.walk_knows_nothing_of_it.is_none(),
+            "{what}: {:?}",
+            typed.walk_knows_nothing_of_it
+        );
+    }
+}
+
+#[test]
+fn the_counts_of_an_open_number_are_told_as_an_open_number_in_a_key() {
+    // Where the key ends in the struct of the counts, or in a call that keeps it, the words are
+    // those of the open number, not of a dtype that is not known.
+    for (what, key) in [
+        (
+            "the largest of the counts of a float",
+            (|typed| chain(a_float(typed), vec![counts(), largest()])) as fn(bool) -> Value,
+        ),
+        ("the largest of the counts of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![counts(), largest()])
+        }),
+    ] {
+        let found = join_of(key(false), key(true));
+        assert_not_told_for(&found, &Unknown::AnOpenNumberInAKey, what);
+    }
+}
+
+#[test]
+fn a_field_read_from_the_counts_of_an_open_number_is_open_as_a_key() {
+    // The field that holds the values is as open as the number it holds, and so is any call that
+    // goes on from it, whose dtype the tables do not hold.
+    let key = |typed: bool| {
+        chain(
+            a_float(typed),
+            vec![counts(), the_field("literal"), largest()],
+        )
+    };
+    let found = join_of(key(false), key(true));
+    assert!(
+        matches!(found.polars, Said::Refuses(_)),
+        "{:?}",
+        found.polars
+    );
+    assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what the key gives: {:?}",
+        found.walked_name
+    );
+}
+
+#[test]
+fn a_struct_made_of_a_field_of_the_counts_of_an_open_number_is_as_open_as_the_number() {
+    // A field read from what `value_counts` writes of an open number is open, and so is the
+    // struct that is made of it, whose field's dtype the walk does not hold.
+    let key = |typed: bool| {
+        chain(
+            struct_of(chain(a_float(typed), vec![counts(), the_field("literal")])),
+            vec![largest()],
+        )
+    };
+    let found = join_of(key(false), key(true));
+    assert!(
+        matches!(found.polars, Said::Refuses(_)),
+        "{:?}",
+        found.polars
+    );
     assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
     assert!(
         found.walk_knows_nothing_of_it.is_some(),
@@ -1742,9 +1963,13 @@ fn an_unnest_inside_a_condition_of_a_join_key_is_not_told_as_an_unnest_as_a_key_
         found.polars
     );
     assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
+    let said = found
+        .walk_knows_nothing_of_it
+        .as_deref()
+        .unwrap_or_default();
     assert!(
-        found.walk_knows_nothing_of_it.is_some(),
-        "the walk says what the keys give: {:?}",
-        found.walked_name
+        said.contains(&Unknown::AnUnnestAsAKey.to_string()),
+        "the walk says {said:?}, not {}",
+        Unknown::AnUnnestAsAKey
     );
 }
