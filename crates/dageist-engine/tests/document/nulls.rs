@@ -1745,6 +1745,47 @@ fn a_count_compared_as_a_value_with_a_number_no_dtype_holds_is_one_polars_may_fo
 }
 
 #[test]
+fn a_count_compared_as_a_value_with_a_number_that_has_a_fraction_is_one_polars_decides_in_a_joins_key()
+ {
+    // No count is 1.5, so Polars decides the comparison of the count while it coerces the types,
+    // and what it leaves, a plain constant, is no aggregate beside a column, as it is not for a
+    // number below zero. A comparison of the count that is not of missing values is kept.
+    let fraction = || {
+        chain(
+            call("polars.lit", json!({ "value": { "float": 1.5 } })),
+            Vec::new(),
+        )
+    };
+    let compared = |entry: &str| {
+        chain(
+            call("polars.lit", json!({ "value": { "integer": 1 } })),
+            vec![
+                call("Expr.len", json!({})),
+                call(entry, json!({ "other": fraction() })),
+                call("Expr.sub", json!({ "other": field("a") })),
+            ],
+        )
+    };
+    for entry in ["Expr.ne_missing", "Expr.eq_missing"] {
+        let report = join_on(compared(entry));
+        assert!(
+            polars_says(&report).is_none(),
+            "{entry}: {:?}",
+            outcome(&report)
+        );
+        assert_eq!(walk(&report).refusal(), None, "{entry}");
+    }
+    let report = join_on(compared("Expr.gt"));
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert_eq!(
+        walk(&report)
+            .refusal()
+            .map(|refusal| refusal.refusal().source()),
+        Some(RefusalSource::Rule(Rule::KeyIsElementwise))
+    );
+}
+
+#[test]
 fn a_count_compared_with_a_number_that_is_kept_is_an_aggregate_beside_a_column_in_a_joins_key() {
     // A number that every dtype holds is never decided at once, and a comparison that is not of
     // missing values is kept whatever the number is.

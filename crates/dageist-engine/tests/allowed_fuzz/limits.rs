@@ -8270,6 +8270,53 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_comparison_of_one_value_with_a_number_that_has_a_fraction_is_excused_and_a_column_is_not()
+     {
+        let reason = "all join key expressions must be elementwise.";
+        let refused_for = |key: Expression| {
+            polars_refuses(
+                &join(key, chain(column("key"), &[])),
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new(),
+            )
+        };
+        let fraction = || chain(call("polars.lit", vec![("value", Value::Float(1.5))]), &[]);
+        let minus_a_column = || {
+            call(
+                "Expr.sub",
+                vec![("other", Value::Expression(chain(column("rk"), &[])))],
+            )
+        };
+        for entry in ["Expr.eq_missing", "Expr.ne_missing"] {
+            // The dtype of an aggregate decides whether Polars keeps the comparison, which the walk
+            // does not follow.
+            assert_eq!(
+                refused_for(chain_of(
+                    column("rb"),
+                    vec![
+                        call("Expr.max", Vec::new()),
+                        compared_with(entry, fraction()),
+                        minus_a_column(),
+                    ]
+                )),
+                vec![Limit::ANullComparisonInAKey],
+                "{entry} of an aggregate"
+            );
+            // The walk decides a column by its dtype.
+            assert_eq!(
+                refused_for(chain_of(
+                    column("rb"),
+                    vec![compared_with(entry, fraction()), minus_a_column()]
+                )),
+                vec![],
+                "{entry} of a column"
+            );
+        }
+    }
+
+    #[test]
     fn shifts_that_total_the_sample_excuse_the_tables_refusing_what_follows_them() {
         let shift = |rows: Option<i64>| {
             call(
