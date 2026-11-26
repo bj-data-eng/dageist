@@ -55,13 +55,13 @@ describe('a block of a working window', () => {
     expect(block.report).toBe('7 rows × 5 columns · 1.6 KB · built in 850 µs');
     expect(block.columns).toHaveLength(5);
     expect(block.columns[0]).toEqual([
-      'DCN-10000000',
-      'DCN-10000000',
-      'DCN-10000000',
-      'DCN-10000000',
-      'DCN-10000001',
-      'DCN-10000001',
-      'DCN-10000001',
+      'DOC-10000000',
+      'DOC-10000000',
+      'DOC-10000000',
+      'DOC-10000000',
+      'DOC-10000001',
+      'DOC-10000001',
+      'DOC-10000001',
     ]);
     expect(block.columns[1]?.[0]).toBe('2025-06-07 09:50:15');
     expect(block.columns[1]?.[6]).toBe('2025-07-31 22:09:51');
@@ -80,7 +80,7 @@ describe('a block of a working window', () => {
 
   it('asks for the columns in the order they were asked for', () => {
     expect(request.columns).toEqual([
-      'dcn',
+      'document_id',
       'timestamp',
       'date_of_receipt',
       'measure_001',
@@ -224,9 +224,9 @@ describe('a block of the wrong shape', () => {
     expect(refusal(frame, request.columns.slice(1)).message).toBe(
       '$.arrow: has 5 columns, not the 4 asked for',
     );
-    const reversed = ['measure_003', 'measure_001', 'date_of_receipt', 'timestamp', 'dcn'];
+    const reversed = ['measure_003', 'measure_001', 'date_of_receipt', 'timestamp', 'document_id'];
     expect(refusal(frame, reversed).message).toBe(
-      '$.arrow.columns[0]: is the column "dcn", not "measure_003" as asked for',
+      '$.arrow.columns[0]: is the column "document_id", not "measure_003" as asked for',
     );
   });
 

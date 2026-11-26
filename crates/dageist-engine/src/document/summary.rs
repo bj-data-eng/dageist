@@ -19,7 +19,7 @@ const NAMED: usize = 3;
 const RENAMES_NAMED: usize = 2;
 
 impl Step {
-    /// What the step works on, in the words of `words`, such as `by dcn,
+    /// What the step works on, in the words of `words`, such as `by document_id,
     /// timestamp` for a sort or `Complete` for a column that is added: the
     /// words that follow the step's head. A step the catalogue gives no
     /// summary for is the empty text.

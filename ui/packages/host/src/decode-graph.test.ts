@@ -28,7 +28,7 @@ function refusal(decode: (value: unknown) => unknown, value: unknown): DecodeErr
 }
 
 // The ids the host gives the starting graph's nodes, in the order it adds them.
-const CLAIMS = '00000000-0000-7000-8000-000000000001';
+const DOCUMENTS = '00000000-0000-7000-8000-000000000001';
 const SLA = '00000000-0000-7000-8000-000000000002';
 const NAMES = '00000000-0000-7000-8000-000000000003';
 const CALENDAR = '00000000-0000-7000-8000-000000000004';
@@ -40,7 +40,7 @@ describe('the graph the application opens on', () => {
   it('lists every node after the nodes it reads', () => {
     const decoded = decodeGraph(graph);
     expect(decoded.nodes.map((node) => [node.id, node.kind])).toEqual([
-      [CLAIMS, 'source'],
+      [DOCUMENTS, 'source'],
       [SLA, 'source'],
       [NAMES, 'source'],
       [CALENDAR, 'source'],
@@ -52,18 +52,18 @@ describe('the graph the application opens on', () => {
   });
 
   it('gives a source its file and the columns it reads', () => {
-    const claims = decodeGraph(graph).nodes[0];
-    expect(claims).toMatchObject({
-      name: 'Claims',
-      summary: 'claims.parquet',
+    const documents = decodeGraph(graph).nodes[0];
+    expect(documents).toMatchObject({
+      name: 'Documents',
+      summary: 'documents.parquet',
       slots: [],
       newInput: null,
-      file: { path: '/sample/claims.parquet', format: 'parquet' },
+      file: { path: '/sample/documents.parquet', format: 'parquet' },
       problems: [],
       frame: null,
     });
-    expect(claims?.columns?.map((column) => column.name)).toEqual([
-      'dcn',
+    expect(documents?.columns?.map((column) => column.name)).toEqual([
+      'document_id',
       'timestamp',
       'step_to',
       'owner',
@@ -75,7 +75,7 @@ describe('the graph the application opens on', () => {
     const transform = decodeGraph(graph).nodes.find((node) => node.id === TIMING);
     expect(transform?.summary).toBe('12 steps');
     expect(transform?.slots.map((slot) => [slot.slot, slot.takes, slot.from])).toEqual([
-      [{ kind: 'start' }, 'table', { kind: 'table', node: CLAIMS }],
+      [{ kind: 'start' }, 'table', { kind: 'table', node: DOCUMENTS }],
       [
         { kind: 'input', name: 'as_of' },
         'value',
@@ -160,7 +160,7 @@ describe('the layout revision and the file chosen', () => {
 
   it('reads a chosen folder, or nothing chosen', () => {
     expect(decodeChosenFolder(null)).toBeNull();
-    expect(decodeChosenFolder('/work/claims')).toBe('/work/claims');
-    expect(() => decodeChosenFolder({ path: '/work/claims' })).toThrow(DecodeError);
+    expect(decodeChosenFolder('/work/documents')).toBe('/work/documents');
+    expect(() => decodeChosenFolder({ path: '/work/documents' })).toThrow(DecodeError);
   });
 });

@@ -8,7 +8,7 @@ import editedFixture from '../fixtures/edit-edited.json';
 import refusedFixture from '../fixtures/edit-refused.json';
 import { replaced, withField, without } from '../test-support/tamper';
 
-// The fixtures are what the host's `node_document` command answers for the claim-timing steps, and
+// The fixtures are what the host's `node_document` command answers for the document-timing steps, and
 // what `edit_document` answers for an edit that was made and one the engine refused, written from
 // Rust by its snapshot test. They are read as `unknown`, as the host's answer is, and the decoder
 // is what says what they are.
@@ -40,7 +40,7 @@ function argumentOf(call: CallView, parameter: string): ArgumentView {
   return found.value;
 }
 
-describe('the document the host holds for the claim-timing node', () => {
+describe('the document the host holds for the document-timing node', () => {
   const held = decodeDocumentState(state);
 
   it('is at its first revision, with the twelve steps in order and what running them reported', () => {
@@ -72,7 +72,7 @@ describe('the document the host holds for the claim-timing node', () => {
           parameter: 'by',
           value: {
             kind: 'many',
-            items: [field('dcn'), field('timestamp')],
+            items: [field('document_id'), field('timestamp')],
           },
         },
       ],

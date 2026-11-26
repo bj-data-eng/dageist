@@ -197,8 +197,8 @@ describe('how a slot draws the value it holds', () => {
   });
 
   it('is as a chain for a field and for anything with methods, once it is in the document', () => {
-    expect(valueDrawing(chain(calls(col('dcn'))), true)).toEqual({ drawn: 'chain' });
-    expect(valueDrawing(chain(calls(col('dcn')), [bare('Expr.abs')]), true)).toEqual({
+    expect(valueDrawing(chain(calls(col('document_id'))), true)).toEqual({ drawn: 'chain' });
+    expect(valueDrawing(chain(calls(col('document_id')), [bare('Expr.abs')]), true)).toEqual({
       drawn: 'chain',
     });
     expect(valueDrawing(chain(input('as_of'), [bare('Expr.abs')]), true)).toEqual({
@@ -207,11 +207,11 @@ describe('how a slot draws the value it holds', () => {
   });
 
   it('is as a word for a field not in the document yet, and as nothing for a chain not in it', () => {
-    expect(valueDrawing(chain(calls(col('dcn'))), false)).toEqual({
+    expect(valueDrawing(chain(calls(col('document_id'))), false)).toEqual({
       drawn: 'word',
-      shape: { kind: 'column', name: 'dcn' },
+      shape: { kind: 'column', name: 'document_id' },
     });
-    expect(valueDrawing(chain(calls(col('dcn')), [bare('Expr.abs')]), false)).toEqual({
+    expect(valueDrawing(chain(calls(col('document_id')), [bare('Expr.abs')]), false)).toEqual({
       drawn: 'word',
       shape: { kind: 'unset' },
     });
@@ -235,7 +235,7 @@ describe('how a chain is laid out', () => {
   });
 
   it('is as the word it starts from for a field, an input and nothing yet', () => {
-    expect(chainBodyOf(chain(calls(col('dcn'))))).toEqual({ body: 'start' });
+    expect(chainBodyOf(chain(calls(col('document_id'))))).toEqual({ body: 'start' });
     expect(chainBodyOf(chain(input('as_of')))).toEqual({ body: 'start' });
     expect(chainBodyOf(chain(HOLE_START))).toEqual({ body: 'start' });
   });
@@ -264,7 +264,7 @@ describe('the word a chain starts from', () => {
 
   it('is the word that lists no typed value for a field, an input and nothing yet', () => {
     for (const body of [
-      chainBodyOf(chain(calls(col('dcn')))),
+      chainBodyOf(chain(calls(col('document_id')))),
       chainBodyOf(chain(input('as_of'))),
       chainBodyOf(chain(HOLE_START)),
     ]) {
@@ -276,19 +276,19 @@ describe('the word a chain starts from', () => {
 
 describe('how a line of a condition is drawn', () => {
   it('is as a comparison for a field and one comparison of the entries that compare', () => {
-    const line = chain(calls(col('dcn')), [bare('Expr.eq')]);
+    const line = chain(calls(col('document_id')), [bare('Expr.eq')]);
     expect(lineDrawing(line, catalogue.comparisons)).toMatchObject({
       drawn: 'condition',
-      test: { column: 'dcn' },
+      test: { column: 'document_id' },
     });
   });
 
   it('is as a chain for anything else', () => {
-    expect(lineDrawing(chain(calls(col('dcn'))), catalogue.comparisons)).toEqual({
+    expect(lineDrawing(chain(calls(col('document_id'))), catalogue.comparisons)).toEqual({
       drawn: 'chain',
     });
     expect(
-      lineDrawing(chain(calls(col('dcn')), [bare('Expr.abs')]), catalogue.comparisons),
+      lineDrawing(chain(calls(col('document_id')), [bare('Expr.abs')]), catalogue.comparisons),
     ).toEqual({ drawn: 'chain' });
   });
 });

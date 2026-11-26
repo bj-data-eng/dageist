@@ -5,7 +5,7 @@ import { decodeNode } from '@dageist/host';
 import nodeFixture from '../../../host/fixtures/node-inputs.json';
 import { findInput, inputDetail, inputLines, originWords, sourceLines } from './inputs';
 
-// What the host writes of the claim-timing node.
+// What the host writes of the document-timing node.
 const node = decodeNode(nodeFixture);
 
 /** The input of the node called `name`. */
@@ -79,9 +79,9 @@ describe('the lines that describe the node’s inputs', () => {
 
   it('say the table the steps start from, with where it comes from', () => {
     expect(sourceLines(node)).toEqual([
-      'claims · table · the steps start from its rows',
-      'from Claims',
-      'dcn · String',
+      'documents · table · the steps start from its rows',
+      'from Documents',
+      'document_id · String',
       'timestamp · Datetime(us)',
       'step_to · String',
       'owner · String',

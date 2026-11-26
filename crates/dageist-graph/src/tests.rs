@@ -148,26 +148,26 @@ fn renaming_keeps_the_id_and_refuses_a_name_another_node_has_in_any_case() {
         &graph,
         Edit::Rename {
             node: id("source"),
-            name: Name::new("Claims").unwrap(),
+            name: Name::new("Documents").unwrap(),
         },
     );
     assert_eq!(
         renamed.node(&id("source")).unwrap().name().as_str(),
-        "Claims"
+        "Documents"
     );
     assert_eq!(
         renamed.edit(&Edit::Rename {
             node: id("transform"),
-            name: Name::new("CLAIMS").unwrap(),
+            name: Name::new("DOCUMENTS").unwrap(),
         }),
-        Err(EditError::NameTaken(Name::new("CLAIMS").unwrap()))
+        Err(EditError::NameTaken(Name::new("DOCUMENTS").unwrap()))
     );
     // A node may take its own name in another case.
     assert!(
         renamed
             .edit(&Edit::Rename {
                 node: id("source"),
-                name: Name::new("claims").unwrap(),
+                name: Name::new("documents").unwrap(),
             })
             .is_ok()
     );
@@ -402,7 +402,7 @@ fn removing_a_parameter_clears_the_inputs_that_read_it() {
 #[test]
 fn files_belong_to_sources_and_outputs_only() {
     let file = File {
-        path: "/data/claims.parquet".to_owned(),
+        path: "/data/documents.parquet".to_owned(),
         format: Format::Parquet,
     };
     let (graph, _) = edited(

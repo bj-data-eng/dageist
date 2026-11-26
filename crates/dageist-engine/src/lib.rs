@@ -32,7 +32,7 @@ mod text;
 pub use block::{Block, ColumnInfo};
 pub use error::EngineError;
 pub use frame::{FileFormat, Frame, InputError, PARAMETER_DTYPES};
-pub use sample::{SampleSpec, claims_generated, generate_claims};
+pub use sample::{SampleSpec, documents_generated, generate_documents};
 pub use startup::PolarsSession;
 pub use stored::ParquetTable;
 pub use table::Table;

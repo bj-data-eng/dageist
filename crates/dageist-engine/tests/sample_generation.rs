@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use dageist_engine::{ParquetTable, SampleSpec, claims_generated, generate_claims};
+use dageist_engine::{ParquetTable, SampleSpec, documents_generated, generate_documents};
 
 struct SampleDirectory {
     path: PathBuf,
@@ -50,13 +50,14 @@ fn generating_a_smaller_table_leaves_no_files_of_the_larger_one() {
         keys: 60,
         filler_columns: 0,
     };
-    generate_claims(&sample.path, two_files).expect("the larger table is generated");
+    generate_documents(&sample.path, two_files).expect("the larger table is generated");
     assert_eq!(parquet_files(&sample.path).len(), 2);
 
-    let written = generate_claims(&sample.path, one_file).expect("the smaller table is generated");
+    let written =
+        generate_documents(&sample.path, one_file).expect("the smaller table is generated");
 
     assert_eq!(written.len(), 1);
-    assert_eq!(parquet_files(&sample.path), ["claims-0000.parquet"]);
+    assert_eq!(parquet_files(&sample.path), ["documents-0000.parquet"]);
     let table = ParquetTable::open(&sample.path).expect("the table opens");
     // Sixty keys of two to eight step rows each.
     assert!(
@@ -74,10 +75,10 @@ fn generated_table_is_reported_only_where_it_was_written() {
         filler_columns: 0,
     };
 
-    assert!(!claims_generated(&sample.path));
-    let written = generate_claims(&sample.path, spec).expect("the table is generated");
+    assert!(!documents_generated(&sample.path));
+    let written = generate_documents(&sample.path, spec).expect("the table is generated");
 
-    assert!(claims_generated(&sample.path));
+    assert!(documents_generated(&sample.path));
     assert!(written.iter().all(|file| file.starts_with(&sample.path)));
     assert!(written.iter().all(|file| file.is_file()));
 }
@@ -89,14 +90,14 @@ fn leftovers_of_an_interrupted_run_are_cleared_and_never_count_as_a_table() {
     staging.push(".partial");
     let staging = PathBuf::from(staging);
     fs::create_dir_all(&staging).expect("a staging folder is left behind");
-    fs::write(staging.join("claims-0000.parquet"), b"half written").expect("a partial file");
+    fs::write(staging.join("documents-0000.parquet"), b"half written").expect("a partial file");
     let spec = SampleSpec {
         keys: 20,
         filler_columns: 0,
     };
 
-    assert!(!claims_generated(&sample.path));
-    generate_claims(&sample.path, spec).expect("the table is generated");
+    assert!(!documents_generated(&sample.path));
+    generate_documents(&sample.path, spec).expect("the table is generated");
 
     assert!(!staging.exists());
     assert!(ParquetTable::open(&sample.path).is_ok());

@@ -71,7 +71,7 @@ fn add(graph: &Graph, kind: Kind, name: &str) -> (Graph, NodeId) {
 
 /// The ids of the sample's nodes.
 struct Nodes {
-    claims: NodeId,
+    source: NodeId,
     calendar: NodeId,
     parameters: NodeId,
     timing: NodeId,
@@ -83,15 +83,15 @@ struct Nodes {
 /// an output of the transform's table, with a box placed with and without a size, and the
 /// transform's document.
 fn sample(root: &Path) -> (Saved, Nodes) {
-    let (graph, claims) = add(&Graph::new(), Kind::Source, "Claims");
+    let (graph, source) = add(&Graph::new(), Kind::Source, "Documents");
     let graph = edit(
         &graph,
         Edit::SetFile {
-            node: claims.clone(),
+            node: source.clone(),
             file: Some(File {
                 path: root
                     .join("data")
-                    .join("claims.parquet")
+                    .join("documents.parquet")
                     .to_string_lossy()
                     .into_owned(),
                 format: Format::Parquet,
@@ -121,14 +121,14 @@ fn sample(root: &Path) -> (Saved, Nodes) {
             },
         },
     );
-    let (graph, timing) = add(&graph, Kind::Transform, "Claim timing");
+    let (graph, timing) = add(&graph, Kind::Transform, "Document timing");
     let graph = edit(
         &graph,
         Edit::Connect {
             node: timing.clone(),
             slot: Slot::Start,
             from: Reference::Table {
-                node: claims.clone(),
+                node: source.clone(),
             },
         },
     );
@@ -172,7 +172,7 @@ fn sample(root: &Path) -> (Saved, Nodes) {
             );
         }
     }
-    let (graph, output) = add(&graph, Kind::Output, "Claim timing output");
+    let (graph, output) = add(&graph, Kind::Output, "Document timing output");
     let graph = edit(
         &graph,
         Edit::Connect {
@@ -187,7 +187,7 @@ fn sample(root: &Path) -> (Saved, Nodes) {
     layout
         .set(
             &graph,
-            &claims,
+            &source,
             Frame {
                 place: Place { x: -40, y: 12 },
                 size: None,
@@ -218,7 +218,7 @@ fn sample(root: &Path) -> (Saved, Nodes) {
             documents,
         },
         Nodes {
-            claims,
+            source,
             calendar,
             parameters,
             timing,
@@ -284,10 +284,10 @@ fn the_files_are_text_in_a_folder_for_each_node_with_paths_inside_the_workspace_
         "{\n  \"version\": 1\n}\n"
     );
     assert_eq!(read(".gitignore".to_owned()), ".dageist/\ndata/\n");
-    let claims = read(format!("nodes/{}/node.json", nodes.claims));
+    let source = read(format!("nodes/{}/node.json", nodes.source));
     assert!(
-        claims.contains("\"path\": \"data/claims.parquet\""),
-        "{claims}"
+        source.contains("\"path\": \"data/documents.parquet\""),
+        "{source}"
     );
     let calendar = read(format!("nodes/{}/node.json", nodes.calendar));
     assert!(
@@ -313,9 +313,9 @@ fn each_save_is_one_commit_and_a_save_that_changes_nothing_makes_none() {
     let mut workspace = Workspace::create(&root, &saved, author(), Options::default())
         .expect("the workspace is made");
     assert_eq!(commits(&root), 1);
-    let renamed = rename(&saved, &nodes.timing, "Document timing");
+    let renamed = rename(&saved, &nodes.timing, "Step timing");
     let commit = workspace
-        .save(&renamed, "Rename Claim timing to Document timing")
+        .save(&renamed, "Rename Document timing to Step timing")
         .expect("saved");
     assert!(commit.is_some());
     assert_eq!(commits(&root), 2);
@@ -327,7 +327,7 @@ fn each_save_is_one_commit_and_a_save_that_changes_nothing_makes_none() {
     assert_eq!(commits(&root), 2);
     assert_eq!(
         git(&root, &["log", "-1", "--format=%s|%an|%ae"]).trim(),
-        "Rename Claim timing to Document timing|Test|test@example.com"
+        "Rename Document timing to Step timing|Test|test@example.com"
     );
     assert_eq!(
         git(&root, &["rev-parse", "HEAD"]).trim(),
@@ -343,7 +343,7 @@ fn each_save_is_one_commit_and_a_save_that_changes_nothing_makes_none() {
             .expect("the node")
             .name()
             .as_str(),
-        "Document timing"
+        "Step timing"
     );
 }
 
@@ -369,7 +369,7 @@ fn removing_a_node_removes_its_folder_from_the_commit_and_the_disk() {
         documents,
     };
     workspace
-        .save(&removed, "Remove Claim timing")
+        .save(&removed, "Remove Document timing")
         .expect("saved");
     assert!(!root.join(format!("nodes/{}", nodes.timing)).exists());
     let tracked = git(&root, &["ls-tree", "-r", "--name-only", "HEAD"]);
@@ -386,9 +386,9 @@ fn a_nodes_history_is_the_commits_that_changed_its_folder_latest_first() {
     let (saved, nodes) = sample(&root);
     let mut workspace = Workspace::create(&root, &saved, author(), Options::default())
         .expect("the workspace is made");
-    let renamed = rename(&saved, &nodes.timing, "Document timing");
+    let renamed = rename(&saved, &nodes.timing, "Step timing");
     workspace
-        .save(&renamed, "Rename Claim timing to Document timing")
+        .save(&renamed, "Rename Document timing to Step timing")
         .expect("saved");
     // Moving a box changes the layout, not the node.
     let mut moved = renamed.clone();
@@ -403,12 +403,10 @@ fn a_nodes_history_is_the_commits_that_changed_its_folder_latest_first() {
             },
         )
         .expect("a box");
+    workspace.save(&moved, "Move Step timing").expect("saved");
+    let other = rename(&moved, &nodes.source, "Records");
     workspace
-        .save(&moved, "Move Document timing")
-        .expect("saved");
-    let other = rename(&moved, &nodes.claims, "Documents");
-    workspace
-        .save(&other, "Rename Claims to Documents")
+        .save(&other, "Rename Documents to Records")
         .expect("saved");
     let mut stepped = other.clone();
     stepped.documents.insert(
@@ -416,7 +414,7 @@ fn a_nodes_history_is_the_commits_that_changed_its_folder_latest_first() {
         "{\"version\": 1, \"steps\": [\"sort\"]}\n".to_owned(),
     );
     workspace
-        .save(&stepped, "Add a sort to Document timing")
+        .save(&stepped, "Add a sort to Step timing")
         .expect("saved");
     let history: Vec<String> = workspace
         .history(&nodes.timing)
@@ -427,18 +425,21 @@ fn a_nodes_history_is_the_commits_that_changed_its_folder_latest_first() {
     assert_eq!(
         history,
         [
-            "Add a sort to Document timing",
-            "Rename Claim timing to Document timing",
+            "Add a sort to Step timing",
+            "Rename Document timing to Step timing",
             "Make the workspace",
         ]
     );
-    let claims: Vec<String> = workspace
-        .history(&nodes.claims)
+    let history: Vec<String> = workspace
+        .history(&nodes.source)
         .expect("a history")
         .into_iter()
         .map(|change| change.message)
         .collect();
-    assert_eq!(claims, ["Rename Claims to Documents", "Make the workspace"]);
+    assert_eq!(
+        history,
+        ["Rename Documents to Records", "Make the workspace"]
+    );
 }
 
 /// The number of loose objects and of packs, as git counts them.
@@ -464,7 +465,7 @@ fn the_repository_is_packed_as_it_goes_and_whole_when_closed() {
     let mut workspace = Workspace::create(&root, &saved, author(), options).expect("made");
     let mut current = saved;
     for edit in 1..=12 {
-        current = rename(&current, &nodes.timing, &format!("Claim timing {edit}"));
+        current = rename(&current, &nodes.timing, &format!("Document timing {edit}"));
         workspace
             .save(&current, &format!("Rename to {edit}"))
             .expect("saved");
@@ -486,7 +487,7 @@ fn the_repository_is_packed_as_it_goes_and_whole_when_closed() {
             .expect("the node")
             .name()
             .as_str(),
-        "Claim timing 12"
+        "Document timing 12"
     );
     assert_eq!(commits(&root), 13);
 }
@@ -496,7 +497,7 @@ fn opening_writes_again_the_files_on_disk_that_differ_from_the_latest_commit() {
     let root = folder("restore");
     let (saved, nodes) = sample(&root);
     Workspace::create(&root, &saved, author(), Options::default()).expect("made");
-    let node = root.join(format!("nodes/{}/node.json", nodes.claims));
+    let node = root.join(format!("nodes/{}/node.json", nodes.source));
     let committed = std::fs::read(&node).expect("the file");
     std::fs::write(&node, b"changed on disk").expect("written");
     std::fs::create_dir_all(root.join("nodes/stray")).expect("a folder");
@@ -526,10 +527,10 @@ fn a_document_for_a_node_that_is_not_a_transform_is_not_saved() {
     let mut wrong = saved.clone();
     wrong
         .documents
-        .insert(nodes.claims.clone(), "{}\n".to_owned());
+        .insert(nodes.source.clone(), "{}\n".to_owned());
     assert!(matches!(
         Workspace::create(&root, &wrong, author(), Options::default()),
-        Err(WorkspaceError::NotATransform(node)) if node == nodes.claims
+        Err(WorkspaceError::NotATransform(node)) if node == nodes.source
     ));
 }
 
@@ -553,7 +554,7 @@ fn packing_whole_keeps_what_every_ref_reaches_and_stores_versions_as_deltas() {
         Workspace::create(&root, &saved, author(), Options::default()).expect("made");
     let mut current = saved;
     for edit in 1..=6 {
-        current = rename(&current, &nodes.timing, &format!("Claim timing {edit}"));
+        current = rename(&current, &nodes.timing, &format!("Document timing {edit}"));
         workspace
             .save(&current, &format!("Rename to {edit}"))
             .expect("saved");
@@ -620,7 +621,7 @@ fn a_save_that_failed_after_its_commit_is_finished_by_the_next() {
     let file = root.join(format!("nodes/{}/node.json", nodes.timing));
     std::fs::remove_file(&file).expect("removed");
     std::fs::create_dir(&file).expect("a folder in its place");
-    let renamed = rename(&saved, &nodes.timing, "Document timing");
+    let renamed = rename(&saved, &nodes.timing, "Step timing");
     assert!(workspace.save(&renamed, "Rename").is_err());
     assert_eq!(commits(&root), 2, "the commit was made");
     std::fs::remove_dir(&file).expect("the folder is removed");
@@ -629,7 +630,7 @@ fn a_save_that_failed_after_its_commit_is_finished_by_the_next() {
     assert!(
         std::fs::read_to_string(&file)
             .expect("the file is written")
-            .contains("Document timing")
+            .contains("Step timing")
     );
     assert_eq!(git(&root, &["status", "--porcelain"]), "");
 }
@@ -643,21 +644,21 @@ fn a_save_of_another_state_after_one_that_failed_brings_every_file_to_its_commit
     let file = root.join(format!("nodes/{}/node.json", nodes.timing));
     std::fs::remove_file(&file).expect("removed");
     std::fs::create_dir(&file).expect("a folder in its place");
-    let renamed = rename(&saved, &nodes.timing, "Document timing");
+    let renamed = rename(&saved, &nodes.timing, "Step timing");
     assert!(workspace.save(&renamed, "Rename").is_err());
     std::fs::remove_dir(&file).expect("the folder is removed");
     // The next edit is of another node: the transform's file is written all the same.
-    let other = rename(&renamed, &nodes.claims, "Documents");
+    let other = rename(&renamed, &nodes.source, "Records");
     assert!(
         workspace
-            .save(&other, "Rename Claims")
+            .save(&other, "Rename Documents")
             .expect("saved")
             .is_some()
     );
     assert!(
         std::fs::read_to_string(&file)
             .expect("the file is written")
-            .contains("Document timing")
+            .contains("Step timing")
     );
     assert_eq!(git(&root, &["status", "--porcelain"]), "");
 }
@@ -670,7 +671,7 @@ fn packing_whole_keeps_what_git_still_uses_a_staged_file_a_stash_and_orig_head()
         Workspace::create(&root, &saved, author(), Options::default()).expect("made");
     let mut current = saved;
     for edit in 1..=3 {
-        current = rename(&current, &nodes.timing, &format!("Claim timing {edit}"));
+        current = rename(&current, &nodes.timing, &format!("Document timing {edit}"));
         workspace
             .save(&current, &format!("Rename to {edit}"))
             .expect("saved");
@@ -731,7 +732,7 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
     let plain = base.join("plain");
     copy_without_git(&first, &plain);
     std::fs::create_dir_all(plain.join("data").join("more")).expect("a folder");
-    std::fs::write(plain.join("data").join("claims.parquet"), b"rows").expect("written");
+    std::fs::write(plain.join("data").join("documents.parquet"), b"rows").expect("written");
     std::fs::write(plain.join("data").join("more").join("notes.csv"), b"a\n").expect("written");
     // What the format has no place for at the top is passed by, and a .gitignore of its own is
     // not read.
@@ -747,16 +748,16 @@ fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied
     let copy = copy.canonicalize().expect("the folder");
     // The source's file is now read from the copy's data folder, which holds the copied file.
     let dageist_graph::Body::Source { file: Some(file) } =
-        opened.graph.node(&nodes.claims).expect("the node").body()
+        opened.graph.node(&nodes.source).expect("the node").body()
     else {
         panic!("the source has no file");
     };
     assert_eq!(
         Path::new(&file.path),
-        copy.join("data").join("claims.parquet")
+        copy.join("data").join("documents.parquet")
     );
     assert_eq!(
-        std::fs::read(copy.join("data").join("claims.parquet")).expect("copied"),
+        std::fs::read(copy.join("data").join("documents.parquet")).expect("copied"),
         b"rows"
     );
     assert_eq!(
@@ -861,7 +862,7 @@ fn a_workspace_whose_files_were_removed_on_disk_opens_from_its_commit() {
         .close()
         .expect("closed");
     std::fs::remove_file(root.join("workspace.json")).expect("removed");
-    std::fs::remove_file(root.join(format!("nodes/{}/node.json", nodes.claims))).expect("removed");
+    std::fs::remove_file(root.join(format!("nodes/{}/node.json", nodes.source))).expect("removed");
     let (_, opened) = Workspace::open(&root, author(), Options::default()).expect("opens");
     assert_eq!(opened, saved);
     assert!(root.join("workspace.json").is_file());

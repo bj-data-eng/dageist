@@ -169,7 +169,11 @@
             <span class="body">
               <button type="button" class="btn verb">Sort table</button>
               <span class="word">by</span>
-              <span class="slot is-many" data-many="dcn,timestamp" data-takes="field"></span>
+              <span
+                class="slot is-many"
+                data-many="document_id,timestamp"
+                data-takes="field"
+              ></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -240,7 +244,7 @@
               <span class="word">by</span>
               <span
                 class="slot is-many"
-                data-many="dcn,timestamp,step_to"
+                data-many="document_id,timestamp,step_to"
                 data-takes="field"
               ></span>
             </span>
@@ -257,7 +261,7 @@
               <span class="word">by</span>
               <span
                 class="slot is-many is-dict"
-                data-pairs="dcn:ascending,timestamp:descending"
+                data-pairs="document_id:ascending,timestamp:descending"
                 data-gives="value"
                 data-takes="field"
               ></span>
@@ -286,7 +290,7 @@
               <button type="button" class="side side-remove" aria-label="Remove">×</button>
               <span class="body">
                 <button type="button" class="btn">over</button>
-                <span class="slot is-many" data-many="dcn,owner" data-takes="field"></span>
+                <span class="slot is-many" data-many="document_id,owner" data-takes="field"></span>
                 <span class="word">order_by</span>
                 <span class="slot is-many" data-many="timestamp" data-takes="field"></span>
               </span>
@@ -458,7 +462,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="cum_max"></span>
             <span class="seam"></span>
-            <span data-piece="live" data-fn="over" data-many="dcn,owner"></span>
+            <span data-piece="live" data-fn="over" data-many="document_id,owner"></span>
           </span>
           <span class="returns"><b>Int64</b></span>
         </div>
@@ -496,7 +500,7 @@
               <button type="button" class="btn verb">Rename</button>
               <span
                 class="slot is-many is-dict"
-                data-pairs="dcn:claim_no,timestamp:moved_at,step_to:step,owner:team,row_days:days,resolved_at:resolved,claim_id:id,claim_code:code,claim_status:status,claim_type:kind,claim_name:label,claim_date:filed_on"
+                data-pairs="document_id:document_no,timestamp:moved_at,step_to:step,owner:team,row_days:days,resolved_at:resolved,record_id:id,record_code:code,record_status:status,record_type:kind,record_name:label,record_date:filed_on"
                 data-takes="field"
               ></span>
             </span>
@@ -537,7 +541,11 @@
             <span class="body">
               <button type="button" class="btn verb">Sort table</button>
               <span class="word">by</span>
-              <span class="slot is-many" data-many="dcn,timestamp" data-takes="field"></span>
+              <span
+                class="slot is-many"
+                data-many="document_id,timestamp"
+                data-takes="field"
+              ></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -638,7 +646,7 @@
                     <span class="seam"></span>
                     <span data-piece="live" data-fn="mean"></span>
                     <span class="seam"></span>
-                    <span data-piece="live" data-fn="over" data-many="dcn,owner"></span>
+                    <span data-piece="live" data-fn="over" data-many="document_id,owner"></span>
                   </span>
                 </span>
               </span>
@@ -1113,7 +1121,11 @@
             ><button type="button" class="side side-remove" aria-label="Remove step">×</button
             ><span class="body"
               ><button type="button" class="btn verb">Sort table</button><span class="word">by</span
-              ><span class="slot is-many" data-many="dcn,timestamp" data-takes="field"></span></span
+              ><span
+                class="slot is-many"
+                data-many="document_id,timestamp"
+                data-takes="field"
+              ></span></span
             ><button type="button" class="side side-add" aria-label="Add a step after">
               +
             </button></span
@@ -1140,7 +1152,7 @@
             <span class="c-num">1</span>
             <span class="c-code">
               <button type="button" class="c-tok c-verb c-sort" data-acts="step">Sort table</button>
-              <i>by</i> <button type="button" class="c-tok c-col">dcn</button>,
+              <i>by</i> <button type="button" class="c-tok c-col">document_id</button>,
               <button type="button" class="c-tok c-col">timestamp</button>
             </span>
           </div>
@@ -1150,14 +1162,14 @@
             <span class="c-code">
               <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
               <button type="button" class="c-tok c-name">step_index</button> <i>=</i>
-              <button type="button" class="c-tok c-col">dcn</button>
+              <button type="button" class="c-tok c-col">document_id</button>
               <span class="c-part"
                 ><i>›</i>
                 <button type="button" class="c-tok c-fn" data-acts="method">cum_count</button></span
               >
               <span class="c-part"
                 ><i>›</i> <button type="button" class="c-tok c-fn" data-acts="method">over</button>
-                <button type="button" class="c-tok c-col">dcn</button></span
+                <button type="button" class="c-tok c-col">document_id</button></span
               >
             </span>
             <span class="c-out">UInt32</span>
@@ -1221,7 +1233,7 @@
                 <span class="c-part"
                   ><i>›</i>
                   <button type="button" class="c-tok c-fn" data-acts="method">over</button>
-                  <button type="button" class="c-tok c-col">dcn</button></span
+                  <button type="button" class="c-tok c-col">document_id</button></span
                 ></span
               >
             </span>
@@ -1386,7 +1398,7 @@
                   <span class="seam"></span>
                   <span class="t-piece">
                     <button type="button" class="t-b t-fn">over</button>
-                    <button type="button" class="t-b t-col">dcn</button>
+                    <button type="button" class="t-b t-col">document_id</button>
                   </span>
                 </span>
                 <span class="t-link t-more">
@@ -1411,7 +1423,7 @@
                   <span class="seam"></span>
                   <span class="t-piece">
                     <button type="button" class="t-b t-fn">over</button>
-                    <button type="button" class="t-b t-col">dcn</button>
+                    <button type="button" class="t-b t-col">document_id</button>
                   </span>
                 </div>
                 <div class="t-sub">
@@ -1433,7 +1445,7 @@
                 <div class="t-group">Fields <i>6</i></div>
                 <div class="t-offers">
                   <span class="t-offer"
-                    ><span class="t-b t-col">dcn</span><i>a different dtype</i></span
+                    ><span class="t-b t-col">document_id</span><i>a different dtype</i></span
                   >
                   <span class="t-offer"
                     ><span class="t-b t-col">timestamp</span><i>Datetime</i></span
@@ -1556,7 +1568,7 @@
     <template id="piece">
       <span class="piece">
         <button type="button" class="side side-remove" aria-label="Remove">×</button>
-        <span class="body"><button type="button" class="btn">dcn</button></span>
+        <span class="body"><button type="button" class="btn">document_id</button></span>
         <button type="button" class="side side-add" aria-label="Add">+</button>
       </span>
     </template>

@@ -23,7 +23,7 @@
                             "parameter": "name",
                             "value": {
                               "kind": "columns",
-                              "names": ["dcn"]
+                              "names": ["document_id"]
                             }
                           }
                         ]
@@ -82,7 +82,7 @@
                               "parameter": "name",
                               "value": {
                                 "kind": "columns",
-                                "names": ["dcn"]
+                                "names": ["document_id"]
                               }
                             }
                           ]
@@ -112,7 +112,7 @@
                                             "parameter": "name",
                                             "value": {
                                               "kind": "columns",
-                                              "names": ["dcn"]
+                                              "names": ["document_id"]
                                             }
                                           }
                                         ]
@@ -213,7 +213,7 @@
                                             "parameter": "name",
                                             "value": {
                                               "kind": "columns",
-                                              "names": ["dcn"]
+                                              "names": ["document_id"]
                                             }
                                           }
                                         ]
@@ -553,7 +553,7 @@
                                             "parameter": "name",
                                             "value": {
                                               "kind": "columns",
-                                              "names": ["dcn"]
+                                              "names": ["document_id"]
                                             }
                                           }
                                         ]
@@ -1089,7 +1089,7 @@
               "parameter": "index",
               "value": {
                 "kind": "columns",
-                "names": ["dcn"]
+                "names": ["document_id"]
               }
             },
             {
@@ -1133,7 +1133,7 @@
   "run": {
     "source": [
       {
-        "name": "dcn",
+        "name": "document_id",
         "dtype": "String"
       },
       {
@@ -1156,13 +1156,13 @@
     "steps": [
       {
         "id": "sort",
-        "summary": "by dcn, timestamp",
+        "summary": "by document_id, timestamp",
         "lazy": true,
         "outcome": {
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -1354,7 +1354,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -1648,7 +1648,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -2061,7 +2061,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -2210,7 +2210,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -2389,7 +2389,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -2689,7 +2689,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -3485,7 +3485,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -3718,7 +3718,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -4365,7 +4365,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -5600,7 +5600,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {
@@ -5803,7 +5803,7 @@
           "status": "valid",
           "columns": [
             {
-              "name": "dcn",
+              "name": "document_id",
               "dtype": "String"
             },
             {

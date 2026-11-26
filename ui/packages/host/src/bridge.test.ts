@@ -75,7 +75,7 @@ describe('the host that calls the bridge', () => {
 
     const node = await bridgeHost().nodeInputs('00000000-0000-7000-8000-000000000006');
 
-    expect(node.source.name).toBe('claims');
+    expect(node.source.name).toBe('documents');
     expect(sent[0]).toMatchObject({ path: '/bridge/node_inputs', body: {} });
   });
 
@@ -113,7 +113,7 @@ describe('the host that calls the bridge', () => {
 
   it('sends the columns and the tables a new step is started on, and decodes what each step starts with', async () => {
     bridgeAnswers(() => jsonResponse(startsFixture));
-    const request = { columns: ['dcn', 'owner'], tables: ['step_names'] };
+    const request = { columns: ['document_id', 'owner'], tables: ['step_names'] };
 
     const found = await bridgeHost().stepStarts(request);
 
@@ -203,7 +203,7 @@ describe('the host that calls the bridge', () => {
     bridgeAnswers(() => new Response(new Uint8Array([0xff, 0xff, 0xff, 0xff])));
 
     await expect(
-      bridgeHost().fetchTableBlock({ offset: 0, length: 3, columns: ['dcn'] }),
+      bridgeHost().fetchTableBlock({ offset: 0, length: 3, columns: ['document_id'] }),
     ).rejects.toThrow(/table_block: \$: has a header of 4294967295 bytes/u);
   });
 

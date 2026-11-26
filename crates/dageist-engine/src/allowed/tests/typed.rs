@@ -180,9 +180,9 @@ fn a_slot_that_takes_text_reads_it_as_it_is_even_if_it_is_a_number() {
 #[test]
 fn a_path_is_text_that_has_no_dtype() {
     assert_eq!(
-        readings("data/claims.parquet", Typed::Path),
+        readings("data/documents.parquet", Typed::Path),
         [Ok((
-            Literal::String("data/claims.parquet".to_owned()),
+            Literal::String("data/documents.parquet".to_owned()),
             None
         ))]
     );

@@ -227,11 +227,15 @@ fn a_step_that_cuts_or_numbers_a_table_starts_with_only_what_it_cannot_do_withou
 #[test]
 fn a_new_select_keeps_every_column_in_the_order_of_the_frame() {
     assert_eq!(
-        started("LazyFrame.select", &["dcn", "owner", "timestamp"], &[]),
+        started(
+            "LazyFrame.select",
+            &["document_id", "owner", "timestamp"],
+            &[]
+        ),
         [(
             "exprs",
             Setting::List(vec![
-                Setting::Field("dcn".to_owned()),
+                Setting::Field("document_id".to_owned()),
                 Setting::Field("owner".to_owned()),
                 Setting::Field("timestamp".to_owned()),
             ])

@@ -1,5 +1,5 @@
 //! What the methods that order values, compare a value with the ones around it, rank it or count
-//! what is distinct do in a step, on the claim-timing sample, whose `row_days` column holds
+//! what is distinct do in a step, on the document-timing sample, whose `row_days` column holds
 //! `0, 2, 2, 0, 2, 2, 1` and whose `timestamp` column orders its seven rows as the rows `3, 0, 6,
 //! 4, 1, 2, 5`. The expected cells are worked out by hand from those, and the dtypes are what
 //! Python Polars documents for each method. The walk's part uses the table `a`, `b`, `f` and `k`
@@ -12,7 +12,7 @@ use dageist_engine::document::{Document, Inputs, Outcome, Report, Segment, StepI
 use polars::prelude::{DataFrame, DataType, IntoLazy, df};
 use serde_json::{Value, json};
 
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 /// The one-step document that selects `expression` as the column `out`.
@@ -27,8 +27,8 @@ pub(crate) fn selecting(expression: Value) -> String {
 pub(crate) fn report_of(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 /// The dtype of the column `out` that the step gives, which it must give.
@@ -46,7 +46,12 @@ pub(crate) fn dtype_of(written: &str) -> DataType {
 pub(crate) fn cells(written: &str) -> Vec<Option<String>> {
     Document::read(written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows")
         .rows()
         .iter()
@@ -154,7 +159,7 @@ fn a_sort_by_orders_a_column_by_another_and_more_keys_break_its_ties() {
     // The days, then the time within a day: rows 0 and 3 have none, so 3 is first, then 0, then
     // the one day of row 6, then rows 4, 1, 2 and 5 by time.
     let by_two = selecting(method(
-        "dcn",
+        "document_id",
         "Expr.sort_by",
         json!({ "by": many(vec![field("row_days")]), "more_by": many(vec![field("timestamp")]) }),
     ));

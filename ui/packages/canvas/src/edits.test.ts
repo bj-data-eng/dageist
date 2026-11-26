@@ -11,7 +11,7 @@ import type { EditPort } from './edits';
 const start = decodeGraph(graphFixture);
 
 // The ids the host gives two of the starting graph's nodes.
-const CLAIMS = '00000000-0000-7000-8000-000000000001';
+const DOCUMENTS = '00000000-0000-7000-8000-000000000001';
 const PARAMETERS = '00000000-0000-7000-8000-000000000005';
 
 /** A host that holds revisions as the real one does: an edit at another revision is refused. */
@@ -76,11 +76,11 @@ const FRAME: FrameView = { x: 10, y: 20, width: null, height: null };
 describe('the queue of edits', () => {
   it('places several boxes asked for at once, each at the revision the one before gave', async () => {
     const { edits, sent, failures, views } = queued();
-    await Promise.all([edits.place(CLAIMS, FRAME), edits.place(PARAMETERS, FRAME)]);
+    await Promise.all([edits.place(DOCUMENTS, FRAME), edits.place(PARAMETERS, FRAME)]);
     expect(failures).toEqual([]);
     const layout = start.layoutRevision;
     expect(sent).toEqual([
-      `place ${CLAIMS} at ${String(layout)}`,
+      `place ${DOCUMENTS} at ${String(layout)}`,
       `place ${PARAMETERS} at ${String(layout + 1)}`,
     ]);
     expect(views.at(-1)?.layoutRevision).toBe(layout + 2);
@@ -90,7 +90,7 @@ describe('the queue of edits', () => {
   it('removes several boxes asked for at once, each at the revision the one before gave', async () => {
     const { edits, sent, failures } = queued();
     await Promise.all([
-      edits.edit({ edit: 'remove', node: CLAIMS }),
+      edits.edit({ edit: 'remove', node: DOCUMENTS }),
       edits.edit({ edit: 'remove', node: PARAMETERS }),
     ]);
     expect(failures).toEqual([]);
@@ -102,7 +102,7 @@ describe('the queue of edits', () => {
 
   it('places a box it added where it was asked to, after the edit that added it', async () => {
     const { edits, sent } = queued();
-    await edits.edit({ edit: 'add', kind: 'transform', follows: CLAIMS, name: null }, () => ({
+    await edits.edit({ edit: 'add', kind: 'transform', follows: DOCUMENTS, name: null }, () => ({
       x: 400,
       y: 0,
     }));
@@ -114,8 +114,8 @@ describe('the queue of edits', () => {
 
   it('says why an edit was refused and keeps the revision for the next', async () => {
     const { edits, sent, refusals } = queued();
-    await edits.edit({ edit: 'rename', node: CLAIMS, name: '' });
-    await edits.edit({ edit: 'remove', node: CLAIMS });
+    await edits.edit({ edit: 'rename', node: DOCUMENTS, name: '' });
+    await edits.edit({ edit: 'remove', node: DOCUMENTS });
     expect(refusals).toEqual(['the name is empty']);
     expect(sent.at(-1)).toBe(`edit remove at ${String(start.revision)}`);
   });
@@ -123,9 +123,9 @@ describe('the queue of edits', () => {
   it('reports a failure and goes on with the edits after it', async () => {
     const { edits, failures, sent } = queued();
     edits.seen({ ...start, revision: start.revision - 1 });
-    await edits.edit({ edit: 'remove', node: CLAIMS });
+    await edits.edit({ edit: 'remove', node: DOCUMENTS });
     edits.seen(start);
-    await edits.edit({ edit: 'remove', node: CLAIMS });
+    await edits.edit({ edit: 'remove', node: DOCUMENTS });
     expect(failures).toHaveLength(1);
     expect(sent.at(-1)).toBe(`edit remove at ${String(start.revision)}`);
   });

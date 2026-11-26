@@ -70,11 +70,11 @@ fn a_table_is_set_by_its_name() {
     let edited = document
         .set_argument(
             &inside(0, "joined", vec![parameter("other")]),
-            Value::Table("claims".to_owned()),
+            Value::Table("documents".to_owned()),
         )
         .expect("set");
     let mut expected = join("left");
-    expected["call"]["arguments"]["other"] = json!({ "table": "claims" });
+    expected["call"]["arguments"]["other"] = json!({ "table": "documents" });
     assert_steps(&edited, vec![expected]);
 }
 

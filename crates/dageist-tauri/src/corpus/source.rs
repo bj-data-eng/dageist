@@ -1,7 +1,7 @@
 //! The node the corpus runs on: one table with a column of every class of dtype the tables
 //! cover, a second table of the same, and a connected value and list.
 //!
-//! The claim-timing sample has five columns of three dtypes, so a chain from it reaches few of the
+//! The document-timing sample has five columns of three dtypes, so a chain from it reaches few of the
 //! places the engine allows an entry at. A column of every class puts every method at the places
 //! the tables have lines for.
 

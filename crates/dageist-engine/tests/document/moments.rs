@@ -1,5 +1,5 @@
 //! What the functions that make a date, a time, a moment or a length of time out of parts, or out
-//! of a count since 1970, do in a step, on the claim-timing sample, whose `row_days` column holds
+//! of a count since 1970, do in a step, on the document-timing sample, whose `row_days` column holds
 //! `0, 2, 2, 0, 2, 2, 1`. The expected cells are worked out by hand from those seven numbers and
 //! from the calendar, and the dtypes are what Python Polars documents for each function.
 
@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Outcome, Report, StepId};
 use polars::prelude::{DataType, TimeUnit, TimeZone};
 use serde_json::{Value, json};
 
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, chain, document, field, field_then, named, step, whole};
 
 /// The one-step document that selects `expression` as the column `out`.
@@ -22,8 +22,8 @@ fn selecting(expression: Value) -> String {
 fn report_of(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 /// The dtype of the column `out` that the step gives, which it must give.
@@ -41,7 +41,12 @@ fn dtype_of(written: &str) -> DataType {
 fn cells(written: &str) -> Vec<Option<String>> {
     Document::read(written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows")
         .rows()
         .iter()

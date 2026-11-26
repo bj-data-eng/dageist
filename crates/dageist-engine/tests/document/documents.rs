@@ -1,5 +1,5 @@
-//! The claim-timing steps of the storyboard, written as a document and run on
-//! seven claim rows.
+//! The document-timing steps of the storyboard, written as a document and run on
+//! seven document rows.
 //!
 //! The rows, the tables connected to the steps and the steps themselves are
 //! the timing corpus in `tests/corpus/timing`. Every expected value is worked
@@ -49,9 +49,9 @@ fn table(name: &str) -> DataFrame {
         .expect("its rows")
 }
 
-/// The seven claim rows of the storyboard, in no useful order.
-pub fn claims() -> DataFrame {
-    table("claims.parquet")
+/// The seven document rows of the storyboard, in no useful order.
+pub fn documents() -> DataFrame {
+    table("documents.parquet")
 }
 
 /// What the storyboard's steps are connected to: the table of the days each
@@ -111,8 +111,8 @@ fn storyboard() -> Document {
 
 fn run() -> Report {
     storyboard()
-        .run(&inputs(), claims().lazy())
-        .expect("the claims have a schema")
+        .run(&inputs(), documents().lazy())
+        .expect("the documents have a schema")
 }
 
 fn report_of<'a>(report: &'a Report, id: &str) -> &'a StepReport {
@@ -198,7 +198,7 @@ fn rows_through(id: &str, limit: usize) -> DataFrame {
     storyboard()
         .rows(
             &inputs(),
-            &claims(),
+            &documents(),
             &StepId::new(id).expect("an id"),
             limit,
         )
@@ -232,9 +232,9 @@ fn the_hand_computed_calendar_matches_the_dates_it_stands_for() {
 
 #[test]
 fn the_sample_rows_are_the_instants_the_calendar_works_out() {
-    let claims = claims();
-    assert_eq!(claims.height(), 7);
-    let timestamps = claims
+    let documents = documents();
+    assert_eq!(documents.height(), 7);
+    let timestamps = documents
         .column("timestamp")
         .expect("a column")
         .as_materialized_series()
@@ -258,7 +258,7 @@ fn the_sample_rows_are_the_instants_the_calendar_works_out() {
         .map(Some)
     );
     assert_eq!(
-        claims.column("timestamp").expect("a column").dtype(),
+        documents.column("timestamp").expect("a column").dtype(),
         &datetime()
     );
 }
@@ -267,8 +267,8 @@ fn the_sample_rows_are_the_instants_the_calendar_works_out() {
 fn the_corpus_runs_its_steps_on_its_own_rows_and_inputs() {
     let steps = storyboard();
     let report = steps
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema");
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema");
     assert_eq!(report.steps().len(), 12);
     assert!(
         report
@@ -276,14 +276,14 @@ fn the_corpus_runs_its_steps_on_its_own_rows_and_inputs() {
             .iter()
             .all(|step| matches!(step.outcome(), Outcome::Valid { .. }))
     );
-    let source: Vec<_> = ColumnDescription::of_schema(claims().schema())
+    let source: Vec<_> = ColumnDescription::of_schema(documents().schema())
         .iter()
         .map(|column| (column.name().to_owned(), column.dtype().to_owned()))
         .collect();
     assert_eq!(
         source,
         [
-            ("dcn", "String"),
+            ("document_id", "String"),
             ("timestamp", "Datetime(us)"),
             ("step_to", "String"),
             ("owner", "String"),
@@ -294,7 +294,7 @@ fn the_corpus_runs_its_steps_on_its_own_rows_and_inputs() {
     let preview = steps
         .preview(
             &inputs(),
-            &claims(),
+            &documents(),
             &StepId::new("pivot").expect("an id"),
             100,
         )
@@ -304,7 +304,10 @@ fn the_corpus_runs_its_steps_on_its_own_rows_and_inputs() {
         .iter()
         .map(|column| column.name())
         .collect();
-    assert_eq!(names, ["dcn", "Intake", "Review", "Pending", "Complete"]);
+    assert_eq!(
+        names,
+        ["document_id", "Intake", "Review", "Pending", "Complete"]
+    );
     assert_eq!(preview.rows().len(), 2);
 }
 
@@ -332,7 +335,7 @@ fn every_step_of_the_storyboard_is_valid_and_only_the_pivot_collects() {
 fn each_step_gives_the_columns_and_dtypes_its_operations_document() {
     let report = run();
     let source = columns(&[
-        ("dcn", DataType::String),
+        ("document_id", DataType::String),
         ("timestamp", datetime()),
         ("step_to", DataType::String),
         ("owner", DataType::String),
@@ -378,7 +381,7 @@ fn each_step_gives_the_columns_and_dtypes_its_operations_document() {
     assert_eq!(
         schema_of(&report, "pivot"),
         columns(&[
-            ("dcn", DataType::String),
+            ("document_id", DataType::String),
             ("Intake", DataType::Int64),
             ("Review", DataType::Int64),
             ("Pending", DataType::Int64),
@@ -493,7 +496,7 @@ fn rows_after_sorting_are_in_key_then_time_order() {
     let rows = rows_through("sort", 100);
     assert_eq!(rows.height(), 7);
     assert_eq!(
-        text_of(&rows, "dcn"),
+        text_of(&rows, "document_id"),
         [
             "A-1001", "A-1001", "A-1001", "A-1001", "A-1002", "A-1002", "A-1002"
         ]
@@ -573,9 +576,9 @@ fn rows_stop_at_the_limit() {
 #[test]
 fn rows_of_the_pivot_collect_there_and_give_one_row_for_each_key() {
     let rows = rows_through("pivot", 100)
-        .sort(["dcn"], SortMultipleOptions::default())
+        .sort(["document_id"], SortMultipleOptions::default())
         .expect("sorted");
-    assert_eq!(text_of(&rows, "dcn"), ["A-1001", "A-1002"]);
+    assert_eq!(text_of(&rows, "document_id"), ["A-1001", "A-1002"]);
     assert_eq!(whole_numbers(&rows, "Intake"), [Some(0), Some(0)]);
     assert_eq!(whole_numbers(&rows, "Review"), [Some(1), Some(2)]);
     // A-1002 never reached Pending.

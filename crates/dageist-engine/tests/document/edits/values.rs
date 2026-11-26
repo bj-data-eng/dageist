@@ -28,8 +28,8 @@ fn text_is_the_kind_of_argument_its_parameter_takes() {
         Value::TimeZone(Some("Europe/Berlin".to_owned()))
     );
     assert_eq!(
-        Value::from_literal(&text("data/claims.parquet"), Kind::Path),
-        Value::Path("data/claims.parquet".to_owned())
+        Value::from_literal(&text("data/documents.parquet"), Kind::Path),
+        Value::Path("data/documents.parquet".to_owned())
     );
     assert_eq!(
         Value::from_literal(&word(), Kind::Value(ValueType::String)),

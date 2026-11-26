@@ -1,13 +1,13 @@
 {
   "source": {
-    "name": "claims",
+    "name": "documents",
     "from": {
       "kind": "node",
-      "name": "Claims"
+      "name": "Documents"
     },
     "columns": [
       {
-        "name": "dcn",
+        "name": "document_id",
         "dtype": "String"
       },
       {

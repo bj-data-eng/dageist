@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use dageist_engine::{Block, SampleSpec, Table, generate_claims};
+use dageist_engine::{Block, SampleSpec, Table, generate_documents};
 use polars::prelude::*;
 
 const KEYS: u32 = 120;
@@ -24,7 +24,7 @@ impl SampleDirectory {
             keys: KEYS,
             filler_columns: FILLER_COLUMNS,
         };
-        let written = generate_claims(&path, spec).expect("the sample is generated");
+        let written = generate_documents(&path, spec).expect("the sample is generated");
         assert_eq!(written.len(), 1, "a small sample fits in one file");
         Self { path }
     }
@@ -62,9 +62,9 @@ fn as_text(frame: &DataFrame) -> DataFrame {
 }
 
 #[test]
-fn generated_table_has_claim_columns_then_filler() {
+fn generated_table_has_document_columns_then_filler() {
     let sample = SampleDirectory::generate("columns");
-    let table = Table::load_keys(&sample.path, "dcn", KEYS).expect("the table loads");
+    let table = Table::load_keys(&sample.path, "document_id", KEYS).expect("the table loads");
 
     let names: Vec<&str> = table
         .columns()
@@ -74,11 +74,11 @@ fn generated_table_has_claim_columns_then_filler() {
 
     assert_eq!(
         names.len(),
-        SampleSpec::CLAIM_COLUMNS.len() + usize::from(FILLER_COLUMNS)
+        SampleSpec::DOCUMENT_COLUMNS.len() + usize::from(FILLER_COLUMNS)
     );
     assert_eq!(
-        names[..SampleSpec::CLAIM_COLUMNS.len()],
-        SampleSpec::CLAIM_COLUMNS
+        names[..SampleSpec::DOCUMENT_COLUMNS.len()],
+        SampleSpec::DOCUMENT_COLUMNS
     );
     assert_eq!(names.last().copied(), Some("measure_012"));
 }
@@ -104,7 +104,8 @@ fn text_values(frame: &DataFrame, column: &str) -> Vec<String> {
 fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
     let sample = SampleDirectory::generate("keys");
     let wanted_keys = 30;
-    let table = Table::load_keys(&sample.path, "dcn", wanted_keys).expect("the table loads");
+    let table =
+        Table::load_keys(&sample.path, "document_id", wanted_keys).expect("the table loads");
     let window = read_ipc(
         table
             .block(0, table.height(), &[])
@@ -114,7 +115,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
     // The sample is written in key order, so the first keys are the first
     // distinct values, and their rows are a prefix of the whole table.
     let whole = read_sample(&sample);
-    let keys = text_values(&whole, "dcn");
+    let keys = text_values(&whole, "document_id");
     let mut first_keys: Vec<&str> = Vec::new();
     for key in &keys {
         if !first_keys.contains(&key.as_str()) {
@@ -138,7 +139,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
 fn timestamps_rise_within_each_key() {
     let sample = SampleDirectory::generate("rising");
     let whole = read_sample(&sample);
-    let dcns = text_values(&whole, "dcn");
+    let document_ids = text_values(&whole, "document_id");
     let stamp_column = whole
         .column("timestamp")
         .expect("timestamp")
@@ -155,17 +156,17 @@ fn timestamps_rise_within_each_key() {
         .collect();
 
     let mut rows_per_key = BTreeMap::new();
-    for dcn in &dcns {
-        *rows_per_key.entry(dcn.as_str()).or_insert(0usize) += 1;
+    for document_id in &document_ids {
+        *rows_per_key.entry(document_id.as_str()).or_insert(0usize) += 1;
     }
     assert_eq!(rows_per_key.len(), KEYS as usize);
     assert!(rows_per_key.values().all(|count| (2..=8).contains(count)));
-    for row in 1..dcns.len() {
-        if dcns[row] == dcns[row - 1] {
+    for row in 1..document_ids.len() {
+        if document_ids[row] == document_ids[row - 1] {
             assert!(
                 stamps[row] > stamps[row - 1],
                 "timestamps rise within {}",
-                dcns[row]
+                document_ids[row]
             );
         }
     }
@@ -174,9 +175,9 @@ fn timestamps_rise_within_each_key() {
 #[test]
 fn block_matches_the_same_rows_of_the_whole() {
     let sample = SampleDirectory::generate("slice");
-    let table = Table::load_keys(&sample.path, "dcn", KEYS).expect("the table loads");
+    let table = Table::load_keys(&sample.path, "document_id", KEYS).expect("the table loads");
     let columns = [
-        "dcn".to_owned(),
+        "document_id".to_owned(),
         "timestamp".to_owned(),
         "measure_002".to_owned(),
     ];
@@ -192,11 +193,11 @@ fn block_matches_the_same_rows_of_the_whole() {
 #[test]
 fn block_past_the_end_is_empty() {
     let sample = SampleDirectory::generate("end");
-    let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
+    let table = Table::load_keys(&sample.path, "document_id", 5).expect("the table loads");
 
     let slice = read_ipc(
         table
-            .block(table.height() + 10, 50, &["dcn".to_owned()])
+            .block(table.height() + 10, 50, &["document_id".to_owned()])
             .expect("an empty block is still written"),
     );
 
@@ -207,7 +208,7 @@ fn block_past_the_end_is_empty() {
 #[test]
 fn unknown_column_is_an_invalid_request() {
     let sample = SampleDirectory::generate("unknown");
-    let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
+    let table = Table::load_keys(&sample.path, "document_id", 5).expect("the table loads");
 
     let error = table
         .block(0, 10, &["no_such_column".to_owned()])
@@ -219,10 +220,10 @@ fn unknown_column_is_an_invalid_request() {
 #[test]
 fn column_named_twice_is_an_invalid_request() {
     let sample = SampleDirectory::generate("twice");
-    let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
+    let table = Table::load_keys(&sample.path, "document_id", 5).expect("the table loads");
 
     let error = table
-        .block(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .block(0, 10, &["document_id".to_owned(), "document_id".to_owned()])
         .expect_err("a repeated column is refused");
 
     assert!(error.is_invalid_request());

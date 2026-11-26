@@ -28,11 +28,11 @@ fn column(name: &str) -> Value {
     }, "then": [] } })
 }
 
-/// A sort by `dcn`, then a column `earlier` that is the timestamp shifted by a row.
+/// A sort by `document_id`, then a column `earlier` that is the timestamp shifted by a row.
 fn small_text() -> String {
     json!({ "version": 1, "steps": [
         { "id": "sort", "call": { "entry": "LazyFrame.sort", "arguments": {
-            "by": { "many": [column("dcn")] },
+            "by": { "many": [column("document_id")] },
             "descending": { "many": [{ "flag": false }] }
         } } },
         { "id": "earlier", "call": { "entry": "LazyFrame.with_columns", "arguments": {
@@ -97,7 +97,7 @@ fn the_document_is_sent_as_the_calls_it_holds_with_numbers_as_the_engine_words_t
                     "start": { "kind": "call", "call": {
                         "entry": "polars.col",
                         "arguments": [{ "parameter": "name", "value": {
-                            "kind": "columns", "names": ["dcn"]
+                            "kind": "columns", "names": ["document_id"]
                         } }]
                     } },
                     "links": []
@@ -129,7 +129,7 @@ fn a_step_added_is_started_by_the_engine_and_the_revision_moves_on() {
             "kind": "addStep",
             "at": 1,
             "entry": "LazyFrame.filter",
-            "frame": { "columns": ["dcn", "timestamp"], "tables": [] }
+            "frame": { "columns": ["document_id", "timestamp"], "tables": [] }
         }),
     )
     .expect("an answer");
@@ -530,7 +530,7 @@ fn made_and_refused() -> (Value, Value) {
         documents_clone(&documents),
         1,
         json!({ "kind": "addStep", "at": 1, "entry": "LazyFrame.head",
-            "frame": { "columns": ["dcn", "timestamp"], "tables": [] } }),
+            "frame": { "columns": ["document_id", "timestamp"], "tables": [] } }),
     )
     .expect("an answer");
     let refused = edit(

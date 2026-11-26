@@ -713,8 +713,8 @@ fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
         json!([{ "kind": "read", "literal": { "kind": "text", "value": "7", "shown": "7" }, "dtype": "String", "fit": null }])
     );
     assert_eq!(
-        read(json!({ "kind": "path" }), "data/claims.parquet")["readings"],
-        json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet", "shown": "data/claims.parquet" }, "dtype": null, "fit": null }])
+        read(json!({ "kind": "path" }), "data/documents.parquet")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/documents.parquet", "shown": "data/documents.parquet" }, "dtype": null, "fit": null }])
     );
     // A pattern is carried as typed with no dtype, a half-typed one included: the step says, with
     // Polars' reason, where it is no regular expression.
@@ -896,7 +896,7 @@ fn names(texts: &[&str]) -> Vec<String> {
 fn every_step_of_the_list_that_can_be_added_is_named() {
     let answer = invoke(
         "step_starts",
-        json!({ "columns": ["dcn", "owner"], "tables": ["step_names", "step_sla"] }),
+        json!({ "columns": ["document_id", "owner"], "tables": ["step_names", "step_sla"] }),
     )
     .expect("the starts");
     // Worked out by hand from the steps the catalogue lists for a table: each that starts a
@@ -1320,7 +1320,7 @@ fn the_snapshots_are_what_the_commands_return() {
             "step-starts.json",
             // The columns and the tables the sample node is connected to.
             json_of(&step_starts_view(
-                &names(&["dcn", "timestamp", "step_to", "owner", "row_days"]),
+                &names(&["document_id", "timestamp", "step_to", "owner", "row_days"]),
                 &names(&["step_names", "step_sla"]),
             )),
         ),

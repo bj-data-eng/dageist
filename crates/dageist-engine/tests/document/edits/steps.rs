@@ -86,7 +86,7 @@ fn a_new_column_starts_as_new_column_holding_a_value_still_to_be_picked() {
 #[test]
 fn a_join_starts_with_the_first_table_and_keeps_the_rows_that_have_no_match() {
     let columns = columns();
-    let tables = vec!["claims".to_owned(), "members".to_owned()];
+    let tables = vec!["documents".to_owned(), "members".to_owned()];
     let document = empty()
         .add_step(0, "LazyFrame.join", &frame(&columns, &tables))
         .expect("a join");
@@ -96,7 +96,7 @@ fn a_join_starts_with_the_first_table_and_keeps_the_rows_that_have_no_match() {
             "join",
             "LazyFrame.join",
             json!({
-                "other": { "table": "claims" },
+                "other": { "table": "documents" },
                 "left_on": many(vec![hole()]),
                 "right_on": many(vec![hole()]),
                 "how": { "choice": "left" },

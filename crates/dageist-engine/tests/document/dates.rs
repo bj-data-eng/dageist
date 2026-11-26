@@ -1,5 +1,5 @@
 //! What the walk and a run say of the methods of the `dt` namespace that take a duration string,
-//! on the claim-timing sample, whose `timestamp` column holds seven moments of March 2026: the
+//! on the document-timing sample, whose `timestamp` column holds seven moments of March 2026: the
 //! expected cells are worked out by hand from them, and the reasons are Polars' own.
 
 use dageist_engine::allowed::{RefusalSource, Representative};
@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Outcome, Report, RunCause, Segment, Ste
 use polars::prelude::IntoLazy;
 use serde_json::{Value, json};
 
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, chain, document, field_then, named, step, text};
 
 /// The one-step document that selects `expression` as the column `out`.
@@ -22,8 +22,8 @@ fn selecting(expression: Value) -> String {
 fn report_of(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 /// The moments with one method of the `dt` namespace after them.
@@ -34,7 +34,12 @@ fn moments_then(id: &str, arguments: Value) -> Value {
 fn cells(written: &str) -> Vec<Option<String>> {
     Document::read(written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows")
         .rows()
         .iter()
@@ -708,8 +713,8 @@ fn the_values_of_a_condition_and_a_fill_value_are_moments_in_one_zone() {
     let written = selecting(moments_then_all(links));
     let report = Document::read(&written)
         .expect("a document")
-        .run(&inputs(), claims().lazy())
-        .expect("the claims have a schema");
+        .run(&inputs(), documents().lazy())
+        .expect("the documents have a schema");
     refused_for_the_zones(&report, "shift", &["Europe/Berlin", "UTC"]);
 }
 

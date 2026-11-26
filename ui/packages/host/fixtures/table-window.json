@@ -2,7 +2,7 @@
   "rows": 46,
   "columns": [
     {
-      "name": "dcn",
+      "name": "document_id",
       "dataType": "str",
       "numeric": false
     },

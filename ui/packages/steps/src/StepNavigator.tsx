@@ -1,6 +1,6 @@
 /**
  * @file The steps as a list of names: each step said by its head, such as
- * "Sort table by dcn" or "Add column step_index", without the pieces under
+ * "Sort table by document_id" or "Add column step_index", without the pieces under
  * it. A click chooses a step, so that its rows can be looked at. A step is
  * dragged to another place in the list, and a double click asks for the
  * editor.

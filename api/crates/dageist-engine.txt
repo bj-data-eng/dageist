@@ -1397,7 +1397,7 @@ pub struct dageist_engine::SampleSpec
 pub dageist_engine::SampleSpec::filler_columns: u16
 pub dageist_engine::SampleSpec::keys: u32
 impl dageist_engine::SampleSpec
-pub const dageist_engine::SampleSpec::CLAIM_COLUMNS: [&'static str; 8]
+pub const dageist_engine::SampleSpec::DOCUMENT_COLUMNS: [&'static str; 8]
 pub struct dageist_engine::Table
 impl dageist_engine::Table
 pub fn dageist_engine::Table::block(&self, offset: usize, length: usize, columns: &[alloc::string::String]) -> core::result::Result<dageist_engine::Block, dageist_engine::EngineError>
@@ -1405,5 +1405,5 @@ pub fn dageist_engine::Table::columns(&self) -> &[dageist_engine::ColumnInfo]
 pub fn dageist_engine::Table::height(&self) -> usize
 pub fn dageist_engine::Table::load_keys(directory: &std::path::Path, key_column: &str, keys: u32) -> core::result::Result<Self, dageist_engine::EngineError>
 pub const dageist_engine::PARAMETER_DTYPES: [&str; 5]
-pub fn dageist_engine::claims_generated(directory: &std::path::Path) -> bool
-pub fn dageist_engine::generate_claims(directory: &std::path::Path, spec: dageist_engine::SampleSpec) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, dageist_engine::EngineError>
+pub fn dageist_engine::documents_generated(directory: &std::path::Path) -> bool
+pub fn dageist_engine::generate_documents(directory: &std::path::Path, spec: dageist_engine::SampleSpec) -> core::result::Result<alloc::vec::Vec<std::path::PathBuf>, dageist_engine::EngineError>

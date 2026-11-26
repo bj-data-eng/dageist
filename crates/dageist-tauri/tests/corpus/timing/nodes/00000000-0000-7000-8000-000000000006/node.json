@@ -1,6 +1,6 @@
 {
   "kind": "transform",
-  "name": "Claim timing",
+  "name": "Document timing",
   "start": {
     "kind": "table",
     "node": "00000000-0000-7000-8000-000000000001"

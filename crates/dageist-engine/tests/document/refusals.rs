@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::ask_polars::{self, Connected};
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn parameter(name: &str) -> Segment {
@@ -21,8 +21,8 @@ fn parameter(name: &str) -> Segment {
 fn run(steps: Vec<Value>) -> Report {
     Document::read(&document(steps))
         .expect("a document")
-        .run(&inputs(), claims().lazy())
-        .expect("the claims have a schema")
+        .run(&inputs(), documents().lazy())
+        .expect("the documents have a schema")
 }
 
 fn refusal_of<'a>(report: &'a Report, id: &str) -> &'a StepRefusal {
@@ -70,9 +70,9 @@ fn first_line(words: &str) -> &str {
 }
 
 /// Polars' own words for the plan the step builds: what `collect_schema` says
-/// of `select` of `expressions` on the claims.
+/// of `select` of `expressions` on the documents.
 fn polars_says(expressions: Vec<Expr>) -> String {
-    claims()
+    documents()
         .lazy()
         .select(expressions)
         .collect_schema()
@@ -82,14 +82,14 @@ fn polars_says(expressions: Vec<Expr>) -> String {
 
 #[test]
 fn a_sum_of_text_is_refused_at_its_link_with_polars_reason() {
-    // `dcn` is text, which Polars cannot add up.
+    // `document_id` is text, which Polars cannot add up.
     let report = run(vec![
         step(
             "bad",
             "LazyFrame.with_columns",
             json!({ "named_exprs": named(vec![(
                 "total",
-                field_then("dcn", vec![call("Expr.sum", json!({}))]),
+                field_then("document_id", vec![call("Expr.sum", json!({}))]),
             )]) }),
         ),
         step("after", "LazyFrame.select", json!({})),
@@ -110,7 +110,7 @@ fn a_sum_of_text_is_refused_at_its_link_with_polars_reason() {
     let said = refused_by_the_tables_as_polars_did(&report, "bad", refusal);
     assert_eq!(
         said.reason(),
-        first_line(&polars_says(vec![col("dcn").sum()]))
+        first_line(&polars_says(vec![col("document_id").sum()]))
     );
     assert!(said.reason().contains("sum"), "{said}");
     assert!(said.reason().contains("str"), "{said}");
@@ -123,7 +123,7 @@ fn taking_text_from_a_timestamp_is_refused_at_its_link_with_polars_reason() {
         "LazyFrame.with_columns",
         json!({ "named_exprs": named(vec![(
             "gap",
-            field_then("timestamp", vec![call("Expr.sub", json!({ "other": field("dcn") }))]),
+            field_then("timestamp", vec![call("Expr.sub", json!({ "other": field("document_id") }))]),
         )]) }),
     )]);
     let refusal = refusal_of(&report, "bad");
@@ -141,7 +141,7 @@ fn taking_text_from_a_timestamp_is_refused_at_its_link_with_polars_reason() {
         first_line(&polars_says(vec![binary_expr(
             col("timestamp"),
             Operator::Minus,
-            col("dcn")
+            col("document_id")
         )]))
     );
 }
@@ -153,7 +153,7 @@ fn a_step_the_walk_refuses_is_not_planned_so_it_reports_no_dtype_but_says_where_
         "LazyFrame.with_columns",
         json!({ "named_exprs": named(vec![(
             "total",
-            field_then("dcn", vec![call("Expr.first", json!({})), call("Expr.sum", json!({}))]),
+            field_then("document_id", vec![call("Expr.first", json!({})), call("Expr.sum", json!({}))]),
         )]) }),
     )]);
     // The dtype of each part of an expression is worked out by planning it, which a step the walk
@@ -187,7 +187,7 @@ fn a_step_after_a_refused_step_is_not_run() {
         step(
             "fine",
             "LazyFrame.select",
-            json!({ "exprs": many(vec![field("dcn")]) }),
+            json!({ "exprs": many(vec![field("document_id")]) }),
         ),
         step(
             "bad",
@@ -197,12 +197,12 @@ fn a_step_after_a_refused_step_is_not_run() {
         step(
             "later",
             "LazyFrame.select",
-            json!({ "exprs": many(vec![field("dcn")]) }),
+            json!({ "exprs": many(vec![field("document_id")]) }),
         ),
         step(
             "last",
             "LazyFrame.select",
-            json!({ "exprs": many(vec![field("dcn")]) }),
+            json!({ "exprs": many(vec![field("document_id")]) }),
         ),
     ]);
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
@@ -224,7 +224,7 @@ fn a_missing_column_is_refused_at_its_start_with_polars_reason() {
     let report = run(vec![step(
         "bad",
         "LazyFrame.sort",
-        json!({ "by": many(vec![field("dcn"), field("nope")]) }),
+        json!({ "by": many(vec![field("document_id"), field("nope")]) }),
     )]);
     let refusal = refusal_of(&report, "bad");
     assert_eq!(
@@ -251,7 +251,7 @@ fn a_column_a_later_step_adds_is_missing_before_that_step() {
         step(
             "second",
             "LazyFrame.with_columns",
-            json!({ "named_exprs": named(vec![("later", field("dcn"))]) }),
+            json!({ "named_exprs": named(vec![("later", field("document_id"))]) }),
         ),
     ]);
     let refusal = refusal_of(&report, "early");
@@ -261,14 +261,14 @@ fn a_column_a_later_step_adds_is_missing_before_that_step() {
 
 #[test]
 fn a_missing_column_inside_a_nested_expression_is_found_through_its_links() {
-    // `dcn.shift(n).over(nope)`: the missing column is the partition.
+    // `document_id.shift(n).over(nope)`: the missing column is the partition.
     let report = run(vec![step(
         "bad",
         "LazyFrame.with_columns",
         json!({ "named_exprs": named(vec![(
             "x",
             field_then(
-                "dcn",
+                "document_id",
                 vec![call("Expr.over", json!({ "partition_by": many(vec![field("nope")]) }))],
             ),
         )]) }),
@@ -297,7 +297,7 @@ fn a_join_on_keys_of_different_dtypes_is_refused_at_the_step() {
         "LazyFrame.join",
         json!({
             "other": { "table": "step_sla" },
-            "left_on": many(vec![field("dcn")]),
+            "left_on": many(vec![field("document_id")]),
             "right_on": many(vec![field("sla_days")]),
         }),
     )]);
@@ -313,7 +313,7 @@ fn a_table_that_is_not_connected_is_refused_at_its_argument() {
         "LazyFrame.join",
         json!({
             "other": { "table": "nowhere" },
-            "on": many(vec![field("dcn")]),
+            "on": many(vec![field("document_id")]),
         }),
     )]);
     let refusal = refusal_of(&report, "join");
@@ -429,7 +429,7 @@ fn rows_of_a_refused_step_or_an_unknown_step_are_errors() {
         step(
             "fine",
             "LazyFrame.select",
-            json!({ "exprs": many(vec![field("dcn")]) }),
+            json!({ "exprs": many(vec![field("document_id")]) }),
         ),
         step(
             "bad",
@@ -438,7 +438,7 @@ fn rows_of_a_refused_step_or_an_unknown_step_are_errors() {
         ),
     ]))
     .expect("a document");
-    let working = claims();
+    let working = documents();
     let id = |text: &str| StepId::new(text).expect("an id");
 
     let rows = document
@@ -470,19 +470,19 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
         "LazyFrame.with_columns",
         json!({ "named_exprs": named(vec![(
             "day",
-            field_then("dcn", vec![call("Expr.dt.date", json!({}))]),
+            field_then("document_id", vec![call("Expr.dt.date", json!({}))]),
         )]) }),
     )];
     let document = Document::read(&document(steps)).expect("a document");
     let nothing = |_: &str| None;
     let connected = Connected::tables(&nothing);
     let step = &document.steps()[0];
-    let planned = ask_polars::guarded(step, || ask_polars::plan(step, 0, &claims(), connected))
+    let planned = ask_polars::guarded(step, || ask_polars::plan(step, 0, &documents(), connected))
         .expect("a step that can be asked");
     let schema = planned.schema.expect("Polars plans it");
     assert_eq!(schema.get("day"), Some(&DataType::Date));
     let error = ask_polars::guarded(step, || {
-        ask_polars::collect(step, 0, &claims(), connected, 10)
+        ask_polars::collect(step, 0, &documents(), connected, 10)
     })
     .expect_err("Polars cannot take the date of text");
     assert!(!error.is_empty());
@@ -491,11 +491,11 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
     // it nor collects its rows.
     let id = StepId::new("day").expect("an id");
     let report = document
-        .run(&inputs(), claims().lazy())
-        .expect("the claims have a schema");
+        .run(&inputs(), documents().lazy())
+        .expect("the documents have a schema");
     assert!(matches!(report.steps()[0].outcome(), Outcome::Refused(_)));
     let error = document
-        .rows(&inputs(), &claims(), &id, 10)
+        .rows(&inputs(), &documents(), &id, 10)
         .expect_err("the step is refused");
     assert!(matches!(error, RowsError::Refused(_)), "{error}");
 }
@@ -531,7 +531,7 @@ fn element_outside_a_pivots_aggregate_is_refused_at_its_start_by_the_rule() {
     assert!(refusal.to_string().contains("element"), "{refusal}");
     // Polars itself refuses `element` on a table's columns.
     assert!(
-        claims()
+        documents()
             .lazy()
             .select([element().first()])
             .collect_schema()
@@ -552,7 +552,7 @@ fn a_joins_right_keys_are_read_against_the_other_table_not_the_one_the_step_star
             }),
         )])
     };
-    // `step` is a column of the other table only, and `step_to` of the claims only.
+    // `step` is a column of the other table only, and `step_to` of the documents only.
     let report = join("step_to", "step");
     assert!(
         matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
@@ -567,7 +567,7 @@ fn a_joins_right_keys_are_read_against_the_other_table_not_the_one_the_step_star
     );
     assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
     assert!(refusal.to_string().contains("step_to"), "{refusal}");
-    // And `left_on` is read against the claims: the other table's column is not found there.
+    // And `left_on` is read against the documents: the other table's column is not found there.
     let report = join("step", "step");
     assert_eq!(
         refusal_of(&report, "join").place().path(),
@@ -621,10 +621,10 @@ fn a_pivot_aggregate_that_is_a_condition_over_element_is_valid_as_polars_accepts
     // Polars, by hand: the same pivot, built on its own API, collects.
     let step_names =
         df!("step_to" => ["Intake", "Review", "Pending", "Complete"]).expect("the step names");
-    let pivoted = claims().lazy().pivot(
+    let pivoted = documents().lazy().pivot(
         cols(["step_to"]),
         Arc::new(step_names),
-        cols(["dcn"]),
+        cols(["document_id"]),
         cols(["row_days"]),
         when(element().is_not_null())
             .then(element())
@@ -643,7 +643,7 @@ fn a_pivot_aggregate_that_is_a_condition_over_element_is_valid_as_polars_accepts
         json!({
             "on": { "columns": ["step_to"] },
             "on_columns": { "table": "step_names" },
-            "index": { "columns": ["dcn"] },
+            "index": { "columns": ["document_id"] },
             "values": { "columns": ["row_days"] },
             "aggregate_function": aggregate,
         }),
@@ -684,7 +684,7 @@ fn a_join_key_that_is_a_condition_of_typed_literals_is_valid_as_polars_accepts_i
         "sla_days" => [1_i64, 1, 2, 3],
     )
     .expect("the SLA table");
-    let joined = claims()
+    let joined = documents()
         .lazy()
         .join_builder()
         .with(sla.lazy())
@@ -729,7 +729,7 @@ fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step_as_t
         json!({
             "on": { "columns": ["step_to"] },
             "on_columns": { "table": "step_names" },
-            "index": { "columns": ["dcn"] },
+            "index": { "columns": ["document_id"] },
             "values": { "columns": ["row_days"] },
             "aggregate_function": field_then("row_days", vec![call("Expr.sum", json!({}))]),
         }),
@@ -754,10 +754,10 @@ fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step_as_t
     // Polars, by hand: its own pivot refuses a column in the aggregate.
     let step_names =
         df!("step_to" => ["Intake", "Review", "Pending", "Complete"]).expect("the step names");
-    let mut pivoted = claims().lazy().pivot(
+    let mut pivoted = documents().lazy().pivot(
         cols(["step_to"]),
         Arc::new(step_names),
-        cols(["dcn"]),
+        cols(["document_id"]),
         cols(["row_days"]),
         col("row_days").sum(),
         false,
@@ -776,7 +776,7 @@ fn a_panic_of_polars_when_it_is_asked_of_a_step_fails_the_test_and_names_the_ste
     let document = Document::read(&document(vec![step(
         "bad",
         "LazyFrame.select",
-        json!({ "exprs": many(vec![field("dcn")]) }),
+        json!({ "exprs": many(vec![field("document_id")]) }),
     )]))
     .expect("a document");
     ask_polars::guarded(&document.steps()[0], || panic!("a thread broke"));

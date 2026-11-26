@@ -15,7 +15,7 @@
                     "arguments": {
                       "name": {
                         "columns": [
-                          "dcn"
+                          "document_id"
                         ]
                       }
                     }
@@ -63,7 +63,7 @@
                       "arguments": {
                         "name": {
                           "columns": [
-                            "dcn"
+                            "document_id"
                           ]
                         }
                       }
@@ -85,7 +85,7 @@
                                     "arguments": {
                                       "name": {
                                         "columns": [
-                                          "dcn"
+                                          "document_id"
                                         ]
                                       }
                                     }
@@ -162,7 +162,7 @@
                                     "arguments": {
                                       "name": {
                                         "columns": [
-                                          "dcn"
+                                          "document_id"
                                         ]
                                       }
                                     }
@@ -428,7 +428,7 @@
                                     "arguments": {
                                       "name": {
                                         "columns": [
-                                          "dcn"
+                                          "document_id"
                                         ]
                                       }
                                     }
@@ -827,7 +827,7 @@
           },
           "index": {
             "columns": [
-              "dcn"
+              "document_id"
             ]
           },
           "values": {

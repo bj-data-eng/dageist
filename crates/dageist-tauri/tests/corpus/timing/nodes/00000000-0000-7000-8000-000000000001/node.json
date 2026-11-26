@@ -1,8 +1,8 @@
 {
   "kind": "source",
-  "name": "Claims",
+  "name": "Documents",
   "file": {
-    "path": "data/claims.parquet",
+    "path": "data/documents.parquet",
     "format": "parquet"
   }
 }

@@ -1,7 +1,7 @@
 //! What a run on the working window counts: the rows each step kept of those
 //! it received, the first values of the columns it added, and which columns it
 //! added or replaced. Every expected value is worked out by hand from the
-//! seven claim rows, whose `row_days` are 0, 2, 2, 0, 2, 2, 1 in the order
+//! seven document rows, whose `row_days` are 0, 2, 2, 0, 2, 2, 1 in the order
 //! they are held.
 
 use dageist_engine::document::{
@@ -10,14 +10,14 @@ use dageist_engine::document::{
 use polars::prelude::IntoLazy;
 use serde_json::json;
 
-use crate::claims::{claims, inputs, storyboard_text};
+use crate::documents::{documents, inputs, storyboard_text};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn run_on(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 fn counted<'a>(report: &'a Report, id: &str) -> &'a Counted {
@@ -111,7 +111,7 @@ fn a_step_is_given_the_rows_the_step_before_kept() {
             "late",
             "LazyFrame.filter",
             json!({ "predicates": many(vec![chain(
-                call("polars.col", json!({ "name": { "columns": ["dcn"] } })),
+                call("polars.col", json!({ "name": { "columns": ["document_id"] } })),
                 vec![call("Expr.eq", json!({ "other": chain(
                     call("polars.lit", json!({ "value": { "string": "A-1001" } })),
                     vec![],
@@ -217,7 +217,7 @@ fn a_select_of_columns_it_was_given_changes_none() {
     let report = run_on(&document(vec![step(
         "pick",
         "LazyFrame.select",
-        json!({ "exprs": many(vec![field("owner"), field("dcn")]) }),
+        json!({ "exprs": many(vec![field("owner"), field("document_id")]) }),
     )]));
     assert!(changes(&report, "pick").is_empty());
     let count = counted(&report, "pick");
@@ -229,14 +229,14 @@ fn a_rename_adds_the_new_name() {
     let report = run_on(&document(vec![step(
         "rename",
         "LazyFrame.rename",
-        json!({ "mapping": { "pairs": [[{ "columns": ["dcn"] }, { "string": "claim" }]] } }),
+        json!({ "mapping": { "pairs": [[{ "columns": ["document_id"] }, { "string": "document" }]] } }),
     )]));
     assert_eq!(
         named_changes(changes(&report, "rename")),
-        [("claim", Change::Added)]
+        [("document", Change::Added)]
     );
     assert_eq!(
-        first_of(counted(&report, "rename"), "claim").0[0],
+        first_of(counted(&report, "rename"), "document").0[0],
         Some("A-1002")
     );
 }
@@ -283,7 +283,7 @@ fn a_pivot_adds_a_column_for_each_value_and_keeps_a_row_for_each_key() {
         ]
     );
     let count = counted(&report, "pivot");
-    // Two claims, from seven rows.
+    // Two documents, from seven rows.
     assert_eq!((count.received(), count.kept()), (7, 2));
     // The sort puts A-1001 first, and A-1002 never reached Pending, so it has
     // no days there.
@@ -297,11 +297,11 @@ fn every_step_of_a_run_is_counted_as_the_rows_after_it_are() {
     let text = storyboard_text();
     let report = run_on(&text);
     let steps = Document::read(&text).expect("a document");
-    let mut before = claims().height();
+    let mut before = documents().height();
     for reported in report.steps() {
         let count = counted(&report, reported.id().as_str());
         let rows = steps
-            .rows(&inputs(), &claims(), reported.id(), 1_000)
+            .rows(&inputs(), &documents(), reported.id(), 1_000)
             .expect("the rows after the step");
         assert_eq!(count.received(), before, "{}", reported.id());
         assert_eq!(count.kept(), rows.height(), "{}", reported.id());
@@ -313,8 +313,8 @@ fn every_step_of_a_run_is_counted_as_the_rows_after_it_are() {
 fn a_run_that_reads_no_rows_counts_none() {
     let report = Document::read(&storyboard_text())
         .expect("a document")
-        .run(&inputs(), claims().lazy())
-        .expect("the claims have a schema");
+        .run(&inputs(), documents().lazy())
+        .expect("the documents have a schema");
     assert!(
         report
             .steps()
@@ -329,13 +329,13 @@ fn a_step_polars_refuses_is_not_counted_and_nor_are_the_steps_after_it() {
         step(
             "sort",
             "LazyFrame.sort",
-            json!({ "by": many(vec![field("dcn")]) }),
+            json!({ "by": many(vec![field("document_id")]) }),
         ),
         with_columns(
             "total",
             vec![(
                 "total",
-                field_then("dcn", vec![call("Expr.sum", json!({}))]),
+                field_then("document_id", vec![call("Expr.sum", json!({}))]),
             )],
         ),
         with_columns("after", vec![("days", field("row_days"))]),
@@ -363,7 +363,10 @@ fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it
                 "day",
                 field_then(
                     "timestamp",
-                    vec![call("Expr.dt.offset_by", json!({ "by": field("dcn") }))],
+                    vec![call(
+                        "Expr.dt.offset_by",
+                        json!({ "by": field("document_id") }),
+                    )],
                 ),
             )],
         ),
@@ -393,7 +396,10 @@ fn a_step_after_a_failure_that_is_refused_says_why_it_is_refused_and_is_not_coun
                 "day",
                 field_then(
                     "timestamp",
-                    vec![call("Expr.dt.offset_by", json!({ "by": field("dcn") }))],
+                    vec![call(
+                        "Expr.dt.offset_by",
+                        json!({ "by": field("document_id") }),
+                    )],
                 ),
             )],
         ),
@@ -401,7 +407,7 @@ fn a_step_after_a_failure_that_is_refused_says_why_it_is_refused_and_is_not_coun
             "total",
             vec![(
                 "total",
-                field_then("dcn", vec![call("Expr.sum", json!({}))]),
+                field_then("document_id", vec![call("Expr.sum", json!({}))]),
             )],
         ),
     ]));
@@ -469,7 +475,7 @@ fn several_columns_chosen_by_name_are_passed_on_by_neither() {
         "pick",
         "LazyFrame.with_columns",
         json!({ "exprs": many(vec![chain(
-            call("polars.col", json!({ "name": { "columns": ["owner", "dcn"] } })),
+            call("polars.col", json!({ "name": { "columns": ["owner", "document_id"] } })),
             vec![],
         )]) }),
     )]));
@@ -501,14 +507,14 @@ fn a_name_written_twice_is_refused_by_polars_for_both_steps_before_any_name_is_r
 fn the_first_values_of_every_step_are_the_first_rows_the_preview_gives_for_it() {
     // The preview collects one plan up to the step; the run collects each step from the one
     // before. They agree, including after the join, which is told to keep the order of the
-    // claims: Polars does not promise any order for a join that is not.
+    // documents: Polars does not promise any order for a join that is not.
     let text = storyboard_text();
     let report = run_on(&text);
     let steps = Document::read(&text).expect("a document");
     for reported in report.steps() {
         let count = counted(&report, reported.id().as_str());
         let preview = steps
-            .preview(&inputs(), &claims(), reported.id(), 1_000)
+            .preview(&inputs(), &documents(), reported.id(), 1_000)
             .expect("the preview");
         for column in count.first() {
             let at = preview

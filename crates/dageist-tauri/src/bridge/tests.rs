@@ -314,7 +314,7 @@ fn the_offers_commands_answer_the_views_the_application_answers() {
         &bridge,
         "step_starts",
         &json!({
-            "columns": ["dcn", "timestamp", "step_to", "owner", "row_days"],
+            "columns": ["document_id", "timestamp", "step_to", "owner", "row_days"],
             "tables": ["step_names", "step_sla"]
         }),
     );
@@ -526,17 +526,17 @@ fn the_sample_commands_keep_the_open_table_between_requests() {
     let shape = opened.json();
     assert_eq!(
         shape["columns"].as_array().expect("columns").len(),
-        SampleSpec::CLAIM_COLUMNS.len() + 4
+        SampleSpec::DOCUMENT_COLUMNS.len() + 4
     );
     assert_eq!(
         shape["columns"][0],
-        json!({ "name": "dcn", "dataType": "str", "numeric": false })
+        json!({ "name": "document_id", "dataType": "str", "numeric": false })
     );
 
     let block = call(
         &bridge,
         "table_block",
-        &json!({ "offset": 3, "length": 7, "columns": ["dcn", "timestamp"] }),
+        &json!({ "offset": 3, "length": 7, "columns": ["document_id", "timestamp"] }),
     );
     assert_eq!(block.status, 200);
     assert_eq!(
@@ -558,7 +558,7 @@ fn the_sample_commands_keep_the_open_table_between_requests() {
     let again = call(
         &bridge,
         "table_block",
-        &json!({ "offset": 50, "length": 12, "columns": ["dcn", "measure_002"] }),
+        &json!({ "offset": 50, "length": 12, "columns": ["document_id", "measure_002"] }),
     );
     assert_eq!(again.status, 200);
 }
@@ -1002,7 +1002,7 @@ fn through_a_socket_the_open_table_is_kept_across_connections() {
             "POST",
             "/bridge/table_block",
             &headers,
-            br#"{"offset": 0, "length": 3, "columns": ["dcn"]}"#,
+            br#"{"offset": 0, "length": 3, "columns": ["document_id"]}"#,
         ),
     );
 

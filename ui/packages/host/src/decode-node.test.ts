@@ -22,14 +22,14 @@ function refusal(decode: (value: unknown) => unknown, value: unknown): DecodeErr
   throw new Error('the value was not refused');
 }
 
-describe('the inputs of the claim-timing node', () => {
-  it('are the claims table the steps start from and each other input by name', () => {
+describe('the inputs of the document-timing node', () => {
+  it('are the documents table the steps start from and each other input by name', () => {
     const decoded = decodeNode(node);
     expect(decoded.source).toEqual({
-      name: 'claims',
-      from: { kind: 'node', name: 'Claims' },
+      name: 'documents',
+      from: { kind: 'node', name: 'Documents' },
       columns: [
-        { name: 'dcn', dtype: 'String' },
+        { name: 'document_id', dtype: 'String' },
         { name: 'timestamp', dtype: 'Datetime(us)' },
         { name: 'step_to', dtype: 'String' },
         { name: 'owner', dtype: 'String' },
@@ -94,14 +94,14 @@ describe('the inputs of the claim-timing node', () => {
   });
 });
 
-// An answer written by hand for the shapes the claim-timing node does not give together: a value
+// An answer written by hand for the shapes the document-timing node does not give together: a value
 // that is null, a list with a null among its first values and values that follow them, and each
 // way an input comes to the node.
 const handWritten: unknown = {
   source: {
-    name: 'claims',
-    from: { kind: 'node', name: 'Claims' },
-    columns: [{ name: 'dcn', dtype: 'String' }],
+    name: 'documents',
+    from: { kind: 'node', name: 'Documents' },
+    columns: [{ name: 'document_id', dtype: 'String' }],
   },
   inputs: [
     {
@@ -169,7 +169,7 @@ describe('the rows after a step', () => {
   it('are text for each cell, and null where the value is', () => {
     const decoded = decodeRows(rows);
     expect(decoded.columns.map((column) => column.name)).toEqual([
-      'dcn',
+      'document_id',
       'timestamp',
       'step_to',
       'owner',
@@ -193,7 +193,7 @@ describe('the rows after a step', () => {
       'Int64',
     ]);
     expect(decoded.rows).toHaveLength(7);
-    // The first claim's first row has no row before it, so what is carried over is null.
+    // The first document's first row has no row before it, so what is carried over is null.
     expect(decoded.rows[0]).toEqual([
       'A-1001',
       '2026-03-02 09:15:00',

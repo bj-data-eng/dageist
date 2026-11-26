@@ -1,4 +1,4 @@
-//! What the walk and a run say of the methods of text, on the claim-timing sample, whose
+//! What the walk and a run say of the methods of text, on the document-timing sample, whose
 //! `owner` column holds `Company A` and `Company B`, and against what Polars does: the expected
 //! cells are worked out by hand from the seven rows.
 
@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Outcome, RunCause, Segment, StepId, Ste
 use serde_json::{Value, json};
 
 use crate::ask_polars::{self, Connected};
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::support::{call, document, field, field_then, named, step, text, whole};
 
 /// The one-step document that selects `expression` as the column `out`.
@@ -22,8 +22,8 @@ fn selecting(expression: Value) -> String {
 fn report_of(text: &str) -> dageist_engine::document::Report {
     Document::read(text)
         .expect("a document")
-        .run_on(&inputs(), &claims())
-        .expect("the claims have a schema")
+        .run_on(&inputs(), &documents())
+        .expect("the documents have a schema")
 }
 
 #[test]
@@ -82,7 +82,12 @@ fn a_chain_of_text_methods_runs_and_previews_what_is_left_of_each_owner() {
     );
     let preview = Document::read(&written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows");
     assert_eq!(
         preview
@@ -133,7 +138,7 @@ fn a_method_of_text_after_whole_numbers_is_refused_at_its_link_as_polars_refuses
         ask_polars::guarded(step, || ask_polars::collect(
             step,
             0,
-            &claims(),
+            &documents(),
             Connected::tables(&nothing),
             100
         ))
@@ -161,7 +166,12 @@ fn a_split_by_a_pattern_runs_and_one_by_text_is_not_a_pattern() {
         assert_eq!(walk_refusal(&report), None);
         let preview = Document::read(&written)
             .expect("a document")
-            .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+            .preview(
+                &inputs(),
+                &documents(),
+                &StepId::new("s").expect("an id"),
+                100,
+            )
             .expect("the rows");
         preview.rows()[0][0].clone().expect("a value")
     };
@@ -206,7 +216,12 @@ fn text_joined_into_one_value_is_an_aggregate_beside_a_column_in_a_select() {
     // Polars broadcasts the one value, as the preview of the rows shows.
     let preview = Document::read(&written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows");
     assert_eq!(preview.rows().len(), 7);
     let first = preview.rows()[0][0].as_deref().expect("a value");
@@ -240,12 +255,12 @@ fn a_test_for_a_prefix_is_a_condition_a_filter_may_hold() {
         .expect("a document")
         .preview(
             &inputs(),
-            &claims(),
+            &documents(),
             &StepId::new("keep").expect("an id"),
             100,
         )
         .expect("the rows");
-    // Four of the seven claims are with Company A.
+    // Four of the seven documents are with Company A.
     assert_eq!(preview.rows().len(), 4);
 }
 
@@ -313,7 +328,12 @@ fn a_trim_that_is_given_no_characters_is_complete_and_trims_whitespace() {
     assert_eq!(step.walk().refusal(), None);
     let preview = Document::read(&written)
         .expect("a document")
-        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .preview(
+            &inputs(),
+            &documents(),
+            &StepId::new("s").expect("an id"),
+            100,
+        )
         .expect("the rows");
     let cells: Vec<Option<&str>> = preview.rows().iter().map(|row| row[0].as_deref()).collect();
     assert_eq!(cells[0], Some("Company A"));

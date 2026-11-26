@@ -16,7 +16,7 @@ fn columns() -> Vec<String> {
 }
 
 fn tables() -> Vec<String> {
-    vec!["claims".to_owned()]
+    vec!["documents".to_owned()]
 }
 
 /// Asserts that writing `document` and reading it again gives `document`.
@@ -456,8 +456,8 @@ fn value_for(parameter: &catalog::Parameter) -> Option<Value> {
         Kind::Duration => Value::Duration("1d".to_owned()),
         Kind::Pattern => Value::Pattern("[a-z]".to_owned()),
         Kind::TimeZone => Value::TimeZone(Some("UTC".to_owned())),
-        Kind::Table => Value::Table("claims".to_owned()),
-        Kind::Path => Value::Path("claims.parquet".to_owned()),
+        Kind::Table => Value::Table("documents".to_owned()),
+        Kind::Path => Value::Path("documents.parquet".to_owned()),
         Kind::Pairs(..) => return Some(Value::Pairs(Vec::new())),
     };
     Some(match parameter.shape() {

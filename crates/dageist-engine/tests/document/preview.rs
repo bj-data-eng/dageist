@@ -1,4 +1,4 @@
-//! The rows after a step as text, on the claim-timing sample. Every expected
+//! The rows after a step as text, on the document-timing sample. Every expected
 //! cell is worked out by hand from the seven rows and from how Polars writes
 //! a value: a date as `2026-03-02`, a timestamp as `2026-03-02 09:15:00`, a
 //! duration in days, hours and minutes.
@@ -6,13 +6,13 @@
 use dageist_engine::document::{Document, Preview, RowsError, StepId};
 use serde_json::json;
 
-use crate::claims::{claims, inputs, storyboard_text};
+use crate::documents::{documents, inputs, storyboard_text};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn preview_through(text: &str, id: &str, limit: usize) -> Result<Preview, RowsError> {
     Document::read(text).expect("a document").preview(
         &inputs(),
-        &claims(),
+        &documents(),
         &StepId::new(id).expect("an id"),
         limit,
     )
@@ -34,14 +34,14 @@ fn columns(preview: &Preview) -> Vec<(&str, &str)> {
         .collect()
 }
 
-/// The claims sorted by key and time, then the gap to the row before and
+/// The documents sorted by key and time, then the gap to the row before and
 /// whether the days are over one.
 fn gaps() -> String {
     document(vec![
         step(
             "sort",
             "LazyFrame.sort",
-            json!({ "by": many(vec![field("dcn"), field("timestamp")]) }),
+            json!({ "by": many(vec![field("document_id"), field("timestamp")]) }),
         ),
         step(
             "gaps",
@@ -75,7 +75,7 @@ fn a_step_gives_its_columns_with_short_dtypes_and_its_rows_as_text() {
     assert_eq!(
         columns(&preview),
         [
-            ("dcn", "String"),
+            ("document_id", "String"),
             ("timestamp", "Datetime(us)"),
             ("step_to", "String"),
             ("owner", "String"),

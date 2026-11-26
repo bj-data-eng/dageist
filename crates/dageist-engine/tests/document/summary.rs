@@ -27,7 +27,8 @@ fn filter(predicates: Vec<Value>) -> String {
 
 #[test]
 fn the_samples_steps_are_summarised_as_the_editor_summarises_them() {
-    let storyboard = Document::read(&crate::claims::storyboard_text()).expect("the corpus's steps");
+    let storyboard =
+        Document::read(&crate::documents::storyboard_text()).expect("the corpus's steps");
     let summaries: Vec<String> = storyboard
         .steps()
         .iter()
@@ -36,7 +37,7 @@ fn the_samples_steps_are_summarised_as_the_editor_summarises_them() {
     assert_eq!(
         summaries,
         [
-            "by dcn, timestamp",
+            "by document_id, timestamp",
             "step_index",
             "resolved_at",
             "received_at",
@@ -149,7 +150,10 @@ fn a_list_of_fields_names_up_to_three_and_otherwise_counts_them() {
             json!({ "by": many(names.iter().map(|name| field(name)).collect()) }),
         ))
     };
-    assert_eq!(sort(&["dcn", "timestamp"]), "by dcn, timestamp");
+    assert_eq!(
+        sort(&["document_id", "timestamp"]),
+        "by document_id, timestamp"
+    );
     assert_eq!(sort(&["a", "b", "c", "d", "e"]), "by 5 fields");
 }
 
@@ -222,9 +226,10 @@ fn a_column_that_is_added_is_named_and_several_are_listed() {
 }
 #[test]
 fn a_step_report_carries_the_summary_of_its_step() {
-    let storyboard = Document::read(&crate::claims::storyboard_text()).expect("the corpus's steps");
+    let storyboard =
+        Document::read(&crate::documents::storyboard_text()).expect("the corpus's steps");
     let report = storyboard
-        .run_on(&crate::claims::inputs(), &crate::claims::claims())
+        .run_on(&crate::documents::inputs(), &crate::documents::documents())
         .expect("a run");
     for (reported, step) in report.steps().iter().zip(storyboard.steps()) {
         assert_eq!(
@@ -232,7 +237,7 @@ fn a_step_report_carries_the_summary_of_its_step() {
             step.summary(dageist_engine::catalog::english())
         );
     }
-    assert_eq!(report.steps()[0].summary(), "by dcn, timestamp");
+    assert_eq!(report.steps()[0].summary(), "by document_id, timestamp");
 }
 
 #[test]
@@ -290,8 +295,11 @@ fn the_names_of_a_list_are_separated_as_the_language_file_says() {
     let sort = Document::read(&document(vec![step(
         "s",
         "LazyFrame.sort",
-        json!({ "by": many(vec![field("dcn"), field("timestamp")]) }),
+        json!({ "by": many(vec![field("document_id"), field("timestamp")]) }),
     )]))
     .expect("a document");
-    assert_eq!(sort.steps()[0].summary(&words), "by dcn + timestamp");
+    assert_eq!(
+        sort.steps()[0].summary(&words),
+        "by document_id + timestamp"
+    );
 }

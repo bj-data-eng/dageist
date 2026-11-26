@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use dageist_engine::allowed::Literal;
 use dageist_engine::catalog::{self, Argument, Build};
 use dageist_engine::document::{Document, Inputs, StepId};
-use dageist_engine::{ParquetTable, SampleSpec, Table, generate_claims};
+use dageist_engine::{ParquetTable, SampleSpec, Table, generate_documents};
 use polars::prelude::*;
 use polars::sql::SQLContext;
 use serde_json::json;
@@ -47,7 +47,7 @@ impl Directory {
     /// Polars through the engine, so a process that did would find Polars set up
     /// before the entry it is meant to try.
     fn variables_with_sample(&self) -> Vec<(&'static str, String)> {
-        generate_claims(&self.0, SPEC).expect("the sample is generated");
+        generate_documents(&self.0, SPEC).expect("the sample is generated");
         self.variables()
     }
 
@@ -126,7 +126,7 @@ fn generating_a_sample_starts_polars() {
         "generating_a_sample_starts_polars",
         || directory.variables(),
         || {
-            generate_claims(&directory_given(), SPEC).expect("the sample is generated");
+            generate_documents(&directory_given(), SPEC).expect("the sample is generated");
             sql_resolves();
         },
     );
@@ -139,7 +139,7 @@ fn loading_a_working_window_starts_polars() {
         "loading_a_working_window_starts_polars",
         || directory.variables_with_sample(),
         || {
-            Table::load_keys(&directory_given(), "dcn", KEYS).expect("the window loads");
+            Table::load_keys(&directory_given(), "document_id", KEYS).expect("the window loads");
             sql_resolves();
         },
     );

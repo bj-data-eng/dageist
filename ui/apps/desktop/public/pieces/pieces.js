@@ -143,7 +143,7 @@ const VERSIONS = [
  * @type {Map<string, { text: string, kind: 'column' | 'value' }>}
  */
 const FIELDS = new Map([
-  ['over', { text: 'dcn', kind: 'column' }],
+  ['over', { text: 'document_id', kind: 'column' }],
   ['shift', { text: '1', kind: 'value' }],
   ['sub', { text: 'resolved_at', kind: 'column' }],
 ]);
@@ -186,7 +186,7 @@ function fill(card, selector, text) {
 /**
  * @typedef {object} Spec What a piece is to be.
  * @property {string | null} state `live`, or the one state it is a picture of.
- * @property {string | null} name What a column is called, where it is not `dcn`.
+ * @property {string | null} name What a column is called, where it is not `document_id`.
  * @property {string | null} fn The function it is, or null for a column.
  * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
  * @property {string | null} slot A value of any kind the function takes, as `kind:text`.
@@ -472,7 +472,7 @@ document.addEventListener('click', (event) => {
  */
 function manyFields() {
   const stems = [
-    'claim',
+    'record',
     'member',
     'provider',
     'service',
@@ -512,7 +512,7 @@ function manyFields() {
     ['rate', 'Float64'],
   ];
   return [
-    { name: 'dcn', dtype: 'String' },
+    { name: 'document_id', dtype: 'String' },
     { name: 'timestamp', dtype: 'Datetime' },
     { name: 'step_to', dtype: 'String' },
     { name: 'owner', dtype: 'String' },
@@ -2025,7 +2025,7 @@ document.addEventListener('click', (event) => {
 /** What each kind of word can be changed to: a name, and a word on what it is. */
 const CALM_OFFERS = {
   field: [
-    ['dcn', 'String'],
+    ['document_id', 'String'],
     ['timestamp', 'Datetime'],
     ['owner', 'String'],
     ['row_days', 'Int64'],

@@ -1,8 +1,8 @@
-//! Generates a made-up claims table for development and measurement.
+//! Generates a made-up documents table for development and measurement.
 //!
 //! Polars has no dataset generator, so the table is built from row numbers:
 //! every value is a seeded hash of its row or key, which makes the output the
-//! same on every run. Each key (`dcn`) owns between two and eight step rows
+//! same on every run. Each key (`document_id`) owns between two and eight step rows
 //! with rising timestamps.
 
 use std::fs::{self, File};
@@ -28,21 +28,23 @@ const STEPS: [&str; 8] = [
     "Intake", "Triage", "Review", "Pending", "Approval", "Payment", "Audit", "Complete",
 ];
 const WORKFLOWS: [&str; 4] = ["Standard", "Expedited", "Appeal", "Manual"];
-const DOCTYPES: [&str; 6] = ["Claim", "Invoice", "Referral", "Appeal", "Letter", "Form"];
+const DOCTYPES: [&str; 6] = [
+    "Contract", "Invoice", "Referral", "Appeal", "Letter", "Form",
+];
 
-/// The size of a generated claims table.
+/// The size of a generated documents table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleSpec {
-    /// How many keys (`dcn` values) to generate.
+    /// How many keys (`document_id` values) to generate.
     pub keys: u32,
-    /// How many numeric columns to add after the claim columns.
+    /// How many numeric columns to add after the document columns.
     pub filler_columns: u16,
 }
 
 impl SampleSpec {
-    /// The claim columns every generated table starts with.
-    pub const CLAIM_COLUMNS: [&'static str; 8] = [
-        "dcn",
+    /// The document columns every generated table starts with.
+    pub const DOCUMENT_COLUMNS: [&'static str; 8] = [
+        "document_id",
         "timestamp",
         "step_from",
         "step_to",
@@ -70,7 +72,11 @@ fn pick(value: Expr, seed: u64, choices: &[&str], name: &str) -> PolarsResult<(E
     Ok((index, lookup.lazy()))
 }
 
-fn claims_for_keys(first_key: i64, key_count: i64, filler_columns: u16) -> PolarsResult<LazyFrame> {
+fn documents_for_keys(
+    first_key: i64,
+    key_count: i64,
+    filler_columns: u16,
+) -> PolarsResult<LazyFrame> {
     let rows = key_count * SLOTS_PER_KEY;
     let row = col("row");
     let key = (lit(first_key) + row.clone().floor_div(lit(SLOTS_PER_KEY))).alias("key");
@@ -121,13 +127,13 @@ fn claims_for_keys(first_key: i64, key_count: i64, filler_columns: u16) -> Polar
     let mut columns: Vec<Expr> = vec![
         concat_str(
             [
-                lit("DCN-"),
+                lit("DOC-"),
                 (col("key") + lit(10_000_000i64)).cast(DataType::String),
             ],
             "",
             false,
         )
-        .alias("dcn"),
+        .alias("document_id"),
         (lit(BASE_MICROS) + seconds * lit(MICROS_PER_SECOND))
             .cast(timestamp_type.clone())
             .alias("timestamp"),
@@ -191,7 +197,7 @@ fn claims_for_keys(first_key: i64, key_count: i64, filler_columns: u16) -> Polar
 }
 
 fn file_name(index: usize) -> String {
-    format!("claims-{index:04}.parquet")
+    format!("documents-{index:04}.parquet")
 }
 
 /// Returns the folder beside `directory` that a table is written into
@@ -199,7 +205,7 @@ fn file_name(index: usize) -> String {
 fn staging_directory(directory: &Path) -> Result<PathBuf, EngineError> {
     let name = directory.file_name().ok_or_else(|| {
         EngineError::request(
-            "generating sample claims",
+            "generating sample documents",
             "the sample directory has no name",
         )
     })?;
@@ -216,17 +222,17 @@ fn remove_directory(directory: &Path) -> Result<(), EngineError> {
     }
 }
 
-/// Reports whether `directory` holds a generated claims table.
+/// Reports whether `directory` holds a generated documents table.
 ///
 /// A new table appears in `directory` only once it is complete, so this is
 /// not true for a table that is still being written into an empty place or
 /// whose writing was interrupted.
 #[must_use]
-pub fn claims_generated(directory: &Path) -> bool {
+pub fn documents_generated(directory: &Path) -> bool {
     directory.join(file_name(0)).is_file()
 }
 
-/// Writes a generated claims table as Parquet files in `directory` and
+/// Writes a generated documents table as Parquet files in `directory` and
 /// returns their paths, in key order.
 ///
 /// The table is written beside `directory` and moved into place when it is
@@ -240,7 +246,7 @@ pub fn claims_generated(directory: &Path) -> bool {
 ///
 /// Returns an error when `directory` has no name, when a directory or file
 /// cannot be written, or when Polars cannot build or run the generating plan.
-pub fn generate_claims(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf>, EngineError> {
+pub fn generate_documents(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf>, EngineError> {
     crate::startup::ensure();
     let staging = staging_directory(directory)?;
     remove_directory(&staging)?;
@@ -251,9 +257,9 @@ pub fn generate_claims(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf
     let total_keys = i64::from(spec.keys);
     while first_key < total_keys {
         let key_count = KEYS_PER_FILE.min(total_keys - first_key);
-        let mut frame = claims_for_keys(first_key, key_count, spec.filler_columns)
+        let mut frame = documents_for_keys(first_key, key_count, spec.filler_columns)
             .and_then(LazyFrame::collect)
-            .map_err(|source| EngineError::polars("generating sample claims", source))?;
+            .map_err(|source| EngineError::polars("generating sample documents", source))?;
         let name = file_name(names.len());
         let file = File::create(staging.join(&name))
             .map_err(|source| EngineError::io("creating a sample file", source))?;

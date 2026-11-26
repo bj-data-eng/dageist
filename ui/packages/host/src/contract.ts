@@ -799,7 +799,7 @@ export type OutcomeView =
 /** What running one step reported. Mirrors `StepReportView` in crates/dageist-tauri/src/report.rs. */
 export interface StepReportView {
   readonly id: string;
-  /** What the step works on, in a few words written by the engine, such as `by dcn, timestamp`. */
+  /** What the step works on, in a few words written by the engine, such as `by document_id, timestamp`. */
   readonly summary: string;
   /** Whether the step stays in a lazy plan; a step that does not collected the data it needs when it was built. */
   readonly lazy: boolean;

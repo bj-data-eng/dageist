@@ -1,6 +1,6 @@
 //! What the aggregates of statistics, the arguments of a maximum and a minimum, the tests of
 //! truth, the approximations, the running minimum and product and the bitwise methods do in a
-//! step, on the claim-timing sample, whose `row_days` column holds `0, 2, 2, 0, 2, 2, 1` and whose
+//! step, on the document-timing sample, whose `row_days` column holds `0, 2, 2, 0, 2, 2, 1` and whose
 //! `step_to` column holds `Intake, Pending, Complete, Intake, Review, Complete, Review`. Each
 //! expected cell is worked out by hand from the definition of the statistic, and the dtypes are
 //! what Python Polars documents for each method. The walk's part uses the table `a`, `b`, `f` and
@@ -11,7 +11,7 @@ use dageist_engine::document::{Document, Outcome, StepId};
 use polars::prelude::DataType;
 use serde_json::{Value, json};
 
-use crate::claims::{claims, inputs};
+use crate::documents::{documents, inputs};
 use crate::order::{
     after, cells, dtype_of, flag, gives, join_walk, method, select_after, select_walk, selecting,
     texts, with_gaps, word,
@@ -58,7 +58,7 @@ fn number(written: &str) -> f64 {
         .expect("a number")
 }
 
-/// Whether the step is one Polars accepts as the engine runs it on the claims: it resolves the
+/// Whether the step is one Polars accepts as the engine runs it on the documents: it resolves the
 /// schema, and the rows it gives are the ones the preview shows. Polars refuses some calls only
 /// when it runs the rows.
 fn is_valid(written: &str) -> bool {
@@ -66,10 +66,15 @@ fn is_valid(written: &str) -> bool {
         Err(_) => false,
         Ok(document) => {
             document
-                .run_on(&inputs(), &claims())
+                .run_on(&inputs(), &documents())
                 .is_ok_and(|report| matches!(report.steps()[0].outcome(), Outcome::Valid { .. }))
                 && document
-                    .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+                    .preview(
+                        &inputs(),
+                        &documents(),
+                        &StepId::new("s").expect("an id"),
+                        100,
+                    )
                     .is_ok()
         }
     }

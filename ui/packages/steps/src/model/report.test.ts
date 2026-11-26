@@ -20,7 +20,7 @@ import {
   sayingOf,
 } from './report';
 
-// What the host reports of the claim-timing steps, and what the editor shows of it. The fixtures
+// What the host reports of the document-timing steps, and what the editor shows of it. The fixtures
 // are written from Rust; the expectations are written by hand from what the steps do.
 const held = decodeDocumentState(documentFixture);
 const prepared = prepareRun(held.document.steps, held.run);
@@ -56,7 +56,7 @@ describe('the columns the editor shows after each step', () => {
     expect(
       stepOf(prepared, 'step_index').after.map((column) => `${column.name}:${column.dtype}`),
     ).toEqual([
-      'dcn:String',
+      'document_id:String',
       'timestamp:Datetime(us)',
       'step_to:String',
       'owner:String',
@@ -95,7 +95,7 @@ describe('the columns the editor shows after each step', () => {
 describe('the rows each step kept and the first values it added', () => {
   it('are how many rows the step kept of those it received, where the engine counted them', () => {
     expect(stepOf(prepared, 'sort').rows).toEqual({ received: 7, kept: 7 });
-    // Seven claim rows make two claims.
+    // Seven document rows make two documents.
     expect(stepOf(prepared, 'pivot').rows).toEqual({ received: 7, kept: 2 });
   });
 
@@ -247,7 +247,7 @@ describe('the dtype the editor shows after each link of a chain', () => {
 });
 
 describe('a refusal', () => {
-  // The claims sorted, then a sum of a text column, which the tables refuse, then a step never run.
+  // The documents sorted, then a sum of a text column, which the tables refuse, then a step never run.
   const run = prepareRun(named('sort', 'total', 'after'), decodeRun(refusedFixture));
 
   it('is shown on the way it marks: here, the method the engine refused', () => {
@@ -296,16 +296,16 @@ describe('a refusal', () => {
       places: [selectAfter('Struct(x: Int64, y: String)', 'many')],
       fields: [
         {
-          dtype: 'Struct(dcn: String, count: UInt32)',
+          dtype: 'Struct(document_id: String, count: UInt32)',
           fields: [
-            { name: 'dcn', dtype: 'String' },
+            { name: 'document_id', dtype: 'String' },
             { name: 'count', dtype: 'UInt32' },
           ],
         },
       ],
     };
     expect(linkHint(chain, 0)).toBe(
-      'after a value of the class Struct(dcn: String, count: UInt32)',
+      'after a value of the class Struct(document_id: String, count: UInt32)',
     );
     expect(linkHint({ ...chain, fields: [{ dtype: 'Struct', fields: null }] }, 0)).toBe(
       'after a value of the class Struct',
@@ -374,7 +374,7 @@ describe('a step with something still to be picked', () => {
 
 describe('the summary the engine wrote of the steps', () => {
   it('is shown for each step the report is of', () => {
-    expect(stepOf(prepared, 'sort').summary).toBe('by dcn, timestamp');
+    expect(stepOf(prepared, 'sort').summary).toBe('by document_id, timestamp');
     expect(prepared.steps.every((step) => step.summary.length > 0)).toBe(true);
   });
 });
@@ -518,7 +518,7 @@ function call(entry: string): CallView {
   return { entry, arguments: [] };
 }
 
-/** The call of the step `id` of the claim-timing document. */
+/** The call of the step `id` of the document-timing steps. */
 function stepCall(id: string): CallView {
   const found = held.document.steps.find((step) => step.id === id);
   if (found === undefined) throw new Error(`no step ${id}`);

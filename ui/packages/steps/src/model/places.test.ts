@@ -204,7 +204,7 @@ describe('whether an entry can be picked at a place', () => {
 
 describe('what can be done to the piece a slot draws', () => {
   it('is adding and taking away for a chain, which a field is drawn as', () => {
-    expect(actionsOfSlot(valueDrawing(chain(calls(col('dcn'))), true))).toEqual({
+    expect(actionsOfSlot(valueDrawing(chain(calls(col('document_id'))), true))).toEqual({
       add: true,
       remove: true,
     });
