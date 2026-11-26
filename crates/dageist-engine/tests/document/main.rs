@@ -18,6 +18,7 @@ mod inputs;
 mod join_keys;
 mod lists;
 mod literal_grid;
+mod membership;
 mod moments;
 mod moments_walked;
 mod nesting;
