@@ -1,0 +1,17 @@
+{
+  "kind": "transform",
+  "name": "Customer lines",
+  "start": {
+    "kind": "table",
+    "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0106"
+  },
+  "inputs": {
+    "customers": {
+      "takes": "table",
+      "from": {
+        "kind": "table",
+        "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0103"
+      }
+    }
+  }
+}

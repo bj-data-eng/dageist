@@ -23,7 +23,6 @@
 //! `cargo run -- bridge`. It has no access control beyond being local, and no
 //! command in it is meant to be exposed further.
 
-mod cache;
 mod http;
 #[cfg(test)]
 mod tests;
@@ -687,7 +686,7 @@ pub fn serve(listener: &TcpListener, bridge: Bridge) -> io::Result<()> {
 ///
 /// Returns why the bridge cannot start or stops.
 pub fn run(port: u16, identifier: &str, workspace: Workspace) -> io::Result<()> {
-    let cache = cache::application_cache(identifier).ok_or_else(|| {
+    let cache = crate::folders::application_cache(identifier).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
             "the platform's cache folder is not known",

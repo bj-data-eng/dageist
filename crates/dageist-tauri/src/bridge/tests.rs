@@ -1059,24 +1059,6 @@ fn the_bridge_listens_on_the_loopback_address_only() {
 }
 
 #[test]
-fn the_cache_folder_is_the_one_tauri_keeps_for_the_identifier() {
-    use tauri::Manager;
-    use tauri::test::{mock_builder, mock_context, noop_assets};
-
-    let app = mock_builder()
-        .build(mock_context(noop_assets()))
-        .expect("the mock application builds");
-    let identifier = app.config().identifier.clone();
-
-    let tauri_cache = app.path().app_cache_dir().expect("Tauri knows its cache");
-
-    assert_eq!(
-        super::cache::application_cache(&identifier),
-        Some(tauri_cache)
-    );
-}
-
-#[test]
 fn a_client_that_trickles_its_request_is_answered_408_when_the_deadline_passes() {
     let folder = SampleFolder::new("trickle");
     let listener = bind(0).expect("a loopback port is free");

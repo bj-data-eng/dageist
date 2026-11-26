@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "by_category",
+      "call": {
+        "entry": "LazyFrame.pivot",
+        "arguments": {
+          "on": {
+            "columns": [
+              "category"
+            ]
+          },
+          "on_columns": {
+            "table": "categories"
+          },
+          "index": {
+            "columns": [
+              "region"
+            ]
+          },
+          "values": {
+            "columns": [
+              "line_total"
+            ]
+          },
+          "maintain_order": {
+            "flag": true
+          },
+          "aggregate_function": {
+            "expression": {
+              "start": {
+                "entry": "polars.element",
+                "arguments": {}
+              },
+              "then": [
+                {
+                  "entry": "Expr.sum",
+                  "arguments": {}
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

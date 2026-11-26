@@ -512,3 +512,99 @@ fn a_folder_that_holds_no_workspace_is_not_opened_and_leaves_the_one_held() {
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// The names of the nodes of `view`, in its order.
+fn names(view: &Value) -> Vec<String> {
+    view["nodes"]
+        .as_array()
+        .expect("nodes")
+        .iter()
+        .map(|node| node["name"].as_str().expect("a name").to_owned())
+        .collect()
+}
+
+#[test]
+fn the_application_starts_on_the_sample_workspace_and_keeps_it_from_one_start_to_the_next() {
+    let data = folder();
+    let first = Workspace::sample(&data, 0).expect("the sample");
+    let root = data.join("samples").join("orders");
+    let view = serde_json::to_value(graph_view(&first)).expect("a view");
+    let mut shown = names(&view);
+    shown.sort();
+    assert_eq!(
+        shown,
+        [
+            "Categories",
+            "Category names",
+            "Customer lines",
+            "Customers",
+            "Order lines",
+            "Orders",
+            "Parameters",
+            "Products",
+            "Region summary",
+            "Region summary output",
+        ]
+    );
+    for node in view["nodes"].as_array().expect("nodes") {
+        if node["kind"] != "output" {
+            assert_eq!(node["problems"], json!([]), "{}", node["name"]);
+        }
+    }
+    // The data was unpacked beside the graph, where git does not see it.
+    for file in [
+        "orders.parquet",
+        "products.parquet",
+        "customers.csv",
+        "categories.csv",
+    ] {
+        assert!(root.join("data").join(file).is_file(), "{file}");
+    }
+    assert_eq!(git(&root, &["log", "--format=%s"]), "Make the workspace\n");
+    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+
+    let summary = view["nodes"]
+        .as_array()
+        .expect("nodes")
+        .iter()
+        .find(|node| node["name"] == "Region summary")
+        .expect("the summary")["id"]
+        .as_str()
+        .expect("an id")
+        .to_owned();
+    let rename: super::GraphEditRequest = serde_json::from_value(
+        json!({ "edit": "rename", "node": summary, "name": "Totals by region" }),
+    )
+    .expect("a request");
+    super::edit_graph_view(&first, graph_view(&first).revision, &rename).expect("renamed");
+    first.close().expect("closed");
+
+    // The next start opens the sample as it was left, and makes no new one.
+    let second = Workspace::sample(&data, 1).expect("the sample again");
+    let again = names(&serde_json::to_value(graph_view(&second)).expect("a view"));
+    assert!(again.contains(&"Totals by region".to_owned()), "{again:?}");
+    assert_eq!(
+        git(&root, &["log", "--format=%s"]),
+        "Rename Region summary to Totals by region\nMake the workspace\n"
+    );
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn a_sample_folder_with_files_but_no_workspace_is_not_overwritten() {
+    let data = folder();
+    let root = data.join("samples").join("orders");
+    std::fs::create_dir_all(&root).expect("a folder");
+    std::fs::write(root.join("notes.txt"), b"mine").expect("written");
+    Workspace::sample(&data, 0).expect_err("not a workspace");
+    assert_eq!(
+        std::fs::read(root.join("notes.txt")).expect("kept"),
+        b"mine"
+    );
+    let left: Vec<_> = std::fs::read_dir(data.join("samples"))
+        .expect("the folder")
+        .map(|entry| entry.expect("an entry").file_name())
+        .collect();
+    assert_eq!(left, ["orders"], "the files unpacked beside it are removed");
+    let _ = std::fs::remove_dir_all(&data);
+}

@@ -103,8 +103,9 @@ its steps run on is what working the graph out binds to its inputs, and their
 working rows are the first 10,000 rows of the table they start from. The core's
 session holds the graph, its layout and each transform's document with its
 revision; the host keeps it as managed state, and the bridge keeps it for as
-long as it runs. The application opens on the claim-timing sample as a graph,
-its tables written as Parquet files for the run. An edit
+long as it runs. The application opens on the
+[sample workspace](explanation.md#the-sample-workspace), unpacked from the files
+the build embeds into the application's data folder the first time. An edit
 and the rows after a step name the revision they are for. The engine formats every cell and names every dtype, so
 the view formats no value, and the host has no Polars of its own.
 

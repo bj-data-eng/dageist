@@ -22,12 +22,14 @@ mod corpus;
 mod dialog;
 mod document;
 mod figures;
+mod folders;
 mod graph;
 mod identity;
 mod node;
 mod offers;
 mod report;
 mod sample_table;
+mod sample_workspace;
 #[cfg(test)]
 mod snapshot;
 #[cfg(test)]
@@ -99,25 +101,21 @@ fn main() -> ExitCode {
     let context = tauri::generate_context!();
     // Held until the job ends, whichever way `main` returns or a panic unwinds out of it.
     let _polars = PolarsSession::start();
-    // The starting graph reads the sample's tables from files written for this run, in a folder
-    // made for it that no other run has, which is removed when the run ends.
-    let sample = match sample_folder() {
-        Ok(folder) => folder,
-        Err(error) => {
-            eprintln!("dageist: a folder for the sample's tables cannot be made: {error}");
-            return ExitCode::FAILURE;
-        }
+    // The application opens on the sample workspace in its data folder, which the window and
+    // the bridge share, as they share its cache.
+    let Some(data) = folders::application_data(&context.config().identifier) else {
+        eprintln!("dageist: the platform's folder for applications' data is not known");
+        return ExitCode::FAILURE;
     };
     let workspace =
-        match graph::Workspace::starting(document::first_revision(SystemTime::now()), &sample) {
+        match graph::Workspace::sample(&data, document::first_revision(SystemTime::now())) {
             Ok(workspace) => workspace,
             Err(error) => {
-                eprintln!("dageist: the starting graph cannot be made: {error:?}");
-                remove_sample_folder(&sample);
+                eprintln!("dageist: the sample workspace cannot be opened: {error:?}");
                 return ExitCode::FAILURE;
             }
         };
-    let code = match invocation {
+    match invocation {
         cli::Invocation::Application => match open_application(context, workspace) {
             0 => ExitCode::SUCCESS,
             code => ExitCode::from(u8::try_from(code).unwrap_or(1)),
@@ -131,26 +129,5 @@ fn main() -> ExitCode {
                 }
             }
         }
-    };
-    remove_sample_folder(&sample);
-    code
-}
-
-/// Makes a new folder for the sample's tables in the system's temporary folder. It is made, not
-/// found: a folder of that name that is already there is refused, so no file is written through
-/// a folder someone else put there.
-fn sample_folder() -> std::io::Result<std::path::PathBuf> {
-    let started = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map_or(0, |since| since.as_nanos());
-    let folder =
-        std::env::temp_dir().join(format!("dageist-sample-{}-{started}", std::process::id()));
-    std::fs::create_dir(&folder)?;
-    Ok(folder)
-}
-
-/// Removes the sample's folder. A folder that cannot be removed is left for the system, which
-/// clears its temporary folder in time; so is the folder of a bridge stopped by a signal.
-fn remove_sample_folder(folder: &std::path::Path) {
-    let _ = std::fs::remove_dir_all(folder);
+    }
 }

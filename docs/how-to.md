@@ -266,8 +266,8 @@ contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
 ### Refresh The Graph Snapshot
 
-`ui/packages/host/fixtures/graph.json` is the graph view of the graph the
-application opens on, as the `graph` command reports it. Each file's folder is
+`ui/packages/host/fixtures/graph.json` is the graph view of the claim-timing
+graph the host's tests build, as the `graph` command reports it. Each file's folder is
 written as `/sample`, so the snapshot does not hold the folder of the machine
 it was written on. After a change to the starting graph, to working a graph out
 or to the graph view, the host's snapshot test fails. Write the file again,

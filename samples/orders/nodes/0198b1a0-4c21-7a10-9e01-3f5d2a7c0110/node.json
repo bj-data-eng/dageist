@@ -1,0 +1,12 @@
+{
+  "kind": "output",
+  "name": "Region summary output",
+  "written": {
+    "kind": "table",
+    "node": "0198b1a0-4c21-7a10-9e01-3f5d2a7c0109"
+  },
+  "file": {
+    "path": "data/region_summary.parquet",
+    "format": "parquet"
+  }
+}
