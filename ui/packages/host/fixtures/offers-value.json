@@ -809,9 +809,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "dtype"
-      ]
+      "slots": ["dtype"]
     },
     {
       "entry": "Expr.cbrt",
@@ -1088,9 +1086,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "time_unit"
-      ]
+      "slots": ["time_unit"]
     },
     {
       "entry": "Expr.dt.century",
@@ -1132,9 +1128,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "time_zone"
-      ]
+      "slots": ["time_zone"]
     },
     {
       "entry": "Expr.dt.date",
@@ -1430,9 +1424,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "time_zone"
-      ]
+      "slots": ["time_zone"]
     },
     {
       "entry": "Expr.dt.round",
@@ -1474,9 +1466,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "format"
-      ]
+      "slots": ["format"]
     },
     {
       "entry": "Expr.dt.time",
@@ -1910,9 +1900,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "n"
-      ]
+      "slots": ["n"]
     },
     {
       "entry": "Expr.ge",
@@ -1989,9 +1977,7 @@
       },
       "argument": null,
       "leftOut": null,
-      "slots": [
-        "upper_bound"
-      ]
+      "slots": ["upper_bound"]
     },
     {
       "entry": "Expr.is_close",

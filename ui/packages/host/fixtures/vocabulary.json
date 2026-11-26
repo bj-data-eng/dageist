@@ -1,18 +1,6 @@
 {
-  "outer": [
-    "select",
-    "filter",
-    "sort",
-    "join_left",
-    "join_right",
-    "pivot_aggregate"
-  ],
-  "nested": [
-    "over.partition_by",
-    "over.order_by",
-    "condition.predicate",
-    "condition.value"
-  ],
+  "outer": ["select", "filter", "sort", "join_left", "join_right", "pivot_aggregate"],
+  "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
   "rules": [
     "arrays-meet-at-one-width",
     "condition-predicate-is-boolean",
@@ -33,55 +21,22 @@
     "pivot-aggregate-gives-one-value",
     "range-is-valid",
     "replacement-values-match-in-number",
+    "struct-arithmetic-needs-numbers",
     "struct-is-filled-forward-or-backward",
     "time-zone-is-valid",
+    "to-struct-names-are-distinct",
     "values-meet-in-count",
     "window-input-is-not-counted",
     "window-input-is-not-widened",
     "written-names-are-distinct"
   ],
-  "stages": [
-    "schema",
-    "rows",
-    "empty"
-  ],
-  "conditionStates": [
-    "when",
-    "then",
-    "chainedWhen",
-    "chainedThen"
-  ],
-  "valueShapes": [
-    "one",
-    "many",
-    "counted"
-  ],
-  "changes": [
-    "added",
-    "replaced"
-  ],
-  "errorKinds": [
-    "noSuchStep",
-    "notRun",
-    "refused",
-    "limit",
-    "stale",
-    "unknownName",
-    "failed"
-  ],
-  "applies": [
-    "expression",
-    "frame",
-    "function",
-    "condition"
-  ],
-  "valueTypes": [
-    "integer",
-    "float",
-    "string",
-    "date",
-    "any"
-  ],
+  "stages": ["schema", "rows", "empty"],
+  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
+  "valueShapes": ["one", "many", "counted"],
+  "changes": ["added", "replaced"],
+  "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "stale", "unknownName", "failed"],
+  "applies": ["expression", "frame", "function", "condition"],
+  "valueTypes": ["integer", "float", "string", "date", "any"],
   "settings": [
     "unset",
     "flag",

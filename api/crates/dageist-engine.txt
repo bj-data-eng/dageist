@@ -169,14 +169,16 @@ pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::RangeIsValid
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
+pub dageist_engine::allowed::Rule::StructArithmeticNeedsNumbers
 pub dageist_engine::allowed::Rule::StructIsFilledForwardOrBackward
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
+pub dageist_engine::allowed::Rule::ToStructNamesAreDistinct
 pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 25]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 27]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -205,8 +207,19 @@ pub dageist_engine::allowed::Typed::Pattern
 pub dageist_engine::allowed::Typed::TimeZone
 pub dageist_engine::allowed::Typed::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::allowed::Unknown
+pub dageist_engine::allowed::Unknown::AnOpenNumberInAKey
+pub dageist_engine::allowed::Unknown::AnUnnestAmongPredicates
+pub dageist_engine::allowed::Unknown::AnUnnestAsAKey
+pub dageist_engine::allowed::Unknown::AnUnnestOfNoField
+pub dageist_engine::allowed::Unknown::ArithmeticOnAStruct
+pub dageist_engine::allowed::Unknown::SeveralColumnsOfAFieldRead
+pub dageist_engine::allowed::Unknown::StructsOfOtherFieldsMeet
+pub dageist_engine::allowed::Unknown::TheFieldsOfAStruct
 pub dageist_engine::allowed::Unknown::TheResultsDtype
 pub dageist_engine::allowed::Unknown::TheStartsDtype
+impl dageist_engine::allowed::Unknown
+pub const dageist_engine::allowed::Unknown::ALL: [Self; 10]
+pub const fn dageist_engine::allowed::Unknown::name(self) -> &'static str
 impl core::fmt::Display for dageist_engine::allowed::Unknown
 pub fn dageist_engine::allowed::Unknown::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Unread
@@ -240,6 +253,7 @@ impl<'a> dageist_engine::allowed::ArgumentSlot<'a>
 pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dageist_engine::catalog::Entry, parameter: &'a str, method_place: dageist_engine::allowed::Place) -> Self
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::among_others(self, others: usize) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::following(self, unit: core::option::Option<polars_core::datatypes::temporal::time_unit::TimeUnit>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::following_fields(self, fields: core::option::Option<&'a dageist_engine::allowed::Fields>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::following_width(self, width: core::option::Option<usize>) -> Self
@@ -249,11 +263,13 @@ pub const fn dageist_engine::allowed::Chosen<'a>::giving_one(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_shape(self, shape: dageist_engine::allowed::Shape) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::in_zone(self, zone: core::option::Option<&'a str>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::named(self, name: core::option::Option<&'a str>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_argument_fields(self, fields: &'a [(&'a str, &'a dageist_engine::allowed::Fields)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_inputs(self, inputs: &'a [dageist_engine::allowed::Input<'a>]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_names(self, names: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_numbers(self, numbers: &'a [(&'a str, i64)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_open_numbers(self, numbers: &'a [&'a str]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_time_zones(self, time_zones: &'a [(&'a str, core::option::Option<&'a str>)]) -> Self

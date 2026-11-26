@@ -36,10 +36,7 @@
           {
             "name": "b",
             "values": {
-              "shown": [
-                "x",
-                null
-              ],
+              "shown": ["x", null],
               "more": 4
             }
           }
@@ -66,10 +63,7 @@
           },
           "start": {
             "kind": "several",
-            "dtypes": [
-              "Int64",
-              "String"
-            ]
+            "dtypes": ["Int64", "String"]
           },
           "links": [
             {

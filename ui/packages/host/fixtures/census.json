@@ -252,18 +252,8 @@
     "path",
     "pairs"
   ],
-  "valueTypes": [
-    "integer",
-    "float",
-    "string",
-    "date",
-    "any"
-  ],
-  "parameterShapes": [
-    "one",
-    "many",
-    "perItem"
-  ],
+  "valueTypes": ["integer", "float", "string", "date", "any"],
+  "parameterShapes": ["one", "many", "perItem"],
   "parameterForms": [
     {
       "shape": "many",
@@ -410,20 +400,8 @@
       }
     }
   ],
-  "optionKinds": [
-    "flag",
-    "choice"
-  ],
-  "defaultKinds": [
-    "required",
-    "none",
-    "flag",
-    "integer",
-    "float",
-    "text",
-    "empty",
-    "other"
-  ],
+  "optionKinds": ["flag", "choice"],
+  "defaultKinds": ["required", "none", "flag", "integer", "float", "text", "empty", "other"],
   "settingKinds": [
     "unset",
     "flag",
@@ -506,46 +484,13 @@
     "Array(Null, 2)",
     "Array(Decimal(10, 2), 2)"
   ],
-  "valueShapes": [
-    "one",
-    "many",
-    "counted"
-  ],
-  "afterKinds": [
-    "start",
-    "value",
-    "condition"
-  ],
-  "conditionStates": [
-    "when",
-    "then",
-    "chainedWhen",
-    "chainedThen"
-  ],
-  "resolutions": [
-    "dtype",
-    "several",
-    "unfinished",
-    "noContext",
-    "refused"
-  ],
-  "causes": [
-    "unknownTable",
-    "unknownInput",
-    "build",
-    "notAllowed",
-    "polars"
-  ],
-  "refusalSources": [
-    "polars",
-    "rule",
-    "structure"
-  ],
-  "stages": [
-    "schema",
-    "rows",
-    "empty"
-  ],
+  "valueShapes": ["one", "many", "counted"],
+  "afterKinds": ["start", "value", "condition"],
+  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
+  "resolutions": ["dtype", "several", "unfinished", "noContext", "refused"],
+  "causes": ["unknownTable", "unknownInput", "build", "notAllowed", "polars"],
+  "refusalSources": ["polars", "rule", "structure"],
+  "stages": ["schema", "rows", "empty"],
   "rules": [
     {
       "name": "arrays-meet-at-one-width",
@@ -601,7 +546,7 @@
     },
     {
       "name": "one-column-is-needed",
-      "statement": "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty: Polars refuses both"
+      "statement": "a filter's only predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty, and Polars refuses both; beside another predicate each expression it expands to is a predicate of its own, which it takes"
     },
     {
       "name": "parameter-takes-one-value",
@@ -624,12 +569,20 @@
       "statement": "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
     },
     {
+      "name": "struct-arithmetic-needs-numbers",
+      "statement": "arithmetic with a struct needs its fields to be numbers: Polars refuses the absolute value, the negation, the sign, a clip and a power of a struct whatever its fields are, and the sum, the difference, the product and the quotients of one that has a field of text, a date, a moment or a time"
+    },
+    {
       "name": "struct-is-filled-forward-or-backward",
       "statement": "a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none"
     },
     {
       "name": "time-zone-is-valid",
       "statement": "a time zone must be one Polars reads"
+    },
+    {
+      "name": "to-struct-names-are-distinct",
+      "statement": "no two names given to the fields of a struct that a list or an array is made may be alike: Polars 2.2.0 accepts them and builds a struct that disagrees with itself, as its dtype and its series hold two fields of one name, and refuses the same names for a struct made of columns or renamed"
     },
     {
       "name": "values-meet-in-count",
@@ -678,6 +631,10 @@
       "because": "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort"
     },
     {
+      "name": "an-unnest-among-predicates",
+      "because": "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come"
+    },
+    {
       "name": "arithmetic-on-a-struct",
       "because": "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly"
     },
@@ -686,22 +643,9 @@
       "because": "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are"
     }
   ],
-  "outcomes": [
-    "valid",
-    "refused",
-    "incomplete",
-    "notRun"
-  ],
-  "rowsStates": [
-    "notCounted",
-    "notReached",
-    "counted",
-    "failed"
-  ],
-  "changes": [
-    "added",
-    "replaced"
-  ],
+  "outcomes": ["valid", "refused", "incomplete", "notRun"],
+  "rowsStates": ["notCounted", "notReached", "counted", "failed"],
+  "changes": ["added", "replaced"],
   "states": [
     {
       "outcome": "valid",
@@ -818,10 +762,7 @@
       "after": "notRun"
     }
   ],
-  "editAnswers": [
-    "edited",
-    "refused"
-  ],
+  "editAnswers": ["edited", "refused"],
   "problemKinds": [
     "noStep",
     "stepChanged",
@@ -879,18 +820,7 @@
     "pairs",
     "partOfStep"
   ],
-  "inputKinds": [
-    "table",
-    "value",
-    "list"
-  ],
-  "origins": [
-    "node",
-    "column",
-    "parameter"
-  ],
-  "cells": [
-    "text",
-    "null"
-  ]
+  "inputKinds": ["table", "value", "list"],
+  "origins": ["node", "column", "parameter"],
+  "cells": ["text", "null"]
 }

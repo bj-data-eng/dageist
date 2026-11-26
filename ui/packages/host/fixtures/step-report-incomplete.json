@@ -130,9 +130,7 @@
                 }
               }
             ],
-            "fields": [
-              null
-            ],
+            "fields": [null],
             "ending": {
               "kind": "allowed"
             }
@@ -214,12 +212,8 @@
                 "verdict": null
               }
             ],
-            "places": [
-              null
-            ],
-            "fields": [
-              null
-            ],
+            "places": [null],
+            "fields": [null],
             "ending": null
           },
           {
@@ -285,10 +279,7 @@
               },
               null
             ],
-            "fields": [
-              null,
-              null
-            ],
+            "fields": [null, null],
             "ending": null
           }
         ],
