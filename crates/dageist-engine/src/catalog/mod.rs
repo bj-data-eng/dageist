@@ -35,7 +35,7 @@ pub use condition::Conditional;
 pub use counting::Counting;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use duration::{DurationError, DurationUse, any_moment, check_duration};
-pub(crate) use entries::time_of_day;
+pub(crate) use entries::{time_of_day, typed_literal};
 pub use left_out::{LeftOut, Reason, left_out};
 pub use pattern::{PatternError, check_pattern, groups_dtype};
 pub use starting::{Setting, StepFrame, StepStart, start_step};

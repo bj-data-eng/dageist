@@ -106,7 +106,7 @@ pub enum Value {
 impl Value {
     /// What [`Entry::arguments`] is asked about this value: an argument of the
     /// same kind, with nothing behind a table or an expression.
-    fn placeholder(&self) -> Argument {
+    pub(super) fn placeholder(&self) -> Argument {
         match self {
             Self::Expression(_) => {
                 Argument::Expression(polars::prelude::lit(polars::prelude::NULL))

@@ -4400,21 +4400,96 @@ const WHOLE_NUMBERS: [Representative; 10] = [
 
 /// Whether a dtype of whole numbers holds `number`: it casts to the dtype and keeps its value.
 /// `Int128` holds every number a document can write, and `UInt128` every number from zero up.
-const fn holds_strictly(dtype: Representative, number: i64) -> bool {
+const fn holds_strictly(dtype: Representative, number: i128) -> bool {
     match dtype {
-        Representative::Int8 => number >= i8::MIN as i64 && number <= i8::MAX as i64,
-        Representative::Int16 => number >= i16::MIN as i64 && number <= i16::MAX as i64,
-        Representative::Int32 => number >= i32::MIN as i64 && number <= i32::MAX as i64,
-        Representative::UInt8 => number >= 0 && number <= u8::MAX as i64,
-        Representative::UInt16 => number >= 0 && number <= u16::MAX as i64,
-        Representative::UInt32 => number >= 0 && number <= u32::MAX as i64,
-        Representative::UInt64 | Representative::UInt128 => number >= 0,
+        Representative::Int8 => number >= i8::MIN as i128 && number <= i8::MAX as i128,
+        Representative::Int16 => number >= i16::MIN as i128 && number <= i16::MAX as i128,
+        Representative::Int32 => number >= i32::MIN as i128 && number <= i32::MAX as i128,
+        Representative::Int64 => number >= i64::MIN as i128 && number <= i64::MAX as i128,
+        Representative::UInt8 => number >= 0 && number <= u8::MAX as i128,
+        Representative::UInt16 => number >= 0 && number <= u16::MAX as i128,
+        Representative::UInt32 => number >= 0 && number <= u32::MAX as i128,
+        Representative::UInt64 => number >= 0 && number <= u64::MAX as i128,
+        Representative::UInt128 => number >= 0,
         _ => true,
     }
 }
 
+/// A literal of a comparison of missing values, as the step engine makes it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Typed {
+    /// A whole number given no dtype, which adapts to what it meets.
+    UntypedWhole(i64),
+    /// A float given no dtype: a 64 bit float.
+    UntypedFloat(f64),
+    /// A 32 or 64 bit float, which is 32 bit where `narrow`.
+    Float { value: f64, narrow: bool },
+    /// A whole number of a dtype of its own.
+    Whole { dtype: Representative, value: i128 },
+    /// Any other: 16 bit floats, `Boolean`, text, or a value that does not cast to its dtype.
+    Other,
+}
+
+/// The literal that `call` makes, if it is `lit`. Given a dtype it is what the step engine makes,
+/// which is `typed_literal`: the value cast strictly to the dtype, so a float given a dtype of
+/// whole numbers is a whole number, and a text given a number's dtype is that number.
+fn literal_of(call: &Call) -> Option<Typed> {
+    use polars::prelude::{AnyValue, DataType as D};
+    if call.entry().id().as_str() != "polars.lit" {
+        return None;
+    }
+    let value = call.argument("value")?;
+    match call.argument("dtype") {
+        None => Some(match value {
+            Value::Integer(number) => Typed::UntypedWhole(*number),
+            Value::Float(number) => Typed::UntypedFloat(*number),
+            _ => Typed::Other,
+        }),
+        Some(Value::Dtype(dtype)) => {
+            let Ok(scalar) = catalog::typed_literal(&value.placeholder(), dtype.as_polars()) else {
+                return Some(Typed::Other);
+            };
+            Some(match (scalar.dtype(), scalar.value()) {
+                (D::Float64, AnyValue::Float64(value)) => Typed::Float {
+                    value: *value,
+                    narrow: false,
+                },
+                (D::Float32, AnyValue::Float32(value)) => Typed::Float {
+                    value: f64::from(*value),
+                    narrow: true,
+                },
+                (dtype, value) => match (Representative::of(dtype), whole_value(value)) {
+                    (Some(dtype), Some(value)) if is_a_whole_number(dtype) => {
+                        Typed::Whole { dtype, value }
+                    }
+                    _ => Typed::Other,
+                },
+            })
+        }
+        Some(_) => Some(Typed::Other),
+    }
+}
+
+/// The whole number that a value of Polars is, where it is one.
+fn whole_value(value: &polars::prelude::AnyValue) -> Option<i128> {
+    use polars::prelude::AnyValue as V;
+    Some(match *value {
+        V::Int8(value) => i128::from(value),
+        V::Int16(value) => i128::from(value),
+        V::Int32(value) => i128::from(value),
+        V::Int64(value) => i128::from(value),
+        V::Int128(value) => value,
+        V::UInt8(value) => i128::from(value),
+        V::UInt16(value) => i128::from(value),
+        V::UInt32(value) => i128::from(value),
+        V::UInt64(value) => i128::from(value),
+        V::UInt128(value) => i128::try_from(value).ok()?,
+        _ => return None,
+    })
+}
+
 /// Whether Polars decides a comparison of missing values of a column of `column`, a dtype of whole
-/// numbers, with the literal `call`, while it coerces the types, for no value of the column is the
+/// numbers, with `literal`, while it coerces the types, for no value of the column is the
 /// literal. It follows `coerce_comparison_literal` of Polars 2.2.0:
 ///
 /// - A literal of 32 or 64 bit floats is read as the number it is, where that number casts to the
@@ -4430,21 +4505,10 @@ const fn holds_strictly(dtype: Representative, number: i64) -> bool {
 ///
 /// A comparison with `UInt128` of a whole number typed as a float is decided where the number is
 /// below zero, as it is not where the number is typed as a whole number.
-fn decides(column: Representative, call: &Call) -> bool {
-    if call.entry().id().as_str() != "polars.lit" || !is_a_whole_number(column) {
+fn decides(column: Representative, literal: Typed) -> bool {
+    if !is_a_whole_number(column) {
         return false;
     }
-    let given = match call.argument("dtype") {
-        None => None,
-        Some(Value::Dtype(dtype)) => Some(dtype.as_polars().clone()),
-        Some(_) => return false,
-    };
-    use polars::prelude::DataType as D;
-    let number = match call.argument("value") {
-        Some(Value::Integer(number)) => Ok(*number),
-        Some(Value::Float(number)) => Err(*number),
-        _ => return false,
-    };
     // The floats that Polars rounds to whole numbers: the value as the float holds it, and the
     // number below which a whole number casts to the float exactly.
     let rounded = |value: f64, exact_below: f64| {
@@ -4452,20 +4516,15 @@ fn decides(column: Representative, call: &Call) -> bool {
             return false;
         }
         let floor = value.floor();
-        floor != value || !holds_strictly(column, floor as i64)
+        floor != value || !holds_strictly(column, floor as i128)
     };
-    let as_float64 = |number: Result<i64, f64>| match number {
-        Ok(number) => number as f64,
-        Err(number) => number,
-    };
-    match given {
-        None => match number {
-            Ok(number) => !holds_strictly_as_a_whole_number(column, number),
-            Err(number) => rounded(number, 2f64.powi(53)),
-        },
-        Some(D::Float64) => rounded(as_float64(number), 2f64.powi(53)),
-        Some(D::Float32) => {
-            let value = as_float64(number) as f32 as f64;
+    match literal {
+        // `UInt128` holds every number a document can write, even one below zero.
+        Typed::UntypedWhole(number) => {
+            column != Representative::UInt128 && !holds_strictly(column, i128::from(number))
+        }
+        Typed::UntypedFloat(value) => rounded(value, 2f64.powi(53)),
+        Typed::Float { value, narrow } => {
             let meets_as_float32 = matches!(
                 column,
                 Representative::Int8
@@ -4475,41 +4534,17 @@ fn decides(column: Representative, call: &Call) -> bool {
             );
             rounded(
                 value,
-                if meets_as_float32 {
+                if narrow && meets_as_float32 {
                     2f64.powi(24)
                 } else {
                     2f64.powi(53)
                 },
             )
         }
-        Some(
-            D::Int8
-            | D::Int16
-            | D::Int32
-            | D::Int64
-            | D::Int128
-            | D::UInt8
-            | D::UInt16
-            | D::UInt32
-            | D::UInt64
-            | D::UInt128,
-        ) => {
-            let same = given.as_ref().and_then(Representative::of) == Some(column);
-            !same
-                && column != Representative::UInt128
-                && matches!(number, Ok(number) if !holds_strictly(column, number))
+        Typed::Whole { dtype, value } => {
+            dtype != column && column != Representative::UInt128 && !holds_strictly(column, value)
         }
-        Some(_) => false,
-    }
-}
-
-/// Whether a number that is no dtype of its own, as Polars 2.2.0 makes it, is held by a dtype of
-/// whole numbers in a comparison of missing values. `UInt128` holds every number a document can
-/// write, even one below zero.
-const fn holds_strictly_as_a_whole_number(dtype: Representative, number: i64) -> bool {
-    match dtype {
-        Representative::UInt128 => true,
-        _ => holds_strictly(dtype, number),
+        Typed::Other => false,
     }
 }
 
@@ -4545,13 +4580,13 @@ fn fold_of_a_missing_comparison(
     // What is compared, and the literals it is compared with: the value the chain has come to with
     // the operands of the link, and, where the chain starts from a literal, the operand it is given
     // with the start.
-    let mut compared: Vec<(Option<Representative>, Shape, Vec<&Call>)> = Vec::new();
+    let mut compared: Vec<(Option<Representative>, Shape, Vec<Typed>)> = Vec::new();
     if let Cur::Value { dtype, shape, .. } = receiver {
         let literals = operands(link)
             .into_iter()
             .filter(|operand| operand.links().is_empty())
             .filter_map(|operand| match operand.start() {
-                Start::Call(call) => Some(call),
+                Start::Call(call) => literal_of(call),
                 Start::Input(_) | Start::Hole => None,
             })
             .collect();
@@ -4559,13 +4594,14 @@ fn fold_of_a_missing_comparison(
     }
     if at == 0
         && let Start::Call(start) = expression.start()
+        && let Some(literal) = literal_of(start)
         && let Some((_, other)) = arguments.iter().find(|(name, _)| name == "other")
     {
-        compared.push((other.dtype, other.shape, vec![start]));
+        compared.push((other.dtype, other.shape, vec![literal]));
     }
     // A literal that some dtype of whole numbers is decided for.
     let is_decided_for_some_dtype =
-        |call: &Call| WHOLE_NUMBERS.iter().any(|dtype| decides(*dtype, call));
+        |literal: Typed| WHOLE_NUMBERS.iter().any(|dtype| decides(*dtype, literal));
     let mut fold = Fold::Kept;
     for (dtype, shape, literals) in compared {
         for literal in literals {
@@ -4587,7 +4623,8 @@ fn fold_of_a_missing_comparison(
     // with it is not the first operand, and the dtype of it is not asked.
     if fold == Fold::Kept
         && at > 0
-        && matches!(expression.start(), Start::Call(start) if is_decided_for_some_dtype(start))
+        && matches!(expression.start(), Start::Call(start)
+            if literal_of(start).is_some_and(is_decided_for_some_dtype))
         && follows_the_start(expression, at)
     {
         fold = Fold::Undecided;

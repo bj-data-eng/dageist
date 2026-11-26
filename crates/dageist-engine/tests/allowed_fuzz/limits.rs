@@ -1473,19 +1473,29 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
     // A number with a fraction is one that no whole number is, and a float that is a whole number
     // some dtype cannot hold is one Polars rounds to it: it decides each at once for what it compares
     // as it does a number that the dtype cannot hold.
+    // A literal given a dtype is its value cast to it, so a text is the number it reads as.
+    let is_a_literal_some_dtype_lacks = |start: &Call| {
+        is(start, "polars.lit")
+            && match start.argument("value") {
+                Some(Value::Integer(number)) => !(0..=127).contains(number),
+                Some(Value::Float(number)) => {
+                    number.fract() != 0.0 || !(0.0..=127.0).contains(number)
+                }
+                Some(Value::String(text)) if start.argument("dtype").is_some() => text
+                    .trim()
+                    .parse::<f64>()
+                    .is_ok_and(|number| number.fract() != 0.0 || !(0.0..=127.0).contains(&number)),
+                _ => false,
+            }
+    };
     let is_a_number_some_dtype_lacks = |expression: &Expression| {
         expression.links().is_empty()
-            && matches!(expression.start(), Start::Call(start)
-                if is(start, "polars.lit")
-                    && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
-                        || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0 || !(0.0..=127.0).contains(number))))
+            && matches!(expression.start(), Start::Call(start) if is_a_literal_some_dtype_lacks(start))
     };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
-        let number_start = matches!(expression.start(), Start::Call(start)
-            if is(start, "polars.lit") && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
-                || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0 || !(0.0..=127.0).contains(number))));
+        let number_start = matches!(expression.start(), Start::Call(start) if is_a_literal_some_dtype_lacks(start));
         expression.links().iter().enumerate().any(|(at, link)| {
             let id = link.entry().id().as_str();
             // `is_between` compares each of its bounds with what it follows, so a bound that is
