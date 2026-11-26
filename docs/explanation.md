@@ -2786,7 +2786,7 @@ possible only for a count a number typed in decides, not for one the rows decide
 `arr.to_struct` given two names alike gives a struct that has one field in its dtype and two in its series, which the
 editor refuses by `field-names-fit-the-struct` and a limit says is right. A key of an inner join whose other side holds
 only null keys is never run by Polars, which a left join of the same case shows. A struct met by a struct of other
-fields is refused by a cast, a compare or a supertype in Polars' words for each call. The walk's naming of an unnest's
+fields is refused by a cast, a compare or a supertype in Polars' words for each call. A condition whose predicate holds a struct, or a call that makes one of text or a list, is taken by Polars for a predicate that is none, and its branches are not run, which the same case run with each predicate a flag that is true shows; a part Polars refuses and the tables allow, inside a case the tables cannot tell, is excused by the limit that names what Polars refuses of it. The walk's naming of an unnest's
 columns is in `output_name` of `crates/dageist-engine/src/document/walk.rs`.
 The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
 drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
