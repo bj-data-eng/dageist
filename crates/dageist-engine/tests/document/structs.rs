@@ -1663,3 +1663,88 @@ fn an_unnest_of_one_value_beside_a_flag_is_not_refused_for_what_it_is_though_it_
         found.walk_refusal
     );
 }
+
+#[test]
+fn the_counts_of_a_struct_of_an_open_number_are_as_open_as_the_struct_as_a_key() {
+    // The number stays open in the field that `value_counts` writes of the struct it counts, so
+    // the key is not told, as the struct is not.
+    let counted = chain(
+        call(
+            "polars.struct",
+            json!({ "exprs": many(vec![chain(call("polars.lit", json!({ "value": { "float": 1.5 } })), vec![])]) }),
+        ),
+        vec![
+            call("Expr.value_counts", json!({})),
+            call("Expr.max", json!({})),
+        ],
+    );
+    let held = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![counted]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    let found = ask_step(held);
+    assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what the key gives: {:?}",
+        found.walked_name
+    );
+}
+
+#[test]
+fn an_unnest_inside_a_condition_of_a_join_key_is_not_told_as_an_unnest_as_a_key_is_not() {
+    // The key writes the column `v` twice, which Polars refuses for the repeated names, where the
+    // walk names the unnest's columns by what it cannot know in a condition.
+    let unnested = || {
+        chain(
+            call(
+                "polars.struct",
+                json!({ "exprs": many(vec![chain(col_call("s_one"), vec![the_field("v")])]) }),
+            ),
+            vec![unnest()],
+        )
+    };
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![chain(call("polars.lit", json!({ "value": { "integer": 1 } })), vec![call("Expr.is_null", json!({}))])]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": unnested() })),
+            call("Then.otherwise", json!({ "statement": unnested() })),
+        ],
+    );
+    let plain = chain(
+        call(
+            "polars.struct",
+            json!({ "exprs": many(vec![chain(col_call("s_one"), vec![the_field("v")])]) }),
+        ),
+        vec![],
+    );
+    let held = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![plain, condition]),
+            "right_on": many(vec![field("rk"), field("rk")]),
+        }),
+    );
+    let found = ask_step(held);
+    assert!(
+        matches!(found.polars, Said::Refuses(_)),
+        "{:?}",
+        found.polars
+    );
+    assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what the keys give: {:?}",
+        found.walked_name
+    );
+}
