@@ -2403,7 +2403,10 @@ impl Walker<'_> {
             let as_read = self
                 .read_against()
                 .and_then(|schema| with_null_columns_as_literals(expression, schema));
-            let repeats = self.repeated_comparisons > repeated_before;
+            // A key that is wholly one value is taken whole, whatever the aggregate that makes it is
+            // given, as it is for the aggregate beside a column.
+            let repeats = self.repeated_comparisons > repeated_before
+                && !wholly_single(expression, expression.links().len(), true);
             let undecided = self.undecided_folds > undecided_before;
             // An expression that holds what gives no expression is judged without it, which the
             // syntax of the whole does not show.
