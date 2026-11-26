@@ -466,13 +466,6 @@ pub enum Limit {
     /// pivot that holds a `struct.json_encode`, with the refusal that text cannot be converted to a
     /// number, which Polars allows.
     AJsonOfANumberInAPivot,
-    /// A list or an array made a struct of names, two of them alike, gives a struct whose dtype
-    /// has one field of that name and whose series has two, so its fields read differently by
-    /// each call that reads them, and an unnest of it is refused. The rule that the names of a
-    /// struct's fields be no two alike refuses them, as Polars does where a struct is renamed or
-    /// made of columns. The rule refusing, with the refusal that two fields would be named alike,
-    /// the call that makes a struct of a list or an array.
-    AToStructGivenNamesAlike,
     /// A control makes every count of an item another at once: the rows and the numbers that
     /// decide each of them. Where the item holds a count in more than one place, Polars refusing
     /// it for lengths then shows that a count is the rows by chance, and not that the one the
@@ -497,7 +490,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 40] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -535,7 +528,6 @@ impl Limit {
         Self::AStructMetByAStructOfOtherFields,
         Self::ACountNoRowsChange,
         Self::AJsonOfANumberInAPivot,
-        Self::AToStructGivenNamesAlike,
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
         Self::AStructTakenForAPredicate,
@@ -591,7 +583,6 @@ impl Limit {
             Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
             Self::ACountNoRowsChange => "a-count-no-rows-change",
             Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
-            Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
             Self::AStructTakenForAPredicate => "a-struct-taken-for-a-predicate",
@@ -678,9 +669,6 @@ impl Limit {
             }
             Self::AJsonOfANumberInAPivot => {
                 "a number written as json text is read as the number again, where the tables measured the call on the sample's text, which is no number"
-            }
-            Self::AToStructGivenNamesAlike => {
-                "a struct made of a list or an array given two names alike has one field in its dtype and two in its series, which Polars allows, where the tables refuse names alike as Polars does for a struct renamed or made of columns"
             }
             Self::SeveralCountsInOneItem => {
                 "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
@@ -4333,13 +4321,6 @@ fn applies(
             Limit::ACountNoRowsChange,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_no_rows_change(case, refused, prediction, observed),
-        (Limit::AToStructGivenNamesAlike, Disagreement::RuleRefuses(refused)) => {
-            matches!(refused.source, Source::Rule("field-names-fit-the-struct"))
-                && refused.reason.contains("two fields would be named")
-                && locate(case, &refused.place).call.is_some_and(|call| {
-                    is(call, "Expr.list.to_struct") || is(call, "Expr.arr.to_struct")
-                })
-        }
         (
             Limit::SeveralCountsInOneItem,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
@@ -11554,33 +11535,6 @@ mod tests {
         assert_eq!(
             tables_refuse(&two, place, Some(TableStage::Rows), reason),
             vec![Limit::ACountNoRowsChange]
-        );
-    }
-
-    #[test]
-    fn names_alike_given_to_a_struct_made_of_a_list_are_excused_and_those_of_a_rename_are_not() {
-        let reason = "two fields would be named \"y\"";
-        let names = Value::Many(vec![
-            Value::String("y".to_owned()),
-            Value::String("y".to_owned()),
-        ]);
-        let made = select(vec![chain_of(
-            column("a"),
-            vec![call("Expr.list.to_struct", vec![("fields", names.clone())])],
-        )]);
-        let place = link_of("exprs", 0, 0);
-        assert_eq!(
-            rule_refuses(&made, place.clone(), "field-names-fit-the-struct", reason),
-            vec![Limit::AToStructGivenNamesAlike]
-        );
-        // Polars refuses the names of a rename alike, so the rule is right there.
-        let renamed = select(vec![chain_of(
-            column("a"),
-            vec![call("Expr.struct.rename_fields", vec![("names", names)])],
-        )]);
-        assert_eq!(
-            rule_refuses(&renamed, place, "field-names-fit-the-struct", reason),
-            vec![]
         );
     }
 

@@ -343,13 +343,19 @@ fn text_fields(count: i64) -> Option<Fields> {
     Fields::new(fields).ok()
 }
 
-/// Fields named `names`, each of the class `class`.
+/// Fields that a list or an array is made, named `names`, each of the class `class`: no two names
+/// are alike, which Polars accepts and the rule `to-struct-names-are-distinct` refuses.
 fn named_fields(names: &[&str], class: Option<Representative>) -> Result<Fields, Said> {
     let fields = names
         .iter()
         .map(|name| Field::of_class(*name, class))
         .collect();
-    Fields::new(fields).map_err(|error| repeated(error.name()))
+    Fields::new(fields).map_err(|error| {
+        (
+            Rule::ToStructNamesAreDistinct,
+            format!("two fields would be named {:?}", error.name()),
+        )
+    })
 }
 
 fn repeated(name: &str) -> Said {

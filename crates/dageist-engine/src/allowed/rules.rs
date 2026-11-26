@@ -46,6 +46,19 @@ pub enum Rule {
     /// The names given to the fields of a struct are as many as its fields where it is renamed, or as
     /// the places of the array it is made of, and no two fields of a struct are named alike.
     FieldNamesFitTheStruct,
+    /// No two names given to the fields of a struct that a list or an array is made are alike. This
+    /// is stricter than Polars by design, and the rule can go once a release of Polars refuses these
+    /// names itself.
+    ///
+    /// Polars 2.2.0 accepts them, though `polars.struct` and `struct.rename_fields` refuse the same
+    /// names, and the struct it builds is inconsistent: its dtype and its series hold two fields of
+    /// one name, `struct.field` reads the first and a row's value holds both, `struct.unnest` is
+    /// refused after the plan accepted it (the Python binding keeps the first), and `clear`,
+    /// `pl.concat` and a streaming query panic. The open pull request pola-rs/polars#30725, "Make
+    /// struct dtypes valid by construction", makes the dtype refuse duplicate names. The test
+    /// `polars_accepts_a_list_made_a_struct_of_a_name_given_twice_and_builds_one_that_disagrees_with_itself`
+    /// shows it on the vendored Polars.
+    ToStructNamesAreDistinct,
     /// A join pairs no two output column names twice: the keys of each side
     /// are named by the column they read, and a key that repeats the name of
     /// an earlier one, beside a key on the other side that repeats the name it
@@ -109,7 +122,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 27] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -132,6 +145,7 @@ impl Rule {
         Self::StructArithmeticNeedsNumbers,
         Self::StructIsFilledForwardOrBackward,
         Self::TimeZoneIsValid,
+        Self::ToStructNamesAreDistinct,
         Self::ValuesMeetInCount,
         Self::WindowInputIsNotCounted,
         Self::WindowInputIsNotWidened,
@@ -164,6 +178,7 @@ impl Rule {
             Self::StructArithmeticNeedsNumbers => "struct-arithmetic-needs-numbers",
             Self::StructIsFilledForwardOrBackward => "struct-is-filled-forward-or-backward",
             Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::ToStructNamesAreDistinct => "to-struct-names-are-distinct",
             Self::ValuesMeetInCount => "values-meet-in-count",
             Self::WindowInputIsNotCounted => "window-input-is-not-counted",
             Self::WindowInputIsNotWidened => "window-input-is-not-widened",
@@ -221,6 +236,9 @@ impl Rule {
                 "a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from"
             }
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::ToStructNamesAreDistinct => {
+                "no two names given to the fields of a struct that a list or an array is made may be alike: Polars 2.2.0 accepts them and builds a struct that disagrees with itself, as its dtype and its series hold two fields of one name, and refuses the same names for a struct made of columns or renamed"
+            }
             Self::StructArithmeticNeedsNumbers => {
                 "arithmetic with a struct needs its fields to be numbers: Polars refuses the absolute value, the negation, the sign, a clip and a power of a struct whatever its fields are, and the sum, the difference, the product and the quotients of one that has a field of text, a date, a moment or a time"
             }
@@ -282,6 +300,7 @@ impl Rule {
             | Self::StructArithmeticNeedsNumbers
             | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
+            | Self::ToStructNamesAreDistinct
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened
@@ -438,6 +457,7 @@ impl Rule {
             | Self::StructArithmeticNeedsNumbers
             | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
+            | Self::ToStructNamesAreDistinct
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened

@@ -514,7 +514,7 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         // A name that is no field is one Polars did not find, and a field named twice or names of
         // another number are refused in its own words.
         Source::Rule(rule) if *rule == FIELD_RULE => probe.contains(NOT_FOUND),
-        Source::Rule(rule) if *rule == FIELD_NAMES_RULE => {
+        Source::Rule(rule) if *rule == FIELD_NAMES_RULE || *rule == TO_STRUCT_NAMES_RULE => {
             probe.contains("multiple fields with name")
                 || probe.contains("different number of fields")
                 || probe.contains("number of field names provided")
@@ -753,6 +753,10 @@ const FIELD_NAMES_RULE: &str = "field-names-fit-the-struct";
 /// The rule that a struct be filled only forward or backward, whose refusal Polars shows by the
 /// strategy it does not support for a struct.
 const STRUCT_FILL_RULE: &str = "struct-is-filled-forward-or-backward";
+
+/// The rule that no two names alike be given to the fields of a struct a list or an array is made,
+/// which Polars accepts and, where it refuses the names, shows as it does for `FIELD_NAMES_RULE`.
+const TO_STRUCT_NAMES_RULE: &str = "to-struct-names-are-distinct";
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.
