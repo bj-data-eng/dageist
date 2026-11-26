@@ -187,6 +187,11 @@ impl Fields {
         self.0.iter().find(|field| field.name == name)
     }
 
+    /// Whether a field was made of a number typed without a dtype, which stays open.
+    pub(super) fn has_a_loose_field(&self) -> bool {
+        self.0.iter().any(Field::is_loose)
+    }
+
     /// The names of the fields, in order.
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(Field::name)

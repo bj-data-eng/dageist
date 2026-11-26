@@ -1328,15 +1328,21 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     let unnested_key = id == "Expr.struct.unnest"
         && matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
         && place.context.nested().is_none();
+    // An unnest of a struct that has no field gives no expression, which the tables, measured on a
+    // struct of two fields, do not say of any place.
+    let unnested_nothing = id == "Expr.struct.unnest"
+        && struct_gives
+            .columns()
+            .is_some_and(|columns| columns.is_empty());
     let cell = tables
         .contexts
         .get(&(measured_as, form, place.context))
-        .filter(|_| !unnested_key)
+        .filter(|_| !unnested_key && !unnested_nothing)
         .or_else(|| {
             tables
                 .contexts
                 .get(&(measured_as, Vec::new(), place.context))
-                .filter(|_| !unnested_key)
+                .filter(|_| !unnested_key && !unnested_nothing)
         });
     if let Some(cell) = cell {
         match &cell.continues {
@@ -1442,7 +1448,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if struct_gives.is_undecided() {
         ending = Ending::NotKnown(Unknown::TheResultsDtype);
     }
-    if unnested_key {
+    if unnested_key || unnested_nothing {
         ending = Ending::NotKnown(Unknown::TheResultsDtype);
     }
     // Polars keeps a number typed without a dtype open in a struct that is a join's key, so the key
@@ -1452,6 +1458,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         && place.context.nested().is_none();
     if in_a_key
         && ((id == "polars.struct" && chosen.inputs.iter().any(Input::is_loose))
+            || chosen.fields.is_some_and(Fields::has_a_loose_field)
             || struct_gives.reads_a_loose_field())
     {
         ending = Ending::NotKnown(Unknown::TheResultsDtype);
