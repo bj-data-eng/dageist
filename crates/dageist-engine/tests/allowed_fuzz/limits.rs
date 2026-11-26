@@ -8188,6 +8188,75 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_comparison_of_a_column_with_a_number_no_dtype_holds_is_no_excuse_but_one_of_one_value_is()
+     {
+        let reason = "all join key expressions must be elementwise.";
+        let refused_for = |key: Expression| {
+            polars_refuses(
+                &join(key, chain(column("key"), &[])),
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new(),
+            )
+        };
+        let number = |number: i64| call("polars.lit", vec![("value", Value::Integer(number))]);
+        for entry in ["Expr.eq_missing", "Expr.ne_missing"] {
+            for value in [300, -1] {
+                // The walk decides what is compared where it is a value for each row, by its
+                // dtype, so a key it took that Polars refuses is none of this limit's.
+                assert_eq!(
+                    refused_for(chain_of(
+                        column("rb"),
+                        vec![compared_with(entry, whole(value))]
+                    )),
+                    vec![],
+                    "{entry} of a column and {value}"
+                );
+                assert_eq!(
+                    refused_for(chain_of(
+                        number(value),
+                        vec![compared_with(entry, chain(column("rb"), &[]))]
+                    )),
+                    vec![],
+                    "{entry} of {value} and a column"
+                );
+                // Where it is one value, the dtype of the value decides whether Polars keeps the
+                // comparison, which the walk does not follow, so the limit stays.
+                assert_eq!(
+                    refused_for(chain_of(
+                        column("rb"),
+                        vec![
+                            call("Expr.max", Vec::new()),
+                            compared_with(entry, whole(value)),
+                            call(
+                                "Expr.sub",
+                                vec![("other", Value::Expression(chain(column("rk"), &[])))]
+                            ),
+                        ]
+                    )),
+                    vec![Limit::ANullComparisonInAKey],
+                    "{entry} of an aggregate and {value}"
+                );
+                assert_eq!(
+                    refused_for(chain_of(
+                        number(value),
+                        vec![
+                            compared_with(entry, chain(column("rb"), &["Expr.max"])),
+                            call(
+                                "Expr.sub",
+                                vec![("other", Value::Expression(chain(column("rk"), &[])))]
+                            ),
+                        ]
+                    )),
+                    vec![Limit::ANullComparisonInAKey],
+                    "{entry} of {value} and an aggregate"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn shifts_that_total_the_sample_excuse_the_tables_refusing_what_follows_them() {
         let shift = |rows: Option<i64>| {
             call(
