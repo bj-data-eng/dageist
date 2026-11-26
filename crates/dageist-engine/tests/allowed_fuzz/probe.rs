@@ -660,7 +660,8 @@ fn enclosing_probe(found: &Found) -> Option<Probe> {
 }
 
 /// The probe of a struct whose fields would be named alike: the struct made only of the inputs that
-/// write the name the rule says, a bare literal for `literal` and a bare column for any other.
+/// write the name the rule says, a literal for `literal` and a column for any other, that no call
+/// renames.
 fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
     if !matches!(found.rest, [] | [Segment::Start])
         || !matches!(found.expression.start(), Start::Call(start)
@@ -672,12 +673,18 @@ fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
     let Start::Call(start) = found.expression.start() else {
         return None;
     };
-    let writes = |expression: &Expression| match (expression.start(), expression.links().is_empty())
-    {
-        (Start::Call(input), true) if name == "literal" => {
+    // A chain keeps the name its start gives it unless a call renames it or reads a field.
+    let keeps_its_name = |expression: &Expression| {
+        expression.links().iter().all(|link| {
+            let id = link.entry().id().as_str();
+            !id.starts_with("Expr.struct.") && !id.starts_with("Expr.name.") && id != "Expr.alias"
+        })
+    };
+    let writes = |expression: &Expression| match expression.start() {
+        Start::Call(input) if keeps_its_name(expression) && name == "literal" => {
             input.entry().id().as_str() == "polars.lit"
         }
-        (Start::Call(input), true) => {
+        Start::Call(input) if keeps_its_name(expression) => {
             input.entry().id().as_str() == "polars.col"
                 && matches!(input.argument("name"), Some(Value::Columns(names)) if names.as_slice() == [name.to_owned()])
         }
