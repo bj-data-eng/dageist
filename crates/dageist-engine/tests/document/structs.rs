@@ -1326,7 +1326,8 @@ fn struct_of_a_number(typed: bool) -> Value {
 #[test]
 fn a_struct_of_an_untyped_number_as_a_key_is_not_said_by_the_walk_where_polars_matches_its_dtype() {
     // Polars keeps the number open in a key, so the key does not match the same struct with the
-    // number given its dtype, though both resolve to one. See Polars issue draft 23.
+    // number given its dtype, though both resolve to one: the open number is `dyn` in the dtype
+    // of the key, and does not match the dtype it resolves to on the other side.
     let key = |left: bool, right: bool| {
         step(
             "s",

@@ -2776,7 +2776,7 @@ the host passes to the view as `because` and the census lists. Nothing is predic
 | The fields of the struct are not known | A field read, a drop or a rename follows a struct whose fields the chain lost, as a condition of structs or the values of a pivot's group are, so whether the names are fields cannot be said. |
 | An unnest as a join's key | It writes a column for each field, and how many keys the other table expands to is not known. |
 | An unnest of no field | It expands to no expression, which Polars leaves out of what holds it, or decides by its siblings: a call given one is not judged either. |
-| An open number in a key | A struct made of a number typed without a dtype, or a field read from one, as a join's key, which Polars does not match with the other table's key as the number resolves (Polars issue draft 23). |
+| An open number in a key | A struct made of a number typed without a dtype, or a field read from one, as a join's key, which Polars does not match with the dtype the other table's key resolves to, for the number stays open, as `dyn float`, in the struct's dtype. |
 | Several columns of a field read | A field read by several names gives several columns, which are no value of one dtype outside a select or a sort. |
 | An unnest among predicates | An unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come. |
 | Arithmetic on a struct | It is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly: a sum with a text, a duration times a number and a struct against a struct are the rest after the rule below. |
