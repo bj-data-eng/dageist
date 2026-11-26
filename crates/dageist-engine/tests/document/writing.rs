@@ -134,3 +134,49 @@ fn a_pattern_is_written_and_read_as_a_kind_of_its_own_and_one_that_is_no_regular
     let not_text = step(r#"{"pattern":1}"#);
     assert!(Document::read(&not_text).is_err());
 }
+
+#[test]
+fn a_document_is_written_indented_for_a_file_and_reads_back_the_same() {
+    let compact = r#"{"version":1,"steps":[{"id":"top","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[]}}]}}}}]}"#;
+    let document = Document::read(compact).expect("a document");
+    let indented = document.write_indented();
+    assert_eq!(
+        indented,
+        concat!(
+            "{\n",
+            "  \"version\": 1,\n",
+            "  \"steps\": [\n",
+            "    {\n",
+            "      \"id\": \"top\",\n",
+            "      \"call\": {\n",
+            "        \"entry\": \"LazyFrame.select\",\n",
+            "        \"arguments\": {\n",
+            "          \"exprs\": {\n",
+            "            \"many\": [\n",
+            "              {\n",
+            "                \"expression\": {\n",
+            "                  \"start\": {\n",
+            "                    \"entry\": \"polars.element\",\n",
+            "                    \"arguments\": {}\n",
+            "                  },\n",
+            "                  \"then\": []\n",
+            "                }\n",
+            "              }\n",
+            "            ]\n",
+            "          }\n",
+            "        }\n",
+            "      }\n",
+            "    }\n",
+            "  ]\n",
+            "}\n",
+        )
+    );
+    let again = Document::read(&indented).expect("the indented text");
+    assert_eq!(again, document);
+    assert_eq!(again.write_indented(), indented);
+    // The document with every kind of argument reads back the same from its indented text.
+    let every = Document::read(CANONICAL).expect("a document");
+    let read = Document::read(&every.write_indented()).expect("the indented text");
+    assert_eq!(read, every);
+    assert_eq!(read.write(), CANONICAL);
+}

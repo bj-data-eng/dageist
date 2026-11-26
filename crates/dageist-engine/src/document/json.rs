@@ -78,6 +78,52 @@ impl Json {
         text
     }
 
+    /// The value as JSON text laid out two spaces deep, each item of an array and each field of
+    /// an object on a line of its own, and an empty one as `[]` or `{}`. [`Json::parse`] reads it
+    /// back as the same value.
+    pub(super) fn to_indented_text(&self) -> String {
+        let mut text = String::new();
+        self.write_indented(&mut text, 0);
+        text
+    }
+
+    fn write_indented(&self, text: &mut String, depth: usize) {
+        let line = |text: &mut String, depth: usize| {
+            text.push('\n');
+            text.push_str(&"  ".repeat(depth));
+        };
+        match self {
+            Self::Array(items) if !items.is_empty() => {
+                text.push('[');
+                for (at, item) in items.iter().enumerate() {
+                    if at > 0 {
+                        text.push(',');
+                    }
+                    line(text, depth + 1);
+                    item.write_indented(text, depth + 1);
+                }
+                line(text, depth);
+                text.push(']');
+            }
+            Self::Object(entries) if !entries.is_empty() => {
+                text.push('{');
+                for (at, (key, value)) in entries.iter().enumerate() {
+                    if at > 0 {
+                        text.push(',');
+                    }
+                    line(text, depth + 1);
+                    write_string(key, text);
+                    text.push_str(": ");
+                    value.write_indented(text, depth + 1);
+                }
+                line(text, depth);
+                text.push('}');
+            }
+            // A scalar, an empty array and an empty object are written as they are compactly.
+            _ => self.write_to(text),
+        }
+    }
+
     fn write_to(&self, text: &mut String) {
         use std::fmt::Write as _;
         // Writing to a `String` cannot fail, so the `write!` results are dropped.

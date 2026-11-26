@@ -1098,6 +1098,7 @@ pub fn dageist_engine::document::Document::run_frame(&self, inputs: &dageist_eng
 pub fn dageist_engine::document::Document::run_on(&self, inputs: &dageist_engine::document::Inputs, working: &polars_core::frame::dataframe::DataFrame) -> core::result::Result<dageist_engine::document::Report, polars_error::PolarsError>
 impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::write(&self) -> alloc::string::String
+pub fn dageist_engine::document::Document::write_indented(&self) -> alloc::string::String
 pub struct dageist_engine::document::Dtype(_)
 impl dageist_engine::document::Dtype
 pub const fn dageist_engine::document::Dtype::as_polars(&self) -> &polars_core::datatypes::dtype::DataType
