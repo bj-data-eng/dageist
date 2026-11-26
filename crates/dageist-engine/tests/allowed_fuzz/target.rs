@@ -14,7 +14,7 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
-use super::limits::{excuses, strict};
+use super::limits::{Limit, excuses, excuses_a_refused_prefix, strict};
 use super::observe::{
     Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
@@ -673,8 +673,7 @@ impl CaseTarget for AllowedTarget {
                 },
             )
         };
-        let excused = |what: &str| -> Option<Result<CaseOutcome>> {
-            let limits = excuses(case, &prediction, &observed);
+        let excused_by = |what: &str, limits: Vec<Limit>| -> Option<Result<CaseOutcome>> {
             if limits.is_empty() {
                 return None;
             }
@@ -686,6 +685,9 @@ impl CaseTarget for AllowedTarget {
                 statements.join("; "),
             ))
         };
+        let excused = |what: &str| -> Option<Result<CaseOutcome>> {
+            excused_by(what, excuses(case, &prediction, &observed))
+        };
         // What the tables say of the dtypes is checked whatever the verdict.
         let dtype_checked = prediction
             .expressions
@@ -696,6 +698,18 @@ impl CaseTarget for AllowedTarget {
             // limit may explain: it is not a dtype the tables got wrong.
             if difference.contains(A_PREFIX_POLARS_REFUSES)
                 && let Some(outcome) = excused("allowed, Polars refuses")
+            {
+                return outcome;
+            }
+            // Where the tables cannot tell the case, the prefix is excused by what Polars refuses
+            // of it alone, for the limit that names that.
+            if matches!(prediction.verdict, Verdict::Undetermined(_))
+                && let Some((_, reason)) =
+                    difference.split_once(&format!("{A_PREFIX_POLARS_REFUSES}: "))
+                && let Some(outcome) = excused_by(
+                    "allowed, Polars refuses a prefix",
+                    excuses_a_refused_prefix(case, &prediction, &observed, reason),
+                )
             {
                 return outcome;
             }

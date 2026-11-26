@@ -4773,6 +4773,38 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
         .collect()
 }
 
+/// The limits that excuse a prefix of an expression that Polars refuses, with `reason`, where the
+/// tables allow it and say nothing of the case as a whole: the refusal is of the prefix and of no
+/// place, as the runner that asks about it in a plain `select` finds it.
+pub fn excuses_a_refused_prefix(
+    case: &Case,
+    prediction: &Prediction,
+    observed: &Observed,
+    reason: &str,
+) -> Vec<Limit> {
+    if strict() {
+        return Vec::new();
+    }
+    let refusal = Refusal {
+        stage: Stage::Schema,
+        at: String::new(),
+        place: None,
+        reason: reason.to_owned(),
+    };
+    Limit::ALL
+        .into_iter()
+        .filter(|limit| {
+            applies(
+                *limit,
+                case,
+                &Disagreement::PolarsRefuses(&refusal),
+                prediction,
+                observed,
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     //! A limit excuses a disagreement only where it is the cause: the same feature
