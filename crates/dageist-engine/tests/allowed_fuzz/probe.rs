@@ -2706,6 +2706,12 @@ mod tests {
             "cannot - a struct with non-numeric field: (field: y, dtype: String)",
             "cannot - a struct with non-numeric field: (field: y, dtype: str)"
         ));
+        // A quotient by a column is refused in another word, where a field is no number.
+        assert!(same_reason(
+            &rule,
+            "cannot / a struct with non-numeric field: (field: g, dtype: String)",
+            "must specify one field in the struct"
+        ));
         assert!(!same_reason(&rule, said, "field not found: zz"));
         assert!(!same_reason(&rule, said, "lengths don't match"));
     }
