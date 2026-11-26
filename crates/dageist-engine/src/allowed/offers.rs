@@ -1479,7 +1479,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             &format!(
                 "the field {:?} is a predicate of the filter and is {}, not Boolean",
                 field.name(),
-                field.written()
+                field.shown()
             ),
         ));
     }

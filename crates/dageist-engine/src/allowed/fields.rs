@@ -91,10 +91,16 @@ impl Field {
         self.class
     }
 
-    /// The dtype as the tables write it, and `?` where it is not known, which is how it is shown.
+    /// The dtype as the tables write it, none where it is not known.
     #[must_use]
-    pub fn written(&self) -> &str {
-        self.written.as_deref().unwrap_or("?")
+    pub fn written(&self) -> Option<&str> {
+        self.written.as_deref()
+    }
+
+    /// The dtype as it is shown: as the tables write it, and `?` where it is not known.
+    #[must_use]
+    pub fn shown(&self) -> &str {
+        self.written().unwrap_or("?")
     }
 
     /// What the field holds where it is a struct and that is known.
@@ -205,7 +211,7 @@ impl Fields {
         let fields: Vec<String> = self
             .0
             .iter()
-            .map(|field| format!("{}: {}", field.name, field.written()))
+            .map(|field| format!("{}: {}", field.name, field.shown()))
             .collect();
         format!("Struct({})", fields.join(", "))
     }
@@ -473,11 +479,11 @@ pub(super) fn gives(
                             (input.width, input.class)
                         {
                             field.width = Some(width);
-                            field.written = Some(
-                                ResultDtype::new(field.written().to_owned(), input.class)
+                            field.written = field.written.take().map(|written| {
+                                ResultDtype::new(written, input.class)
                                     .of_width(width)
-                                    .to_string(),
-                            );
+                                    .to_string()
+                            });
                         }
                         if let (Some(fields), Some(Representative::Struct)) =
                             (input.fields, input.class)
@@ -595,11 +601,11 @@ pub(super) fn gives(
             }
             if let (Some(width), Some(Representative::Array(_))) = (chosen.width, receiver) {
                 values.width = Some(width);
-                values.written = Some(
-                    ResultDtype::new(values.written().to_owned(), receiver)
+                values.written = values.written.take().map(|written| {
+                    ResultDtype::new(written, receiver)
                         .of_width(width)
-                        .to_string(),
-                );
+                        .to_string()
+                });
             }
             let counts = Field::of_class(
                 counted,
@@ -704,7 +710,7 @@ pub(super) fn arithmetic_refused(
             format!(
                 "cannot {symbol} a struct with non-numeric field: (field: {}, dtype: {})",
                 field.name,
-                field.written()
+                field.shown()
             )
         })
 }
@@ -739,7 +745,7 @@ impl Gives {
                 )),
                 None,
             ),
-            Self::Field(Some(field)) => (Some(ResultDtype::of_field(field)), field.fields.clone()),
+            Self::Field(Some(field)) => (ResultDtype::of_field(field), field.fields.clone()),
             Self::Field(None) | Self::Columns(_) | Self::Unknown | Self::Undecided => (None, None),
         })
     }
@@ -774,12 +780,12 @@ impl Gives {
 
 impl ResultDtype {
     /// The dtype of a field, as the tables write it.
-    fn of_field(field: &Field) -> Self {
+    fn of_field(field: &Field) -> Option<Self> {
         // A number left open meets another as that one's dtype, which the tables do not say.
-        Self::new(
-            field.written().to_owned(),
+        Some(Self::new(
+            field.written()?.to_owned(),
             field.class.filter(|_| !field.loose),
-        )
+        ))
     }
 }
 

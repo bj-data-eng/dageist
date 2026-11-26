@@ -299,8 +299,9 @@ pub const fn dageist_engine::allowed::Field::fields(&self) -> core::option::Opti
 pub fn dageist_engine::allowed::Field::name(&self) -> &str
 pub fn dageist_engine::allowed::Field::of_class(name: impl core::convert::Into<alloc::string::String>, class: core::option::Option<dageist_engine::allowed::Representative>) -> Self
 pub fn dageist_engine::allowed::Field::of_dtype(name: impl core::convert::Into<alloc::string::String>, dtype: &polars_core::datatypes::dtype::DataType) -> Self
+pub fn dageist_engine::allowed::Field::shown(&self) -> &str
 pub const fn dageist_engine::allowed::Field::width(&self) -> core::option::Option<usize>
-pub fn dageist_engine::allowed::Field::written(&self) -> &str
+pub fn dageist_engine::allowed::Field::written(&self) -> core::option::Option<&str>
 pub struct dageist_engine::allowed::Fields(_)
 impl dageist_engine::allowed::Fields
 pub fn dageist_engine::allowed::Fields::get(&self, name: &str) -> core::option::Option<&dageist_engine::allowed::Field>

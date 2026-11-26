@@ -517,7 +517,7 @@ fn struct_view(held: Option<&Fields>) -> StructView {
                 .iter()
                 .map(|field| FieldView {
                     name: field.name().to_owned(),
-                    dtype: field.written().to_owned(),
+                    dtype: field.shown().to_owned(),
                 })
                 .collect()
         }),
