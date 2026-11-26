@@ -1578,3 +1578,41 @@ fn a_filter_of_several_predicates_takes_an_unnest_beside_the_others_as_polars_do
         );
     }
 }
+#[test]
+fn a_condition_whose_value_is_an_unnest_is_named_by_the_fields_not_by_the_column() {
+    // Polars names what the condition gives by the fields it unnests, `x` and `z`, so the value
+    // named after the column `s_xz` beside it is no name twice.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![call(
+            "When.then",
+            json!({ "statement": chain(col_call("s_xz"), vec![unnest()]) }),
+        )],
+    );
+    let made = chain(
+        call(
+            "polars.struct",
+            json!({ "exprs": many(vec![condition, field("s_xz")]) }),
+        ),
+        vec![],
+    );
+    let found = ask_step(step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![made]) }),
+    ));
+    assert_eq!(
+        found.polars,
+        Said::Accepts,
+        "Polars refuses: {:?}",
+        found.polars
+    );
+    assert!(
+        found.walk_refusal.is_none(),
+        "the walk refuses it: {:?}",
+        found.walk_refusal
+    );
+}
