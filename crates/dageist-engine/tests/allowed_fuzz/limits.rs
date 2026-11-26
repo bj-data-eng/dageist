@@ -129,20 +129,22 @@ pub enum Limit {
     ASingleValueInAKey,
     /// Polars decides some comparisons while it coerces the types, before it asks whether a
     /// join's key is elementwise, and what it leaves depends on the dtypes and on what the
-    /// comparison follows, which the tables did not measure and the named rule, which holds what
-    /// the evidence settles, does not model. A comparison with a null literal becomes a null
-    /// repeated to the length of what is compared, which is not elementwise, or a plain null
-    /// where that is one value: a column compared with a null is refused by the rule, and an
-    /// aggregate compared with a null, or a comparison that follows one, is found by running. An
-    /// `eq_missing` or an `ne_missing` of a value and a whole number that some dtype cannot
-    /// hold, below zero or above 127, or a number with a fraction, is decided the same way where the
-    /// dtype of the value cannot hold the number, and kept where it can. The rule refuses it where the value is a column of
-    /// a dtype it knows, which is a constant repeated to the length of the column; it does not
-    /// where the value is one value, as an aggregate is, for Polars gives a plain constant that a
-    /// key may be where the dtype cannot hold the number, as an unsigned count cannot, and keeps
-    /// the comparison, with the aggregate beside the column that makes the key not elementwise,
-    /// where it can. Polars refusing the join as not elementwise, with no place, in a case whose
-    /// join key holds a comparison with a null literal, or one of those, at any depth.
+    /// comparison follows, which the tables did not measure and the named rule, which holds
+    /// what the evidence settles, does not model. A comparison with a null literal becomes a
+    /// null repeated to the length of what is compared, which is not elementwise, or a plain
+    /// null where that is one value: a column compared with a null is refused by the rule, and
+    /// an aggregate compared with a null, or a comparison that follows one, is found by
+    /// running. An `eq_missing` or an `ne_missing` of a value and a whole number that some
+    /// dtype cannot hold, below zero or above 127, or a number with a fraction, or a float that
+    /// is such a whole number, is decided the same way where the dtype of the value cannot hold
+    /// the number, and kept where it can. The rule refuses it where the value is a column of a
+    /// dtype it knows, which is a constant repeated to the length of the column; it does not
+    /// where the value is one value, as an aggregate is, for Polars gives a plain constant that
+    /// a key may be where the dtype cannot hold the number, as an unsigned count cannot, and
+    /// keeps the comparison, with the aggregate beside the column that makes the key not
+    /// elementwise, where it can. Polars refusing the join as not elementwise, with no place,
+    /// in a case whose join key holds a comparison with a null literal, or one of those, at any
+    /// depth.
     ANullComparisonInAKey,
     /// The tables ran every call on columns that hold values, so what Polars does
     /// with a call that has only nulls to meet was not measured: it does not meet
@@ -1468,21 +1470,22 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
     // A whole number that some dtype cannot hold, below zero or above what an `Int8` holds, is
     // one that Polars decides at once for a comparison of missing values where the dtype of what
     // it is compared with cannot hold it, as it decides a comparison with a null.
-    // A number with a fraction is one that no whole number is, which Polars decides at once for
-    // what it compares as it does a number that the dtype cannot hold.
+    // A number with a fraction is one that no whole number is, and a float that is a whole number
+    // some dtype cannot hold is one Polars rounds to it: it decides each at once for what it compares
+    // as it does a number that the dtype cannot hold.
     let is_a_number_some_dtype_lacks = |expression: &Expression| {
         expression.links().is_empty()
             && matches!(expression.start(), Start::Call(start)
                 if is(start, "polars.lit")
                     && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
-                        || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0)))
+                        || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0 || !(0.0..=127.0).contains(number))))
     };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
         let number_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && (matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number))
-                || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0)));
+                || matches!(start.argument("value"), Some(Value::Float(number)) if number.fract() != 0.0 || !(0.0..=127.0).contains(number))));
         expression.links().iter().enumerate().any(|(at, link)| {
             let id = link.entry().id().as_str();
             // `is_between` compares each of its bounds with what it follows, so a bound that is

@@ -4383,39 +4383,24 @@ fn is_a_comparison_of_missing_values(link: &Call) -> bool {
     )
 }
 
-/// Whether a whole number is one that some dtype cannot hold: one below zero, which no unsigned
-/// dtype holds, or above 127, which an `Int8` does not. A number from zero to 127 is held by
-/// every dtype, and Polars never decides a comparison with one at once.
-fn some_dtype_lacks(number: i64) -> bool {
-    !(0..=127).contains(&number)
-}
+/// The whole-number dtypes a column may have, which a comparison of missing values with a literal
+/// is decided for or kept by their own bounds.
+const WHOLE_NUMBERS: [Representative; 10] = [
+    Representative::Int8,
+    Representative::Int16,
+    Representative::Int32,
+    Representative::Int64,
+    Representative::Int128,
+    Representative::UInt8,
+    Representative::UInt16,
+    Representative::UInt32,
+    Representative::UInt64,
+    Representative::UInt128,
+];
 
-/// A number that a comparison of missing values is given.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Number {
-    /// A number with a fraction, which no whole number is.
-    Fraction,
-    /// A whole number.
-    Whole(i64),
-}
-
-/// The number that `call` is, where it is `lit` of one.
-fn number_of(call: &Call) -> Option<Number> {
-    if is_a_fraction(call) {
-        return Some(Number::Fraction);
-    }
-    match call.argument("value") {
-        Some(Value::Integer(number)) if call.entry().id().as_str() == "polars.lit" => {
-            Some(Number::Whole(*number))
-        }
-        _ => None,
-    }
-}
-
-/// Whether a dtype of whole numbers holds `number`, as Polars 2.2.0 decides a comparison of missing
-/// values with it. A number a document writes has 64 bits, which `Int128` holds, and Polars decides
-/// no such comparison against a column of `UInt128` either, not even with a number below zero.
-const fn holds(dtype: Representative, number: i64) -> bool {
+/// Whether a dtype of whole numbers holds `number`: it casts to the dtype and keeps its value.
+/// `Int128` holds every number a document can write, and `UInt128` every number from zero up.
+const fn holds_strictly(dtype: Representative, number: i64) -> bool {
     match dtype {
         Representative::Int8 => number >= i8::MIN as i64 && number <= i8::MAX as i64,
         Representative::Int16 => number >= i16::MIN as i64 && number <= i16::MAX as i64,
@@ -4423,8 +4408,108 @@ const fn holds(dtype: Representative, number: i64) -> bool {
         Representative::UInt8 => number >= 0 && number <= u8::MAX as i64,
         Representative::UInt16 => number >= 0 && number <= u16::MAX as i64,
         Representative::UInt32 => number >= 0 && number <= u32::MAX as i64,
-        Representative::UInt64 => number >= 0,
+        Representative::UInt64 | Representative::UInt128 => number >= 0,
         _ => true,
+    }
+}
+
+/// Whether Polars decides a comparison of missing values of a column of `column`, a dtype of whole
+/// numbers, with the literal `call`, while it coerces the types, for no value of the column is the
+/// literal. It follows `coerce_comparison_literal` of Polars 2.2.0:
+///
+/// - A literal of 32 or 64 bit floats is read as the number it is, where that number casts to the
+///   float exactly: below 2^24 for 32 bit floats where the column meets them as 32 bit floats, which
+///   the 8 and 16 bit whole numbers do, and below 2^53 otherwise. A number with a fraction, or a
+///   whole number the column cannot hold, is decided. A number that casts inexactly is kept.
+/// - A literal of 16 bit floats or of `Boolean`, or of any dtype that is not a number, is kept.
+/// - A literal of whole numbers is decided where the column cannot hold it. It is never for a
+///   column of `UInt128`, which no signed literal meets, and not where it has the dtype of the
+///   column.
+/// - A literal that is no dtype of its own is the number it is: a whole number of a dtype that
+///   adapts to the column, or a float that is a 64 bit float.
+///
+/// A comparison with `UInt128` of a whole number typed as a float is decided where the number is
+/// below zero, as it is not where the number is typed as a whole number.
+fn decides(column: Representative, call: &Call) -> bool {
+    if call.entry().id().as_str() != "polars.lit" || !is_a_whole_number(column) {
+        return false;
+    }
+    let given = match call.argument("dtype") {
+        None => None,
+        Some(Value::Dtype(dtype)) => Some(dtype.as_polars().clone()),
+        Some(_) => return false,
+    };
+    use polars::prelude::DataType as D;
+    let number = match call.argument("value") {
+        Some(Value::Integer(number)) => Ok(*number),
+        Some(Value::Float(number)) => Err(*number),
+        _ => return false,
+    };
+    // The floats that Polars rounds to whole numbers: the value as the float holds it, and the
+    // number below which a whole number casts to the float exactly.
+    let rounded = |value: f64, exact_below: f64| {
+        if value.is_nan() || value.abs() >= exact_below {
+            return false;
+        }
+        let floor = value.floor();
+        floor != value || !holds_strictly(column, floor as i64)
+    };
+    let as_float64 = |number: Result<i64, f64>| match number {
+        Ok(number) => number as f64,
+        Err(number) => number,
+    };
+    match given {
+        None => match number {
+            Ok(number) => !holds_strictly_as_a_whole_number(column, number),
+            Err(number) => rounded(number, 2f64.powi(53)),
+        },
+        Some(D::Float64) => rounded(as_float64(number), 2f64.powi(53)),
+        Some(D::Float32) => {
+            let value = as_float64(number) as f32 as f64;
+            let meets_as_float32 = matches!(
+                column,
+                Representative::Int8
+                    | Representative::Int16
+                    | Representative::UInt8
+                    | Representative::UInt16
+            );
+            rounded(
+                value,
+                if meets_as_float32 {
+                    2f64.powi(24)
+                } else {
+                    2f64.powi(53)
+                },
+            )
+        }
+        Some(
+            D::Int8
+            | D::Int16
+            | D::Int32
+            | D::Int64
+            | D::Int128
+            | D::UInt8
+            | D::UInt16
+            | D::UInt32
+            | D::UInt64
+            | D::UInt128,
+        ) => {
+            let same = given.as_ref().and_then(Representative::of) == Some(column);
+            !same
+                && column != Representative::UInt128
+                && matches!(number, Ok(number) if !holds_strictly(column, number))
+        }
+        Some(_) => false,
+    }
+}
+
+/// Whether a number that is no dtype of its own, as Polars 2.2.0 makes it, is held by a dtype of
+/// whole numbers in a comparison of missing values. `UInt128` holds every number a document can
+/// write, even one below zero.
+const fn holds_strictly_as_a_whole_number(dtype: Representative, number: i64) -> bool {
+    match dtype {
+        Representative::UInt128 => true,
+        _ => holds_strictly(dtype, number),
     }
 }
 
@@ -4457,64 +4542,53 @@ fn fold_of_a_missing_comparison(
     if !is_a_comparison_of_missing_values(link) {
         return Fold::Kept;
     }
-    // What is compared, and the numbers it is compared with: the value the chain has come to with
-    // the operands of the link, and, where the chain starts from a number, the operand it is given
+    // What is compared, and the literals it is compared with: the value the chain has come to with
+    // the operands of the link, and, where the chain starts from a literal, the operand it is given
     // with the start.
-    let mut compared: Vec<(Option<Representative>, Shape, Vec<Number>)> = Vec::new();
+    let mut compared: Vec<(Option<Representative>, Shape, Vec<&Call>)> = Vec::new();
     if let Cur::Value { dtype, shape, .. } = receiver {
-        let numbers = operands(link)
+        let literals = operands(link)
             .into_iter()
             .filter(|operand| operand.links().is_empty())
             .filter_map(|operand| match operand.start() {
-                Start::Call(call) => number_of(call),
+                Start::Call(call) => Some(call),
                 Start::Input(_) | Start::Hole => None,
             })
             .collect();
-        compared.push((*dtype, *shape, numbers));
+        compared.push((*dtype, *shape, literals));
     }
     if at == 0
         && let Start::Call(start) = expression.start()
-        && let Some(number) = number_of(start)
         && let Some((_, other)) = arguments.iter().find(|(name, _)| name == "other")
     {
-        compared.push((other.dtype, other.shape, vec![number]));
+        compared.push((other.dtype, other.shape, vec![start]));
     }
+    // A literal that some dtype of whole numbers is decided for.
+    let is_decided_for_some_dtype =
+        |call: &Call| WHOLE_NUMBERS.iter().any(|dtype| decides(*dtype, call));
     let mut fold = Fold::Kept;
-    for (dtype, shape, numbers) in compared {
-        for number in numbers {
+    for (dtype, shape, literals) in compared {
+        for literal in literals {
             match (dtype, shape) {
                 (Some(dtype), Shape::Many) => {
-                    if is_a_whole_number(dtype)
-                        && match number {
-                            Number::Fraction => true,
-                            Number::Whole(number) => !holds(dtype, number),
-                        }
-                    {
+                    if decides(dtype, literal) {
                         return Fold::Repeats;
                     }
                 }
                 _ => {
-                    let lacks = match number {
-                        Number::Whole(number) => some_dtype_lacks(number),
-                        // No whole number is it, but where the value is of a dtype that has fractions
-                        // Polars keeps the comparison, so it is one value that is not known to be
-                        // decided unless the dtype is of a column, which the walk follows.
-                        Number::Fraction => shape != Shape::Many,
-                    };
-                    if lacks {
+                    if is_decided_for_some_dtype(literal) {
                         fold = Fold::Undecided;
                     }
                 }
             }
         }
     }
-    // A number that leads a chain which calls that leave it as it was follow: what is compared
+    // A literal that leads a chain which calls that leave it as it was follow: what is compared
     // with it is not the first operand, and the dtype of it is not asked.
     if fold == Fold::Kept
-        && matches!(expression.start(), Start::Call(start)
-            if matches!(number_of(start), Some(Number::Whole(number)) if some_dtype_lacks(number)))
-        && follows_the_start(expression, at)
         && at > 0
+        && matches!(expression.start(), Start::Call(start) if is_decided_for_some_dtype(start))
+        && follows_the_start(expression, at)
     {
         fold = Fold::Undecided;
     }
@@ -4536,23 +4610,6 @@ const fn is_a_whole_number(dtype: Representative) -> bool {
             | Representative::UInt64
             | Representative::UInt128
     )
-}
-
-/// Whether a call is `lit` of a number that has a fraction and is no whole number's: it is given no
-/// dtype or a 32 or 64 bit float, the two Polars rewrites the number of, for it makes the number the
-/// whole number it is cut to where it is given the dtype of whole numbers and does not rewrite one
-/// of 16 bits.
-fn is_a_fraction(call: &Call) -> bool {
-    call.entry().id().as_str() == "polars.lit"
-        && matches!(call.argument("value"), Some(Value::Float(number)) if number.is_finite() && number.fract() != 0.0)
-        && match call.argument("dtype") {
-            None => true,
-            Some(Value::Dtype(dtype)) => matches!(
-                dtype.as_polars(),
-                polars::prelude::DataType::Float32 | polars::prelude::DataType::Float64
-            ),
-            Some(_) => false,
-        }
 }
 
 /// Whether an expression is a whole number below zero and no more.
