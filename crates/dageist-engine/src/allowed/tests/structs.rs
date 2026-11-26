@@ -292,3 +292,88 @@ fn arithmetic_on_a_struct_is_refused_where_the_context_refuses_every_method() {
     );
     assert!(on_a_struct.refusal().is_some(), "{on_a_struct:?}");
 }
+
+/// What a call says it cannot tell, in the words it says it in.
+fn cannot_tell(verdict: &Verdict) -> String {
+    match allowed(verdict).can_end() {
+        Ending::NotKnown(unknown) => unknown.to_string(),
+        other => panic!("it can be told: {other:?}"),
+    }
+}
+
+#[test]
+fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
+    let fields = xy();
+    let none = Fields::of_dtype(&DataType::Struct(Vec::new())).expect("a struct");
+    let select = after_a_struct();
+    let key = Place::new(
+        Context::step(Outer::JoinLeft),
+        After::Value {
+            dtype: Representative::Struct,
+            shape: Shape::Many,
+        },
+    );
+    // The fields of the struct a name is read of are not known.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.struct.field"),
+            &select,
+            &Chosen::default().with_names(&[("name", "x")]),
+        )),
+        "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said"
+    );
+    // An unnest as a join's key.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.struct.unnest"),
+            &key,
+            &Chosen::default().following_fields(Some(&fields)),
+        )),
+        "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known"
+    );
+    // An unnest of a struct of no field.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.struct.unnest"),
+            &select,
+            &Chosen::default().following_fields(Some(&none)),
+        )),
+        "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings"
+    );
+    // A struct of an open number as a join's key.
+    let open = [Input::new(Some("literal"), Some(Representative::Float64), None).loose_if(true)];
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("polars.struct"),
+            &Place::new(Context::step(Outer::JoinLeft), After::Start),
+            &Chosen::default().with_inputs(&open).giving_many(),
+        )),
+        "a number typed without a dtype stays open in a struct that is a join's key, and Polars does not match it with the other table's key as its dtype resolves (Polars issue draft 23)"
+    );
+    // Several columns of one field read, outside a select or a sort.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.struct.field"),
+            &Place::new(
+                Context::step(Outer::Filter),
+                After::Value {
+                    dtype: Representative::Struct,
+                    shape: Shape::Many,
+                },
+            ),
+            &Chosen::default()
+                .following_fields(Some(&fields))
+                .with_names(&[("name", "x"), ("more_names", "y")]),
+        )),
+        "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort"
+    );
+    // A struct met by a struct, which Polars does field by field.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.add"),
+            &select,
+            &Chosen::default().with_arguments(&[("other", Representative::Struct)]),
+        )),
+        "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly"
+    );
+}
