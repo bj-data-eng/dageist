@@ -8364,6 +8364,32 @@ mod tests {
         assert_eq!(refused_for(float(-1.0)), vec![Limit::ANullComparisonInAKey]);
         // One that every dtype holds is not.
         assert_eq!(refused_for(float(100.0)), vec![]);
+        // A float or a text given a dtype is cast to it, and is the number it casts to.
+        let typed = |value: Value, representative: Representative| {
+            let dtype = Dtype::new(representative.dtype()).expect("a dtype");
+            chain(
+                call(
+                    "polars.lit",
+                    vec![("value", value), ("dtype", Value::Dtype(dtype))],
+                ),
+                &[],
+            )
+        };
+        assert_eq!(
+            refused_for(typed(Value::Float(300.0), Representative::Int16)),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        assert_eq!(
+            refused_for(typed(Value::String("-1".to_owned()), Representative::Int8)),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        assert_eq!(
+            refused_for(typed(
+                Value::String("100".to_owned()),
+                Representative::Int16
+            )),
+            vec![]
+        );
     }
 
     #[test]

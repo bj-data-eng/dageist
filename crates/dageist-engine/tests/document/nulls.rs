@@ -1377,6 +1377,40 @@ fn a_number_given_a_dtype_is_decided_as_polars_coerces_it_for_a_column_of_whole_
             literal_of(float(-1.5), Some("Float64")),
             true,
         ),
+        // The literal is the value cast to its dtype, as the step engine makes it, so a float or a
+        // text that casts to whole numbers is a whole-number literal, and text that casts to a
+        // float is a float.
+        (
+            DataType::Int8,
+            literal_of(float(300.0), Some("Int16")),
+            true,
+        ),
+        (DataType::UInt8, literal_of(float(-1.0), Some("Int8")), true),
+        (
+            DataType::UInt64,
+            literal_of(float(-1.0), Some("Int8")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "300" }), Some("Int16")),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(json!({ "string": "-1" }), Some("Int8")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "1.5" }), Some("Float64")),
+            true,
+        ),
+        (
+            DataType::Int8,
+            literal_of(json!({ "string": "100" }), Some("Int16")),
+            false,
+        ),
     ];
     for (held, literal, refused) in cases {
         for method in ["Expr.eq_missing", "Expr.ne_missing"] {
@@ -1433,18 +1467,17 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
         i64::MAX,
         -129,
     ];
-    let floats: [f64; 10] = [
+    let floats: [f64; 8] = [
         -1.0,
-        0.0,
         100.0,
         300.0,
         1.5,
-        -1.5,
         16_777_216.0,
         16_777_217.5,
         9_007_199_254_740_992.0,
         1e18,
     ];
+    let texts = ["300", "-1", "1.5", "100000000"];
     let dtypes = [
         None,
         Some("Float64"),
@@ -1465,8 +1498,14 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
         }
     }
     for number in floats {
-        for word in [None, Some("Float64"), Some("Float32"), Some("Float16")] {
+        for word in dtypes {
             literals.push(literal_of(json!({ "float": number }), word));
+        }
+    }
+    // Text only makes a literal where it casts to its dtype.
+    for text in texts {
+        for word in dtypes.into_iter().flatten() {
+            literals.push(literal_of(json!({ "string": text }), Some(word)));
         }
     }
     let mut differences: Vec<String> = Vec::new();
