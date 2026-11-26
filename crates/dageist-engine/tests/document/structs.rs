@@ -1293,3 +1293,53 @@ fn an_unnest_of_a_struct_with_no_field_is_a_predicate_of_nothing_that_the_walk_c
         found.walk_refusal
     );
 }
+
+#[test]
+fn two_inputs_that_write_one_name_are_refused_though_another_writes_none_known() {
+    // A condition is named by what the walk cannot say here, but the two literals write `literal`.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![call("When.then", json!({ "statement": field("n") }))],
+    );
+    let found = a_struct_of(vec![whole(1), condition, whole(2)], vec![]);
+    assert_refused_by(
+        &found,
+        "field-names-fit-the-struct",
+        &["literal"],
+        "a struct of two literals and a condition",
+    );
+}
+
+#[test]
+fn an_open_number_in_a_struct_in_a_struct_is_as_open_as_one_in_a_struct_as_a_key() {
+    let inner = chain(
+        call(
+            "polars.struct",
+            json!({ "exprs": many(vec![chain(call("polars.lit", json!({ "value": { "float": 1.5 } })), vec![])]) }),
+        ),
+        vec![],
+    );
+    let outer = chain(
+        call("polars.struct", json!({ "exprs": many(vec![inner]) })),
+        vec![],
+    );
+    let held = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![outer]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    let found = ask_step(held);
+    assert!(found.walk_refusal.is_none(), "{:?}", found.walk_refusal);
+    assert!(
+        found.walk_knows_nothing_of_it.is_some(),
+        "the walk says what the key gives: {:?}",
+        found.walked_name
+    );
+}
