@@ -1,0 +1,8 @@
+{
+  "kind": "source",
+  "name": "Holiday calendar",
+  "file": {
+    "path": "data/holidays.parquet",
+    "format": "parquet"
+  }
+}

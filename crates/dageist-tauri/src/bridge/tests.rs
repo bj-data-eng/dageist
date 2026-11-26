@@ -13,8 +13,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use dageist_engine::SampleSpec;
-use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::Document;
 use serde_json::{Value, json};
 
 use super::{Bridge, Deadlines, Session, admits, bind, serve, serve_connection};
@@ -59,11 +57,9 @@ impl Drop for SampleFolder {
     }
 }
 
-/// The starting graph, as the host starts with it, with every revision starting at 0.
+/// The timing corpus, with every revision starting at 0.
 fn sample_documents() -> Workspace {
-    crate::graph::tests::sample_of(
-        Document::read(ClaimTiming::STEPS_JSON).expect("the sample's steps are a document"),
-    )
+    crate::graph::tests::sample()
 }
 
 fn bridge(folder: &SampleFolder, port: u16) -> Bridge {

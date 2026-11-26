@@ -3,7 +3,6 @@
 //! works on.
 
 use dageist_engine::catalog::english;
-use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::Document;
 use serde_json::{Value, json};
 
@@ -28,9 +27,8 @@ fn filter(predicates: Vec<Value>) -> String {
 
 #[test]
 fn the_samples_steps_are_summarised_as_the_editor_summarises_them() {
-    let sample = ClaimTiming::new().expect("the sample node");
-    let summaries: Vec<String> = sample
-        .steps()
+    let storyboard = Document::read(&crate::claims::storyboard_text()).expect("the corpus's steps");
+    let summaries: Vec<String> = storyboard
         .steps()
         .iter()
         .map(|step| step.summary(english()))
@@ -224,9 +222,11 @@ fn a_column_that_is_added_is_named_and_several_are_listed() {
 }
 #[test]
 fn a_step_report_carries_the_summary_of_its_step() {
-    let sample = ClaimTiming::new().expect("the sample node");
-    let report = sample.run(sample.steps()).expect("a run");
-    for (reported, step) in report.steps().iter().zip(sample.steps().steps()) {
+    let storyboard = Document::read(&crate::claims::storyboard_text()).expect("the corpus's steps");
+    let report = storyboard
+        .run_on(&crate::claims::inputs(), &crate::claims::claims())
+        .expect("a run");
+    for (reported, step) in report.steps().iter().zip(storyboard.steps()) {
         assert_eq!(
             reported.summary(),
             step.summary(dageist_engine::catalog::english())

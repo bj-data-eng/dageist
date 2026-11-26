@@ -1,15 +1,17 @@
-//! The claim-timing steps the step editor's storyboard opens with, written as
-//! a document and run on seven claim rows.
+//! The claim-timing steps of the storyboard, written as a document and run on
+//! seven claim rows.
 //!
-//! The sample node is the engine's own, `ClaimTiming`, which the host serves
-//! to the view too. Every expected value is worked out by hand from its seven
-//! rows and from what Polars documents for each operation, not read from a
-//! run.
+//! The rows, the tables connected to the steps and the steps themselves are
+//! the timing corpus in `tests/corpus/timing`. Every expected value is worked
+//! out by hand from its seven rows and from what Polars documents for each
+//! operation, not read from a run.
+
+use std::path::PathBuf;
 
 use dageist_engine::catalog::Laziness;
-use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::{
-    Document, ExpressionDtypes, Inputs, Outcome, Report, Resolution, Segment, StepId, StepReport,
+    ColumnDescription, Document, ExpressionDtypes, Inputs, ListOrigin, Outcome, Report, Resolution,
+    Segment, StepId, StepReport,
 };
 use polars::prelude::*;
 
@@ -29,25 +31,78 @@ fn datetime() -> DataType {
     DataType::Datetime(TimeUnit::Microseconds, None)
 }
 
-/// The seven claim rows of the storyboard, in no useful order.
-pub fn claims() -> DataFrame {
-    ClaimTiming::new()
-        .expect("the sample node")
-        .source()
-        .clone()
+/// The file `name` of the timing corpus.
+fn corpus(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("corpus")
+        .join("timing")
+        .join(name)
 }
 
+/// The table in the corpus's Parquet file `name`, read through the engine, which sets Polars up
+/// as the release does before it reads.
+fn table(name: &str) -> DataFrame {
+    dageist_engine::Frame::scan(&corpus(name), dageist_engine::FileFormat::Parquet)
+        .expect("a table of the corpus")
+        .working(1_000)
+        .expect("its rows")
+}
+
+/// The seven claim rows of the storyboard, in no useful order.
+pub fn claims() -> DataFrame {
+    table("claims.parquet")
+}
+
+/// What the storyboard's steps are connected to: the table of the days each
+/// step may take, the table of step names a pivot gives its columns from, a
+/// cutoff of 1, an as-of date of 2026-03-02 and the list of holidays.
 pub fn inputs() -> Inputs {
-    ClaimTiming::new()
-        .expect("the sample node")
-        .inputs()
-        .clone()
+    let mut inputs = Inputs::new();
+    inputs
+        .add_table("step_sla", "SLA by step", table("step_sla.parquet").lazy())
+        .expect("a new input");
+    inputs
+        .add_table(
+            "step_names",
+            "Step names",
+            table("step_names.parquet").lazy(),
+        )
+        .expect("a new input");
+    inputs
+        .add_value(
+            "sla_cutoff",
+            Scalar::new(DataType::Int64, AnyValue::Int64(1)),
+        )
+        .expect("a new input");
+    inputs
+        .add_value(
+            "as_of",
+            Scalar::new(DataType::Date, AnyValue::Date(date(2))),
+        )
+        .expect("a new input");
+    let holidays = table("holidays.parquet")
+        .column("date")
+        .expect("the dates")
+        .as_materialized_series()
+        .clone();
+    inputs
+        .add_list(
+            "holidays",
+            ListOrigin::Column {
+                node: "Holiday calendar".to_owned(),
+                column: "date".to_owned(),
+            },
+            holidays,
+        )
+        .expect("a new input");
+    inputs
 }
 
 /// The storyboard's starting steps, with what the catalogue covers: `is_in`
 /// is not in it, so the holiday test is a comparison with a connected date.
 pub fn storyboard_text() -> String {
-    ClaimTiming::STEPS_JSON.to_owned()
+    std::fs::read_to_string(corpus("steps.json")).expect("the corpus's steps")
 }
 
 fn storyboard() -> Document {
@@ -209,9 +264,11 @@ fn the_sample_rows_are_the_instants_the_calendar_works_out() {
 }
 
 #[test]
-fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
-    let node = ClaimTiming::new().expect("the sample node");
-    let report = node.run(node.steps()).expect("the claims have a schema");
+fn the_corpus_runs_its_steps_on_its_own_rows_and_inputs() {
+    let steps = storyboard();
+    let report = steps
+        .run_on(&inputs(), &claims())
+        .expect("the claims have a schema");
     assert_eq!(report.steps().len(), 12);
     assert!(
         report
@@ -219,8 +276,7 @@ fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
             .iter()
             .all(|step| matches!(step.outcome(), Outcome::Valid { .. }))
     );
-    let source: Vec<_> = node
-        .source_columns()
+    let source: Vec<_> = ColumnDescription::of_schema(claims().schema())
         .iter()
         .map(|column| (column.name().to_owned(), column.dtype().to_owned()))
         .collect();
@@ -235,8 +291,13 @@ fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
         ]
         .map(|(name, dtype)| (name.to_owned(), dtype.to_owned()))
     );
-    let preview = node
-        .preview(node.steps(), &StepId::new("pivot").expect("an id"), 100)
+    let preview = steps
+        .preview(
+            &inputs(),
+            &claims(),
+            &StepId::new("pivot").expect("an id"),
+            100,
+        )
         .expect("the pivot's rows");
     let names: Vec<_> = preview
         .columns()

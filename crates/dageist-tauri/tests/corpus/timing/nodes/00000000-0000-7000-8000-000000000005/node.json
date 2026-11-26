@@ -1,0 +1,14 @@
+{
+  "kind": "parameters",
+  "name": "Parameters",
+  "values": {
+    "as_of": {
+      "dtype": "Date",
+      "text": "2026-03-02"
+    },
+    "sla_cutoff": {
+      "dtype": "Int64",
+      "text": "1"
+    }
+  }
+}

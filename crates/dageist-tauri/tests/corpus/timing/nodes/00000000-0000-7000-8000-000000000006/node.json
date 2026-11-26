@@ -1,0 +1,48 @@
+{
+  "kind": "transform",
+  "name": "Claim timing",
+  "start": {
+    "kind": "table",
+    "node": "00000000-0000-7000-8000-000000000001"
+  },
+  "inputs": {
+    "as_of": {
+      "takes": "value",
+      "from": {
+        "kind": "parameter",
+        "node": "00000000-0000-7000-8000-000000000005",
+        "name": "as_of"
+      }
+    },
+    "holidays": {
+      "takes": "list",
+      "from": {
+        "kind": "column",
+        "node": "00000000-0000-7000-8000-000000000004",
+        "column": "date"
+      }
+    },
+    "sla_cutoff": {
+      "takes": "value",
+      "from": {
+        "kind": "parameter",
+        "node": "00000000-0000-7000-8000-000000000005",
+        "name": "sla_cutoff"
+      }
+    },
+    "step_names": {
+      "takes": "table",
+      "from": {
+        "kind": "table",
+        "node": "00000000-0000-7000-8000-000000000003"
+      }
+    },
+    "step_sla": {
+      "takes": "table",
+      "from": {
+        "kind": "table",
+        "node": "00000000-0000-7000-8000-000000000002"
+      }
+    }
+  }
+}
