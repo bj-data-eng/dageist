@@ -486,11 +486,18 @@ pub enum Limit {
     /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
     /// reason the tables gave of a key of the join, where it allows the inner join.
     AJoinKeyPolarsDoesNotRun,
+    /// Polars compares a struct with a value field by field and gives a struct, not a Boolean, which
+    /// a condition takes for its predicate and runs neither branch for, so a part in a branch is
+    /// never met. The tables measured a comparison as giving a Boolean, and judged the branches. The
+    /// tables refusing a part of a branch of a condition whose predicate compares a struct, which
+    /// Polars allows, where the case run again with each predicate a flag that is true is refused
+    /// for the same reason: the predicate is then why Polars allows it.
+    AStructTakenForAPredicate,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 41] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -531,6 +538,7 @@ impl Limit {
         Self::AToStructGivenNamesAlike,
         Self::SeveralCountsInOneItem,
         Self::AJoinKeyPolarsDoesNotRun,
+        Self::AStructTakenForAPredicate,
     ];
 
     /// The name a kept case is filed under.
@@ -586,6 +594,7 @@ impl Limit {
             Self::AToStructGivenNamesAlike => "a-to-struct-given-names-alike",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
             Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
+            Self::AStructTakenForAPredicate => "a-struct-taken-for-a-predicate",
         }
     }
 
@@ -675,6 +684,9 @@ impl Limit {
             }
             Self::SeveralCountsInOneItem => {
                 "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
+            }
+            Self::AStructTakenForAPredicate => {
+                "Polars compares a struct field by field and gives a struct, which a condition takes for its predicate and runs neither branch for, where the tables measured the comparison as giving a Boolean and judged the branches"
             }
             Self::AJoinKeyPolarsDoesNotRun => {
                 "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
@@ -4332,6 +4344,13 @@ fn applies(
             Limit::SeveralCountsInOneItem,
             Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
         ) => super::counts::is_a_count_among_counts(case, refused),
+        (Limit::AStructTakenForAPredicate, Disagreement::PolarsAllows(refused)) => {
+            matches!(refused.source, Source::Polars)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_condition_of_a_compared_struct))
+                && refused_when_the_predicates_are_true(case, refused) == Some(true)
+        }
         (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
             is(step, "LazyFrame.join")
                 && matches!(refused.source, Source::Polars)
@@ -4518,6 +4537,73 @@ fn applies(
     }
 }
 
+/// Whether the call is a condition with a predicate that compares a struct: one that starts from
+/// `polars.struct` and goes on to a comparison, or is compared with one.
+fn is_a_condition_of_a_compared_struct(call: &Call) -> bool {
+    let compares_a_struct = |predicate: &Expression| {
+        predicate.links().iter().any(|link| {
+            link.entry().family() == catalog::Family::Compare
+                && (matches!(predicate.start(), Start::Call(start) if is(start, "polars.struct"))
+                    || operands(link).into_iter().any(|(_, operand)| {
+                        any_call(operand, &|inside| is(inside, "polars.struct"))
+                    }))
+        })
+    };
+    (is(call, "polars.when") || is(call, "Then.when"))
+        && operands(call)
+            .into_iter()
+            .any(|(parameter, predicate)| parameter == "predicates" && compares_a_struct(predicate))
+}
+
+/// The case with the predicates of each condition made a flag that is true, which a branch is run
+/// for.
+fn case_with_true_predicates(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !(is(call, "polars.when") || is(call, "Then.when")) {
+            return None;
+        }
+        let truth = Expression::new(
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.lit")?,
+                    vec![("value", Value::Flag(Some(true)))],
+                )
+                .ok()?,
+            ),
+            Vec::new(),
+        )
+        .ok()?;
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                if given.parameter() == "predicates" {
+                    (
+                        given.parameter(),
+                        Value::Many(vec![Value::Expression(truth.clone())]),
+                    )
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case, with each predicate a flag that is true, for the reason the
+/// tables gave: the predicate is then why it allows the case. `None` where no condition is there.
+fn refused_when_the_predicates_are_true(case: &Case, refused: &Refused) -> Option<bool> {
+    changed(case_with_true_predicates(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    || is_refused_for_what_it_met_alike(&refused.reason, &refusal.reason)
+            })
+        })
+    })
+}
+
 /// The case with its join made a left join, which runs the keys of the left table where an inner
 /// join with only null keys on the other side does not. `None` where the join is no inner join.
 fn case_with_a_left_join(case: &Case) -> Option<Case> {
@@ -4544,8 +4630,15 @@ fn case_with_a_left_join(case: &Case) -> Option<Case> {
 /// which the tables measured on the sample's column and the control runs on the case's own: the
 /// words before the dtype met are the same.
 fn is_refused_for_what_it_met_alike(tables: &str, control: &str) -> bool {
-    let objection = |reason: &str| reason.split(", got ").next().map(str::to_owned);
-    tables.contains(", got ") && objection(tables) == objection(control)
+    const MARKERS: [&str; 2] = [", got ", " for dtype "];
+    let objection = |reason: &str| {
+        MARKERS
+            .iter()
+            .filter_map(|marker| reason.find(marker))
+            .min()
+            .map(|at| reason[..at].to_owned())
+    };
+    objection(tables).is_some() && objection(tables) == objection(control)
 }
 
 /// Whether Polars refuses the case, run as a left join, for the reason the tables gave of its
@@ -11453,6 +11546,23 @@ mod tests {
             rule_refuses(&renamed, place, "field-names-fit-the-struct", reason),
             vec![]
         );
+    }
+
+    #[test]
+    fn a_struct_compared_in_a_predicate_is_why_polars_allows_a_branch_the_tables_refuse() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-struct-taken-for-a-predicate.case"),
+            vec![Limit::AStructTakenForAPredicate]
+        );
+        // The same branch under a predicate that is no comparison of a struct is no case of it.
+        let text =
+            String::from_utf8(kept_case("uncovered-a-struct-taken-for-a-predicate.case").encode())
+                .expect("text");
+        let plain = text.replace(r#""entry":"Expr.eq""#, r#""entry":"Expr.is_null""#);
+        assert_ne!(plain, text);
+        if let Ok(other) = Case::decode(plain.as_bytes()) {
+            assert!(!excused_by(&other).contains(&Limit::AStructTakenForAPredicate));
+        }
     }
 
     #[test]
