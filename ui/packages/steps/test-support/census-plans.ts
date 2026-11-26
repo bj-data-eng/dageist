@@ -622,6 +622,9 @@ function planReports(census: Census, found: Findings): void {
   for (const rule of census.rules) {
     if (rule.statement.trim() === '') found.lacks(`rule ${rule.name}: says nothing`);
   }
+  for (const unknown of census.notKnown) {
+    if (unknown.because.trim() === '') found.lacks(`not known ${unknown.name}: says nothing`);
+  }
 }
 
 /** The raw step the families below are made from. */

@@ -355,7 +355,7 @@ fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
         cannot_tell(&offer(
             entry("Expr.struct.field"),
             &Place::new(
-                Context::step(Outer::Filter),
+                Context::step(Outer::PivotAggregate),
                 After::Value {
                     dtype: Representative::Struct,
                     shape: Shape::Many,

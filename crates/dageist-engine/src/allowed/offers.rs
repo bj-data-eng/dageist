@@ -409,9 +409,59 @@ pub enum Unknown {
     /// it gives was not told to [`offer`].
     TheStartsDtype,
     /// A dtype that is needed is not known: the argument that decides what a
-    /// method gives is not chosen, or the fields of a struct that the method
-    /// reads, drops or renames are not known.
+    /// method gives is not chosen.
     TheResultsDtype,
+    /// The fields of a struct that a method reads, drops or renames are not known, as where the
+    /// chain lost them, so whether the names are fields of it is not.
+    TheFieldsOfAStruct,
+    /// An unnest as a join's key writes a column for each field, and how many keys the other
+    /// table expands to is not known.
+    AnUnnestAsAKey,
+    /// An unnest of a struct that has no field expands to no expression, which Polars leaves out of
+    /// what holds it or decides by its siblings.
+    AnUnnestOfNoField,
+    /// A number typed without a dtype stays open in a struct that is a join's key, and Polars does
+    /// not match it with the other table's key as its dtype resolves.
+    AnOpenNumberInAKey,
+    /// A field read by several names gives several columns, which are no value of one dtype outside
+    /// a select or a sort.
+    SeveralColumnsOfAFieldRead,
+    /// Arithmetic on a struct is done field by field, and Polars does it irregularly.
+    ArithmeticOnAStruct,
+    /// Structs whose fields differ meet, which Polars casts field by field and refuses or not by
+    /// what the fields are.
+    StructsOfOtherFieldsMeet,
+}
+
+impl Unknown {
+    /// Every reason, in the order they are listed.
+    pub const ALL: [Self; 9] = [
+        Self::TheStartsDtype,
+        Self::TheResultsDtype,
+        Self::TheFieldsOfAStruct,
+        Self::AnUnnestAsAKey,
+        Self::AnUnnestOfNoField,
+        Self::AnOpenNumberInAKey,
+        Self::SeveralColumnsOfAFieldRead,
+        Self::ArithmeticOnAStruct,
+        Self::StructsOfOtherFieldsMeet,
+    ];
+
+    /// The name of the reason.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::TheStartsDtype => "the-starts-dtype",
+            Self::TheResultsDtype => "the-results-dtype",
+            Self::TheFieldsOfAStruct => "the-fields-of-a-struct",
+            Self::AnUnnestAsAKey => "an-unnest-as-a-key",
+            Self::AnUnnestOfNoField => "an-unnest-of-no-field",
+            Self::AnOpenNumberInAKey => "an-open-number-in-a-key",
+            Self::SeveralColumnsOfAFieldRead => "several-columns-of-a-field-read",
+            Self::ArithmeticOnAStruct => "arithmetic-on-a-struct",
+            Self::StructsOfOtherFieldsMeet => "structs-of-other-fields-meet",
+        }
+    }
 }
 
 impl fmt::Display for Unknown {
@@ -419,6 +469,13 @@ impl fmt::Display for Unknown {
         formatter.write_str(match self {
             Self::TheStartsDtype => "the dtype of the start is not given",
             Self::TheResultsDtype => "the dtype that the arguments decide is not known",
+            Self::TheFieldsOfAStruct => "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said",
+            Self::AnUnnestAsAKey => "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known",
+            Self::AnUnnestOfNoField => "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings",
+            Self::AnOpenNumberInAKey => "a number typed without a dtype stays open in a struct that is a join's key, and Polars does not match it with the other table's key as its dtype resolves (Polars issue draft 23)",
+            Self::SeveralColumnsOfAFieldRead => "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort",
+            Self::ArithmeticOnAStruct => "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly",
+            Self::StructsOfOtherFieldsMeet => "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are",
         })
     }
 }
@@ -1436,10 +1493,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // not by what the fields are, which Polars says and the walk cannot: where the struct is the
     // values of a pivot's group, or comes of a call that did not say its fields.
     if struct_gives.is_undecided() {
-        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+        ending = Ending::NotKnown(Unknown::TheFieldsOfAStruct);
     }
-    if unnested_key || unnested_nothing {
-        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+    if unnested_key {
+        ending = Ending::NotKnown(Unknown::AnUnnestAsAKey);
+    }
+    if unnested_nothing {
+        ending = Ending::NotKnown(Unknown::AnUnnestOfNoField);
     }
     // Polars keeps a number typed without a dtype open in a struct that is a join's key, so the key
     // does not match the one the number is given its dtype in, though both resolve to one (Polars
@@ -1451,7 +1511,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             || chosen.fields.is_some_and(Fields::has_a_loose_field)
             || struct_gives.reads_a_loose_field())
     {
-        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+        ending = Ending::NotKnown(Unknown::AnOpenNumberInAKey);
     }
     // Several columns of a field read with several names are no dtype of one value, and the tables
     // measured one name: where the place is no item of a select or a sort key, they do not say.
@@ -1460,7 +1520,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         && columns.as_ref().is_some_and(|columns| columns.len() >= 2)
         && !matches!(place.context.outer(), Outer::Select | Outer::Sort)
     {
-        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+        ending = Ending::NotKnown(Unknown::SeveralColumnsOfAFieldRead);
     }
     // An array is written at the width it has, where the chain knows it.
     if let (Some(width), Some(found)) = (chosen.width, &result)
@@ -1471,7 +1531,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     let width = struct_gives.width();
     if struct_arithmetic {
         result = None;
-        ending = Ending::NotKnown(Unknown::TheResultsDtype);
+        ending = Ending::NotKnown(Unknown::ArithmeticOnAStruct);
     }
     Ok(Allowance {
         result,

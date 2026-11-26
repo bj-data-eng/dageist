@@ -25,7 +25,9 @@
 
 use std::collections::BTreeSet;
 
-use dageist_engine::allowed::{After, ConditionState, Literal, Representative, Rule, Shape, Stage};
+use dageist_engine::allowed::{
+    After, ConditionState, Literal, Representative, Rule, Shape, Stage, Unknown,
+};
 use dageist_engine::catalog::{self, Build, Kind, Setting, Shape as ShapeOf, ValueType};
 use dageist_engine::document::{Call, Change, Expression, Place, Start, Value as Held, ValueKind};
 use serde::Serialize;
@@ -848,6 +850,7 @@ pub(crate) fn census() -> Value {
         "refusalSources": words(&sources(), "by"),
         "stages": plains(&Stage::ALL.map(stage_view)),
         "rules": Rule::ALL.map(|rule| json!({ "name": rule.name(), "statement": rule.statement() })),
+        "notKnown": Unknown::ALL.map(|unknown| json!({ "name": unknown.name(), "because": unknown.to_string() })),
         "outcomes": words(&outcomes(), "status"),
         "rowsStates": words(&counts(), "kind"),
         "changes": plains(&Change::ALL.map(change_view)),

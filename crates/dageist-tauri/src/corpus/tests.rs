@@ -9,7 +9,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::sync::OnceLock;
 
-use dageist_engine::allowed::{After, Context, Representative, Rule, Shape, Stage};
+use dageist_engine::allowed::{After, Context, Representative, Rule, Shape, Stage, Unknown};
 use dageist_engine::catalog::{self, Applies};
 use dageist_engine::document::{Call, Document, Start, Value};
 use serde_json::Value as Json;
@@ -464,6 +464,71 @@ fn the_corpus_holds_a_refusal_by_each_rule_and_each_stage_of_polars_the_tables_g
         .filter(|rule| !held_rules.contains(*rule))
         .collect();
     let declared: BTreeSet<&str> = NOT_HELD.iter().map(|(rule, _)| *rule).collect();
+    assert_eq!(not_held, declared);
+}
+
+/// The reasons a walk says it cannot tell that no document of the corpus is told by, each with why.
+const UNKNOWN_NOT_HELD: &[(&str, &str)] = &[
+    (
+        "the-fields-of-a-struct",
+        "no document the corpus plans reads, drops or renames a field of a struct whose fields the walk lost; one was not tried, and may be built",
+    ),
+    (
+        "an-unnest-as-a-key",
+        "no document the corpus plans unnests a struct as a join's key; one was not tried, and may be built",
+    ),
+    (
+        "an-unnest-of-no-field",
+        "no document the corpus plans unnests a struct that has no field; one was not tried, and may be built",
+    ),
+    (
+        "an-open-number-in-a-key",
+        "no document the corpus plans makes a struct of a number typed without a dtype as a join's key; one was not tried, and may be built",
+    ),
+    (
+        "several-columns-of-a-field-read",
+        "no document the corpus plans reads a struct by several names outside a select or a sort; one was not tried, and may be built",
+    ),
+    (
+        "arithmetic-on-a-struct",
+        "no document the corpus plans calculates with a struct, whose fields it does not make; one was not tried, and may be built",
+    ),
+    (
+        "structs-of-other-fields-meet",
+        "no document the corpus plans meets a struct with a struct of other fields; one was not tried, and may be built",
+    ),
+];
+
+/// Collects the words of every ending that says it cannot tell, in a report.
+fn cannot_tell_in(json: &Json, found: &mut BTreeSet<String>) {
+    match json {
+        Json::Object(fields) => {
+            if fields.get("kind").and_then(Json::as_str) == Some("notKnown")
+                && let Some(because) = fields.get("because").and_then(Json::as_str)
+            {
+                found.insert(because.to_owned());
+            }
+            fields
+                .values()
+                .for_each(|inner| cannot_tell_in(inner, found));
+        }
+        Json::Array(items) => items.iter().for_each(|inner| cannot_tell_in(inner, found)),
+        _ => {}
+    }
+}
+
+#[test]
+fn the_corpus_holds_a_call_the_walk_cannot_tell_for_each_reason_or_declares_it_not_held() {
+    let mut held_reasons = BTreeSet::new();
+    for held in documents() {
+        cannot_tell_in(&held.run, &mut held_reasons);
+    }
+    let not_held: BTreeSet<&str> = Unknown::ALL
+        .iter()
+        .filter(|unknown| !held_reasons.contains(&unknown.to_string()))
+        .map(|unknown| unknown.name())
+        .collect();
+    let declared: BTreeSet<&str> = UNKNOWN_NOT_HELD.iter().map(|(name, _)| *name).collect();
     assert_eq!(not_held, declared);
 }
 

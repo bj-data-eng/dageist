@@ -137,6 +137,12 @@ describe('a variant the census gains that the editor lacks', () => {
     ).toContain('rule pattern-is-valid: says nothing');
   });
 
+  it('fails the check where it is a reason the walk cannot tell that says nothing', () => {
+    expect(
+      planFor(plus('notKnown', { name: 'a-new-reason', because: ' ' })).unplanned,
+    ).toEqual(['not known a-new-reason: says nothing']);
+  });
+
   it('fails the check where it is a class of dtype, a shape or a state of a condition the grid has no place for', () => {
     expect(planFor(plus('dtypeClasses', 'Decimal(38, 9)')).unplanned).toEqual([
       'dtype class Decimal(38, 9): not in the grid',
