@@ -988,6 +988,204 @@ fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_a
     taken("a select", &selected);
 }
 
+/// A join of the table `x` whose key is `key`, where `x` is one column of `dtype` holding 1, 1 and
+/// 2, with the key of the other table `rk`.
+fn join_on_a_column_of(dtype: &DataType, key: Value) -> Ran {
+    let working = df!("x" => [1_i64, 1, 2])
+        .expect("the table")
+        .lazy()
+        .select([col("x").cast(dtype.clone())])
+        .collect()
+        .expect("the column cast to its dtype");
+    let mut given = json!({ "left_on": many(vec![key]), "right_on": many(vec![field("rk")]) });
+    given["other"] = json!({ "table": "other" });
+    ran_on(
+        &Document::read(&document(vec![step("s", "LazyFrame.join", given)])).expect("a document"),
+        &working,
+    )
+}
+
+/// What each report says of a key: that Polars and the walk both refuse it as not elementwise, or
+/// that neither refuses it.
+fn assert_refused_by_both(said: &str, report: &Ran) {
+    assert!(
+        polars_says(report).is_some_and(|reason| reason.contains("elementwise")),
+        "{said}: Polars says {:?}, the engine {:?}",
+        polars_says(report),
+        outcome(report)
+    );
+    assert!(
+        walk(report).refusal().is_some_and(|refusal| matches!(
+            refusal.refusal().source(),
+            RefusalSource::Rule(Rule::KeyIsElementwise)
+        )),
+        "{said}: {:?}",
+        walk(report).refusal()
+    );
+}
+
+fn assert_taken_by_both(said: &str, report: &Ran) {
+    assert!(
+        polars_says(report).is_none(),
+        "{said}: Polars says {:?}",
+        polars_says(report)
+    );
+    assert_eq!(walk(report).refusal(), None, "{said}");
+}
+
+#[test]
+fn a_missing_comparison_of_a_column_with_a_number_its_dtype_cannot_hold_is_no_elementwise_key_as_polars_takes_it()
+ {
+    // Python Polars 2.2.0 decides `x.eq_missing(300)` of an `Int8` column at once, for none of its
+    // values is 300, and the key it leaves is a constant repeated to the length of the column,
+    // which the join refuses as not elementwise, in both engines. It does the same for the number
+    // before the column, for `ne_missing`, and for a number below the lowest value or above the
+    // highest of any of the whole-number dtypes, and takes the number each of them holds, the
+    // lowest and the highest among them. The numbers are the ones a document can write, which
+    // are 64 bit, so every one of them is held by `Int64` and `Int128`; Polars decides none
+    // against a column of `UInt128`, not even a number below zero.
+    let bounds: [(DataType, i128, i128); 10] = [
+        (DataType::Int8, i128::from(i8::MIN), i128::from(i8::MAX)),
+        (DataType::Int16, i128::from(i16::MIN), i128::from(i16::MAX)),
+        (DataType::Int32, i128::from(i32::MIN), i128::from(i32::MAX)),
+        (DataType::Int64, i128::from(i64::MIN), i128::from(i64::MAX)),
+        (DataType::Int128, i128::MIN, i128::MAX),
+        (DataType::UInt8, 0, i128::from(u8::MAX)),
+        (DataType::UInt16, 0, i128::from(u16::MAX)),
+        (DataType::UInt32, 0, i128::from(u32::MAX)),
+        (DataType::UInt64, 0, i128::from(u64::MAX)),
+        (DataType::UInt128, i128::MIN, i128::MAX),
+    ];
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let beside = |method: &str, number: i64| {
+        chain(
+            col_call("x"),
+            vec![call(method, json!({ "other": whole(number) })), cast()],
+        )
+    };
+    let swapped = |method: &str, number: i64| {
+        chain(
+            call("polars.lit", json!({ "value": { "integer": number } })),
+            vec![call(method, json!({ "other": field("x") })), cast()],
+        )
+    };
+    for (held, lowest, highest) in bounds {
+        let mut numbers: Vec<i64> = vec![-1, 0, 1, 127, 128, 300, i64::MIN, i64::MAX];
+        for edge in [
+            lowest.checked_sub(1),
+            Some(lowest),
+            Some(highest),
+            highest.checked_add(1),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            numbers.extend(i64::try_from(edge));
+        }
+        numbers.sort_unstable();
+        numbers.dedup();
+        for number in numbers {
+            let holds = (lowest..=highest).contains(&i128::from(number));
+            for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+                for (form, key) in [
+                    ("beside", beside(method, number)),
+                    ("swapped", swapped(method, number)),
+                ] {
+                    let said = format!("{method} {form}, {number} and a column of {held}");
+                    let report = join_on_a_column_of(&held, key);
+                    if holds {
+                        assert_taken_by_both(&said, &report);
+                    } else {
+                        assert_refused_by_both(&said, &report);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_missing_comparison_with_a_number_that_the_dtype_of_what_is_compared_holds_is_taken_in_a_joins_key()
+ {
+    // The column is of the dtype it is cast to, so a cast that widens it holds the number that
+    // the column did not, and one that narrows it does not hold the number the column did.
+    let cast_to = |word: &str| call("Expr.cast", json!({ "dtype": dtype(word) }));
+    let compared = |casts: Vec<Value>, method: &str, other: Value| {
+        let mut then = casts;
+        then.push(call(method, json!({ "other": other })));
+        then.push(cast_to("Int64"));
+        chain(col_call("x"), then)
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        taken_cases(method, &compared);
+        // `x` is an `Int8` and a cast to `Int16` holds 300.
+        assert_taken_by_both(
+            &format!("{method}, widened"),
+            &join_on_a_column_of(
+                &DataType::Int8,
+                compared(vec![cast_to("Int16")], method, whole(300)),
+            ),
+        );
+        assert_taken_by_both(
+            &format!("{method}, widened to whole numbers with a sign"),
+            &join_on_a_column_of(
+                &DataType::UInt8,
+                compared(vec![cast_to("Int64")], method, whole(-1)),
+            ),
+        );
+        assert_refused_by_both(
+            &format!("{method}, narrowed"),
+            &join_on_a_column_of(
+                &DataType::Int64,
+                compared(vec![cast_to("Int8")], method, whole(300)),
+            ),
+        );
+        assert_refused_by_both(
+            &format!("{method}, narrowed to an unsigned dtype"),
+            &join_on_a_column_of(
+                &DataType::Int64,
+                compared(vec![cast_to("UInt16")], method, whole(-1)),
+            ),
+        );
+    }
+}
+
+/// The comparisons with a number that Polars takes as they are: a comparison that does not take a
+/// missing value as a value, whatever the number is, a number with no fraction, and what is one
+/// value, as the sum of the column is.
+fn taken_cases(method: &str, compared: &dyn Fn(Vec<Value>, &str, Value) -> Value) {
+    let none = Vec::new;
+    let float = |number: f64| {
+        chain(
+            call("polars.lit", json!({ "value": { "float": number } })),
+            Vec::new(),
+        )
+    };
+    assert_taken_by_both(
+        &format!("{method} of an Int8 and a number with no fraction"),
+        &join_on_a_column_of(&DataType::Int8, compared(none(), method, float(2.0))),
+    );
+    for other in [
+        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+    ] {
+        assert_taken_by_both(
+            &format!("{other} of an Int8 and 300"),
+            &join_on_a_column_of(&DataType::Int8, compared(none(), other, whole(300))),
+        );
+    }
+    let summed = chain(
+        col_call("x"),
+        vec![
+            call(method, json!({ "other": whole(300) })),
+            call("Expr.sum", json!({})),
+        ],
+    );
+    assert_taken_by_both(
+        &format!("{method} of an Int8 and 300, summed"),
+        &join_on_a_column_of(&DataType::Int8, summed),
+    );
+}
+
 #[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
