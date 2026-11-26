@@ -8400,6 +8400,32 @@ mod tests {
             )),
             vec![]
         );
+        // The limit excuses what the walk leaves undecided, and no more: a literal that Polars
+        // keeps for every dtype of whole numbers is no cause. Floats that do not cast exactly,
+        // 16 bit floats, flags and text that is no number are kept.
+        let kept = |value: Value, representative: Representative| {
+            refused_for(typed(value, representative))
+        };
+        assert_eq!(refused_for(float(9_007_199_254_740_992.0)), vec![]);
+        assert_eq!(kept(Value::Float(300.0), Representative::Float16), vec![]);
+        assert_eq!(kept(Value::Integer(300), Representative::Boolean), vec![]);
+        assert_eq!(
+            kept(Value::String("300".to_owned()), Representative::String),
+            vec![]
+        );
+        assert_eq!(
+            kept(Value::Float(16_777_216.0), Representative::Float32),
+            vec![]
+        );
+        // And a whole number above 128 bits of signed whole numbers, which `UInt128` holds, is
+        // decided for the unsigned columns.
+        assert_eq!(
+            kept(
+                Value::String("170141183460469231731687303715884105728".to_owned()),
+                Representative::UInt128
+            ),
+            vec![Limit::ANullComparisonInAKey]
+        );
     }
 
     #[test]

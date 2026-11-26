@@ -1411,6 +1411,46 @@ fn a_number_given_a_dtype_is_decided_as_polars_coerces_it_for_a_column_of_whole_
             literal_of(json!({ "string": "100" }), Some("Int16")),
             false,
         ),
+        // A whole number above what 128 bits of signed whole numbers hold is held by `UInt128`
+        // alone, so Polars decides it for the unsigned columns of 8 to 64 bits and keeps it for
+        // the others.
+        (
+            DataType::UInt8,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            true,
+        ),
+        (
+            DataType::UInt64,
+            literal_of(
+                json!({ "string": "340282366920938463463374607431768211455" }),
+                Some("UInt128"),
+            ),
+            true,
+        ),
+        (
+            DataType::UInt8,
+            literal_of(float(2e38), Some("UInt128")),
+            true,
+        ),
+        (
+            DataType::UInt128,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            false,
+        ),
+        (
+            DataType::Int64,
+            literal_of(
+                json!({ "string": "170141183460469231731687303715884105728" }),
+                Some("UInt128"),
+            ),
+            false,
+        ),
     ];
     for (held, literal, refused) in cases {
         for method in ["Expr.eq_missing", "Expr.ne_missing"] {
@@ -1467,17 +1507,30 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
         i64::MAX,
         -129,
     ];
-    let floats: [f64; 8] = [
+    let floats: [f64; 11] = [
         -1.0,
+        0.0,
         100.0,
         300.0,
         1.5,
+        -1.5,
         16_777_216.0,
         16_777_217.5,
         9_007_199_254_740_992.0,
         1e18,
+        2e38,
     ];
-    let texts = ["300", "-1", "1.5", "100000000"];
+    // Numbers above 64 bits, which a text or a float can give: the greatest 128 bit whole number
+    // and the next, and the greatest unsigned one.
+    let texts = [
+        "300",
+        "-1",
+        "1.5",
+        "100000000",
+        "170141183460469231731687303715884105727",
+        "170141183460469231731687303715884105728",
+        "340282366920938463463374607431768211455",
+    ];
     let dtypes = [
         None,
         Some("Float64"),
@@ -1486,10 +1539,14 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
         Some("Boolean"),
         Some("Int8"),
         Some("Int16"),
+        Some("Int32"),
         Some("Int64"),
+        Some("Int128"),
         Some("UInt8"),
+        Some("UInt16"),
         Some("UInt32"),
         Some("UInt64"),
+        Some("UInt128"),
     ];
     let mut literals: Vec<Value> = Vec::new();
     for number in integers {
