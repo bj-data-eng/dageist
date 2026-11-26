@@ -518,6 +518,7 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         Source::Rule(rule) if *rule == STRUCT_ARITHMETIC_RULE => {
             probe.contains("operation not supported for dtype `struct")
                 || probe.contains("a struct with non-numeric field")
+                || probe.contains("must specify one field in the struct")
         }
         Source::Rule(rule) if *rule == FIELD_NAMES_RULE || *rule == TO_STRUCT_NAMES_RULE => {
             probe.contains("multiple fields with name")
