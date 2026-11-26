@@ -232,6 +232,7 @@ impl Step {
             zones: Vec::new(),
             fieldsets: Vec::new(),
             gave_no_expression: 0,
+            keyed_unnests: 0,
             names: Vec::new(),
             written: Vec::new(),
             pair_key: None,
@@ -436,6 +437,9 @@ struct Walker<'a> {
     fieldsets: Vec<Fields>,
     /// How many expressions gave no expression: an unnest of a struct that has no field.
     gave_no_expression: usize,
+    /// How many unnests stood in a join's key, whose columns are written by how many keys the other
+    /// table expands to.
+    keyed_unnests: usize,
     /// The names the walk has met expressions written under, which a [`NameAt`] points into.
     names: Vec<String>,
     /// What each item of a select or of the columns a step adds writes: where the item is, the
@@ -1881,6 +1885,7 @@ impl Walker<'_> {
     /// the predicate there, and which is an argument of a call otherwise.
     fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
         let none_before = self.gave_no_expression;
+        let keyed_before = self.keyed_unnests;
         // The values of a condition end the predicate where the condition is
         // all the expression is: a method that goes on from it is what ends it.
         let values_end = held == Some(true)
@@ -2341,6 +2346,10 @@ impl Walker<'_> {
             );
         if of_a_list {
             self.of_lists.push(place.clone());
+        }
+        // An unnest anywhere in a join's key, inside a condition too, leaves the key not told.
+        if self.keyed_unnests > keyed_before && !matches!(last_end, Some(Ending::Refused(_))) {
+            last_end = Some(Ending::NotKnown(Unknown::AnUnnestAsAKey));
         }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
@@ -3043,6 +3052,12 @@ impl Walker<'_> {
             None => chosen,
         };
         let verdict = allowed::offer(entry, &place, &chosen);
+        if matches!(
+            &verdict,
+            Verdict::Allowed(found) if matches!(found.can_end(), Ending::NotKnown(Unknown::AnUnnestAsAKey))
+        ) {
+            self.keyed_unnests += 1;
+        }
         let mut standing = Standing {
             follows: Some(after),
             verdict: Some(verdict.clone()),

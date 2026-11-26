@@ -1430,9 +1430,11 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // The columns an unnest writes are the keys of a join as many as the other side's keys are, which
     // the tables measured as one, and are named by the fields, which the keys' names are asked of
     // by what the document says: where it is a join's key, they do not say.
-    let unnested_key = id == "Expr.struct.unnest"
-        && matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
-        && place.context.nested().is_none();
+    let unnested_in_key = id == "Expr.struct.unnest"
+        && matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight);
+    // Inside a value of the key, as of a condition, the tables are asked what they say of the place,
+    // and what they allow is not told, for the key's names are no better known there.
+    let unnested_key = unnested_in_key && place.context.nested().is_none();
     // An unnest of a struct that has no field gives no expression, which the tables, measured on a
     // struct of two fields, do not say of any place.
     let unnested_nothing = id == "Expr.struct.unnest"
@@ -1586,7 +1588,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if struct_gives.is_undecided() {
         ending = Ending::NotKnown(Unknown::TheFieldsOfAStruct);
     }
-    if unnested_key {
+    if unnested_in_key {
         ending = Ending::NotKnown(Unknown::AnUnnestAsAKey);
     }
     if unnested_nothing {

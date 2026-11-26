@@ -2774,7 +2774,7 @@ the host passes to the view as `because` and the census lists. Nothing is predic
 | The dtype of the start is not given | A start whose dtype its arguments decide was not told. |
 | The dtype the arguments decide is not known | The argument that decides what a method gives is not chosen. |
 | The fields of the struct are not known | A field read, a drop or a rename follows a struct whose fields the chain lost, as a condition of structs or the values of a pivot's group are, so whether the names are fields cannot be said. |
-| An unnest as a join's key | It writes a column for each field, and how many keys the other table expands to is not known. |
+| An unnest as a join's key | It writes a column for each field, and how many keys the other table expands to is not known. An unnest anywhere in a join's key, inside the value of a condition too, leaves the key not told. |
 | An unnest of no field | It expands to no expression, which Polars leaves out of what holds it, or decides by its siblings: a call given one is not judged either. |
 | An open number in a key | A struct made of a number typed without a dtype, or a field read from one, as a join's key, which Polars does not match with the dtype the other table's key resolves to, for the number stays open, as `dyn float`, in the struct's dtype. |
 | Several columns of a field read | A field read by several names gives several columns, which are no value of one dtype outside a select or a sort. |

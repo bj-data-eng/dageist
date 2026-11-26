@@ -583,7 +583,23 @@ pub(super) fn gives(
                     "count"
                 },
             );
-            let values = Field::of_class(name, receiver);
+            // The values keep what the receiver is: the fields of a struct, with a number left open
+            // in it, and the width of an array.
+            let mut values = Field::of_class(name, receiver);
+            if receiver == Some(Representative::Struct)
+                && let Some(held) = chosen.fields
+            {
+                values.written = Some(held.written());
+                values.fields = Some(held.clone());
+            }
+            if let (Some(width), Some(Representative::Array(_))) = (chosen.width, receiver) {
+                values.width = Some(width);
+                values.written = Some(
+                    ResultDtype::new(values.written().to_owned(), receiver)
+                        .of_width(width)
+                        .to_string(),
+                );
+            }
             let counts = Field::of_class(
                 counted,
                 Some(if word(chosen, "normalize") == Some("true") {
