@@ -21,6 +21,7 @@
     "pivot-aggregate-gives-one-value",
     "range-is-valid",
     "replacement-values-match-in-number",
+    "struct-is-filled-forward-or-backward",
     "time-zone-is-valid",
     "values-meet-in-count",
     "window-input-is-not-counted",

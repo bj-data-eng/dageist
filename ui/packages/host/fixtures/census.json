@@ -546,7 +546,7 @@
     },
     {
       "name": "one-column-is-needed",
-      "statement": "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and Polars refuses it"
+      "statement": "a filter's predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty: Polars refuses both"
     },
     {
       "name": "parameter-takes-one-value",
@@ -567,6 +567,10 @@
     {
       "name": "replacement-values-match-in-number",
       "statement": "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
+    },
+    {
+      "name": "struct-is-filled-forward-or-backward",
+      "statement": "a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none"
     },
     {
       "name": "time-zone-is-valid",
