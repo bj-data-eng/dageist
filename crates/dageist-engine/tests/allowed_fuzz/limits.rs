@@ -135,16 +135,19 @@ pub enum Limit {
     /// null where that is one value: a column compared with a null is refused by the rule, and
     /// an aggregate compared with a null, or a comparison that follows one, is found by
     /// running. An `eq_missing` or an `ne_missing` of a value and a whole number that some
-    /// dtype cannot hold, below zero or above 127, or a number with a fraction, or a float that
-    /// is such a whole number, is decided the same way where the dtype of the value cannot hold
-    /// the number, and kept where it can. The rule refuses it where the value is a column of a
-    /// dtype it knows, which is a constant repeated to the length of the column; it does not
-    /// where the value is one value, as an aggregate is, for Polars gives a plain constant that
-    /// a key may be where the dtype cannot hold the number, as an unsigned count cannot, and
-    /// keeps the comparison, with the aggregate beside the column that makes the key not
-    /// elementwise, where it can. Polars refusing the join as not elementwise, with no place,
-    /// in a case whose join key holds a comparison with a null literal, or one of those, at any
-    /// depth.
+    /// dtype cannot hold, below zero or above 127, or a number with a fraction, or a literal
+    /// that Polars reads as such a number, is decided the same way where the dtype of the value
+    /// cannot hold the number, and kept where it can. A literal is read as the cast of its
+    /// value to its dtype: a whole number, or a float of 32 or 64 bits that casts to the whole
+    /// number or the fraction it is exactly. A literal of 16 bit floats, of `Boolean` or of
+    /// text that is no number, and a float that does not cast exactly, are kept, and no cause.
+    /// The rule refuses it where the value is a column of a dtype it knows, which is a constant
+    /// repeated to the length of the column; it does not where the value is one value, as an
+    /// aggregate is, for Polars gives a plain constant that a key may be where the dtype cannot
+    /// hold the number, as an unsigned count cannot, and keeps the comparison, with the
+    /// aggregate beside the column that makes the key not elementwise, where it can. Polars
+    /// refusing the join as not elementwise, with no place, in a case whose join key holds a
+    /// comparison with a null literal, or one of those, at any depth.
     ANullComparisonInAKey,
     /// The tables ran every call on columns that hold values, so what Polars does
     /// with a call that has only nulls to meet was not measured: it does not meet
@@ -1449,9 +1452,137 @@ fn keys(case: &Case, joins: bool) -> Vec<(Place, &Expression)> {
     found
 }
 
+/// The columns of whole numbers, the whole numbers each holds, and whether Polars meets one in 32
+/// bit floats beside a literal of them, as it does the ones of 8 and 16 bits. `UInt128` holds up to
+/// what `Int128` does here, and what is above that is told apart.
+fn whole_columns() -> [(polars::prelude::DataType, i128, i128, bool); 10] {
+    use polars::prelude::DataType as D;
+    [
+        (D::Int8, i128::from(i8::MIN), i128::from(i8::MAX), true),
+        (D::Int16, i128::from(i16::MIN), i128::from(i16::MAX), true),
+        (D::Int32, i128::from(i32::MIN), i128::from(i32::MAX), false),
+        (D::Int64, i128::from(i64::MIN), i128::from(i64::MAX), false),
+        (D::Int128, i128::MIN, i128::MAX, false),
+        (D::UInt8, 0, i128::from(u8::MAX), true),
+        (D::UInt16, 0, i128::from(u16::MAX), true),
+        (D::UInt32, 0, i128::from(u32::MAX), false),
+        (D::UInt64, 0, i128::from(u64::MAX), false),
+        (D::UInt128, 0, i128::MAX, false),
+    ]
+}
+
+/// Whether Polars decides a comparison of missing values with the literal `start` for a column of
+/// some dtype of whole numbers, while it coerces the types, for no value of the column is the
+/// literal: the set that the walk leaves undecided where what is compared is one value, written
+/// again from the coercion in Polars 2.2.0 and not from the walk.
+///
+/// A literal given a dtype is its value cast to it, which Polars makes and the harness asks by
+/// selecting the literal on the sample, so the dtype and the value are the ones that run: the
+/// cast of a text or of a float is no reading of the written value. A float is decided where it
+/// casts exactly, below 2^24 for 32 bit floats beside the 8 and 16 bit columns and below 2^53 for
+/// the rest, and has a fraction or is a whole number the column cannot hold. A whole number is
+/// decided for the columns that cannot hold it, but for none of `UInt128` and not for the column
+/// of its own dtype, and one above what `Int128` holds, which only a literal of `UInt128` is, for
+/// the unsigned columns of 8 to 64 bits. Any other dtype is kept.
+fn is_decided_for_a_column(frames: &Frames, start: &Call) -> bool {
+    use polars::prelude::{AnyValue, DataType as D};
+    if !is(start, "polars.lit") {
+        return false;
+    }
+    let float_is_decided = |value: f64, narrow: bool| {
+        whole_columns()
+            .iter()
+            .any(|(_, lowest, highest, meets_as_f32)| {
+                let exact_below = if narrow && *meets_as_f32 {
+                    2f64.powi(24)
+                } else {
+                    2f64.powi(53)
+                };
+                value.is_finite()
+                    && value.abs() < exact_below
+                    && (value.fract() != 0.0
+                        || !(*lowest..=*highest).contains(&(value.floor() as i128)))
+            })
+    };
+    let Some(dtype) = start.argument("dtype") else {
+        return match start.argument("value") {
+            Some(Value::Integer(number)) => {
+                whole_columns().iter().any(|(column, lowest, highest, _)| {
+                    *column != D::UInt128 && !(*lowest..=*highest).contains(&i128::from(*number))
+                })
+            }
+            Some(Value::Float(number)) => float_is_decided(*number, false),
+            _ => false,
+        };
+    };
+    if !matches!(dtype, Value::Dtype(_)) {
+        return false;
+    }
+    let (Some(select), Ok(id)) = (catalog::entry("LazyFrame.select"), StepId::new("s")) else {
+        return false;
+    };
+    let Ok(literal) = Expression::new(Start::Call(start.clone()), Vec::new()) else {
+        return false;
+    };
+    let Ok(call) = Call::new(
+        select,
+        vec![(
+            "named_exprs",
+            Value::Pairs(vec![(
+                Value::Columns(vec!["out".to_owned()]),
+                Value::Expression(literal),
+            )]),
+        )],
+    ) else {
+        return false;
+    };
+    let Ok(step) = Step::new(id, call) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![step]) else {
+        return false;
+    };
+    let Some(rows) = asked::first_rows(&document, frames) else {
+        return false;
+    };
+    let Some(cell) = rows.columns().first().and_then(|column| column.get(0).ok()) else {
+        return false;
+    };
+    match cell {
+        AnyValue::Float64(value) => float_is_decided(value, false),
+        AnyValue::Float32(value) => float_is_decided(f64::from(value), true),
+        value => {
+            let held = value.dtype();
+            let number: Option<Result<i128, ()>> = match value {
+                AnyValue::Int8(n) => Some(Ok(i128::from(n))),
+                AnyValue::Int16(n) => Some(Ok(i128::from(n))),
+                AnyValue::Int32(n) => Some(Ok(i128::from(n))),
+                AnyValue::Int64(n) => Some(Ok(i128::from(n))),
+                AnyValue::Int128(n) => Some(Ok(n)),
+                AnyValue::UInt8(n) => Some(Ok(i128::from(n))),
+                AnyValue::UInt16(n) => Some(Ok(i128::from(n))),
+                AnyValue::UInt32(n) => Some(Ok(i128::from(n))),
+                AnyValue::UInt64(n) => Some(Ok(i128::from(n))),
+                AnyValue::UInt128(n) => Some(i128::try_from(n).map_err(|_| ())),
+                _ => None,
+            };
+            match number {
+                None => false,
+                // Above what `Int128` holds, which only a literal of `UInt128` is.
+                Some(Err(())) => true,
+                Some(Ok(number)) => whole_columns().iter().any(|(column, lowest, highest, _)| {
+                    *column != held
+                        && *column != D::UInt128
+                        && !(*lowest..=*highest).contains(&number)
+                }),
+            }
+        }
+    }
+}
+
 /// Whether a key holds, at any depth, a comparison with a null literal: one that
 /// is given it, or one that follows it.
-fn holds_a_null_comparison(key: &Expression) -> bool {
+fn holds_a_null_comparison(key: &Expression, frames: &Frames) -> bool {
     let comparisons = [
         "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
     ];
@@ -1473,21 +1604,7 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
     // A number with a fraction is one that no whole number is, and a float that is a whole number
     // some dtype cannot hold is one Polars rounds to it: it decides each at once for what it compares
     // as it does a number that the dtype cannot hold.
-    // A literal given a dtype is its value cast to it, so a text is the number it reads as.
-    let is_a_literal_some_dtype_lacks = |start: &Call| {
-        is(start, "polars.lit")
-            && match start.argument("value") {
-                Some(Value::Integer(number)) => !(0..=127).contains(number),
-                Some(Value::Float(number)) => {
-                    number.fract() != 0.0 || !(0.0..=127.0).contains(number)
-                }
-                Some(Value::String(text)) if start.argument("dtype").is_some() => text
-                    .trim()
-                    .parse::<f64>()
-                    .is_ok_and(|number| number.fract() != 0.0 || !(0.0..=127.0).contains(&number)),
-                _ => false,
-            }
-    };
+    let is_a_literal_some_dtype_lacks = |start: &Call| is_decided_for_a_column(frames, start);
     let is_a_number_some_dtype_lacks = |expression: &Expression| {
         expression.links().is_empty()
             && matches!(expression.start(), Start::Call(start) if is_a_literal_some_dtype_lacks(start))
@@ -4222,10 +4339,13 @@ fn applies(
                                     )
                             })
                     };
-                    keys.iter().any(|(_, key)| holds_a_null_comparison(key))
+                    let frames =
+                        Frames::with_key(case.receiver, case.argument, &case.structs, None);
+                    keys.iter()
+                        .any(|(_, key)| holds_a_null_comparison(key, &frames))
                         && keys
                             .iter()
-                            .filter(|(_, key)| !holds_a_null_comparison(key))
+                            .filter(|(_, key)| !holds_a_null_comparison(key, &frames))
                             .all(|(_, key)| !other_cause(key))
                 }
         }

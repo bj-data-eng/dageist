@@ -2407,14 +2407,18 @@ impl Walker<'_> {
             // given, as it is for the aggregate beside a column.
             let repeats = self.repeated_comparisons > repeated_before
                 && !wholly_single(expression, expression.links().len(), true);
-            let undecided = self.undecided_folds > undecided_before;
+            let comparisons = if self.undecided_folds > undecided_before {
+                Comparisons::SomeUndecided
+            } else {
+                Comparisons::AllJudged
+            };
             // An expression that holds what gives no expression is judged without it, which the
             // syntax of the whole does not show.
             if self.gave_no_expression == none_before
                 && (is_not_elementwise(
                     expression,
                     as_read.as_ref().unwrap_or(expression),
-                    undecided,
+                    comparisons,
                 ) || repeats)
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
@@ -4259,6 +4263,17 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         })
 }
 
+/// What the walk found of the comparisons of missing values with a number that a key holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Comparisons {
+    /// Each is one the walk could judge, by the dtype of what is compared, or there is none.
+    AllJudged,
+    /// Some is one Polars may decide by a dtype that the walk does not follow: Polars may have
+    /// replaced it by a constant that hides what it is given, so the rest of the key is not judged
+    /// as it would be.
+    SomeUndecided,
+}
+
 /// Whether a key is not elementwise, as Polars takes it: it holds an aggregate
 /// beside what is not one value, or a column compared with a null. A key that is
 /// wholly one value is the whole key, which the tables measured, and Polars
@@ -4268,11 +4283,11 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
 fn is_not_elementwise(
     key: &Expression,
     with_nulls_for_null_columns: &Expression,
-    holds_an_undecided_comparison: bool,
+    comparisons: Comparisons,
 ) -> bool {
     !wholly_single(key, key.links().len(), true)
         && !holds_a_comparison_that_polars_may_fold(key)
-        && !holds_an_undecided_comparison
+        && comparisons == Comparisons::AllJudged
         && (holds_an_aggregate(key)
             || holds_what_polars_evaluates(key, &is_counting)
             || holds_a_null_comparison(with_nulls_for_null_columns)
@@ -4399,7 +4414,9 @@ const WHOLE_NUMBERS: [Representative; 10] = [
 ];
 
 /// Whether a dtype of whole numbers holds `number`: it casts to the dtype and keeps its value.
-/// `Int128` holds every number a document can write, and `UInt128` every number from zero up.
+/// `Int128` holds every whole number that fits 128 signed bits, and `UInt128` every one from zero
+/// up to that, the ones above it being [`Typed::AboveSigned`], which a text or a float given the
+/// dtype of `UInt128` can be.
 const fn holds_strictly(dtype: Representative, number: i128) -> bool {
     match dtype {
         Representative::Int8 => number >= i8::MIN as i128 && number <= i8::MAX as i128,
@@ -4426,6 +4443,8 @@ enum Typed {
     Float { value: f64, narrow: bool },
     /// A whole number of a dtype of its own.
     Whole { dtype: Representative, value: i128 },
+    /// A whole number of `UInt128` above what `Int128` holds, which no signed dtype holds.
+    AboveSigned,
     /// Any other: 16 bit floats, `Boolean`, text, or a value that does not cast to its dtype.
     Other,
 }
@@ -4458,6 +4477,9 @@ fn literal_of(call: &Call) -> Option<Typed> {
                     value: f64::from(*value),
                     narrow: true,
                 },
+                (D::UInt128, AnyValue::UInt128(value)) if i128::try_from(*value).is_err() => {
+                    Typed::AboveSigned
+                }
                 (dtype, value) => match (Representative::of(dtype), whole_value(value)) {
                     (Some(dtype), Some(value)) if is_a_whole_number(dtype) => {
                         Typed::Whole { dtype, value }
@@ -4544,6 +4566,15 @@ fn decides(column: Representative, literal: Typed) -> bool {
         Typed::Whole { dtype, value } => {
             dtype != column && column != Representative::UInt128 && !holds_strictly(column, value)
         }
+        // Polars decides it for the unsigned columns of 8 to 64 bits, which the rest of the whole
+        // numbers meet in a dtype that holds it or in none.
+        Typed::AboveSigned => matches!(
+            column,
+            Representative::UInt8
+                | Representative::UInt16
+                | Representative::UInt32
+                | Representative::UInt64
+        ),
         Typed::Other => false,
     }
 }
