@@ -859,6 +859,7 @@ impl Builder<'_> {
         Ok(match value {
             Value::Expression(expression) => Argument::Expression(self.expression(expression)?),
             Value::Columns(names) => Argument::Columns(names.clone()),
+            Value::Field(name) => Argument::Field(name.clone()),
             Value::Integer(number) => Argument::Integer(*number),
             Value::Float(number) => Argument::Float(*number),
             Value::String(text) => Argument::String(text.clone()),

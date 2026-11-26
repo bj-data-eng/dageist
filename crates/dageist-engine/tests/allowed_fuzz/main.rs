@@ -32,6 +32,7 @@ mod observe;
 mod predict;
 mod probe;
 mod reduce;
+mod structs;
 mod target;
 mod timeout;
 mod watchdog;
@@ -278,7 +279,8 @@ fn the_threads_polars_runs_on_are_the_ones_it_is_told_to() {
 /// because the count is the table's rows, or one value, by chance, which the case on more rows
 /// shows; a file named `by-engine-<what it shows>.case` is a case where a named rule refuses what
 /// Polars' streaming engine runs and its in-memory engine refuses, for what the rule names; a
-/// file named `uncovered-<limit>.case` is a case the tables state they do not cover, and replays
+/// file named `by-rule-<what it shows>.case` is a case where a named rule that is stricter than Polars
+/// by design refuses what Polars allows; a file named `uncovered-<limit>.case` is a case the tables state they do not cover, and replays
 /// as excused by that limit, and every limit has one. A limit may have others, named
 /// `uncovered-<limit>--<what it shows>.case`. Every case is replayed before the ones that are
 /// not settled are reported, so one run names all of them.
@@ -293,6 +295,8 @@ enum Settled {
     Stricter,
     ByDesign,
     ByEngine,
+    /// A named rule that is stricter than Polars by design refuses what Polars allows.
+    ByRule,
     /// Excused by the limits it names, the first of which is the one it shows.
     Excused(Vec<Limit>),
 }
@@ -303,6 +307,8 @@ impl Settled {
             Ok(Self::Fixed)
         } else if name.starts_with("by-engine-") {
             Ok(Self::ByEngine)
+        } else if name.starts_with("by-rule-") {
+            Ok(Self::ByRule)
         } else if name.starts_with("by-design-") {
             Ok(Self::ByDesign)
         } else if name.starts_with("stricter-") {
@@ -361,6 +367,10 @@ impl Settled {
             Self::ByEngine => rejected_as(
                 "stricter than one of Polars' engines",
                 target::STRICTER_THAN_ONE_ENGINE,
+            ),
+            Self::ByRule => rejected_as(
+                "refused by a rule that is stricter than Polars by design",
+                "the rule ",
             ),
             Self::ByDesign => rejected_as(
                 "stricter by design where a count is the rows by chance",
@@ -422,7 +432,7 @@ fn kept_cases_replay_as_settled() {
         })
         .collect();
     files.sort();
-    let (mut fixed, mut stricter, mut by_design, mut by_engine) = (0, 0, 0, 0);
+    let (mut fixed, mut stricter, mut by_design, mut by_engine, mut by_rule) = (0, 0, 0, 0, 0);
     let mut excused = std::collections::BTreeSet::new();
     let mut unsettled = Vec::new();
     for path in files {
@@ -439,6 +449,7 @@ fn kept_cases_replay_as_settled() {
             Settled::Stricter => stricter += 1,
             Settled::ByDesign => by_design += 1,
             Settled::ByEngine => by_engine += 1,
+            Settled::ByRule => by_rule += 1,
             Settled::Excused(named) => {
                 excused.insert(named[0].slug().to_owned());
             }
@@ -459,6 +470,10 @@ fn kept_cases_replay_as_settled() {
     assert!(fixed > 0, "a disagreement that was settled is kept");
     assert!(stricter > 0, "a part Polars does not evaluate is kept");
     assert!(by_design > 0, "a count that is the rows by chance is kept");
+    assert!(
+        by_rule > 0,
+        "a rule that is stricter than Polars by design is kept"
+    );
     assert!(
         by_engine > 0,
         "a case that one of Polars' engines runs and the other refuses is kept"

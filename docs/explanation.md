@@ -1035,7 +1035,7 @@ time zones are refused by `moments-share-a-zone`.
 Some of what the editor refuses Polars takes, on purpose:
 
 - A repeat of a struct that is cast to another dtype is refused, though Polars casts a struct of one field to the dtype of
-  its field: the tables measure a struct of two, and the editor does not know how many fields a column's struct has.
+  its field: the tables measure a struct of two.
 - An interval of nothing or below nothing is refused whatever the bounds are, though Polars gives no values where the end is
   before the start and refuses it only where it is not: the editor is strict where the data decide.
 - A count of exactly one beside the rows, an operand, a fill, an exponent or a share is refused, as `values-meet-in-count`
@@ -1197,14 +1197,13 @@ What Polars does with each is what the tables say, and some of it is not what a 
   `Struct(year: String, 2: String)`, so the report, the walk and the offers name the fields. A pattern with no
   groups gives a struct with no fields, which Polars 2.2.0 takes in a test for a value that is unique or
   duplicated and in the first and the last, as it takes a struct of two. The fields are
-  read with `struct.field`, which is not catalogued yet: the walk knows what the call gives, and a chain that
-  goes on from it is judged as one that follows a struct of two fields.
+  read with `struct.field`: the walk carries them, as [the explanation of structs](#structs) says.
 - `str.escape_regex` puts a backslash before each character that has a meaning in a pattern. Python's
   `polars.escape_regex` gives a Python string, and not an expression, so it is no start the catalogue has, and
   is left out as never offered: `literal` and the method give a step what it needs.
 - Left for later: `str.contains_any`, `str.replace_many`, `str.extract_many` and `str.find_many`, which take a
   list of literal patterns that Polars matches all at once, wait for a kind that holds a list of texts, typed or
-  connected; `str.split_exact` and `str.splitn` give a struct that waits for `struct.field`.
+  connected.
 
 The catalogue holds the twenty steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
@@ -1623,7 +1622,7 @@ result:
 | Which groups of offers a word's list holds, and the connected inputs it offers; the word a chain starts from lists the typed values too where it starts from a number or text typed in, so that the value is retyped where it stands and its methods stay | `listsOf`, `listsChainRow`, `startWordOf`, `OFFERED_INPUTS` in [model/words.ts](../ui/packages/steps/src/model/words.ts), through `listedGroups`, which takes one function for each group a kind of word may list, so a group a drawing does not make fails to compile; `listsOf` takes its groups from `GROUPS_OF_WORD`, the table `listedGroups` is made from, and leaves out only the options of a name with none and the functions of a value outside the document |
 | Whether a method can be added after a piece, or the piece taken away | `actionsOf`, `noAddition` in `model/words.ts`; a component that draws no adding for a piece stops compiling when the model gives that piece one |
 | How a value is drawn: as one word, as one word that a method can follow, as a chain, or as the lines of a condition; a connected input or a number or text typed in is drawn as a word a method can follow where it stands in the document, and as a word with its methods after it where it has some | `valueDrawing`, `chainBodyOf`, `lineDrawing` in `model/words.ts` |
-| Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts) |
+| Which control a parameter gets, and which parameters of a method are options | `controlOf`, `oneControlOf`, `startsWithEngineWord`, `methodOptionParameters` in [model/controls.ts](../ui/packages/steps/src/model/controls.ts); the name of a field of a struct gets the control `field`, which offers the fields the walk reports for the place the method stands at (`fields` of each walked expression, one for each of its places), each with its dtype, and none where the walk does not know them |
 | Which parameters a step's head draws, and so which are options | `HEAD`, which the head reads for the names of its parameters, in [model/catalogue.ts](../ui/packages/steps/src/model/catalogue.ts); `HeadName` is the type of those names, a step parameter is drawn by one, and `CONDITION_TESTS`, which a `when` reads for its predicates, is the name `HEAD` gives a filter's |
 | Which functions a chain starts from besides a field and a typed value | `START_FUNCTIONS` in `model/catalogue.ts`, which the start list reads through `startOffers` |
 | What a step's report and its rows say, beside its row and at its end | `sayingOf`, `rowEndOf`, `rowsFailure` in [model/report.ts](../ui/packages/steps/src/model/report.ts) |
@@ -1710,13 +1709,13 @@ The census holds:
   and `element` among them; and the 4 kinds of typed value a document holds as
   the value of `lit`, each with its class of dtype and whether the host reads
   typed text as one, and the 17 ways a slot reads a text typed into it.
-- The 12 kinds of parameter, the 5 types of literal, the 3 shapes, the 18 forms
+- The 13 kinds of parameter, among them the name of a field, the 5 types of literal, the 3 shapes, the 18 forms
   of kind and shape the catalogue's parameters have, and the 2 kinds that are set
   as options, a flag and a choice.
 - The 67 classes of dtype, the 3 shapes of a value, the 3 kinds of place and the
   4 states of a condition.
 - The 5 causes of a refusal, the 3 sources it comes from, its 3 stages and the
-  20 rules the engine holds that Polars does not, each with what it says.
+  25 rules the engine holds that Polars does not, each with what it says.
 - The 4 outcomes of a step, the 4 states of its rows, which are not counted, not
   reached, counted and failed, and the 19 states a step can be reported in: its
   outcome, the cause where it was refused, its rows, and what came before it,
@@ -1756,7 +1755,7 @@ Today the declared gaps are these:
   `otherwise`, in the 24 contexts where the engine allows one.
 - The functions the editor does not start a chain from: `date`, `date_range`,
   `datetime`, `datetime_range`, `duration`, `from_epoch`, `int_range`,
-  `linear_space`, `repeat`, `time` and `time_range`. It starts a chain from a
+  `linear_space`, `repeat`, `struct`, `time` and `time_range`. It starts a chain from a
   field, a connected input, a typed value, `when` and `element`.
 - The parameters of a start or a condition that it does not set: `col`'s further
   names, `lit`'s dtype and its object flag, and the keyword constraints of a
@@ -2343,6 +2342,68 @@ A window that joins the values of a group into a list gives a list of what it fo
 element dtype, and a method that follows a list of one dtype gives lists of that dtype, so what comes of
 a column of lists is carried through each call, in each place that holds an expression.
 
+### Structs
+
+A struct is one class, `Struct`, for the tables, measured as `Struct(x: Int64, y: String)`, a struct of two
+fields. Every ordinary method (`eq`, `is_null`, `first`, `sort`, `fill_null`) is judged by that one class whatever
+fields a struct has, and the tables keep it so. What depends on the fields is not the tables': the walk
+carries a struct's fields, as it carries an array's width and a moment's zone, and the calls that read, name and
+make them say what they give of the fields they were given. The fields are the names in order and the dtype of each:
+its class where the tables cover one, none where they cover none (a list of lists), and what it holds where it is a
+struct itself. The walk holds each set of fields once, by its place in a list, as it holds a time zone by its name, so
+that an operand and a link carry a handle that can be copied. Where the walk lost the fields, as it does after
+a condition whose values are structs, it carries none and says `Struct` and no fields, and a call that needs the fields
+is not judged: it gives no dtype and the walk says it cannot tell.
+
+| What the fields come from | The fields |
+| --- | --- |
+| a struct column of the table, or the column a pivot takes values from | its schema's, each with the dtype Polars gives, written as Polars names it |
+| a method that keeps the struct (`first`, `last`, `sort`, `reverse`, `shift`, `fill_null`, `replace`) | those of the struct it follows |
+| `str.extract_groups` | the groups of its pattern, as Polars works the schema of the call out, each of text |
+| `polars.struct` | its values, each named as the value is, which is the column a chain starts from, `literal` for a literal, the field a field read gives, and the name a pair gives a value; the listed values come before the named ones |
+| `str.split_exact` and `str.splitn` | `field_0` and on, each of text: one more than the number of splits for the first, as many as the number for the second |
+| `list.to_struct` | the names it is given, each of the dtype of the elements of the list |
+| `arr.to_struct` | the names it is given, which are as many as the places of the array, or `field_0` and on for each place, which the width of the array says |
+| `value_counts` | the column's own name with its dtype, and `count`, or `proportion` of a `Float64` where it is told to normalize, or the name it is given |
+
+The calls that read and change fields are the methods of the `struct` namespace:
+
+- `struct.field` gives the class of the field it is given, written as the field is. Polars reads a name that is `*` or a
+  pattern as several fields, which the editor does not take as a name: the name must be a field of the struct, and
+  `more_names` is not offered, for the columns of several fields stand where no place of the editor holds one.
+- `struct.rename_fields` gives the same fields under new names, as many names as fields and none twice.
+- `struct.drop` drops the fields it names, and refuses a name that is no field where it is strict, which is the
+  default; Polars drops nothing of a name that is no field where `strict` is false, and a struct with no field is one.
+- `struct.json_encode` gives text. Polars encodes a value of any dtype as it does a struct, so the catalogue's
+  `accepts` for it is the narrower claim, which the test of what Polars refuses names.
+- `struct.unnest` writes a column for each field, named as the field is, so it gives no dtype of one value: the
+  walk carries the columns, not the fields, and the call is judged where several columns may stand. A struct of one
+  field is one column, which the call gives as the field it holds, and is judged as the field read is; a struct of none writes
+  no column. The tables measured an unnest on a struct of two: they allow it as an item of a select and as a key of a sort,
+  and refuse it in a filter and in a pivot's aggregate. A join's key that is an unnest is not judged: the walk says it cannot
+  tell whether it may end there, for Polars accepts it where the other side's keys expand to as many columns, which the tables
+  measured as one, and a key that repeats a name is refused by what the fields are named, which the keys' names do not read.
+
+Seven named rules hold what Polars does of fields and the tables cannot say:
+
+| Rule | What it holds |
+| --- | --- |
+| `field-is-of-the-struct` | A field that a method reads or drops is one of the fields of the struct it follows, which the refusal lists. A field that was renamed or dropped before is none. |
+| `field-names-fit-the-struct` | The names given to the fields are as many as the fields of the struct they rename, or the places of the array they name, and no two fields of a struct are named alike, as `polars.struct`, `value_counts` and `to_struct` make them. |
+| `one-column-is-needed` | A filter's only predicate is one column: an expression that gives several, as the unnest of a struct of several fields does, or none, as the unnest of a struct of no field does, is refused there. Beside another predicate each expression it expands to is a predicate of its own, which Polars takes, and a field that is no flag is refused as any other predicate that is none. |
+| `struct-arithmetic-needs-numbers` | Arithmetic with a struct needs its fields to be numbers. Polars always refuses `abs`, `neg`, `sign`, `clip` and `pow` of a struct, and the operators of one that has a field of text, a date, a moment or a time, met by a number on either side, which the rule refuses in Polars' words from the fields the walk carries. Arithmetic Polars does irregularly, a sum with a text and a struct against a struct, is one the walk says it cannot tell. |
+| `to-struct-names-are-distinct` | No two names given to the fields of a struct that a list or an array is made are alike. The rule is stricter than Polars by design: Polars 2.2.0 accepts the names and builds a struct that disagrees with itself, as its dtype and series hold two fields of one name, `struct.field` reads the first and a row's value holds both, `struct.unnest` is refused after the plan accepted it (the Python binding keeps the first), and `clear`, `pl.concat` and a streaming query panic, while `polars.struct` and `struct.rename_fields` refuse the same names. The open pull request pola-rs/polars#30725, "Make struct dtypes valid by construction", makes the dtype refuse duplicate names, after which the rule can go. A test runs the vendored Polars to show it. |
+| `struct-is-filled-forward-or-backward` | A struct is filled by a strategy only forward or backward. Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing with them where it holds none, so the editor refuses them whatever the rows hold; the rule is stricter than Polars by design. |
+| `written-names-are-distinct` | The columns that the items of a select or of `with_columns` write are named differently, where a field read or an unnest names one: a column the table already has is replaced by `with_columns`, and two items that write one name are refused. The outputs of one name that no field names wait for [#161](https://github.com/bj-data-eng/dageist/issues/161). |
+
+Where Polars does what the editor refuses, on purpose: `list.to_struct` of a name given twice, which `to-struct-names-are-distinct` refuses for the reasons it holds. A separator that is a column is
+refused beside a text of one value, where Polars refuses it only for a table with no rows. The rule that `written-names-are-distinct`
+asks of the items of a step is asked of those that read or unnest a field, and of the others they are written beside.
+
+`Expr.struct.with_fields`, `Expr.struct.eval` and `polars.field` take a body whose `field(...)` reads the struct's own
+fields, which is the body shape that `list.eval` is of lists. The walk carries the fields now, but no table is measured
+in a body, so they stay left out until the body shape exists.
+
 ### What The Tables Are Checked Against
 
 The tables are measured one combination at a time, so whether they predict what
@@ -2614,14 +2675,16 @@ excused by both.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
 which the target names: `pivot-aggregate-gives-one-value`, since Polars lets a running
-value stand in a pivot's aggregate, and the rule that a predicate be a `Boolean` or a
+value stand in a pivot's aggregate, `struct-is-filled-forward-or-backward`, since Polars does nothing with the
+strategies it refuses for a struct where the struct holds no null, and the rule that a predicate be a `Boolean` or a
 rule a probe shows right where Polars does not evaluate the part. Any other rule that
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about half of the pivot cases (61 of the 144 of
-the fixed seed, and the same share in longer campaigns), so those pivot aggregates are checked
-little; the tally counts the pivot cases and those the rule refuses apart.
+wherever it refuses, which is more than a quarter of the pivot cases (39 of the 146 of
+the fixed seed, and a similar share in longer campaigns), so those pivot aggregates are checked
+little; the tally counts the pivot cases and those the rule refuses apart. A kept case where a rule that is stricter by design refuses what Polars allows is filed as
+`regressions/by-rule-<what it shows>.case`.
 
 A refusal of a [count of values](#a-count-of-values) that Polars allows is of two kinds, and neither is
 a disagreement. Where Polars drops the part, as a sort key that is one value, the probe asks about the part
@@ -2633,13 +2696,14 @@ rows is, the tables are stricter by design: a count is no number the editor can 
 case run again with the count made another and nothing else changed, which Polars refuses for lengths: on
 twelve rows, which are the sample's three four times over; on four rows that tie, the second and the third
 twice, where the values that occur most and the values that differ are two, as the sample leaves them one or
-all; and with the number that decides each first, last, nth, placed or repeated count made 2 (`head`, `tail`,
+all; on the three rows with a null in the middle one of every column that holds none, where a test of a column,
+a comparison and a length, which the sample leaves as one value, are two; and with the number that decides each first, last, nth, placed or repeated count made 2 (`head`, `tail`,
 `limit`, `top_k`, `bottom_k`, `gather_every`, `slice` and `repeat`), which is neither one value, which Polars
 broadcasts, nor the three rows. A part that Polars drops and whose count is by chance is asked
 apart from the case, where it is allowed on the sample. A refusal that stays when the count differs is
 not this: a count that is the rows whatever they are, as the values that occur most of the places that sort a
-column are, which Polars allows with any rows, stays a finding, as does a count met by a part Polars folds
-to a null. Only the rules for counts and the table of counts are asked. A control changes every count the case
+column are, which Polars allows with any rows, is the limit of a count no rows change where no probe settles
+it first, and a count met by a part Polars folds to a null stays a finding. Only the rules for counts and the table of counts are asked. A control changes every count the case
 holds, so it is asked of the item of the step that holds the refused place, and of nothing where that item
 holds a count in more than one place, a count in a chain and one in an expression a call of it is given, as
 another count's refusal for lengths says nothing of the first; such a case stays a finding. Such a case is kept as `regressions/by-design-<what it shows>.case`, counted as refused
@@ -2662,17 +2726,80 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, that were refused where a count is the rows by chance, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 9 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 29 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 42 cases
-refused by the rule that is stricter by design, of 144 pivot cases, the 842 that agree, the 87 refused by both for
-another reason and the 9 refused where Polars does not evaluate the part; the cases that a limit excused are 6, and 5 at one thread. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
+1000 cases give none disagreeing; 7 of those that agree are refused by the rule against a
+repeated pair of key names. Its 146 pivot cases, the 39 refused by the rule that is stricter by design,
+the 19 refused where Polars does not evaluate the part and the 5 that a limit excused are the same at one thread,
+at two and at the machine's own; the 850 that agree and the 86 refused by both for another reason are 851 and 85 at one thread,
+where Polars gives, for one case, the reason the tables gave. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
 gives where the tables and Polars both refuse, and a case in which Polars panics at some counts and
 not at others moves a case between them. The test
 asserts none of those.
 
 The methods of the `list` and the `arr` namespace are drawn only where `DAGEIST_FUZZ_FOCUS` names one of them,
 and the column under test is then a list or an array of any element dtype.
+
+The calls that read, name or make a [struct](#structs), which are the methods of the `struct` namespace,
+`value_counts`, `str.split_exact` and `str.splitn`, `list.to_struct` and `arr.to_struct`, and the function
+`polars.struct`, are drawn only where the focus names one of them too, and the struct columns are then
+drawn with fields of their own. Without a focus the one struct the tables measured is the only one, and a case
+that names no fields has it. A focused campaign draws the struct for `a`, most often where it names a method of
+the `struct` namespace, and for `b`, as a struct of none to five fields: each a scalar of any of the dtypes a list
+holds, a list of one, or a struct of fields of its own up to two deep, under names of the columns of the sample
+(`a`, `b`, `k`), of a count and of a literal, so that a field and a column, a count or a literal meet. The case
+writes the fields in the line above its document, under `a_struct` and `b_struct`, and the sample tables are made with
+them, so that the walk reads from the schema what Polars is given and a case replays as it was drawn; a column that
+is not a struct, or is one and names none, has no such key. The campaign draws a name that is a field and one that
+is none, new names of the number the fields have and of others, two fields given one name, `strict` set both ways, the
+options of `value_counts` (its name among them, equal to the column's and to its count), the number of parts of a split
+from none, names for an array of the width the sample's arrays have and of others, and a struct made of columns,
+literals, the fields of structs and values given names. It does not draw a name given twice to `list.to_struct` or
+`arr.to_struct`, for Polars' plan then holds one field of that name and its rows two, of which no column can be made
+and which the editor refuses by `field-names-fit-the-struct`, nor `*` or a pattern as the field a call reads, which
+Polars reads as several and the editor does not take as one name, nor the flag that makes a series of `polars.struct`,
+which a step always refuses. What it compares of a struct is what it does of any value: whether Polars allows the case,
+the class after each call, which for a field read is the class of the field, and the reason of a refusal, which for a
+name that is no field is Polars' `field not found`. A join key made of a struct is the dtype Polars gives it, and a
+dtype that no column can have, a struct with two fields of one name, is no case for the tables.
+
+A campaign focused on these calls, at the machine's own thread count and at two, finds nothing unsettled
+in the seeds it was run on. What depends on the fields is the walk's to judge, and what the tables and the walk
+cannot know is a limit, which is named and tight. The walk carries the fields of a struct, the width of an array a
+field holds, whether a field was made of a number typed without a dtype, the fields of each argument and the name an
+expression is written under, and judges from them what a call reads, drops, renames, makes and calculates with. Where
+what Polars does depends on more than that, the walk says it cannot tell, and says why, in a reason of its own that
+the host passes to the view as `because` and the census lists. Nothing is predicted of the call or of what it holds:
+
+| Why the walk cannot tell | When |
+| --- | --- |
+| The dtype of the start is not given | A start whose dtype its arguments decide was not told. |
+| The dtype the arguments decide is not known | The argument that decides what a method gives is not chosen. |
+| The fields of the struct are not known | A field read, a drop or a rename follows a struct whose fields the chain lost, as a condition of structs or the values of a pivot's group are, so whether the names are fields cannot be said. |
+| An unnest as a join's key | It writes a column for each field, and how many keys the other table expands to is not known. An unnest anywhere in a join's key, inside the value of a condition too, leaves the key not told. |
+| An unnest of no field | It expands to no expression, which Polars leaves out of what holds it, or decides by its siblings: a call given one is not judged either. |
+| An open number in a key | A struct made of a number typed without a dtype, or the counts of one, which hold it as the field of their values, or a field read from either, as a join's key, which Polars does not match with the dtype the other table's key resolves to, for the number stays open, as `dyn float`, in the struct's dtype. |
+| Several columns of a field read | A field read by several names gives several columns, which are no value of one dtype outside a select or a sort. |
+| An unnest among predicates | An unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come. |
+| Arithmetic on a struct | It is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly: a sum with a text, a duration times a number and a struct against a struct are the rest after the rule below. |
+| Structs of other fields meet | A call on a struct is given one whose fields differ, or the values of a condition are, which Polars casts field by field and refuses or not by what the fields are. |
+
+An unnest of a struct of no field gives no expression, so a filter of it alone is refused by `one-column-is-needed`, as
+Polars refuses it, and a field that is made of a number typed without a dtype says no dtype once it is read, for it
+adapts to what it meets. The strategies of a fill that Polars refuses for a struct where it holds a null are refused by
+`struct-is-filled-forward-or-backward` whatever the rows hold, as the editor is strict where a pivot's missing
+cells make nulls, and a kept case may be named for such a rule, as `by-rule-<what it shows>.case`. A list or an array
+made a struct of names alike is refused by `to-struct-names-are-distinct`, for the reasons it holds.
+
+What stays a limit is of these kinds. The count machinery settles a count by running the case with that count made
+another, which it cannot do where an item holds two counts whose rows both decide, as a `value_counts` beside another
+count of the rows does: each control changes both, so Polars refusing it for lengths does not say which one the tables
+refused, and a control that changes one count alone is possible only for a count a number typed in decides, not for one
+the rows decide. A key of an inner join whose other side holds only null keys is never run by Polars, which a left join
+of the same case shows. A condition whose predicate holds a struct, or a call that makes one of text or a list, is taken
+by Polars for a predicate that is none, and its branches are not run, which the same case run with each predicate a flag
+that is true shows; a part Polars refuses and the tables allow, inside a case the tables cannot tell, is excused by the
+limit that names what Polars refuses of it. The generator draws filters of one predicate and of several, for Polars
+judges an expression that expands to none or to several alone and beside others differently. The walk's naming of an
+unnest's columns is in `output_name` of `crates/dageist-engine/src/document/walk.rs`.
 The methods that give [a count of values](#a-count-of-values) and the functions that start a chain with one are
 drawn only where `DAGEIST_FUZZ_FOCUS` names them, so the fixed seed does not draw them. The gate stays, though the
 two kinds that a focused campaign found are now settled: a count that is the table's rows, or one value, by chance
@@ -2720,7 +2847,6 @@ These are what remains of the fuzz items of #129. The gate is lifted when a camp
 | A cast of a value the dtype cannot hold | A strict `cast`, a strict `replace_strict` asked for a dtype and given no default (given one it converts as a cast that gives a null does), the test of closeness and the fill by a value or of NaN, which convert what they meet to the one dtype that holds both as a strict cast does, the difference, which converts unsigned numbers to the signed dtype of its result (a subtraction of unsigned numbers wraps to a number beyond it), and the count of characters that `str.head`, `str.tail`, `str.slice`, `str.pad_start`, `str.pad_end` and `str.zfill` are given, which they convert to a whole number as one does, signed for where to start and how many to keep and unsigned for how long, refuse a value the dtype cannot hold: a number out of its range, below zero beside an unsigned dtype, the infinity or the not-a-number of a float beside a whole number, text that does not read as the number, or a `UInt128` above the largest `Int128` beside one. The tables measured them on the sample's rows, whose values every number dtype holds, and a table with no rows has the value that an aggregate of nothing is. Polars refusing the rows or the empty table with a failed conversion that has no place, in a case with a strict cast, a test of closeness, a fill by a value or of NaN, a difference (where the failed conversion is of an unsigned number to a signed one), a count of characters, or a strict replacement given a dtype and no default: the case run again with each cast not strict, each test of closeness a comparison of the same two, each fill and each difference a fill forward, each count the whole number 1 and each replacement not asked for a dtype is not refused for a failed conversion. A literal is one value that Polars converts when it works out the schema, so the refusal may be the schema's, which names the scalar the literal is, where a column's is the rows'. |
 | A drop changes the lengths | `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column that holds one has fewer values than the table has rows, which Polars refuses to meet the table's rows or another expression's values. The tables measure the two in a context on a column that holds no null, where they drop nothing. Polars refusing the rows with a reason about lengths, or about the shape of the exponent of a power that does not match its base, or about what a replacement replaces by being fewer than what it replaces, or about its default having other lengths than its input, that has no place, in a case with either: the case run again with each made a fill of nulls forward, which keeps every value, is not refused for lengths. |
 | A replacement of columns in a window | A window evaluates what it follows once for each group, and what a replacement lists as the values of a column is then a list for each group, which Polars refuses as a replacement pattern per row where what it replaces is one value for each group, as an aggregate is, and as an output of the length of the column where what it replaces is one value, as a literal is. The tables measure a replacement in a context with the receiver's own rows. Polars refusing the rows with a reason that names a pattern per row or an output of another length than its input, in a case that has a window and a replacement that lists the values of a column: the case run again with what each replacement lists made null literals is not refused for it. |
-| A null struct to fill | A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone, are one null, where those of the sample's rows are a value. Polars refusing the rows or the empty table with the refusal that a strategy of a fill is not supported for a struct, which has no place, in a case with a fill by a strategy that follows one of the five: the case run again with each of the five made a fill of nulls forward, which leaves the nulls of the column and no more, is not refused for it. Inside a condition Polars refuses the strategy for a struct where it fills nothing, which it runs in a plain select: the case with a condition and a fill by a strategy, run again with each fill a fill forward, is not refused for it. |
 | A strict replacement given no default | A strict replacement that is given no default is held to more than one that is: it refuses a value that it does not list, which depends on the rows, and values of a dtype that cannot become the dtype of the column it follows, which a default lets pass. The tables measured it with a default and with what it replaces the column it follows. Polars refusing the rows with the refusal of an incomplete mapping, of nothing listed to replace, or of values of a type that cannot replace the column's, which has no place, or, of the empty table, in the words of what follows it, for Polars gives back what the replacement follows where it lists nothing, in a case with a `replace_strict` given no default: the case run again with each given a null default is not refused for it. |
 | A replacement of every match given a null value | `str.replace_all` refuses a value that is null where Polars reads the value as one value, which it does of a literal and of a piece of one row. Polars' streaming engine runs the rows in pieces, whose length depends on how the rows are shared among the threads, so a column that holds a null is refused where a piece is one row and not where it is longer, though Polars' in-memory engine and the tables allow it. A literal null is refused at every count. Polars refusing the rows or the empty table with the refusal that the value cannot be null, which has no place, in a case with a `str.replace_all`, or a `str.replace` given a count below zero, which replaces every match: the case run again with the value of each made a text literal is not refused for it. |
 | A replacement of more than the first match | Polars replaces more than the first match only of plain text and of one value, and refuses a pattern that has an ASCII punctuation mark, which it takes for a regular expression, or a value that is many, with a count above one. The tables measured the first match, which is `n`'s default. Polars refusing the rows or the empty table with the refusal that a replacement of a pattern or of many values with a count above one is not yet supported, which has no place, in a case with a `str.replace` given a count above one: the case run again with each count left out is not refused for it. |
@@ -2731,7 +2857,12 @@ These are what remains of the fuzz items of #129. The gate is lifted when a camp
 | A replacement of an aggregate in a window key | Polars' streaming engine does not meet a text of one value, a literal or an aggregate, with each of the many values of a replacement in the order key of a window, or in a key inside it, which it does in a select, where the tables measured the replacement. It refuses the lengths at every thread count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a window and a replacement: the case run again with the value of each replacement made a text literal is not refused for it, and nor is the case run again with each window made a fill. |
 | A moment of one value filled in another zone | A shift of a moment that is one value, which a function of literals alone or an aggregate of a column makes, takes the number it is filled with whatever the zone of the fill is. Polars' schema names the zone of the receiver, and so do the rows in memory; the streaming engine gives rows in the zone of the fill for an aggregate and for a moment of literals in `with_columns`, and in the zone of the receiver for a moment of literals in a `select`. The streaming engine panics when the same shift follows a column of moments (in memory it shifts them), which the named rule that moments share a zone refuses for every receiver. The rule is the tables' own, so the disagreement is of a rule that refuses what Polars allows: the rule `moments-share-a-zone` refusing a shift that is filled, whose receiver gives one value (a literal moment, or an aggregate of a column such as its `max` or `first`), is excused, and a shift of a column or of what keeps a column's many values is not. |
 | A part Polars folds to a null | Polars folds a call that carries nulls, given the null literal as an operand, or as the receiver of the first call of a chain, into a null before it runs what the call followed, so `h + null` is a null whatever `h` holds and what follows it is run on a null. As observed, it folds the comparisons and the `add` of text; for text it refuses `sub`, `mul`, `floordiv`, `mod` and `truediv` before it folds, so a case with one of them is excused only where the control, which runs Polars, shows the fold is why. The tables judge a call for the dtype of what it is given, as written. Polars allowing the step, where the call the tables refused is given an expression that holds such a call, at any depth, with another call after it (a fold that ends a chain leaves a null literal, which is a literal's, and a call after a fold in its own chain is asked of a value of its dtype), and Polars refusing the case run again with every such call left out for the reason the tables gave, at no place or inside the expression that holds the refused call: the fold is then why Polars allows it. The control puts the other operand in the place of a null receiver. A panic is never excused here: it stays with the limit for a panic. A case that is the same without the folds, or that Polars still allows or refuses for another reason, is excused by nothing. |
+| A number written as json | `struct.json_encode` writes a value of any dtype as text, a number as its digits, which a pivot's aggregate reads as a number of a group, where the sample's text, a duration, is no number. The tables refusing, in a pivot that holds a `struct.json_encode`, with the reason that text cannot be converted to a number, which Polars allows. |
+| Several counts in one item | Each control makes every count of an item another at once: the rows and the numbers that decide each of them. Where the item holds a count in more than one place, Polars refusing it for lengths then shows that a count is the rows by chance, and not that the one the tables refused is. A control that changes one count alone is possible only for a count a number typed in decides, and replacing the others would change what the refused count meets, so it is another case. The tables refusing a count, or a rule about counts doing so, in an item that holds a count in more than one place, which Polars allows on the sample's rows and refuses for lengths once the counts are made another. |
+| A count no rows change | A count of values that the data decide is one value, or the rows, by what the values are made of: a test of a struct is never null, a comparison with a null is null, a column of the dtype Null holds one value. No rows the sample can give, nor ties, nor a null in every column, make it another, so it is no count that is the rows by chance, and the controls above show nothing of it. The tables refusing a count, or a rule about counts doing so, which Polars allows on the sample's rows and on every control, in a case where no probe of the part, of the part alone or of the call apart from the case settles the refusal first. It is asked of a case that holds several counts as of one that holds a single count: the controls change every count, so Polars allowing the case on all of them shows that none is by chance; a control that Polars refuses leaves the case to the counts the rows decide. |
 | A gather beyond the rows | A gather takes places, and Polars refuses one beyond what it follows when the rows run, and every place when the table has none. The tables measured a gather that gives a null for such a place. Polars refusing the rows or the empty table with the words for a place out of bounds, with no place, in a case with a gather that is not told to give a null, where the case run again with each gather told to give one is no longer refused for them: the places the rows leave it are why. A case with no gather, another reason, or a gather that already gives a null is excused by nothing. |
+| A join key Polars does not run | Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match: it gives no rows, and a key it would refuse is never met. The tables measured the keys with columns of nulls on the other side. Polars refusing the join with its kind made a left join, which runs the key, for the reason the tables gave of a key of the join, where it allows the inner join. |
+| A struct taken for a predicate | Polars takes a struct for a condition's predicate, where a comparison with one, or a method of text on one, gives a struct and not a Boolean, and runs neither branch, so a part in a branch is never met. The tables measured a comparison as giving a Boolean, and judged the branches. The tables refusing a part of a branch of a condition whose predicate holds a struct or a call that makes one, which Polars allows, where the case run again with each predicate a flag that is true is refused for the same reason. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |
 
 

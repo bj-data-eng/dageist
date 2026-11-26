@@ -14,7 +14,7 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
-use super::limits::{excuses, strict};
+use super::limits::{Limit, excuses, excuses_a_refused_prefix, strict};
 use super::observe::{
     Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
@@ -26,7 +26,7 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
+const STRICTER_BY_DESIGN: [(&str, &str); 6] = [
     (
         "pivot-aggregate-gives-one-value",
         "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
@@ -38,6 +38,14 @@ const STRICTER_BY_DESIGN: [(&str, &str); 4] = [
     (
         "element-dtype-is-measured",
         "a method that depends on the element is not run on one the tables do not measure, which Polars may panic on",
+    ),
+    (
+        "to-struct-names-are-distinct",
+        "no two names are given to the fields of a struct a list or an array is made, though Polars 2.2.0 accepts them and builds a struct that disagrees with itself (pola-rs/polars#30725)",
+    ),
+    (
+        "struct-is-filled-forward-or-backward",
+        "a struct is filled only forward or backward, though Polars fills it by any strategy where it holds no null",
     ),
     (
         "element-dtype-is-implemented",
@@ -399,6 +407,27 @@ fn is_a_later_call_of_the_chain(why: &str, refused: &str) -> bool {
     }
 }
 
+/// Whether Polars refused at a call inside an expression of which the tables said they could not
+/// tell whether it may end: `why` names the place of the expression before its colon, and `refused`
+/// is the place of Polars' refusal, which is a call of it, its start or a link. What the expression's
+/// calls give is not known, so what Polars refuses of one of them contradicts nothing the tables say.
+fn is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+    why: &str,
+    refused: &str,
+) -> bool {
+    let Some((place, said)) = why.split_once(": ") else {
+        return false;
+    };
+    said.starts_with("whether it may end is not known")
+        && refused
+            .strip_prefix(place)
+            .is_some_and(|inside| inside.starts_with(", "))
+}
+
+/// How the difference of a dtype says that the tables allow a part and Polars refuses it, which
+/// the limits excuse where they are the cause, as they do the refusal of the whole case.
+const A_PREFIX_POLARS_REFUSES: &str = "the tables allow it, Polars refuses it";
+
 /// What the tables predict of the dtypes, compared with what Polars says: the
 /// first difference, if there is one.
 fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -> Option<String> {
@@ -417,7 +446,11 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
         Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
             refusal.stage == Stage::Schema
                 && (why.starts_with(&format!("{}: ", refusal.at))
-                    || is_a_later_call_of_the_chain(why, &refusal.at))
+                    || is_a_later_call_of_the_chain(why, &refusal.at)
+                    || is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                        why,
+                        &refusal.at,
+                    ))
                 && refusal
                     .place
                     .as_ref()
@@ -446,7 +479,7 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
                 )),
                 Seen::Refused(reason) if !pivot && !refused_anyway(&expected.place) => {
                     Some(format!(
-                        "{} {what}: the tables allow it, Polars refuses it: {reason}",
+                        "{} {what}: {A_PREFIX_POLARS_REFUSES}: {reason}",
                         expected.place
                     ))
                 }
@@ -626,7 +659,7 @@ impl CaseTarget for AllowedTarget {
         {
             tally("join keys of different dtypes share a column");
             return CaseOutcome::unsupported(
-                "one column of the other table is paired with keys of different dtypes",
+                "one column of the other table is paired with keys of different dtypes, or with a key of a dtype that no column has",
             );
         }
         let allowance = Self::property(ALLOWANCE);
@@ -644,8 +677,7 @@ impl CaseTarget for AllowedTarget {
                 },
             )
         };
-        let excused = |what: &str| -> Option<Result<CaseOutcome>> {
-            let limits = excuses(case, &prediction, &observed);
+        let excused_by = |what: &str, limits: Vec<Limit>| -> Option<Result<CaseOutcome>> {
             if limits.is_empty() {
                 return None;
             }
@@ -657,12 +689,34 @@ impl CaseTarget for AllowedTarget {
                 statements.join("; "),
             ))
         };
+        let excused = |what: &str| -> Option<Result<CaseOutcome>> {
+            excused_by(what, excuses(case, &prediction, &observed))
+        };
         // What the tables say of the dtypes is checked whatever the verdict.
         let dtype_checked = prediction
             .expressions
             .iter()
             .any(|expected| expected.start.is_some() || expected.links.iter().any(Option::is_some));
         if let Some(difference) = dtype_difference(case, &prediction, &observed) {
+            // A prefix that Polars refuses where the tables allow it is the refusal of the case a
+            // limit may explain: it is not a dtype the tables got wrong.
+            if difference.contains(A_PREFIX_POLARS_REFUSES)
+                && let Some(outcome) = excused("allowed, Polars refuses")
+            {
+                return outcome;
+            }
+            // Where the tables cannot tell the case, the prefix is excused by what Polars refuses
+            // of it alone, for the limit that names that.
+            if matches!(prediction.verdict, Verdict::Undetermined(_))
+                && let Some((_, reason)) =
+                    difference.split_once(&format!("{A_PREFIX_POLARS_REFUSES}: "))
+                && let Some(outcome) = excused_by(
+                    "allowed, Polars refuses a prefix",
+                    excuses_a_refused_prefix(case, &prediction, &observed, reason),
+                )
+            {
+                return outcome;
+            }
             let text = match &prediction.verdict {
                 Verdict::Allows => "allows".to_owned(),
                 Verdict::Refuses(refused) => format!("refuses ({})", refused.reason),
@@ -1384,6 +1438,129 @@ mod tests {
         let (outcome, tally) = evaluated_and_tallied(text);
         assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
         assert_eq!(counted(&tally, "excused by a limit"), Some(1), "{tally:?}");
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
+
+    /// The case `select(a.struct.field(name))` on a column `a` of the struct that `fields` write.
+    fn reads_a_field(fields: &str, name: &str) -> &'static str {
+        let text = format!(
+            r#"{{"a":"Struct(x: Int64, y: String)","a_struct":{fields},"b":"Int8","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["a"]}}}}}},"then":[{{"entry":"Expr.struct.field","arguments":{{"name":{{"field":"{name}"}}}}}}]}}}}]}}}}}}}}]}}"#
+        );
+        Box::leak(text.into_boxed_str())
+    }
+
+    #[test]
+    fn a_field_read_of_a_struct_column_of_the_fields_a_case_names_is_checked_against_polars() {
+        // Polars is given a column `a` whose fields are the ones the case names, so what it says of
+        // the read is what it says of that struct, and the walk says the same: the dtype of the field.
+        for (fields, name) in [
+            (r#"[["k","Int64"],["s","String"]]"#, "s"),
+            (r#"[["only","Boolean"]]"#, "only"),
+            (r#"[["k","Int64"],["l","List(String)"]]"#, "l"),
+            (
+                r#"[["k","Int64"],["n",[["p","Date"],["q","Float32"]]]]"#,
+                "n",
+            ),
+        ] {
+            let (outcome, tally) = evaluated_and_tallied(reads_a_field(fields, name));
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::Evaluated,
+                "{fields} {name}: {outcome:?}"
+            );
+            assert_eq!(
+                counted(&tally, "cases agreeing"),
+                Some(1),
+                "{fields} {name}: {tally:?}"
+            );
+            assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+        }
+    }
+
+    #[test]
+    fn a_name_that_is_no_field_of_the_struct_a_case_names_is_refused_by_both() {
+        // `x` is a field of the struct the tables measured and of no struct here: the rule names the
+        // fields, Polars the name it did not find, and they refuse it for the same reason.
+        let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "x"));
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+        let (outcome, tally) = evaluated_and_tallied(reads_a_field(r#"[["k","Int64"]]"#, "k"));
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+    }
+
+    /// A join whose right key is a struct made of three columns and renamed so that two of its
+    /// fields are named alike, which Polars gives a dtype in its schema that no column can have.
+    const A_KEY_OF_FIELDS_NAMED_ALIKE: &str = r#"{"a":"Array(UInt64, 2)","b":"Float32","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"left_on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}}]},"right_on":{"many":[{"expression":{"start":{"entry":"polars.struct","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["ra"]}}},"then":[]}},{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"UInt64"}}},"then":[]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["rk"]}}},"then":[]}}]}}},"then":[{"entry":"Expr.struct.rename_fields","arguments":{"names":{"many":[{"string":"rk"},{"string":"rk"},{"string":"c"}]}}}]}}]},"how":{"choice":"right"},"nulls_equal":{"flag":true},"coalesce":{"flag":null},"force_parallel":{"flag":false}}}}]}"#;
+
+    #[test]
+    fn a_join_key_of_fields_named_alike_is_no_case_for_the_tables_and_ends_no_campaign() {
+        // The other table's key column is made of the dtype the key has, and Polars cannot make a
+        // column of a struct whose fields share a name: that is no refusal of the tables to check.
+        let (outcome, tally) = evaluated_and_tallied(A_KEY_OF_FIELDS_NAMED_ALIKE);
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+        assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
+    }
+
+    #[test]
+    fn a_refusal_inside_an_expression_the_tables_could_not_end_explains_a_prefix_and_no_other() {
+        let why = "step \"s\", exprs item 1: whether it may end is not known: the dtype that the arguments decide is not known";
+        assert!(
+            is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                why,
+                "step \"s\", exprs item 1, the start"
+            )
+        );
+        assert!(
+            is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                why,
+                "step \"s\", exprs item 1, link 3"
+            )
+        );
+        // Another item, another place of the same one, and another reason are no explanation.
+        for refused in [
+            "step \"s\", exprs item 2, the start",
+            "step \"s\", exprs item 12, the start",
+            "step \"s\", exprs item 1",
+        ] {
+            assert!(
+                !is_inside_an_expression_that_may_not_end_for_all_the_tables_know(why, refused),
+                "{refused}"
+            );
+        }
+        assert!(
+            !is_inside_an_expression_that_may_not_end_for_all_the_tables_know(
+                "step \"s\", exprs item 1: a count that may not end",
+                "step \"s\", exprs item 1, the start"
+            )
+        );
+    }
+
+    #[test]
+    fn a_struct_column_with_no_fields_is_run_as_a_struct_column_and_is_judged() {
+        let text = r#"{"a":"Struct(x: Int64, y: String)","a_struct":[],"b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.is_null","arguments":{}}]}}]}}}}]}"#;
+        let (outcome, tally) = evaluated_and_tallied(text);
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Evaluated,
+            "{outcome:?}"
+        );
         assert_eq!(counted(&tally, "disagreeing").unwrap_or(0), 0, "{tally:?}");
     }
 }

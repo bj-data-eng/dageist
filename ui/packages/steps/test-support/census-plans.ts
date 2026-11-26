@@ -106,6 +106,7 @@ function kindFrom(kind: CensusKind): KindView | null {
   switch (kind.kind) {
     case 'expression':
     case 'column':
+    case 'field':
     case 'flag':
     case 'dtype':
     case 'duration':
@@ -620,6 +621,9 @@ function planReports(census: Census, found: Findings): void {
   }
   for (const rule of census.rules) {
     if (rule.statement.trim() === '') found.lacks(`rule ${rule.name}: says nothing`);
+  }
+  for (const unknown of census.notKnown) {
+    if (unknown.because.trim() === '') found.lacks(`not known ${unknown.name}: says nothing`);
   }
 }
 

@@ -134,6 +134,21 @@
               },
               null
             ],
+            "fields": [
+              {
+                "dtype": "Struct(x: Int64)",
+                "fields": [
+                  {
+                    "name": "x",
+                    "dtype": "Int64"
+                  }
+                ]
+              },
+              {
+                "dtype": "Struct",
+                "fields": null
+              }
+            ],
             "ending": {
               "kind": "notKnown",
               "because": "the dtype is not known"

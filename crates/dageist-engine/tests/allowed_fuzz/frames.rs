@@ -19,6 +19,8 @@ use polars::prelude::{
     StructChunked,
 };
 
+use super::structs::{Fieldset, Kind, Structs};
+
 /// The name of the column the join's `index`th key is paired with on the other
 /// side, when a case pairs a key with a bare column: `key`, then `key2`, `key3`.
 pub fn key_column(index: usize) -> String {
@@ -113,6 +115,30 @@ fn column(dtype: Representative, name: &str) -> Series {
     }
 }
 
+/// A column of the struct of the fields `fields`, of three rows as every column is: the values of
+/// each field, a null and the values again.
+fn struct_of(fields: &Fieldset, name: &str) -> Series {
+    let columns: Vec<Series> = fields
+        .iter()
+        .map(|field| match field.kind() {
+            Kind::Scalar(inner) => column(inner.class(), field.name()),
+            Kind::List(inner) => column(Representative::List(*inner), field.name()),
+            Kind::Struct(inner) => struct_of(inner, field.name()),
+        })
+        .collect();
+    StructChunked::from_series(name.into(), 3, columns.iter())
+        .expect("fields of three rows make a struct")
+        .into_series()
+}
+
+/// The column `name` of the class `class`: the struct of `fields` where it names them.
+fn column_of(class: Representative, fields: Option<&Fieldset>, name: &str) -> Series {
+    match (class, fields) {
+        (Representative::Struct, Some(fields)) => struct_of(fields, name),
+        _ => column(class, name),
+    }
+}
+
 /// A column of lists of the dtype `inner`: of the two values that its own sample holds in the
 /// first row, a null, and of the second value in the last, which is joined by the first where the
 /// lists must be as long as one another, as an array's are.
@@ -163,10 +189,16 @@ pub struct Frames {
 }
 
 impl Frames {
-    /// The tables with `a` of the class `receiver`, `b` of `argument`, and a
-    /// column for each of the dtypes `keys`, named by [`key_column`], all null.
-    pub fn new(receiver: Representative, argument: Representative, keys: &[DataType]) -> Self {
-        Self::with_key(receiver, argument, Some(keys))
+    /// The tables with `a` of the class `receiver`, `b` of `argument`, the fields `structs` names for
+    /// those that are structs, and a column for each of the dtypes `keys`, named by [`key_column`],
+    /// all null.
+    pub fn new(
+        receiver: Representative,
+        argument: Representative,
+        structs: &Structs,
+        keys: &[DataType],
+    ) -> Self {
+        Self::with_key(receiver, argument, structs, Some(keys))
     }
 
     /// The tables as [`Frames::new`] makes them, but with no key columns when
@@ -175,13 +207,14 @@ impl Frames {
     pub fn with_key(
         receiver: Representative,
         argument: Representative,
+        structs: &Structs,
         keys: Option<&[DataType]>,
     ) -> Self {
         let side = |names: [&str; 6]| {
             let [a, b, f, k, g, h] = names;
             let mut columns = vec![
-                column(receiver, a).into(),
-                column(argument, b).into(),
+                column_of(receiver, structs.receiver.as_ref(), a).into(),
+                column_of(argument, structs.argument.as_ref(), b).into(),
                 Series::new(f.into(), [Some(true), Some(false), Some(true)]).into(),
                 Series::new(k.into(), [1_i64, 1, 2]).into(),
                 Series::new(g.into(), ["x", "y", "x"]).into(),
@@ -265,6 +298,41 @@ impl Frames {
         Self {
             rows: pick(&self.rows),
             other_rows: pick(&self.other_rows),
+            ..self
+        }
+    }
+
+    /// The same tables with a null in the middle row of every column that holds none: the columns the
+    /// chains read for a test, a comparison or a length, which then give more than one value where
+    /// the sample's rows leave them one.
+    pub fn with_nulls(self) -> Self {
+        let mask = polars::prelude::BooleanChunked::new("".into(), [true, false, true]);
+        let nulled = |frame: &DataFrame| {
+            let columns: Vec<polars::prelude::Column> = frame
+                .columns()
+                .iter()
+                .map(|column| {
+                    if column.null_count() > 0 {
+                        return column.clone();
+                    }
+                    let series = column.as_materialized_series();
+                    let nulls =
+                        Series::full_null(series.name().clone(), series.len(), series.dtype());
+                    series
+                        .zip_with(&mask, &nulls)
+                        .expect("a column and its nulls are of one dtype")
+                        .into()
+                })
+                .collect();
+            DataFrame::new(frame.height(), columns).expect("columns of the rows they had")
+        };
+        let rows = nulled(&self.rows);
+        let other_rows = nulled(&self.other_rows);
+        Self {
+            empty: rows.clear(),
+            other_empty: other_rows.clear(),
+            rows,
+            other_rows,
             ..self
         }
     }
@@ -356,7 +424,12 @@ mod tests {
             (DataType::Null, DataType::Null),
         ];
         let asked: Vec<DataType> = keys.iter().map(|(asked, _)| asked.clone()).collect();
-        let frames = Frames::new(Representative::Int64, Representative::Int64, &asked);
+        let frames = Frames::new(
+            Representative::Int64,
+            Representative::Int64,
+            &Structs::default(),
+            &asked,
+        );
         for (at, (asked, made)) in keys.iter().enumerate() {
             let column = frames.rows.column(&key_column(at)).expect("a key column");
             assert_eq!(column.dtype(), made, "{asked:?}");
@@ -365,10 +438,90 @@ mod tests {
     }
 
     #[test]
+    fn a_struct_column_has_the_fields_a_case_names_and_the_rows_every_column_has() {
+        use super::super::structs::{Field, Fieldset, Kind};
+        let inner =
+            Fieldset::new(vec![Field::new("p", Kind::Scalar(Inner::Date))]).expect("fields");
+        let sets = [
+            Fieldset::new(vec![]).expect("no fields"),
+            Fieldset::new(vec![Field::new("only", Kind::List(Inner::Float32))]).expect("fields"),
+            Fieldset::new(vec![
+                Field::new("k", Kind::Scalar(Inner::DatetimeZoned)),
+                Field::new("n", Kind::Struct(inner)),
+                Field::new("z", Kind::Scalar(Inner::Null)),
+                Field::new("d", Kind::Scalar(Inner::Decimal)),
+            ])
+            .expect("fields"),
+        ];
+        for set in sets {
+            let structs = Structs {
+                receiver: Some(set.clone()),
+                argument: Some(set.clone()),
+            };
+            let frames = Frames::new(
+                Representative::Struct,
+                Representative::Struct,
+                &structs,
+                &[DataType::Int64],
+            );
+            for name in ["a", "b", "ra", "rb"] {
+                let column = frames.dtype_of(name).expect("a column");
+                assert_eq!(column, &set.dtype(), "{name}");
+            }
+            assert_eq!(frames.rows.height(), 3);
+            assert_eq!(frames.empty.height(), 0);
+            assert_eq!(
+                frames.empty.column("a").expect("a column").dtype(),
+                &set.dtype()
+            );
+            // The walk reads the same fields from the schema as the case names.
+            let walked = dageist_engine::allowed::Fields::of_dtype(
+                frames.rows.schema().get("a").expect("a column"),
+            )
+            .expect("a struct");
+            assert_eq!(walked.names().count(), set.len());
+        }
+        // A struct column that names no fields has the struct the tables measured.
+        let measured = Frames::new(
+            Representative::Struct,
+            Representative::Int8,
+            &Structs::default(),
+            &[],
+        );
+        assert_eq!(
+            measured.dtype_of("a"),
+            Some(&Representative::Struct.dtype())
+        );
+    }
+
+    #[test]
+    fn tables_with_nulls_hold_one_in_every_column_and_keep_their_dtypes() {
+        let frames = Frames::new(
+            Representative::String,
+            Representative::Boolean,
+            &Structs::default(),
+            &[DataType::Int64],
+        )
+        .with_nulls();
+        for table in [&frames.rows, &frames.other_rows] {
+            assert_eq!(table.height(), 3);
+            for column in table.columns() {
+                assert!(column.null_count() >= 1, "{}", column.name());
+            }
+        }
+        let h = frames.rows.column("h").expect("a column");
+        assert_eq!(h.null_count(), 1);
+        assert_eq!(h.dtype(), &DataType::String);
+        assert_eq!(frames.empty.height(), 0);
+        assert_eq!(frames.empty.width(), frames.rows.width());
+    }
+
+    #[test]
     fn rows_picked_keep_the_columns_their_dtypes_and_their_values() {
         let frames = Frames::new(
             Representative::Date,
             Representative::Int8,
+            &Structs::default(),
             &[DataType::Int64],
         )
         .picked(&[0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]);
@@ -381,8 +534,13 @@ mod tests {
         let a = frames.rows.column("a").expect("a column");
         assert_eq!(a.dtype(), &Representative::Date.dtype());
         assert_eq!(a.null_count(), 4);
-        let tied =
-            Frames::new(Representative::Date, Representative::Int8, &[]).picked(&[1, 2, 1, 2]);
+        let tied = Frames::new(
+            Representative::Date,
+            Representative::Int8,
+            &Structs::default(),
+            &[],
+        )
+        .picked(&[1, 2, 1, 2]);
         let u = tied.rows.column("u").expect("a column");
         assert_eq!(u.n_unique().expect("the values that differ"), 2);
     }

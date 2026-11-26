@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.pivot","arguments":{"on":{"columns":["h"]},"on_columns":{"table":"on_h"},"values":{"columns":["a"]},"aggregate_function":{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[{"entry":"Expr.value_counts","arguments":{}},{"entry":"Expr.nan_min","arguments":{}},{"entry":"Expr.struct.rename_fields","arguments":{"names":{"many":[{"string":"k"},{"string":"value"},{"string":"k"}]}}}]}}}}}]}

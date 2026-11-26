@@ -414,7 +414,10 @@ function MethodLink({
           around={{
             frame,
             items: () => [],
-            method: entry === null ? undefined : { entry: entry.id, place },
+            method:
+              entry === null
+                ? undefined
+                : { entry: entry.id, place, fields: dtypes?.fields[index]?.fields ?? null },
           }}
           layout="inline"
         />

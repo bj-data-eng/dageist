@@ -43,6 +43,8 @@ export function shownOf(argument: ArgumentView | undefined): Shown | null {
     case 'pattern':
     case 'path':
       return { text: true, shown: argument.text };
+    case 'field':
+      return { text: true, shown: argument.name };
     case 'timeZone':
       return argument.zone === null ? null : { text: true, shown: argument.zone };
     default:

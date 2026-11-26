@@ -79,6 +79,8 @@ pub enum ArgumentView {
     },
     /// Names of input columns.
     Columns { names: Vec<String> },
+    /// The name of a field of a struct.
+    Field { name: String },
     /// A whole number, as the engine shows it.
     Integer { shown: String },
     /// A number with a fraction, as the engine shows it.
@@ -153,6 +155,7 @@ fn argument_view(value: &Value) -> ArgumentView {
         Value::Columns(names) => ArgumentView::Columns {
             names: names.clone(),
         },
+        Value::Field(name) => ArgumentView::Field { name: name.clone() },
         Value::Integer(number) => ArgumentView::Integer {
             shown: Literal::Integer(*number).shown(),
         },
@@ -303,6 +306,7 @@ pub(crate) struct EntryRequest {
 pub(crate) enum ValueRequest {
     Expression { expression: ExpressionRequest },
     Columns { names: Vec<String> },
+    Field { name: String },
     Integer { value: i64 },
     Float { value: f64 },
     String { value: String },
@@ -323,6 +327,7 @@ impl ValueRequest {
         Ok(match self {
             Self::Expression { expression } => Value::Expression(expression.expression()?),
             Self::Columns { names } => Value::Columns(names.clone()),
+            Self::Field { name } => Value::Field(name.clone()),
             Self::Integer { value } => Value::Integer(*value),
             Self::Float { value } => Value::Float(*value),
             Self::String { value } => Value::String(value.clone()),
@@ -546,6 +551,7 @@ impl EditRequest {
 pub(crate) enum ValueKindView {
     Expression,
     Columns,
+    Field,
     Integer,
     Float,
     String,
@@ -565,6 +571,7 @@ pub(crate) const fn value_kind_view(kind: ValueKind) -> ValueKindView {
     match kind {
         ValueKind::Expression => ValueKindView::Expression,
         ValueKind::Columns => ValueKindView::Columns,
+        ValueKind::Field => ValueKindView::Field,
         ValueKind::Integer => ValueKindView::Integer,
         ValueKind::Float => ValueKindView::Float,
         ValueKind::String => ValueKindView::String,
@@ -584,9 +591,10 @@ pub(crate) const fn value_kind_view(kind: ValueKind) -> ValueKindView {
 #[cfg(test)]
 impl ValueKindView {
     /// Every kind, in the order the contract lists them, for the vocabulary snapshot.
-    pub(crate) const ALL: [Self; 15] = [
+    pub(crate) const ALL: [Self; 16] = [
         Self::Expression,
         Self::Columns,
+        Self::Field,
         Self::Integer,
         Self::Float,
         Self::String,

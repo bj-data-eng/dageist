@@ -363,11 +363,20 @@ fn symbol_word(symbol: &str) -> String {
         .collect()
 }
 
+/// What Polars says of a field it did not find, before the name it was asked for.
+const NOT_FOUND: &str = "field not found:";
+
 /// The words of a reason that say what Polars objected to, and to which call:
 /// what is quoted, in parentheses or a dtype is the part's, not the objection's,
 /// but what is quoted in backticks that is no dtype or column, and the symbol of
 /// a comparison or an operation, name the call.
 fn objection(reason: &str) -> String {
+    // The name of a field that was not found is the one the call was given, as a column's is.
+    let reason = reason.split_once(NOT_FOUND).map_or_else(
+        || reason.to_owned(),
+        |(before, _)| format!("{before}{NOT_FOUND}"),
+    );
+    let reason = reason.as_str();
     const DTYPES: [&str; 20] = [
         "str",
         "string",
@@ -502,6 +511,24 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
         Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
+        // A name that is no field is one Polars did not find, and a field named twice or names of
+        // another number are refused in its own words.
+        Source::Rule(rule) if *rule == FIELD_RULE => probe.contains(NOT_FOUND),
+        // The operation Polars does not do on a struct, or the field it cannot do it with.
+        Source::Rule(rule) if *rule == STRUCT_ARITHMETIC_RULE => {
+            probe.contains("operation not supported for dtype `struct")
+                || probe.contains("a struct with non-numeric field")
+                || probe.contains("must specify one field in the struct")
+        }
+        Source::Rule(rule) if *rule == FIELD_NAMES_RULE || *rule == TO_STRUCT_NAMES_RULE => {
+            probe.contains("multiple fields with name")
+                || probe.contains("different number of fields")
+                || probe.contains("number of field names provided")
+        }
+        // A struct filled by a strategy that Polars refuses it for where it holds a null.
+        Source::Rule(rule) if *rule == STRUCT_FILL_RULE => {
+            probe.contains("fill null strategy not yet supported")
+        }
         // A count that values meet, or a window is given, is refused as lengths that do not match.
         Source::Rule(rule) if COUNT_MEETING_RULES.contains(rule) => is_a_refusal_of_lengths(probe),
         // Polars finds no dtype that two zones have in common, and says it of a comparison as it
@@ -638,12 +665,105 @@ fn enclosing_probe(found: &Found) -> Option<Probe> {
     })
 }
 
+/// The name an expression is written under where no call of it renames it: a literal is `literal`,
+/// a column is its own name, and a struct is named as its first input is.
+fn name_written(expression: &Expression) -> Option<String> {
+    // A chain keeps the name its start gives it unless a call renames it or reads a field.
+    let keeps_its_name = expression.links().iter().all(|link| {
+        let id = link.entry().id().as_str();
+        !id.starts_with("Expr.struct.") && !id.starts_with("Expr.name.") && id != "Expr.alias"
+    });
+    if !keeps_its_name {
+        return None;
+    }
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    match start.entry().id().as_str() {
+        "polars.lit" => Some("literal".to_owned()),
+        "polars.col" => match start.argument("name") {
+            Some(Value::Columns(names)) if names.len() == 1 => names.first().cloned(),
+            _ => None,
+        },
+        "polars.struct" => match start.argument("exprs") {
+            Some(Value::Many(items)) => match items.first() {
+                Some(Value::Expression(first)) => name_written(first),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// The probe of a struct whose fields would be named alike: the struct made only of the inputs that
+/// write the name the rule says, those of its expressions that no call renames and that are written
+/// under it, and its named inputs of that name.
+fn writers_of_a_name_probe(found: &Found, refused: &Refused) -> Option<Probe> {
+    if !matches!(found.rest, [] | [Segment::Start])
+        || !matches!(found.expression.start(), Start::Call(start)
+        if start.entry().id().as_str() == "polars.struct")
+    {
+        return None;
+    }
+    let name = refused.reason.split('"').nth(1)?;
+    let Start::Call(start) = found.expression.start() else {
+        return None;
+    };
+    // Each writer stands as its start, which gives the name it writes, without the calls that go
+    // on from it and that Polars may refuse before it meets the names.
+    let kept: Vec<Value> = match start.argument("exprs")? {
+        Value::Many(items) => items
+            .iter()
+            .filter_map(|item| match item {
+                Value::Expression(expression)
+                    if name_written(expression).as_deref() == Some(name) =>
+                {
+                    Expression::new(expression.start().clone(), Vec::new())
+                        .ok()
+                        .map(Value::Expression)
+                }
+                _ => None,
+            })
+            .collect(),
+        _ => return None,
+    };
+    let named: Vec<(Value, Value)> = match start.argument("named_exprs") {
+        Some(Value::Pairs(pairs)) => pairs
+            .iter()
+            .filter(|(key, _)| matches!(key, Value::Columns(names) if names.as_slice() == [name.to_owned()]))
+            .cloned()
+            .collect(),
+        _ => Vec::new(),
+    };
+    if kept.len() + named.len() < 2 {
+        return None;
+    }
+    let mut given = vec![("exprs", Value::Many(kept))];
+    if !named.is_empty() {
+        given.push(("named_exprs", Value::Pairs(named)));
+    }
+    let only = call("polars.struct", given)?;
+    let held = place_of_the_part(found, false);
+    Some(Probe {
+        part: Expression::new(Start::Call(only), Vec::new()).ok()?,
+        filter: false,
+        before: None,
+        at: vec![held.clone(), held.then(Segment::Start)],
+    })
+}
+
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
         Source::Polars => chain_probe(found),
         Source::Rule(rule)
-            if *rule == COUNT_RULE || *rule == ZONE_RULE || COUNT_MEETING_RULES.contains(rule) =>
+            if *rule == COUNT_RULE
+                || *rule == ZONE_RULE
+                || *rule == FIELD_RULE
+                || *rule == FIELD_NAMES_RULE
+                || *rule == STRUCT_ARITHMETIC_RULE
+                || COUNT_MEETING_RULES.contains(rule) =>
         {
             chain_probe(found)
         }
@@ -664,6 +784,26 @@ const ZONE_WORDS: [&str; 3] = [
     "failed to determine supertype",
     "is incompatible with expected type",
 ];
+
+/// The rule that a name a call reads or drops be a field of the struct it follows, whose refusal
+/// Polars shows by the field it did not find.
+const FIELD_RULE: &str = "field-is-of-the-struct";
+
+/// The rule that the names given to the fields of a struct be as many as its fields and no two
+/// alike, whose refusal Polars shows by a field named twice or by another number of names.
+const FIELD_NAMES_RULE: &str = "field-names-fit-the-struct";
+
+/// The rule that a struct be filled only forward or backward, whose refusal Polars shows by the
+/// strategy it does not support for a struct.
+const STRUCT_FILL_RULE: &str = "struct-is-filled-forward-or-backward";
+
+/// The rule that no two names alike be given to the fields of a struct a list or an array is made,
+/// which Polars accepts and, where it refuses the names, shows as it does for `FIELD_NAMES_RULE`.
+const TO_STRUCT_NAMES_RULE: &str = "to-struct-names-are-distinct";
+
+/// The rule that arithmetic with a struct needs its fields to be numbers, whose refusal Polars
+/// shows by the operation it does not do on a struct or by the field that is no number.
+const STRUCT_ARITHMETIC_RULE: &str = "struct-arithmetic-needs-numbers";
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.
@@ -770,11 +910,17 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     if matches!(refused.source, Source::Polars) && is_a_count_that_may_not_end(&refused.reason) {
         probes.push(enclosing_probe(&found));
     }
+    // A struct that holds a part Polars refuses first is refused whole for that, and not for the
+    // names alike the rule found, which the inputs that write the name show alone.
+    if matches!(&refused.source, Source::Rule(rule) if *rule == FIELD_NAMES_RULE) {
+        probes.push(writers_of_a_name_probe(&found, refused));
+    }
     let run = |part: Expression, filter: bool| {
         let document = document_of(case, &found, part, filter)?;
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         })
     };
@@ -806,6 +952,7 @@ pub fn cases_of_the_part(case: &Case, refused: &Refused) -> Option<(Case, Option
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         })
     };
@@ -840,6 +987,7 @@ pub fn counts_alone(case: &Case, refused: &Refused) -> Vec<Case> {
             Some(Case {
                 receiver: case.receiver,
                 argument: case.argument,
+                structs: case.structs.clone(),
                 document,
             })
         })
@@ -1025,6 +1173,7 @@ pub fn settle_on_a_value(
         let probed = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         };
         let at = place_of_the_part(&found, false).then(Segment::Link(0));
@@ -1091,6 +1240,7 @@ pub fn settle_a_start_given_columns(
         let probed = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         };
         let at = place_of_the_part(&found, false).then(Segment::Start);
@@ -1142,6 +1292,7 @@ pub fn settle_a_predicate_on_a_value(
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: document_of(case, &found, probe.part, probe.filter)?,
     };
     let tables = Tables::standing(found.on_the_other_table, &[class])?;
@@ -1384,6 +1535,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: join_on(case, parameter, &part)?,
     };
     let at = Place::of_step(0, StepId::new(STEP).ok())
@@ -1394,6 +1546,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         let alone = Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: join_on(case, parameter, &before)?,
         };
         if refused_anywhere_as(&alone, Tables::default(), refused) {
@@ -1452,6 +1605,7 @@ pub fn settle_on_a_value_as_a_key(
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: join_on(case, parameter, &part)?,
     };
     let at = Place::of_step(0, StepId::new(STEP).ok())
@@ -1583,6 +1737,7 @@ pub fn settle_in_the_position(
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: step_with(case, parameter, part)?,
         })
     };
@@ -1591,6 +1746,7 @@ pub fn settle_in_the_position(
     let selected = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: document_of(case, &found, part.clone(), false)?,
     };
     let differs_as_the_tables_say = observe_probe(&selected, on(class))
@@ -1743,6 +1899,7 @@ fn is_refused_for_its_predicate(case: &Case, place: &Place) -> bool {
         .map(|document| Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document,
         });
     made_false.is_some_and(|made_false| (0..RUNS).all(|_| observe(&made_false).refusal.is_none()))
@@ -1966,6 +2123,7 @@ pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Opt
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         })
     };
@@ -2055,6 +2213,7 @@ pub fn settle_given_no_known_dtype(case: &Case, refused: &Refused) -> Option<Set
         Some(Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: document_of(case, &found, part, false)?,
         })
     };
@@ -2414,6 +2573,19 @@ mod tests {
         assert!(found.reason.contains("compare"), "{}", found.reason);
     }
 
+    #[test]
+    fn two_fields_named_alike_are_probed_by_the_inputs_that_write_the_name_alone() {
+        // The struct holds a part that Polars refuses first, a field read of text, so the whole of
+        // it is refused for another reason: the two literals that write one name are the probe.
+        let found =
+            settled("stricter-two-fields-named-alike-in-a-struct-with-a-part-no-table-judges.case");
+        assert!(
+            found.reason.contains("multiple fields with name"),
+            "{}",
+            found.reason
+        );
+    }
+
     /// A case that selects the chain `a` followed by the `links` (calls with no
     /// arguments) on columns of `receiver`.
     fn chain_of(receiver: &str, start: &str, links: &[&str]) -> Case {
@@ -2517,6 +2689,92 @@ mod tests {
             "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date",
             "could not evaluate '>' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date"
         ));
+    }
+
+    #[test]
+    fn a_field_that_is_none_is_one_objection_whatever_the_name_it_was_asked_for() {
+        // The tables measured a read of `x`, and a case reads the name it was drawn with.
+        for probe in [
+            "field not found: field_9",
+            "field not found: x ",
+            "field not found: id",
+        ] {
+            assert!(
+                same_reason(&Source::Polars, "field not found: x", probe),
+                "{probe}"
+            );
+        }
+        for probe in [
+            "lengths don't match: zip node received non-equal length inputs",
+            "`cum_sum` operation not supported for dtype `date`",
+            "struct.rename_fields() argument has a different number of fields than the struct it operates on (1 vs 2).",
+        ] {
+            assert!(
+                !same_reason(&Source::Polars, "field not found: x", probe),
+                "{probe}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_rule_that_a_field_be_one_of_the_struct_is_met_by_polars_not_finding_the_field() {
+        let rule = Source::Rule("field-is-of-the-struct");
+        let said = "\"zz\" is no field of the struct, whose fields are \"x\"";
+        assert!(same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
+        assert!(!same_reason(
+            &rule,
+            said,
+            "duplicate: multiple fields with name 'literal' found"
+        ));
+    }
+
+    #[test]
+    fn the_rule_for_struct_arithmetic_is_met_by_polars_refusing_the_operation_or_the_field() {
+        let rule = Source::Rule("struct-arithmetic-needs-numbers");
+        let said = "`abs` is not done on a struct, whatever its fields are";
+        assert!(same_reason(
+            &rule,
+            said,
+            "`abs` operation not supported for dtype `struct[1]`"
+        ));
+        assert!(same_reason(
+            &rule,
+            "cannot - a struct with non-numeric field: (field: y, dtype: String)",
+            "cannot - a struct with non-numeric field: (field: y, dtype: str)"
+        ));
+        // A quotient by a column is refused in another word, where a field is no number.
+        assert!(same_reason(
+            &rule,
+            "cannot / a struct with non-numeric field: (field: g, dtype: String)",
+            "must specify one field in the struct"
+        ));
+        assert!(!same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
+    }
+
+    #[test]
+    fn the_rule_that_names_fit_the_struct_is_met_by_polars_refusing_a_name_twice_or_another_number()
+    {
+        let rule = Source::Rule("field-names-fit-the-struct");
+        let said = "two fields would be named \"literal\"";
+        assert!(same_reason(
+            &rule,
+            said,
+            "duplicate: multiple fields with name 'literal' found"
+        ));
+        assert!(same_reason(
+            &rule,
+            "3 names are given to a struct of 2 fields",
+            "struct.rename_fields() argument has a different number of fields than the struct it operates on (3 vs 2)."
+        ));
+        assert!(same_reason(
+            &rule,
+            "1 names are given to an array of 2 places",
+            "arr.to_struct() number of field names provided (1) does not match width of input (2)."
+        ));
+        assert!(!same_reason(&rule, said, "field not found: zz"));
+        assert!(!same_reason(&rule, said, "lengths don't match"));
     }
 
     /// What the tables predict and Polars gives of the case, to settle it on a

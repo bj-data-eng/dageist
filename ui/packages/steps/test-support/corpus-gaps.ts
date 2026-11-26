@@ -72,6 +72,8 @@ function oneFits(control: OneControl, value: ArgumentView): string | null {
         return ['expression'];
       case 'column':
         return ['columns'];
+      case 'field':
+        return ['field'];
       case 'literal':
         switch (control.type) {
           case 'integer':
@@ -343,6 +345,7 @@ class Rebuild {
         }
         return;
       case 'columns':
+      case 'field':
       case 'integer':
       case 'float':
       case 'string':

@@ -156,22 +156,29 @@ pub dageist_engine::allowed::Rule::DurationIsValid
 pub dageist_engine::allowed::Rule::ElementDtypeIsImplemented
 pub dageist_engine::allowed::Rule::ElementDtypeIsMeasured
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
+pub dageist_engine::allowed::Rule::FieldIsOfTheStruct
+pub dageist_engine::allowed::Rule::FieldNamesFitTheStruct
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::MomentsShareAZone
+pub dageist_engine::allowed::Rule::OneColumnIsNeeded
 pub dageist_engine::allowed::Rule::ParameterTakesOneValue
 pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::RangeIsValid
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
+pub dageist_engine::allowed::Rule::StructArithmeticNeedsNumbers
+pub dageist_engine::allowed::Rule::StructIsFilledForwardOrBackward
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
+pub dageist_engine::allowed::Rule::ToStructNamesAreDistinct
 pub dageist_engine::allowed::Rule::ValuesMeetInCount
 pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
+pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 20]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 27]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -200,8 +207,19 @@ pub dageist_engine::allowed::Typed::Pattern
 pub dageist_engine::allowed::Typed::TimeZone
 pub dageist_engine::allowed::Typed::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::allowed::Unknown
+pub dageist_engine::allowed::Unknown::AnOpenNumberInAKey
+pub dageist_engine::allowed::Unknown::AnUnnestAmongPredicates
+pub dageist_engine::allowed::Unknown::AnUnnestAsAKey
+pub dageist_engine::allowed::Unknown::AnUnnestOfNoField
+pub dageist_engine::allowed::Unknown::ArithmeticOnAStruct
+pub dageist_engine::allowed::Unknown::SeveralColumnsOfAFieldRead
+pub dageist_engine::allowed::Unknown::StructsOfOtherFieldsMeet
+pub dageist_engine::allowed::Unknown::TheFieldsOfAStruct
 pub dageist_engine::allowed::Unknown::TheResultsDtype
 pub dageist_engine::allowed::Unknown::TheStartsDtype
+impl dageist_engine::allowed::Unknown
+pub const dageist_engine::allowed::Unknown::ALL: [Self; 10]
+pub const fn dageist_engine::allowed::Unknown::name(self) -> &'static str
 impl core::fmt::Display for dageist_engine::allowed::Unknown
 pub fn dageist_engine::allowed::Unknown::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Unread
@@ -225,22 +243,33 @@ pub const fn dageist_engine::allowed::Verdict::refusal(&self) -> core::option::O
 pub struct dageist_engine::allowed::Allowance
 impl dageist_engine::allowed::Allowance
 pub const fn dageist_engine::allowed::Allowance::can_end(&self) -> &dageist_engine::allowed::Ending
+pub const fn dageist_engine::allowed::Allowance::columns(&self) -> core::option::Option<&dageist_engine::allowed::Fields>
+pub const fn dageist_engine::allowed::Allowance::fields(&self) -> core::option::Option<&dageist_engine::allowed::Fields>
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
+pub const fn dageist_engine::allowed::Allowance::width(&self) -> core::option::Option<usize>
 pub struct dageist_engine::allowed::ArgumentSlot<'a>
 impl<'a> dageist_engine::allowed::ArgumentSlot<'a>
 pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dageist_engine::catalog::Entry, parameter: &'a str, method_place: dageist_engine::allowed::Place) -> Self
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::among_others(self, others: usize) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::following(self, unit: core::option::Option<polars_core::datatypes::temporal::time_unit::TimeUnit>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::following_fields(self, fields: core::option::Option<&'a dageist_engine::allowed::Fields>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::following_width(self, width: core::option::Option<usize>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_one(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_shape(self, shape: dageist_engine::allowed::Shape) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::in_zone(self, zone: core::option::Option<&'a str>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::named(self, name: core::option::Option<&'a str>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_argument_fields(self, fields: &'a [(&'a str, &'a dageist_engine::allowed::Fields)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_inputs(self, inputs: &'a [dageist_engine::allowed::Input<'a>]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_names(self, names: &'a [(&'a str, &'a str)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_numbers(self, numbers: &'a [(&'a str, i64)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_open_numbers(self, numbers: &'a [&'a str]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_time_zones(self, time_zones: &'a [(&'a str, core::option::Option<&'a str>)]) -> Self
@@ -263,10 +292,40 @@ pub struct dageist_engine::allowed::DefaultArgument
 impl dageist_engine::allowed::DefaultArgument
 pub const fn dageist_engine::allowed::DefaultArgument::literal(&self) -> &dageist_engine::allowed::Literal
 pub const fn dageist_engine::allowed::DefaultArgument::parameter(&self) -> &'static str
+pub struct dageist_engine::allowed::Field
+impl dageist_engine::allowed::Field
+pub const fn dageist_engine::allowed::Field::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
+pub const fn dageist_engine::allowed::Field::fields(&self) -> core::option::Option<&dageist_engine::allowed::Fields>
+pub fn dageist_engine::allowed::Field::name(&self) -> &str
+pub fn dageist_engine::allowed::Field::of_class(name: impl core::convert::Into<alloc::string::String>, class: core::option::Option<dageist_engine::allowed::Representative>) -> Self
+pub fn dageist_engine::allowed::Field::of_dtype(name: impl core::convert::Into<alloc::string::String>, dtype: &polars_core::datatypes::dtype::DataType) -> Self
+pub fn dageist_engine::allowed::Field::shown(&self) -> &str
+pub const fn dageist_engine::allowed::Field::width(&self) -> core::option::Option<usize>
+pub fn dageist_engine::allowed::Field::written(&self) -> core::option::Option<&str>
+pub struct dageist_engine::allowed::Fields(_)
+impl dageist_engine::allowed::Fields
+pub fn dageist_engine::allowed::Fields::get(&self, name: &str) -> core::option::Option<&dageist_engine::allowed::Field>
+pub const fn dageist_engine::allowed::Fields::is_empty(&self) -> bool
+pub fn dageist_engine::allowed::Fields::iter(&self) -> core::slice::iter::Iter<'_, dageist_engine::allowed::Field>
+pub const fn dageist_engine::allowed::Fields::len(&self) -> usize
+pub fn dageist_engine::allowed::Fields::listed(&self) -> alloc::string::String
+pub fn dageist_engine::allowed::Fields::names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn dageist_engine::allowed::Fields::new(fields: alloc::vec::Vec<dageist_engine::allowed::Field>) -> core::result::Result<Self, dageist_engine::allowed::RepeatedName>
+pub fn dageist_engine::allowed::Fields::of_dtype(dtype: &polars_core::datatypes::dtype::DataType) -> core::option::Option<Self>
+pub fn dageist_engine::allowed::Fields::written(&self) -> alloc::string::String
+impl<'a> core::iter::traits::collect::IntoIterator for &'a dageist_engine::allowed::Fields
+pub type &'a dageist_engine::allowed::Fields::IntoIter = core::slice::iter::Iter<'a, dageist_engine::allowed::Field>
+pub type &'a dageist_engine::allowed::Fields::Item = &'a dageist_engine::allowed::Field
+pub fn &'a dageist_engine::allowed::Fields::into_iter(self) -> Self::IntoIter
 pub struct dageist_engine::allowed::Fit
 impl dageist_engine::allowed::Fit
 pub const fn dageist_engine::allowed::Fit::dtype(&self) -> dageist_engine::allowed::Representative
 pub const fn dageist_engine::allowed::Fit::verdict(&self) -> &dageist_engine::allowed::Verdict
+pub struct dageist_engine::allowed::Input<'a>
+impl<'a> dageist_engine::allowed::Input<'a>
+pub const fn dageist_engine::allowed::Input<'a>::loose_if(self, loose: bool) -> Self
+pub const fn dageist_engine::allowed::Input<'a>::new(name: core::option::Option<&'a str>, class: core::option::Option<dageist_engine::allowed::Representative>, fields: core::option::Option<&'a dageist_engine::allowed::Fields>) -> Self
+pub const fn dageist_engine::allowed::Input<'a>::with_width(self, width: core::option::Option<usize>) -> Self
 pub struct dageist_engine::allowed::Offer
 impl dageist_engine::allowed::Offer
 pub const fn dageist_engine::allowed::Offer::entry(&self) -> &'static dageist_engine::catalog::Entry
@@ -304,6 +363,12 @@ pub const fn dageist_engine::allowed::Refusal::source(&self) -> dageist_engine::
 impl core::error::Error for dageist_engine::allowed::Refusal
 impl core::fmt::Display for dageist_engine::allowed::Refusal
 pub fn dageist_engine::allowed::Refusal::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::allowed::RepeatedName(_)
+impl dageist_engine::allowed::RepeatedName
+pub fn dageist_engine::allowed::RepeatedName::name(&self) -> &str
+impl core::error::Error for dageist_engine::allowed::RepeatedName
+impl core::fmt::Display for dageist_engine::allowed::RepeatedName
+pub fn dageist_engine::allowed::RepeatedName::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::allowed::ResultDtype
 impl dageist_engine::allowed::ResultDtype
 pub const fn dageist_engine::allowed::ResultDtype::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
@@ -332,6 +397,7 @@ pub fn dageist_engine::allowed::refuse_an_argument_not_judged(entry: &'static da
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_name_written_twice(name: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_range_that_cannot_be_made(said: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_receiver(entry: &dageist_engine::catalog::Entry, receiver: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -356,6 +422,7 @@ pub dageist_engine::catalog::Argument::Columns(alloc::vec::Vec<alloc::string::St
 pub dageist_engine::catalog::Argument::Dtype(polars_core::datatypes::dtype::DataType)
 pub dageist_engine::catalog::Argument::Duration(alloc::string::String)
 pub dageist_engine::catalog::Argument::Expression(polars_plan::dsl::expr::Expr)
+pub dageist_engine::catalog::Argument::Field(alloc::string::String)
 pub dageist_engine::catalog::Argument::Flag(core::option::Option<bool>)
 pub dageist_engine::catalog::Argument::Float(f64)
 pub dageist_engine::catalog::Argument::Integer(i64)
@@ -468,10 +535,11 @@ pub dageist_engine::catalog::Dtypes::Integer
 pub dageist_engine::catalog::Dtypes::List
 pub dageist_engine::catalog::Dtypes::Numeric
 pub dageist_engine::catalog::Dtypes::String
+pub dageist_engine::catalog::Dtypes::Struct
 pub dageist_engine::catalog::Dtypes::Temporal
 pub dageist_engine::catalog::Dtypes::Time
 impl dageist_engine::catalog::Dtypes
-pub const dageist_engine::catalog::Dtypes::ALL: [Self; 12]
+pub const dageist_engine::catalog::Dtypes::ALL: [Self; 13]
 pub const fn dageist_engine::catalog::Dtypes::key(self) -> &'static str
 pub enum dageist_engine::catalog::DurationUse
 pub dageist_engine::catalog::DurationUse::Cut
@@ -495,12 +563,13 @@ pub dageist_engine::catalog::Family::Rows
 pub dageist_engine::catalog::Family::Search
 pub dageist_engine::catalog::Family::Start
 pub dageist_engine::catalog::Family::Steps
+pub dageist_engine::catalog::Family::Structs
 pub dageist_engine::catalog::Family::Temporal
 pub dageist_engine::catalog::Family::Text
 pub dageist_engine::catalog::Family::Trigonometry
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 21]
+pub const dageist_engine::catalog::Family::ALL: [Self; 22]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -508,6 +577,7 @@ pub dageist_engine::catalog::Kind::Column
 pub dageist_engine::catalog::Kind::Dtype
 pub dageist_engine::catalog::Kind::Duration
 pub dageist_engine::catalog::Kind::Expression(&'static [dageist_engine::catalog::Dtypes])
+pub dageist_engine::catalog::Kind::Field
 pub dageist_engine::catalog::Kind::Flag
 pub dageist_engine::catalog::Kind::Pairs(&'static dageist_engine::catalog::Kind, &'static dageist_engine::catalog::Kind)
 pub dageist_engine::catalog::Kind::Path
@@ -662,6 +732,7 @@ pub fn dageist_engine::catalog::Arguments::columns(&self, parameter: &'static st
 pub fn dageist_engine::catalog::Arguments::duration(&self, parameter: &'static str) -> core::result::Result<alloc::string::String, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::expression(&self, parameter: &'static str) -> core::result::Result<core::option::Option<polars_plan::dsl::expr::Expr>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::expressions(&self, parameter: &'static str) -> core::result::Result<alloc::vec::Vec<polars_plan::dsl::expr::Expr>, dageist_engine::catalog::BuildError>
+pub fn dageist_engine::catalog::Arguments::fields(&self, parameter: &'static str) -> core::result::Result<alloc::vec::Vec<alloc::string::String>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::flag(&self, parameter: &'static str, default: bool) -> core::result::Result<bool, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::get(&self, parameter: &str) -> core::option::Option<&dageist_engine::catalog::Argument>
 pub fn dageist_engine::catalog::Arguments::new() -> Self
@@ -669,6 +740,7 @@ pub fn dageist_engine::catalog::Arguments::pairs(&self, parameter: &'static str)
 pub fn dageist_engine::catalog::Arguments::pattern(&self, parameter: &'static str, means: dageist_engine::catalog::PatternMeans) -> core::result::Result<alloc::string::String, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::required_expression(&self, parameter: &'static str) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::string(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::string::String>, dageist_engine::catalog::BuildError>
+pub fn dageist_engine::catalog::Arguments::strings(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::vec::Vec<alloc::string::String>>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::table(&self, parameter: &'static str) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::time_zone(&self, parameter: &'static str, takes_none: bool) -> core::result::Result<core::option::Option<polars_core::datatypes::temporal::time_zone::TimeZone>, dageist_engine::catalog::BuildError>
 pub struct dageist_engine::catalog::DurationError
@@ -971,6 +1043,7 @@ pub dageist_engine::document::Value::Columns(alloc::vec::Vec<alloc::string::Stri
 pub dageist_engine::document::Value::Dtype(dageist_engine::document::Dtype)
 pub dageist_engine::document::Value::Duration(alloc::string::String)
 pub dageist_engine::document::Value::Expression(dageist_engine::document::Expression)
+pub dageist_engine::document::Value::Field(alloc::string::String)
 pub dageist_engine::document::Value::Flag(core::option::Option<bool>)
 pub dageist_engine::document::Value::Float(f64)
 pub dageist_engine::document::Value::Integer(i64)
@@ -989,6 +1062,7 @@ pub dageist_engine::document::ValueKind::Columns
 pub dageist_engine::document::ValueKind::Dtype
 pub dageist_engine::document::ValueKind::Duration
 pub dageist_engine::document::ValueKind::Expression
+pub dageist_engine::document::ValueKind::Field
 pub dageist_engine::document::ValueKind::Flag
 pub dageist_engine::document::ValueKind::Float
 pub dageist_engine::document::ValueKind::Integer
@@ -1247,6 +1321,7 @@ pub fn dageist_engine::document::WalkedExpression::calls(&self) -> &[dageist_eng
 pub const fn dageist_engine::document::WalkedExpression::context(&self) -> core::option::Option<dageist_engine::allowed::Context>
 pub const fn dageist_engine::document::WalkedExpression::count(&self) -> core::option::Option<dageist_engine::allowed::Count>
 pub const fn dageist_engine::document::WalkedExpression::ending(&self) -> core::option::Option<&dageist_engine::allowed::Ending>
+pub fn dageist_engine::document::WalkedExpression::fields(&self) -> &[core::option::Option<dageist_engine::allowed::Fields>]
 pub const fn dageist_engine::document::WalkedExpression::place(&self) -> &dageist_engine::document::Place
 pub fn dageist_engine::document::WalkedExpression::places(&self) -> alloc::vec::Vec<core::option::Option<dageist_engine::allowed::Place>>
 pub const dageist_engine::document::FIRST_VALUES: usize

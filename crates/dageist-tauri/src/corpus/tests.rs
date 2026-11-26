@@ -9,7 +9,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::sync::OnceLock;
 
-use dageist_engine::allowed::{After, Context, Representative, Rule, Shape, Stage};
+use dageist_engine::allowed::{After, Context, Representative, Rule, Shape, Stage, Unknown};
 use dageist_engine::catalog::{self, Applies};
 use dageist_engine::document::{Call, Document, Start, Value};
 use serde_json::Value as Json;
@@ -82,8 +82,18 @@ fn calls_of(document: &Document) -> Vec<&Call> {
 /// no place the walk allows them, each with why. A method the engine allows after a count of
 /// values only with an argument that meets the count is one the corpus can give no such argument
 /// of: a list of many values is refused by the rule that the values a call meets meet in count,
-/// and the argument that would be allowed is the form of `is_in` that Polars has deprecated.
-const NOT_PLACED: [(&str, &str); 1] = [("Expr.is_in", "counted")];
+/// and the argument that would be allowed is the form of `is_in` that Polars has deprecated. A field
+/// read after a count of structs is the other: the values that differ are counted by `value_counts`,
+/// whose fields are the column's own name and the count, so the one name the corpus gives a field
+/// is no field of it. Renaming the fields is the third: a method added to a chain is given no names,
+/// and a struct is refused names that are not as many as its fields.
+const NOT_PLACED: [(&str, &str); 5] = [
+    ("Expr.is_in", "counted"),
+    ("Expr.struct.field", "counted"),
+    ("Expr.struct.rename_fields", "counted"),
+    ("Expr.struct.rename_fields", "many"),
+    ("Expr.struct.rename_fields", "one"),
+];
 
 /// What the engine allows of the methods, by the entry and the word of the shape, over every place
 /// of the grid.
@@ -362,8 +372,24 @@ fn the_corpus_holds_each_outcome_of_a_step_each_state_of_its_rows_and_each_cause
 /// give a call three rules and the walk the others the corpus meets, among them those of a pattern,
 /// a duration, a time zone, a range, a join's keys, a window given a count of values, a replacement
 /// and two moments of different zones, for each of which a document is made by editing one that is
-/// allowed. These three are the rest.
+/// allowed. These are the rest.
 const NOT_HELD: &[(&str, &str)] = &[
+    (
+        "one-column-is-needed",
+        "no document the corpus plans unnests a struct of several fields where a filter needs one column; one was not tried, and may be built",
+    ),
+    (
+        "to-struct-names-are-distinct",
+        "no document the corpus plans names the fields of a struct a list or an array is made alike; one was not tried, and may be built",
+    ),
+    (
+        "struct-is-filled-forward-or-backward",
+        "no document the corpus plans fills a struct by a strategy; one was not tried, and may be built",
+    ),
+    (
+        "written-names-are-distinct",
+        "no document the corpus plans writes one name twice by a field of a struct; one was not tried, and may be built",
+    ),
     (
         "arrays-meet-at-one-width",
         "the arrays of the corpus's tables are all of the one width the tables measure, 2, so none meets one of another width",
@@ -442,6 +468,75 @@ fn the_corpus_holds_a_refusal_by_each_rule_and_each_stage_of_polars_the_tables_g
         .filter(|rule| !held_rules.contains(*rule))
         .collect();
     let declared: BTreeSet<&str> = NOT_HELD.iter().map(|(rule, _)| *rule).collect();
+    assert_eq!(not_held, declared);
+}
+
+/// The reasons a walk says it cannot tell that no document of the corpus is told by, each with why.
+const UNKNOWN_NOT_HELD: &[(&str, &str)] = &[
+    (
+        "the-fields-of-a-struct",
+        "no document the corpus plans reads, drops or renames a field of a struct whose fields the walk lost; one was not tried, and may be built",
+    ),
+    (
+        "an-unnest-as-a-key",
+        "no document the corpus plans unnests a struct as a join's key; one was not tried, and may be built",
+    ),
+    (
+        "an-unnest-of-no-field",
+        "no document the corpus plans unnests a struct that has no field; one was not tried, and may be built",
+    ),
+    (
+        "an-open-number-in-a-key",
+        "no document the corpus plans makes a struct of a number typed without a dtype as a join's key; one was not tried, and may be built",
+    ),
+    (
+        "several-columns-of-a-field-read",
+        "no document the corpus plans reads a struct by several names outside a select or a sort; one was not tried, and may be built",
+    ),
+    (
+        "an-unnest-among-predicates",
+        "no document the corpus plans unnests a struct beside another predicate of a filter; one was not tried, and may be built",
+    ),
+    (
+        "arithmetic-on-a-struct",
+        "no document the corpus plans calculates with a struct, whose fields it does not make; one was not tried, and may be built",
+    ),
+    (
+        "structs-of-other-fields-meet",
+        "no document the corpus plans meets a struct with a struct of other fields; one was not tried, and may be built",
+    ),
+];
+
+/// Collects the words of every ending that says it cannot tell, in a report.
+fn cannot_tell_in(json: &Json, found: &mut BTreeSet<String>) {
+    match json {
+        Json::Object(fields) => {
+            if fields.get("kind").and_then(Json::as_str) == Some("notKnown")
+                && let Some(because) = fields.get("because").and_then(Json::as_str)
+            {
+                found.insert(because.to_owned());
+            }
+            fields
+                .values()
+                .for_each(|inner| cannot_tell_in(inner, found));
+        }
+        Json::Array(items) => items.iter().for_each(|inner| cannot_tell_in(inner, found)),
+        _ => {}
+    }
+}
+
+#[test]
+fn the_corpus_holds_a_call_the_walk_cannot_tell_for_each_reason_or_declares_it_not_held() {
+    let mut held_reasons = BTreeSet::new();
+    for held in documents() {
+        cannot_tell_in(&held.run, &mut held_reasons);
+    }
+    let not_held: BTreeSet<&str> = Unknown::ALL
+        .iter()
+        .filter(|unknown| !held_reasons.contains(&unknown.to_string()))
+        .map(|unknown| unknown.name())
+        .collect();
+    let declared: BTreeSet<&str> = UNKNOWN_NOT_HELD.iter().map(|(name, _)| *name).collect();
     assert_eq!(not_held, declared);
 }
 

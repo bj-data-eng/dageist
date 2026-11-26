@@ -505,6 +505,12 @@ pub struct ResultDtype {
 }
 
 impl ResultDtype {
+    /// The result dtype written `name`, of the class `class`: a struct written with the fields the
+    /// walk carries, which no table holds.
+    pub(super) const fn new(name: String, class: Option<Representative>) -> Self {
+        Self { name, class }
+    }
+
     /// The result dtype written `name` in a table.
     pub(super) fn from_name(name: &str) -> Self {
         Self {
@@ -569,7 +575,8 @@ fn class_of_name(name: &str) -> Option<Representative> {
     if name.starts_with("Decimal(") {
         return Some(Representative::Decimal);
     }
-    if name.starts_with("Struct(") {
+    // A struct whose fields the walk does not know is written as the class alone.
+    if name == "Struct" || name.starts_with("Struct(") {
         return Some(Representative::Struct);
     }
     if let Some(inside) = name

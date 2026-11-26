@@ -112,6 +112,8 @@ export function wordArgument(kind: KindView, word: string): ValueRequest {
       return { kind: 'dtype', name: word };
     case 'column':
       return { kind: 'columns', names: [word] };
+    case 'field':
+      return { kind: 'field', name: word };
     case 'table':
       return { kind: 'table', name: word };
     case 'timeZone':

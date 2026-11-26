@@ -3,10 +3,11 @@
 //! argument that is only its start. Each is built through the document's own
 //! constructors, so what they refuse is not offered, and nothing is repaired.
 
-use dageist_engine::allowed::Representative;
+use dageist_engine::allowed::{Inner, Representative};
 use dageist_engine::document::{Call, Document, Expression, Step, Value};
 
 use super::case::Case;
+use super::structs::{Field, Fieldset, Kind, Structs};
 
 /// Whether `smaller` encodes shorter than `larger`, or the same length and
 /// lexically below it, as the framework's search measures.
@@ -18,15 +19,50 @@ fn smaller(smaller: &Case, larger: &[u8]) -> bool {
 pub fn candidates(case: &Case) -> Vec<Case> {
     let encoded = case.encode();
     let mut found = Vec::new();
+    // A column that is no longer a struct names no fields.
     for receiver in Representative::MEASURED {
         found.push(Case {
             receiver,
+            structs: Structs {
+                receiver: case
+                    .structs
+                    .receiver
+                    .clone()
+                    .filter(|_| receiver == Representative::Struct),
+                ..case.structs.clone()
+            },
             ..case.clone()
         });
     }
     for argument in Representative::MEASURED {
         found.push(Case {
             argument,
+            structs: Structs {
+                argument: case
+                    .structs
+                    .argument
+                    .clone()
+                    .filter(|_| argument == Representative::Struct),
+                ..case.structs.clone()
+            },
+            ..case.clone()
+        });
+    }
+    for fields in simpler_fields(case.structs.receiver.as_ref()) {
+        found.push(Case {
+            structs: Structs {
+                receiver: fields,
+                ..case.structs.clone()
+            },
+            ..case.clone()
+        });
+    }
+    for fields in simpler_fields(case.structs.argument.as_ref()) {
+        found.push(Case {
+            structs: Structs {
+                argument: fields,
+                ..case.structs.clone()
+            },
             ..case.clone()
         });
     }
@@ -42,6 +78,27 @@ pub fn candidates(case: &Case) -> Vec<Case> {
         }
     }
     found.retain(|candidate| smaller(candidate, &encoded));
+    found
+}
+
+/// The fields of a struct column made simpler: the struct the tables measured, one field left out,
+/// and one field of another dtype than a whole number of the fewest bits.
+fn simpler_fields(fields: Option<&Fieldset>) -> Vec<Option<Fieldset>> {
+    let Some(fields) = fields else {
+        return Vec::new();
+    };
+    let all: Vec<Field> = fields.iter().cloned().collect();
+    let mut found = vec![None];
+    for at in 0..all.len() {
+        let mut without = all.clone();
+        without.remove(at);
+        found.extend(Fieldset::new(without).ok().map(Some));
+        if all[at].kind() != &Kind::Scalar(Inner::Int8) {
+            let mut simple = all.clone();
+            simple[at] = Field::new(all[at].name(), Kind::Scalar(Inner::Int8));
+            found.extend(Fieldset::new(simple).ok().map(Some));
+        }
+    }
     found
 }
 

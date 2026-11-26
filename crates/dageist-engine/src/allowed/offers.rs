@@ -8,8 +8,9 @@ use polars::prelude::{DataType, TimeUnit, TimeZone};
 use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
-use super::context::Context;
+use super::context::{Context, Outer};
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
+use super::fields::{self, Fields, Gives, Input};
 use super::rules::Rule;
 use super::table::{
     LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
@@ -82,18 +83,39 @@ impl ConditionState {
 /// then judged for any dtype of argument that fits.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Chosen<'a> {
-    arguments: &'a [(&'a str, Representative)],
-    options: &'a [(&'a str, &'a str)],
+    pub(super) arguments: &'a [(&'a str, Representative)],
+    pub(super) options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
-    patterns: &'a [(&'a str, &'a str)],
+    pub(super) patterns: &'a [(&'a str, &'a str)],
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
-    width: Option<usize>,
+    pub(super) width: Option<usize>,
     zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
     shape: Option<Shape>,
+    /// The fields of the struct the call follows, where the chain knows them.
+    pub(super) fields: Option<&'a Fields>,
+    /// The fields of each argument that is a struct whose fields the chain knows, by the parameter
+    /// that holds it.
+    pub(super) argument_fields: &'a [(&'a str, &'a Fields)],
+    /// The arguments that are a number typed without a dtype, which adapts to what it meets.
+    pub(super) open_numbers: &'a [&'a str],
+    /// The call follows a number typed without a dtype, which it keeps open in what it makes.
+    pub(super) follows_an_open_number: bool,
+    /// How many other expressions stand beside this one in the list it is an item of: the other
+    /// predicates of a filter.
+    pub(super) among_others: usize,
+    /// The names the call is given, each by the parameter that holds it: the name of a field to read
+    /// or drop, the new names of the fields, the name of a count.
+    pub(super) names: &'a [(&'a str, &'a str)],
+    /// The whole numbers the call is given, each by the parameter that holds it.
+    pub(super) numbers: &'a [(&'a str, i64)],
+    /// The name the value the call follows is written under, where the chain knows it.
+    pub(super) output_name: Option<&'a str>,
+    /// What a call that makes a struct of what it is given is given, one for each.
+    pub(super) inputs: &'a [Input<'a>],
 }
 
 impl<'a> Chosen<'a> {
@@ -179,6 +201,75 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
+        self
+    }
+
+    /// How many other expressions stand beside this one in the list of items it is one of.
+    #[must_use]
+    pub const fn among_others(mut self, others: usize) -> Self {
+        self.among_others = others;
+        self
+    }
+
+    /// The arguments that are a number typed without a dtype, by the parameter that holds each.
+    #[must_use]
+    pub const fn with_open_numbers(mut self, numbers: &'a [&'a str]) -> Self {
+        self.open_numbers = numbers;
+        self
+    }
+
+    /// That the call follows a number typed without a dtype, as the first call of an expression
+    /// that starts with one does.
+    #[must_use]
+    pub(crate) const fn following_an_open_number(mut self, open: bool) -> Self {
+        self.follows_an_open_number = open;
+        self
+    }
+
+    /// The fields of each argument that is a struct whose fields the chain knows, by the parameter
+    /// that holds it.
+    #[must_use]
+    pub const fn with_argument_fields(mut self, fields: &'a [(&'a str, &'a Fields)]) -> Self {
+        self.argument_fields = fields;
+        self
+    }
+
+    /// The fields of the struct the call follows, where the chain knows them.
+    #[must_use]
+    pub const fn following_fields(mut self, fields: Option<&'a Fields>) -> Self {
+        self.fields = fields;
+        self
+    }
+
+    /// The names the call is given, each as `(parameter, name)`, in order: the fields it reads or
+    /// drops, the names it gives the fields, the name it gives a count.
+    #[must_use]
+    pub const fn with_names(mut self, names: &'a [(&'a str, &'a str)]) -> Self {
+        self.names = names;
+        self
+    }
+
+    /// The whole numbers the call is given, each as `(parameter, number)`: how many pieces a text
+    /// is split into.
+    #[must_use]
+    pub const fn with_numbers(mut self, numbers: &'a [(&'a str, i64)]) -> Self {
+        self.numbers = numbers;
+        self
+    }
+
+    /// The name the value the call follows is written under, where the chain knows it: the column a
+    /// count of values names its values by.
+    #[must_use]
+    pub const fn named(mut self, name: Option<&'a str>) -> Self {
+        self.output_name = name;
+        self
+    }
+
+    /// What a function that makes a struct is given, one for each field it makes: the name that
+    /// each is written under and the dtype it has, as far as they are known.
+    #[must_use]
+    pub const fn with_inputs(mut self, inputs: &'a [Input<'a>]) -> Self {
+        self.inputs = inputs;
         self
     }
 
@@ -358,6 +449,62 @@ pub enum Unknown {
     /// A dtype that is needed is not known: the argument that decides what a
     /// method gives is not chosen.
     TheResultsDtype,
+    /// The fields of a struct that a method reads, drops or renames are not known, as where the
+    /// chain lost them, so whether the names are fields of it is not.
+    TheFieldsOfAStruct,
+    /// An unnest as a join's key writes a column for each field, and how many keys the other
+    /// table expands to is not known.
+    AnUnnestAsAKey,
+    /// An unnest of a struct that has no field expands to no expression, which Polars leaves out of
+    /// what holds it or decides by its siblings.
+    AnUnnestOfNoField,
+    /// A number typed without a dtype stays open in a struct that is a join's key, and Polars does
+    /// not match it with the other table's key as its dtype resolves.
+    AnOpenNumberInAKey,
+    /// A field read by several names gives several columns, which are no value of one dtype outside
+    /// a select or a sort.
+    SeveralColumnsOfAFieldRead,
+    /// An unnest that is one of several predicates of a filter expands to a predicate for each field,
+    /// or to none, which Polars takes as they come.
+    AnUnnestAmongPredicates,
+    /// Arithmetic on a struct is done field by field, and Polars does it irregularly.
+    ArithmeticOnAStruct,
+    /// Structs whose fields differ meet, which Polars casts field by field and refuses or not by
+    /// what the fields are.
+    StructsOfOtherFieldsMeet,
+}
+
+impl Unknown {
+    /// Every reason, in the order they are listed.
+    pub const ALL: [Self; 10] = [
+        Self::TheStartsDtype,
+        Self::TheResultsDtype,
+        Self::TheFieldsOfAStruct,
+        Self::AnUnnestAsAKey,
+        Self::AnUnnestOfNoField,
+        Self::AnOpenNumberInAKey,
+        Self::SeveralColumnsOfAFieldRead,
+        Self::AnUnnestAmongPredicates,
+        Self::ArithmeticOnAStruct,
+        Self::StructsOfOtherFieldsMeet,
+    ];
+
+    /// The name of the reason.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::TheStartsDtype => "the-starts-dtype",
+            Self::TheResultsDtype => "the-results-dtype",
+            Self::TheFieldsOfAStruct => "the-fields-of-a-struct",
+            Self::AnUnnestAsAKey => "an-unnest-as-a-key",
+            Self::AnUnnestOfNoField => "an-unnest-of-no-field",
+            Self::AnOpenNumberInAKey => "an-open-number-in-a-key",
+            Self::SeveralColumnsOfAFieldRead => "several-columns-of-a-field-read",
+            Self::AnUnnestAmongPredicates => "an-unnest-among-predicates",
+            Self::ArithmeticOnAStruct => "arithmetic-on-a-struct",
+            Self::StructsOfOtherFieldsMeet => "structs-of-other-fields-meet",
+        }
+    }
 }
 
 impl fmt::Display for Unknown {
@@ -365,6 +512,14 @@ impl fmt::Display for Unknown {
         formatter.write_str(match self {
             Self::TheStartsDtype => "the dtype of the start is not given",
             Self::TheResultsDtype => "the dtype that the arguments decide is not known",
+            Self::TheFieldsOfAStruct => "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said",
+            Self::AnUnnestAsAKey => "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known",
+            Self::AnUnnestOfNoField => "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings",
+            Self::AnOpenNumberInAKey => "a number typed without a dtype stays open in a struct that is a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to",
+            Self::SeveralColumnsOfAFieldRead => "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort",
+            Self::AnUnnestAmongPredicates => "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come",
+            Self::ArithmeticOnAStruct => "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly",
+            Self::StructsOfOtherFieldsMeet => "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are",
         })
     }
 }
@@ -403,6 +558,9 @@ pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
     ending: Ending,
+    fields: Option<Fields>,
+    columns: Option<Fields>,
+    width: Option<usize>,
 }
 
 impl Allowance {
@@ -435,6 +593,27 @@ impl Allowance {
     #[must_use]
     pub const fn result(&self) -> Option<&ResultDtype> {
         self.result.as_ref()
+    }
+
+    /// The fields of the struct the chain has after the entry, where it is one whose fields are
+    /// known: the struct a call makes, the one it keeps, or the one a field read holds.
+    #[must_use]
+    pub const fn fields(&self) -> Option<&Fields> {
+        self.fields.as_ref()
+    }
+
+    /// The width of the array the chain has after the entry where the entry decides it: the array a
+    /// field read holds.
+    #[must_use]
+    pub const fn width(&self) -> Option<usize> {
+        self.width
+    }
+
+    /// The columns the entry writes where it writes several, one for each field of a struct it
+    /// unnests, and the fields are known: the chain has no dtype of one value then.
+    #[must_use]
+    pub const fn columns(&self) -> Option<&Fields> {
+        self.columns.as_ref()
     }
 
     /// Whether the chain gives one value after the entry.
@@ -945,6 +1124,55 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         return Err(Refusal::rule_because(rule, &said));
     }
+    // What the call says of a struct: a field that is none, names that do not fit, or fields made.
+    let receiver_class = match place.after {
+        After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    };
+    let struct_gives = fields::gives(entry, receiver_class, chosen)
+        .map_err(|(rule, said)| Refusal::rule_because(rule, &said))?;
+    // A filter's predicate is one column. The tables measured an unnest on a struct of two fields, so
+    // a struct of one, which is one column, is judged as the field it is, and one of none, which
+    // Polars expands to no expression, is refused.
+    if struct_gives
+        .columns()
+        .is_some_and(|columns| columns.len() != 1)
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+        && chosen.among_others == 0
+    {
+        return Err(Refusal::rule(Rule::OneColumnIsNeeded));
+    }
+    // Arithmetic on a struct is done field by field, each by its own dtype and that of what meets it,
+    // and differs for each call: a struct of numbers is added to a number, a field of text refuses
+    // it, a list field is added as a list. The tables measured one struct, of a whole number and
+    // text, so they say nothing of the others.
+    let struct_arithmetic = is_method(entry)
+        && entry.family() == catalog::Family::Arithmetic
+        && (receiver_class == Some(Representative::Struct)
+            || chosen
+                .arguments
+                .iter()
+                .any(|(_, class)| *class == Representative::Struct));
+    // A struct met by a struct whose fields differ is cast field by field, and Polars refuses or
+    // not by what the fields are, which the tables, measured on one struct, do not say.
+    let meets_other_fields = is_method(entry)
+        && receiver_class == Some(Representative::Struct)
+        && chosen.fields.is_some_and(|receiver| {
+            chosen
+                .argument_fields
+                .iter()
+                .any(|(_, argument)| *argument != receiver)
+        });
+    // What Polars always refuses of it is refused, in its words.
+    if struct_arithmetic
+        && let Some(said) = fields::arithmetic_refused(entry, receiver_class, chosen)
+    {
+        return Err(Refusal::rule_because(
+            Rule::StructArithmeticNeedsNumbers,
+            &said,
+        ));
+    }
     // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
@@ -994,7 +1222,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         ));
     }
     // What the options set are refused for, on the dtype of the value the method follows.
-    if is_method(entry) {
+    if is_method(entry) && !struct_arithmetic && !meets_other_fields {
         let receiver = match place.after {
             After::Value { dtype, .. } => Some(dtype),
             _ => None,
@@ -1071,8 +1299,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             shape: receiver_shape,
         },
         true,
-    ) = (place.after, is_method(entry))
-    {
+    ) = (
+        place.after,
+        is_method(entry) && !struct_arithmetic && !meets_other_fields,
+    ) {
         let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
@@ -1114,21 +1344,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         });
         if needs_a_dtype {
             result = None;
-        }
-        // A call whose pattern names the fields of what it gives, as `extract_groups` does, gives
-        // nothing until it is told the pattern, and then the struct Polars works out of it: the
-        // dtype table measured it with one pattern, whose groups are not the call's.
-        if let Some(parameter) = entry
-            .parameters()
-            .iter()
-            .find(|parameter| parameter.names_the_fields_of_the_result())
-        {
-            result = chosen
-                .patterns
-                .iter()
-                .find(|(name, _)| *name == parameter.name())
-                .and_then(|(_, text)| catalog::groups_dtype(text).ok())
-                .map(|dtype| ResultDtype::from_name(&dtype_name(&dtype)));
         }
         // A call that is given a time zone gives a moment in it, and one given none a moment of no
         // zone, where the tables, measured with the zone UTC, say only that a moment is given: it
@@ -1196,6 +1411,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             result = None;
         }
     }
+    // What follows a struct by arithmetic keeps its shape and has no dtype the tables say.
+    if (struct_arithmetic || meets_other_fields)
+        && let After::Value { shape: kept, .. } = place.after
+    {
+        shape = kept;
+    }
     // What the call says of what it gives, where the tables do not.
     if result.is_none() && !is_method(entry) {
         result = chosen
@@ -1209,10 +1430,70 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // An option given in place of a parameter makes the method another form, which the table
     // measured apart where it differs: a fill by a strategy is not a fill by a value.
     let form = form_of(entry, chosen);
+    // A struct of one field that is unnested is the field read, where the tables measured an unnest
+    // of a struct of two.
+    let measured_as = if id == "Expr.struct.unnest" && matches!(struct_gives, Gives::Field(_)) {
+        "Expr.struct.field"
+    } else {
+        id
+    };
+    // The columns an unnest writes are the keys of a join as many as the other side's keys are, which
+    // the tables measured as one, and are named by the fields, which the keys' names are asked of
+    // by what the document says: where it is a join's key, they do not say.
+    let unnested_in_key = id == "Expr.struct.unnest"
+        && matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight);
+    // Inside a value of the key, as of a condition, the tables are asked what they say of the place,
+    // and what they allow is not told, for the key's names are no better known there.
+    let unnested_key = unnested_in_key && place.context.nested().is_none();
+    // An unnest of a struct that has no field gives no expression, which the tables, measured on a
+    // struct of two fields, do not say of any place.
+    let unnested_nothing = id == "Expr.struct.unnest"
+        && struct_gives
+            .columns()
+            .is_some_and(|columns| columns.is_empty());
+    // Beside another predicate of a filter an unnest is taken, which the tables, measured with it as
+    // the only one, refuse.
+    let unnested_among_predicates = id == "Expr.struct.unnest"
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+        && chosen.among_others > 0;
+    // Each field is a predicate then, which must be a flag.
+    if unnested_among_predicates
+        && matches!(
+            place.after,
+            After::Value {
+                shape: Shape::Many,
+                ..
+            }
+        )
+        && let Some(field) = struct_gives.columns().and_then(|columns| {
+            columns.iter().find(|field| {
+                field
+                    .class()
+                    .is_some_and(|class| class != Representative::Boolean)
+            })
+        })
+    {
+        return Err(Refusal::rule_because(
+            Rule::FilterPredicateIsBoolean,
+            &format!(
+                "the field {:?} is a predicate of the filter and is {}, not Boolean",
+                field.name(),
+                field.shown()
+            ),
+        ));
+    }
+    let skipped = unnested_key || unnested_nothing || unnested_among_predicates;
     let cell = tables
         .contexts
-        .get(&(id, form, place.context))
-        .or_else(|| tables.contexts.get(&(id, Vec::new(), place.context)));
+        .get(&(measured_as, form, place.context))
+        .filter(|_| !skipped)
+        .or_else(|| {
+            tables
+                .contexts
+                .get(&(measured_as, Vec::new(), place.context))
+                .filter(|_| !skipped)
+        });
     if let Some(cell) = cell {
         match &cell.continues {
             Outcome::Refused(reason) => return Err(Refusal::polars(reason)),
@@ -1257,10 +1538,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
     let boolean_needed = Rule::boolean_needed(place.context);
-    let ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
+    // A field that is read is a value of its own dtype, which the tables measured as a number: it
+    // ends where a value of that dtype does, as a start of it does, which the rules judge.
+    let read = matches!(struct_gives, Gives::Field(Some(_)))
+        .then(|| struct_gives.result())
+        .flatten()
+        .and_then(|(read, _)| read);
+    let judged = read.as_ref().or(result.as_ref());
+    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, judged, shape) {
         Ending::Refused(Refusal::rule(rule))
     } else if let Some(refusal) = Refusal::count(place.context, shape) {
         Ending::Refused(refusal)
+    } else if let Some(read) = &read {
+        if read.class().is_none() && boolean_needed {
+            Ending::NotKnown(Unknown::TheResultsDtype)
+        } else {
+            Ending::Allowed
+        }
     } else if entry.applies() == Applies::Function {
         // The table measured a start with one argument, and what its arguments
         // decide is the dtype of the value: a column's own, a literal's. Told
@@ -1282,16 +1576,88 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             Outcome::Allowed(_) => Ending::Allowed,
         }
     };
+    // A struct is written with the fields the chain carries, and the call that reads, names or makes
+    // fields gives what it says of them: not what the tables measured on a struct of two.
+    let mut fields = None;
+    match &struct_gives {
+        Gives::Nothing => {
+            if result.as_ref().and_then(ResultDtype::class) == Some(Representative::Struct) {
+                let keeps = receiver_class == Some(Representative::Struct);
+                let (written, held) = fields::kept(chosen.fields.filter(|_| keeps));
+                result = Some(written);
+                fields = held;
+            }
+        }
+        decided => {
+            (result, fields) = decided.result().unwrap_or((None, None));
+        }
+    }
+    // Names read, dropped or given to a struct whose fields the chain does not know are refused or
+    // not by what the fields are, which Polars says and the walk cannot: where the struct is the
+    // values of a pivot's group, or comes of a call that did not say its fields.
+    if struct_gives.is_undecided() {
+        ending = Ending::NotKnown(Unknown::TheFieldsOfAStruct);
+    }
+    if unnested_in_key {
+        ending = Ending::NotKnown(Unknown::AnUnnestAsAKey);
+    }
+    if unnested_nothing {
+        ending = Ending::NotKnown(Unknown::AnUnnestOfNoField);
+    }
+    if id == "Expr.struct.unnest"
+        && place.context.outer() == Outer::Filter
+        && place.context.nested().is_none()
+        && chosen.among_others > 0
+        && !unnested_nothing
+        && struct_gives
+            .columns()
+            .is_some_and(|columns| columns.len() >= 2)
+    {
+        ending = Ending::NotKnown(Unknown::AnUnnestAmongPredicates);
+    }
+    // Polars keeps a number typed without a dtype open in a struct that is a join's key, as `dyn
+    // float` in its dtype, so the key does not match the other table's key that the number resolves
+    // to, though both are one dtype: a key made of such a struct, or of a field read from one, is
+    // not told.
+    let in_a_key = matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
+        && place.context.nested().is_none();
+    if in_a_key
+        && ((id == "polars.struct" && chosen.inputs.iter().any(Input::is_loose))
+            || chosen.fields.is_some_and(Fields::has_a_loose_field)
+            || struct_gives.reads_a_loose_field())
+    {
+        ending = Ending::NotKnown(Unknown::AnOpenNumberInAKey);
+    }
+    // Several columns of a field read with several names are no dtype of one value, and the tables
+    // measured one name: where the place is no item of a select or a sort key, they do not say.
+    let columns = struct_gives.columns().cloned();
+    if id == "Expr.struct.field"
+        && columns.as_ref().is_some_and(|columns| columns.len() >= 2)
+        && !matches!(place.context.outer(), Outer::Select | Outer::Sort)
+    {
+        ending = Ending::NotKnown(Unknown::SeveralColumnsOfAFieldRead);
+    }
     // An array is written at the width it has, where the chain knows it.
     if let (Some(width), Some(found)) = (chosen.width, &result)
         && matches!(found.class(), Some(Representative::Array(_)))
     {
         result = Some(found.of_width(width));
     }
+    let width = struct_gives.width();
+    if struct_arithmetic {
+        result = None;
+        ending = Ending::NotKnown(Unknown::ArithmeticOnAStruct);
+    } else if meets_other_fields {
+        result = None;
+        ending = Ending::NotKnown(Unknown::StructsOfOtherFieldsMeet);
+    }
     Ok(Allowance {
         result,
         shape,
         ending,
+        fields,
+        columns,
+        width,
     })
 }
 
@@ -1613,6 +1979,21 @@ pub fn refuse_a_count_that_may_not_end(context: Context) -> Result<(), Refusal> 
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_a_repeated_pair_of_key_names(context: Context) -> Result<(), Refusal> {
     Rule::forbids_repeated_key_names(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
+/// The refusal of the rule that the columns that the items of a select, or of the columns a step
+/// adds, write are named differently, where two of them write the name `name`. What each item
+/// writes, an unnest and a field read writing the names of fields, is a matter of the whole step,
+/// which the caller finds.
+///
+/// # Errors
+///
+/// Always: the caller asks it where it found a name written twice.
+pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::WrittenNamesAreDistinct,
+        &format!("two items write the name {name:?}"),
+    ))
 }
 
 /// Every entry that stands in an expression, offered or refused at `place`.

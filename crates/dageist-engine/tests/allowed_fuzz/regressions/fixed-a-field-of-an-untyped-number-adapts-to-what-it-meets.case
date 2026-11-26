@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"UInt32"}}},"then":[{"entry":"Expr.and_","arguments":{"others":{"many":[{"expression":{"start":{"entry":"polars.struct","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}]}}},"then":[{"entry":"Expr.struct.field","arguments":{"name":{"field":"literal"}}}]}}]}}}]}}]}}}}]}

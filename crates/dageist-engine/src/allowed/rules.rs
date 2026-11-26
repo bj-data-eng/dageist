@@ -23,6 +23,13 @@ use super::table::Shape;
 pub enum Rule {
     /// A pivot's aggregate gives one value for each group.
     PivotAggregateGivesOneValue,
+    /// A filter's only predicate is one column: an expression that gives several, as the unnest of a
+    /// struct of several fields does, or none, as the unnest of a struct of no field does, is
+    /// refused there, and taken beside another predicate.
+    OneColumnIsNeeded,
+    /// The columns that the items of a select or of `with_columns` write are named differently,
+    /// as the fields that an unnest and a field read write are named by the fields.
+    WrittenNamesAreDistinct,
     /// The predicate of a condition is a `Boolean`.
     ConditionPredicateIsBoolean,
     /// The predicate of a `filter` is a `Boolean`, and so is what a condition
@@ -33,6 +40,25 @@ pub enum Rule {
     /// A moment or a length of time made of numbers typed in is no part of a join's key: Polars
     /// makes a literal of the call and names it by an alias, which a key may not hold anywhere.
     FoldedFunctionIsNoJoinKey,
+    /// A field that a method reads or drops is one of the fields of the struct it follows, which the
+    /// walk knows: Polars refuses a name that is none, one that was renamed or dropped before.
+    FieldIsOfTheStruct,
+    /// The names given to the fields of a struct are as many as its fields where it is renamed, or as
+    /// the places of the array it is made of, and no two fields of a struct are named alike.
+    FieldNamesFitTheStruct,
+    /// No two names given to the fields of a struct that a list or an array is made are alike. This
+    /// is stricter than Polars by design, and the rule can go once a release of Polars refuses these
+    /// names itself.
+    ///
+    /// Polars 2.2.0 accepts them, though `polars.struct` and `struct.rename_fields` refuse the same
+    /// names, and the struct it builds is inconsistent: its dtype and its series hold two fields of
+    /// one name, `struct.field` reads the first and a row's value holds both, `struct.unnest` is
+    /// refused after the plan accepted it (the Python binding keeps the first), and `clear`,
+    /// `pl.concat` and a streaming query panic. The open pull request pola-rs/polars#30725, "Make
+    /// struct dtypes valid by construction", makes the dtype refuse duplicate names. The test
+    /// `polars_accepts_a_list_made_a_struct_of_a_name_given_twice_and_builds_one_that_disagrees_with_itself`
+    /// shows it on the vendored Polars.
+    ToStructNamesAreDistinct,
     /// A join pairs no two output column names twice: the keys of each side
     /// are named by the column they read, and a key that repeats the name of
     /// an earlier one, beside a key on the other side that repeats the name it
@@ -67,6 +93,14 @@ pub enum Rule {
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
+    /// A struct is filled by a strategy that goes forward or backward: the others, the smallest, the
+    /// largest, the mean, zero and one, Polars refuses where the struct holds a null and does
+    /// nothing with where it holds none.
+    StructIsFilledForwardOrBackward,
+    /// Arithmetic with a struct needs its fields to be numbers: Polars refuses `abs`, `neg`, `sign`,
+    /// `clip` and `pow` of a struct whatever its fields are, and the operators of one that has a
+    /// field of text, a date, a moment or a time.
+    StructArithmeticNeedsNumbers,
     /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
     TimeZoneIsValid,
     /// The operands of a comparison, a difference, a fill and the bounds of an interval, the values of
@@ -88,27 +122,34 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 27] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementDtypeIsImplemented,
         Self::ElementDtypeIsMeasured,
         Self::ElementOnlyInPivotAggregate,
+        Self::FieldIsOfTheStruct,
+        Self::FieldNamesFitTheStruct,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
+        Self::OneColumnIsNeeded,
         Self::ParameterTakesOneValue,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::RangeIsValid,
         Self::ReplacementValuesMatchInNumber,
+        Self::StructArithmeticNeedsNumbers,
+        Self::StructIsFilledForwardOrBackward,
         Self::TimeZoneIsValid,
+        Self::ToStructNamesAreDistinct,
         Self::ValuesMeetInCount,
         Self::WindowInputIsNotCounted,
         Self::WindowInputIsNotWidened,
+        Self::WrittenNamesAreDistinct,
     ];
 
     /// The name the tables give the rule.
@@ -122,19 +163,26 @@ impl Rule {
             Self::ElementDtypeIsMeasured => "element-dtype-is-measured",
             Self::ArraysMeetAtOneWidth => "arrays-meet-at-one-width",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
+            Self::FieldIsOfTheStruct => "field-is-of-the-struct",
+            Self::FieldNamesFitTheStruct => "field-names-fit-the-struct",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
+            Self::OneColumnIsNeeded => "one-column-is-needed",
             Self::ParameterTakesOneValue => "parameter-takes-one-value",
             Self::PatternIsValid => "pattern-is-valid",
             Self::RangeIsValid => "range-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
+            Self::StructArithmeticNeedsNumbers => "struct-arithmetic-needs-numbers",
+            Self::StructIsFilledForwardOrBackward => "struct-is-filled-forward-or-backward",
             Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::ToStructNamesAreDistinct => "to-struct-names-are-distinct",
             Self::ValuesMeetInCount => "values-meet-in-count",
             Self::WindowInputIsNotCounted => "window-input-is-not-counted",
             Self::WindowInputIsNotWidened => "window-input-is-not-widened",
+            Self::WrittenNamesAreDistinct => "written-names-are-distinct",
         }
     }
 
@@ -161,6 +209,18 @@ impl Rule {
             Self::ElementOnlyInPivotAggregate => {
                 "`polars.element` stands only in a pivot's aggregate"
             }
+            Self::FieldIsOfTheStruct => {
+                "a field that a method reads or drops must be one of the fields of the struct it follows: Polars refuses a name that is none, as one that was renamed or dropped before is"
+            }
+            Self::FieldNamesFitTheStruct => {
+                "the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name"
+            }
+            Self::OneColumnIsNeeded => {
+                "a filter's only predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty, and Polars refuses both; beside another predicate each expression it expands to is a predicate of its own, which it takes"
+            }
+            Self::WrittenNamesAreDistinct => {
+                "the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name"
+            }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
             Self::FoldedFunctionIsNoJoinKey => {
                 "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
@@ -176,6 +236,15 @@ impl Rule {
                 "a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from"
             }
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::ToStructNamesAreDistinct => {
+                "no two names given to the fields of a struct that a list or an array is made may be alike: Polars 2.2.0 accepts them and builds a struct that disagrees with itself, as its dtype and its series hold two fields of one name, and refuses the same names for a struct made of columns or renamed"
+            }
+            Self::StructArithmeticNeedsNumbers => {
+                "arithmetic with a struct needs its fields to be numbers: Polars refuses the absolute value, the negation, the sign, a clip and a power of a struct whatever its fields are, and the sum, the difference, the product and the quotients of one that has a field of text, a date, a moment or a time"
+            }
+            Self::StructIsFilledForwardOrBackward => {
+                "a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none"
+            }
             Self::ValuesMeetInCount => {
                 "the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal"
             }
@@ -221,14 +290,21 @@ impl Rule {
             | Self::ElementDtypeIsMeasured
             | Self::ArraysMeetAtOneWidth
             | Self::MomentsShareAZone
+            | Self::FieldIsOfTheStruct
+            | Self::FieldNamesFitTheStruct
+            | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
+            | Self::StructArithmeticNeedsNumbers
+            | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
+            | Self::ToStructNamesAreDistinct
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
-            | Self::WindowInputIsNotWidened => false,
+            | Self::WindowInputIsNotWidened
+            | Self::WrittenNamesAreDistinct => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -374,11 +450,18 @@ impl Rule {
             | Self::RangeIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::MomentsShareAZone
+            | Self::FieldIsOfTheStruct
+            | Self::FieldNamesFitTheStruct
+            | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
+            | Self::StructArithmeticNeedsNumbers
+            | Self::StructIsFilledForwardOrBackward
             | Self::TimeZoneIsValid
+            | Self::ToStructNamesAreDistinct
             | Self::ValuesMeetInCount
             | Self::WindowInputIsNotCounted
-            | Self::WindowInputIsNotWidened => false,
+            | Self::WindowInputIsNotWidened
+            | Self::WrittenNamesAreDistinct => false,
         }
     }
 }

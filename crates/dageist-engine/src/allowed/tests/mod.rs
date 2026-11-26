@@ -16,6 +16,7 @@ mod probe;
 mod rebuilt;
 mod sample;
 mod siblings;
+mod structs;
 mod tables;
 mod text;
 mod typed;

@@ -571,6 +571,22 @@
       "slots": []
     },
     {
+      "entry": "Expr.arr.to_struct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected Array datatype for array operation, got: Datetime('μs')"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.arr.unique",
       "verdict": {
         "kind": "refused",
@@ -2489,6 +2505,22 @@
       "slots": []
     },
     {
+      "entry": "Expr.list.to_struct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "attempted list to_struct on non-list dtype: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.list.unique",
       "verdict": {
         "kind": "refused",
@@ -3473,6 +3505,38 @@
       "slots": []
     },
     {
+      "entry": "Expr.str.split_exact",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.splitn",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.str.starts_with",
       "verdict": {
         "kind": "refused",
@@ -3649,6 +3713,84 @@
       "slots": []
     },
     {
+      "entry": "Expr.struct.drop",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "struct.drop operation not supported for dtype `datetime[μs]` (expected: Struct)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.field",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "field not found: x"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.json_encode",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.rename_fields",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "rename_fields operation not supported for dtype `datetime[μs]` (expected: Struct)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.struct.unnest",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "struct.field operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.sub",
       "verdict": {
         "kind": "allowed",
@@ -3803,6 +3945,20 @@
       "verdict": {
         "kind": "allowed",
         "result": "UInt32",
+        "shape": "counted",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.value_counts",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Struct",
         "shape": "counted",
         "ending": {
           "kind": "allowed"
@@ -4056,6 +4212,21 @@
     },
     {
       "entry": "polars.repeat",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.struct",
       "verdict": {
         "kind": "refused",
         "refusal": {

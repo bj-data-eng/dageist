@@ -1,0 +1,2 @@
+{"a":"Date","b":"Struct(x: Int64, y: String)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[{"entry":"Expr.str.split_exact","arguments":{"by":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"string":"a|d"}}},"then":[]}},"n":{"integer":4}}},{"entry":"Expr.fill_null","arguments":{"value":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}}}]}

@@ -32,6 +32,8 @@ export type OneControl =
   | { readonly control: 'expression' }
   /** One field of the rows. */
   | { readonly control: 'column' }
+  /** One field of the struct the method follows, among those the engine says it has. */
+  | { readonly control: 'field' }
   /** Something typed into the search box of its list. */
   | { readonly control: 'literal'; readonly type: LiteralType }
   | { readonly control: 'flag' }
@@ -50,6 +52,8 @@ export function oneControlOf(kind: KindView): OneControl {
       return { control: 'expression' };
     case 'column':
       return { control: 'column' };
+    case 'field':
+      return { control: 'field' };
     case 'value':
       return { control: 'literal', type: kind.type };
     case 'duration':
@@ -112,6 +116,18 @@ export function controlOf(parameter: ParameterView): ParameterControl {
       : { shape: 'many', each: oneControlOf(kind) };
   }
   return { shape: 'one', one: oneControlOf(kind) };
+}
+
+/** Returns whether `control` is drawn as a pick among the fields of a struct, one or several. */
+export function offersFields(control: ParameterControl): boolean {
+  switch (control.shape) {
+    case 'one':
+      return control.one.control === 'field';
+    case 'many':
+      return control.each.control === 'field';
+    default:
+      return false;
+  }
 }
 
 /**

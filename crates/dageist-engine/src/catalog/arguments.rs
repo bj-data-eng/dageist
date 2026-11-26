@@ -27,6 +27,8 @@ pub enum Argument {
     Expression(Expr),
     /// Names of input columns.
     Columns(Vec<String>),
+    /// The name of a field of a struct.
+    Field(String),
     /// A whole number typed in.
     Integer(i64),
     /// A floating-point number typed in.
@@ -60,6 +62,7 @@ impl Argument {
         match self {
             Self::Expression(_) => "an expression",
             Self::Columns(_) => "column names",
+            Self::Field(_) => "a field name",
             Self::Integer(_) => "a whole number",
             Self::Float(_) => "a number",
             Self::String(_) => "text",
@@ -324,6 +327,46 @@ impl Arguments {
         }
     }
 
+    /// The names of the fields given for `parameter`: one name, or a list of them, in order.
+    ///
+    /// # Errors
+    ///
+    /// When another kind of argument was given.
+    pub fn fields(&self, parameter: &'static str) -> Result<Vec<String>, BuildError> {
+        match self.get(parameter) {
+            None => Ok(Vec::new()),
+            Some(Argument::Field(name)) => Ok(vec![name.clone()]),
+            Some(Argument::Many(items)) => items
+                .iter()
+                .map(|item| match item {
+                    Argument::Field(name) => Ok(name.clone()),
+                    other => Err(Self::wrong(parameter, "field names", other)),
+                })
+                .collect(),
+            Some(other) => Err(Self::wrong(parameter, "a field name", other)),
+        }
+    }
+
+    /// The texts given for `parameter`, a list of them in order, or none where it was not given.
+    ///
+    /// # Errors
+    ///
+    /// When another kind of argument was given.
+    pub fn strings(&self, parameter: &'static str) -> Result<Option<Vec<String>>, BuildError> {
+        match self.get(parameter) {
+            None => Ok(None),
+            Some(Argument::Many(items)) => items
+                .iter()
+                .map(|item| match item {
+                    Argument::String(text) => Ok(text.clone()),
+                    other => Err(Self::wrong(parameter, "text", other)),
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(Some),
+            Some(other) => Err(Self::wrong(parameter, "a list of text", other)),
+        }
+    }
+
     /// The flag given for `parameter`, or `default` when it was not given.
     ///
     /// # Errors
@@ -475,6 +518,7 @@ const fn expects(kind: Kind) -> &'static str {
     match kind {
         Kind::Expression(_) => "an expression",
         Kind::Column => "column names",
+        Kind::Field => "a field name",
         Kind::Value(ValueType::Integer) => "a whole number",
         Kind::Value(ValueType::Float) => "a number",
         Kind::Value(ValueType::String) => "text",
@@ -498,6 +542,7 @@ fn check_kind(parameter: &'static str, kind: Kind, argument: &Argument) -> Resul
     match (kind, argument) {
         (Kind::Expression(_), Argument::Expression(_))
         | (Kind::Column, Argument::Columns(_))
+        | (Kind::Field, Argument::Field(_))
         | (Kind::Value(ValueType::Integer), Argument::Integer(_))
         | (Kind::Value(ValueType::Float), Argument::Float(_))
         | (Kind::Value(ValueType::String), Argument::String(_))

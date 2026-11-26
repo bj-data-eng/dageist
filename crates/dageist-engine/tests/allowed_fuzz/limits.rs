@@ -52,6 +52,7 @@ use super::literal::{
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
+use super::structs::Structs;
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -333,18 +334,6 @@ pub enum Limit {
     /// has a window and a replacement that lists the values of a column: the case run again with
     /// the values of each replacement made null literals is not refused for it.
     AReplacementOfColumnsInAWindow,
-    /// A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the
-    /// sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum
-    /// and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone,
-    /// are one null, where those of the sample's rows are a value. Polars refusing the rows or
-    /// the empty table with the refusal that a strategy of a fill is not supported for a struct,
-    /// which has no place, in a case with a fill by a strategy that follows one of the five: the
-    /// case run again with each of the five made a fill of nulls forward, which leaves the nulls
-    /// of the column and no more, is not refused for it. Inside a condition Polars refuses the
-    /// strategy for a struct where it fills nothing, which it runs in a plain select: the case
-    /// with a condition and a fill by a strategy, run again with each fill a fill forward, is
-    /// not refused for it.
-    ANullStructToFill,
     /// A strict replacement that is given no default is held to more than one that is: it refuses
     /// a value that it does not list, which depends on the rows, and it refuses what it replaces
     /// when the dtype of that cannot become the dtype of what it follows, which a default lets
@@ -453,11 +442,47 @@ pub enum Limit {
     /// the case run again with each gather told to is no longer refused for them: the places the
     /// rows leave it are why.
     AGatherBeyondTheRows,
+    /// A count of values that the data or the arguments decide is one value, or the rows, by what
+    /// the values are made of, as a test of a struct is, which is never null, a comparison with a
+    /// null, and a column of the dtype Null: no rows the sample can give, nor ties, nor a null in
+    /// every column, make it another, so it is no count that is the rows by chance. The tables
+    /// refuse a count where the rows or one value are needed, or where it meets values that are
+    /// not its own count, and Polars allows it where it is one value, which it broadcasts. The
+    /// tables refusing a count, or a rule about counts doing so, in a case that holds one count,
+    /// which Polars allows on the sample's rows and on twelve rows, on four rows that tie and on
+    /// rows where every column holds a null.
+    ACountNoRowsChange,
+    /// `struct.json_encode` writes a value of any dtype as text, a number as its digits, which a
+    /// pivot's aggregate then reads as a number of a group where the sample's text, a duration, is
+    /// no number. The tables measured the call on the sample's text. The tables refusing, in a
+    /// pivot that holds a `struct.json_encode`, with the refusal that text cannot be converted to a
+    /// number, which Polars allows.
+    AJsonOfANumberInAPivot,
+    /// A control makes every count of an item another at once: the rows and the numbers that
+    /// decide each of them. Where the item holds a count in more than one place, Polars refusing
+    /// it for lengths then shows that a count is the rows by chance, and not that the one the
+    /// tables refused is. The tables refusing a count, or a rule about counts doing so, in a case
+    /// that holds a count in more than one place of the item the refusal is in, which Polars
+    /// allows on the sample's rows and refuses for lengths once the counts are made another.
+    SeveralCountsInOneItem,
+    /// Polars does not run the key of the left table in an inner join where every key of the
+    /// other table is null, which no key can match: it gives no rows, and a key it would refuse is
+    /// never met. The tables measured the keys of a join with its columns of nulls on the other
+    /// side. Polars refusing the join with its kind made a left join, which runs the key, for the
+    /// reason the tables gave of a key of the join, where it allows the inner join.
+    AJoinKeyPolarsDoesNotRun,
+    /// Polars takes a struct for a condition's predicate, where a comparison with one, or a method
+    /// of text on one, gives a struct and not a Boolean, and runs neither branch, so a part in a
+    /// branch is never met. The tables measured a comparison as giving a Boolean, and judged the
+    /// branches. The tables refusing a part of a branch of a condition whose predicate holds a struct
+    /// or a call that makes one, which Polars allows, where the case run again with each predicate a flag that is true is refused
+    /// for the same reason: the predicate is then why Polars allows it.
+    AStructTakenForAPredicate,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -481,7 +506,6 @@ impl Limit {
         Self::ACastOfAValueTheDtypeCannotHold,
         Self::ADropChangesTheLengths,
         Self::AReplacementOfColumnsInAWindow,
-        Self::ANullStructToFill,
         Self::AStrictReplacementGivenNoDefault,
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
@@ -493,6 +517,11 @@ impl Limit {
         Self::AMomentOfOneValueFilledInAnotherZone,
         Self::APartPolarsFoldsToANull,
         Self::AGatherBeyondTheRows,
+        Self::ACountNoRowsChange,
+        Self::AJsonOfANumberInAPivot,
+        Self::SeveralCountsInOneItem,
+        Self::AJoinKeyPolarsDoesNotRun,
+        Self::AStructTakenForAPredicate,
     ];
 
     /// The name a kept case is filed under.
@@ -521,7 +550,6 @@ impl Limit {
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
             Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
             Self::AReplacementOfColumnsInAWindow => "a-replacement-of-columns-in-a-window",
-            Self::ANullStructToFill => "a-null-struct-to-fill",
             Self::AStrictReplacementGivenNoDefault => "a-strict-replacement-given-no-default",
             Self::AReplacementOfEveryMatchGivenANullValue => {
                 "a-replacement-of-every-match-given-a-null-value"
@@ -543,6 +571,11 @@ impl Limit {
             }
             Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
             Self::AGatherBeyondTheRows => "a-gather-beyond-the-rows",
+            Self::ACountNoRowsChange => "a-count-no-rows-change",
+            Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
+            Self::SeveralCountsInOneItem => "several-counts-in-one-item",
+            Self::AJoinKeyPolarsDoesNotRun => "a-join-key-polars-does-not-run",
+            Self::AStructTakenForAPredicate => "a-struct-taken-for-a-predicate",
         }
     }
 
@@ -624,6 +657,21 @@ impl Limit {
             Self::AMomentOfOneValueFilledInAnotherZone => {
                 "Polars shifts a moment that is one value, of literals alone or an aggregate, with a fill in another time zone, and names the zone of the receiver in its schema, where the streaming engine panics for a column of moments, which the tables measured"
             }
+            Self::AJsonOfANumberInAPivot => {
+                "a number written as json text is read as the number again, where the tables measured the call on the sample's text, which is no number"
+            }
+            Self::SeveralCountsInOneItem => {
+                "every count of an item is made another at once, so where it holds a count in more than one place, Polars refusing it for lengths once they are does not show that the count the tables refused is the rows by chance"
+            }
+            Self::AStructTakenForAPredicate => {
+                "Polars compares a struct field by field and gives a struct, which a condition takes for its predicate and runs neither branch for, where the tables measured the comparison as giving a Boolean and judged the branches"
+            }
+            Self::AJoinKeyPolarsDoesNotRun => {
+                "Polars does not run the key of the left table in an inner join whose other table holds only null keys, which no key can match, where the tables measured the keys with columns of nulls"
+            }
+            Self::ACountNoRowsChange => {
+                "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
+            }
             Self::AGatherBeyondTheRows => {
                 "a gather refuses a place beyond the rows it follows when they run, and every place where the table has none, where the tables measured a gather that gives a null for it"
             }
@@ -640,13 +688,10 @@ impl Limit {
                 "Polars' streaming engine does not meet a text of one value with each value of a replacement in the order key of a window, which it does in a select, where the tables measured it"
             }
             Self::ALiteralTextBesideManyReplacementValues => {
-                "a literal text is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
+                "a literal text, or a struct of literals written as text, is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
-            }
-            Self::ANullStructToFill => {
-                "a shift, and the first, the last, the minimum and the maximum of nothing, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
             }
             Self::AReplacementOfColumnsInAWindow => {
                 "a window gives a replacement of columns a list of values for each group, which Polars refuses as a pattern per row, where the tables measured it in select"
@@ -1168,15 +1213,17 @@ fn gives_one_value_of_literals(expression: &Expression, upto: usize) -> bool {
 
 /// The functions that start a chain and give one value of what they are given, which a column
 /// does not stand in for: the literal, and the ones that make a date, a time, a moment, a length
-/// of time or a moment from a count since 1970. A function is no value of literals alone until it
+/// of time or a moment from a count since 1970, and the one that makes a struct of values, which is
+/// one value where each is. A function is no value of literals alone until it
 /// is named here; the catalogue's functions are checked against this list, so that a new one is
 /// decided when it is added and not excused for what it gives many values of.
-const FUNCTIONS_OF_LITERALS: [&str; 6] = [
+const FUNCTIONS_OF_LITERALS: [&str; 7] = [
     "polars.date",
     "polars.datetime",
     "polars.duration",
     "polars.from_epoch",
     "polars.lit",
+    "polars.struct",
     "polars.time",
 ];
 
@@ -2082,6 +2129,7 @@ fn case_without(case: &Case, undo: Undo<'_>) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -2198,6 +2246,7 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -2738,8 +2787,7 @@ const A_VALUE_OF_ANOTHER_LENGTH: &str = "does not match string column length";
 /// in it or in an expression it holds.
 fn holds_a_replacement_of_a_literal(expression: &Expression) -> bool {
     let replaces = |link: &Call| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all");
-    let starts_from_a_text =
-        matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"));
+    let starts_from_a_text = starts_from_a_text_of_literals(expression);
     (starts_from_a_text && expression.links().iter().any(replaces))
         || std::iter::once(expression.start())
             .filter_map(|start| match start {
@@ -2766,24 +2814,38 @@ fn call_with_columns_for(
     is_it: &dyn Fn(&Expression) -> bool,
     column: &str,
 ) -> Option<Call> {
-    call_with_columns_cut_for(call, is_it, &|_| column.to_owned(), &|_| None, &|_| false)
+    call_with_columns_cut_for(
+        call,
+        is_it,
+        &|_| column.to_owned(),
+        &|_| None,
+        &|_| false,
+        &text_made_of_literals,
+        false,
+    )
 }
 
 /// As [`call_with_columns_for`], with the column each chain is made `column_of` says of it, cast
 /// to the dtype `cast_to` says of it, if it does, and each chain made so is cut after its first
-/// call that `cut_after` accepts: what follows is no part of what the column stands in for.
+/// call that `cut_after` accepts: what follows is no part of what the column stands in for. The
+/// first links of each chain made so, as many as `skipped` says of it, are left out, for the column
+/// stands in for what they made.
 fn call_with_columns_cut_for(
     call: &Call,
     is_it: &dyn Fn(&Expression) -> bool,
     column_of: &dyn Fn(&Expression) -> String,
     cast_to: &dyn Fn(&Expression) -> Option<Value>,
     cut_after: &dyn Fn(&Call) -> bool,
+    skipped: &dyn Fn(&Expression) -> usize,
+    literal_text: bool,
 ) -> Option<Call> {
     struct Replacing<'a> {
         is_it: &'a dyn Fn(&Expression) -> bool,
         column_of: &'a dyn Fn(&Expression) -> String,
         cast_to: &'a dyn Fn(&Expression) -> Option<Value>,
         cut_after: &'a dyn Fn(&Call) -> bool,
+        skipped: &'a dyn Fn(&Expression) -> usize,
+        literal_text: bool,
     }
     fn value(held: &Value, replacing: &Replacing) -> Option<Value> {
         Some(match held {
@@ -2807,7 +2869,15 @@ fn call_with_columns_cut_for(
     }
     fn expression_of_columns(expression: &Expression, replacing: &Replacing) -> Option<Expression> {
         let replaced = (replacing.is_it)(expression);
-        let start = if replaced {
+        let start = if replaced && replacing.literal_text {
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.lit")?,
+                    vec![("value", Value::String((replacing.column_of)(expression)))],
+                )
+                .ok()?,
+            )
+        } else if replaced {
             Start::Call(
                 Call::new(
                     catalog::entry("polars.col")?,
@@ -2828,7 +2898,13 @@ fn call_with_columns_cut_for(
         if replaced && let Some(dtype) = (replacing.cast_to)(expression) {
             links.push(Call::new(catalog::entry("Expr.cast")?, vec![("dtype", dtype)]).ok()?);
         }
-        for link in expression.links() {
+        // What the column stands in for is what the first links made of the start, which are left out.
+        let left_out = if replaced {
+            (replacing.skipped)(expression)
+        } else {
+            0
+        };
+        for link in expression.links().iter().skip(left_out) {
             links.push(call_replaced(link, replacing)?);
             if replaced && (replacing.cut_after)(link) {
                 break;
@@ -2851,13 +2927,36 @@ fn call_with_columns_cut_for(
             column_of,
             cast_to,
             cut_after,
+            skipped,
+            literal_text,
         },
     )
 }
 
+/// How many links make the text of a struct of literals: the ones up to its `json_encode`, which
+/// give one value and write it as text, so a column of text stands in for the chain from there.
+/// None for any other chain.
+fn text_made_of_literals(expression: &Expression) -> usize {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.struct") => expression
+            .links()
+            .iter()
+            .position(|link| is(link, "Expr.struct.json_encode"))
+            .filter(|at| gives_one_value_of_literals(expression, *at))
+            .map_or(0, |at| at + 1),
+        _ => 0,
+    }
+}
+
+/// Whether the chain starts from a literal text, or from a struct of literals that it writes as text.
+fn starts_from_a_text_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+        || text_made_of_literals(expression) > 0
+}
+
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
 fn holds_a_replacement_of_a_literal_alone(expression: &Expression) -> bool {
-    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+    starts_from_a_text_of_literals(expression)
         && expression
             .links()
             .iter()
@@ -2873,6 +2972,7 @@ fn refused_for_a_value_of_another_length_with_columns(case: &Case) -> Option<boo
     let control = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     };
     changed(Some(control), case).map(|control| {
@@ -3089,94 +3189,6 @@ fn case_without_windows(case: &Case) -> Option<Case> {
         is(call, "Expr.over")
             .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
             .flatten()
-    })
-}
-
-/// Whether the call is a shift, or the first, the last, the minimum or the maximum, which the table
-/// with no rows gives as one null.
-fn makes_a_null(call: &Call) -> bool {
-    matches!(
-        call.entry().id().as_str(),
-        "Expr.shift" | "Expr.first" | "Expr.last" | "Expr.min" | "Expr.max"
-    )
-}
-
-/// Whether an expression holds, at any depth, a fill by a strategy that follows one of those five
-/// in its chain, not necessarily next to it.
-fn holds_a_fill_after_a_null_is_made(expression: &Expression) -> bool {
-    let mut made = false;
-    for link in expression.links() {
-        if makes_a_null(link) {
-            made = true;
-        } else if made && is(link, "Expr.fill_null") && link.argument("strategy").is_some() {
-            return true;
-        }
-    }
-    let calls = std::iter::once(expression.start())
-        .filter_map(|start| match start {
-            Start::Call(call) => Some(call),
-            Start::Input(_) | Start::Hole => None,
-        })
-        .chain(expression.links());
-    calls.into_iter().any(|call| {
-        operands(call)
-            .into_iter()
-            .any(|(_, inside)| holds_a_fill_after_a_null_is_made(inside))
-    })
-}
-
-/// The case with each of the five a fill of nulls forward, which leaves the nulls of what it is
-/// given and no more.
-fn case_without_nulls_made(case: &Case) -> Option<Case> {
-    case_changed(case, &|call| {
-        makes_a_null(call)
-            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
-            .flatten()
-    })
-}
-
-/// Whether an expression holds, at any depth, a condition and a fill by a strategy: Polars refuses
-/// a strategy for a struct inside a condition where it fills nothing, which it runs elsewhere.
-fn holds_a_fill_by_a_strategy_in_a_condition(expression: &Expression) -> bool {
-    any_call(expression, &|call| is(call, "polars.when"))
-        && any_call(expression, &|call| {
-            is(call, "Expr.fill_null") && call.argument("strategy").is_some()
-        })
-}
-
-/// The case with each fill by a strategy made a fill of nulls forward, which a condition runs.
-fn case_without_strategies(case: &Case) -> Option<Case> {
-    case_changed(case, &|call| {
-        (is(call, "Expr.fill_null") && call.argument("strategy").is_some())
-            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
-            .flatten()
-    })
-}
-
-/// Whether Polars refuses the case for the strategy of a fill still when each is a fill forward.
-fn refused_for_a_strategy_without_strategies(case: &Case) -> Option<bool> {
-    changed(case_without_strategies(case), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control).refusal.is_some_and(|refusal| {
-                refusal
-                    .reason
-                    .contains("fill null strategy not yet supported")
-            })
-        })
-    })
-}
-
-/// Whether Polars refuses the case for the strategy of a fill still when none of the five is one:
-/// the null is then no cause of it.
-fn refused_for_a_strategy_without_nulls_made(case: &Case) -> Option<bool> {
-    changed(case_without_nulls_made(case), case).map(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control).refusal.is_some_and(|refusal| {
-                refusal
-                    .reason
-                    .contains("fill null strategy not yet supported")
-            })
-        })
     })
 }
 
@@ -3477,6 +3489,7 @@ fn case_without_folds(case: &Case) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![rebuilt]).ok()?,
     })
 }
@@ -3682,6 +3695,7 @@ fn control_with_columns(
         Case {
             receiver: case.receiver,
             argument: case.argument,
+            structs: case.structs.clone(),
             document: Document::new(vec![rebuilt]).ok()?,
         },
         other_as_left,
@@ -3809,6 +3823,7 @@ fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
     let control = Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document,
     };
     let at = Place::of_step(0, Some(step.id().clone()))
@@ -3867,23 +3882,6 @@ fn applies(
                     || refused_for_lengths_without_explodes(case) == Some(true))
                 && (!held.iter().any(|(_, held)| any_call(held, &is_a_drop))
                     || refused_for_lengths_without_drops(case) == Some(true))
-        }
-        (Limit::ANullStructToFill, Disagreement::PolarsRefuses(refusal)) => {
-            // The null is the cause where Polars stops refusing the strategy of a fill once
-            // none of the five makes one.
-            unplaced(refusal)
-                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
-                && refusal
-                    .reason
-                    .contains("fill null strategy not yet supported for dtype: struct[")
-                && (held
-                    .iter()
-                    .any(|(_, held)| holds_a_fill_after_a_null_is_made(held))
-                    && refused_for_a_strategy_without_nulls_made(case) == Some(false)
-                    || held
-                        .iter()
-                        .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
-                        && refused_for_a_strategy_without_strategies(case) == Some(false))
         }
         (Limit::AReplacementOfAnAggregateInAWindowKey, Disagreement::PolarsRefuses(refusal)) => {
             // The window and the many values are the cause where Polars stops refusing the lengths
@@ -4102,7 +4100,7 @@ fn applies(
             pivot && (of_nothing || a_text_share)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
-            let frames = Frames::with_key(case.receiver, case.argument, None);
+            let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
@@ -4202,7 +4200,7 @@ fn applies(
         }
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
-            let frames = Frames::with_key(case.receiver, case.argument, None);
+            let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // What the call follows, or is given, is only nulls: as the rows of the sample, followed
             // through the calls that are known, say, or as Polars gives them where what the call
             // follows or is given is run alone on the left table.
@@ -4306,6 +4304,43 @@ fn applies(
                 && !refusal.reason.contains("with overflow")
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
+        (
+            Limit::ACountNoRowsChange,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => super::counts::is_a_count_no_rows_change(case, refused, prediction, observed),
+        (
+            Limit::SeveralCountsInOneItem,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => super::counts::is_a_count_among_counts(case, refused),
+        (Limit::AStructTakenForAPredicate, Disagreement::PolarsAllows(refused)) => {
+            matches!(refused.source, Source::Polars)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_condition_of_a_compared_struct))
+                && refused_when_the_predicates_are_true(case, refused) == Some(true)
+        }
+        (
+            Limit::AJoinKeyPolarsDoesNotRun,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => {
+            is(step, "LazyFrame.join")
+                && matches!(
+                    refused.source,
+                    Source::Polars | Source::Rule("struct-arithmetic-needs-numbers")
+                )
+                && matches!(refused.place.path().first(),
+                    Some(Segment::Parameter(name)) if ["on", "left_on", "right_on"].contains(&name.as_str()))
+                && refused_when_the_join_keeps_the_left_rows(case, refused) == Some(true)
+        }
+        (Limit::AJsonOfANumberInAPivot, Disagreement::PolarsAllows(refused)) => {
+            pivot
+                && matches!(refused.source, Source::Polars)
+                && refused.reason.starts_with("conversion from `str` to")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.struct.json_encode")))
+                && refused_for_a_conversion_of_text_without_the_json(case) == Some(true)
+        }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
@@ -4448,6 +4483,182 @@ fn applies(
     }
 }
 
+/// Whether the call is a condition with a predicate that holds a struct: one `polars.struct` makes,
+/// or a call that gives one of text, a list, an array or a count, which a comparison or a method
+/// then takes field by field, so the predicate is none that is a Boolean.
+fn is_a_condition_of_a_compared_struct(call: &Call) -> bool {
+    const MAKERS: [&str; 7] = [
+        "polars.struct",
+        "Expr.value_counts",
+        "Expr.list.to_struct",
+        "Expr.arr.to_struct",
+        "Expr.str.split_exact",
+        "Expr.str.splitn",
+        "Expr.str.extract_groups",
+    ];
+    (is(call, "polars.when") || is(call, "Then.when"))
+        && operands(call).into_iter().any(|(parameter, predicate)| {
+            parameter == "predicates"
+                && any_call(predicate, &|inside| {
+                    MAKERS.iter().any(|maker| is(inside, maker))
+                })
+        })
+}
+
+/// The case with the predicates of each condition made a flag that is true, which a branch is run
+/// for.
+fn case_with_true_predicates(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !(is(call, "polars.when") || is(call, "Then.when")) {
+            return None;
+        }
+        let truth = Expression::new(
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.lit")?,
+                    vec![("value", Value::Flag(Some(true)))],
+                )
+                .ok()?,
+            ),
+            Vec::new(),
+        )
+        .ok()?;
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                if given.parameter() == "predicates" {
+                    (
+                        given.parameter(),
+                        Value::Many(vec![Value::Expression(truth.clone())]),
+                    )
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case, with each predicate a flag that is true, for the reason the
+/// tables gave: the predicate is then why it allows the case. `None` where no condition is there.
+fn refused_when_the_predicates_are_true(case: &Case, refused: &Refused) -> Option<bool> {
+    changed(case_with_true_predicates(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    || is_refused_for_what_it_met_alike(&refused.reason, &refusal.reason)
+            })
+        })
+    })
+}
+
+/// The case with its join made a left join, which runs the keys of the left table where an inner
+/// join with only null keys on the other side does not. `None` where the join is no inner join.
+fn case_with_a_left_join(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is(call, "LazyFrame.join")
+            || call
+                .argument("how")
+                .is_some_and(|how| !matches!(how, Value::Choice(word) if word == "inner"))
+        {
+            return None;
+        }
+        let mut given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != "how")
+            .map(|given| (given.parameter(), given.value().clone()))
+            .collect();
+        given.push(("how", Value::Choice("left".to_owned())));
+        Call::new(catalog::entry("LazyFrame.join")?, given).ok()
+    })
+}
+
+/// Whether two refusals say the same of a call and differ in the dtype they name of what it met,
+/// which the tables measured on the sample's column and the control runs on the case's own: the
+/// words before the dtype met are the same.
+fn is_refused_for_what_it_met_alike(tables: &str, control: &str) -> bool {
+    const MARKERS: [&str; 2] = [", got ", " for dtype "];
+    let objection = |reason: &str| {
+        MARKERS
+            .iter()
+            .filter_map(|marker| reason.find(marker))
+            .min()
+            .map(|at| reason[..at].to_owned())
+    };
+    objection(tables).is_some() && objection(tables) == objection(control)
+}
+
+/// Whether Polars refuses the case, run as a left join, for the reason the tables gave of its
+/// keys: the join is then why it allows the case. `None` where the join is no inner join.
+fn refused_when_the_join_keeps_the_left_rows(case: &Case, refused: &Refused) -> Option<bool> {
+    changed(case_with_a_left_join(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    || is_refused_for_what_it_met_alike(&refused.reason, &refusal.reason)
+            })
+        })
+    })
+}
+
+/// Whether the chain holds the json of a struct, whose links up to it make what it writes.
+fn holds_a_json(expression: &Expression) -> bool {
+    expression
+        .links()
+        .iter()
+        .any(|link| is(link, "Expr.struct.json_encode"))
+}
+
+/// How many links make the json of a chain that holds one: up to and with its `json_encode`.
+fn links_that_write_a_json(expression: &Expression) -> usize {
+    expression
+        .links()
+        .iter()
+        .position(|link| is(link, "Expr.struct.json_encode"))
+        .map_or(0, |at| at + 1)
+}
+
+/// The case with the chain that writes a json made a text of one value that is no number, which the
+/// links after the json read as they read it.
+fn case_with_text_for_the_json(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(
+        step.id().clone(),
+        call_with_columns_cut_for(
+            step.call(),
+            &holds_a_json,
+            &|_| "1d".to_owned(),
+            &|_| None,
+            &|_| false,
+            &links_that_write_a_json,
+            true,
+        )?,
+    )
+    .ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        structs: case.structs.clone(),
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case for reading text as a number still when a text that is no number
+/// stands where the json is: the json is then why it allows the case, as its text is a number.
+/// `None` where no chain holds a json.
+fn refused_for_a_conversion_of_text_without_the_json(case: &Case) -> Option<bool> {
+    changed(case_with_text_for_the_json(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.starts_with("conversion from `str` to"))
+        })
+    })
+}
+
 /// What Polars refuses a gather with when a place is beyond what it follows.
 const A_PLACE_OUT_OF_BOUNDS: &str = "gather indices are out of bounds";
 
@@ -4509,6 +4720,38 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     Limit::ALL
         .into_iter()
         .filter(|limit| applies(*limit, case, &disagreement, prediction, observed))
+        .collect()
+}
+
+/// The limits that excuse a prefix of an expression that Polars refuses, with `reason`, where the
+/// tables allow it and say nothing of the case as a whole: the refusal is of the prefix and of no
+/// place, as the runner that asks about it in a plain `select` finds it.
+pub fn excuses_a_refused_prefix(
+    case: &Case,
+    prediction: &Prediction,
+    observed: &Observed,
+    reason: &str,
+) -> Vec<Limit> {
+    if strict() {
+        return Vec::new();
+    }
+    let refusal = Refusal {
+        stage: Stage::Schema,
+        at: String::new(),
+        place: None,
+        reason: reason.to_owned(),
+    };
+    Limit::ALL
+        .into_iter()
+        .filter(|limit| {
+            applies(
+                *limit,
+                case,
+                &Disagreement::PolarsRefuses(&refusal),
+                prediction,
+                observed,
+            )
+        })
         .collect()
 }
 
@@ -4581,6 +4824,7 @@ mod tests {
         Case {
             receiver: Representative::Int64,
             argument: Representative::Int64,
+            structs: Structs::default(),
             document: Document::new(vec![step]).expect("a document"),
         }
     }
@@ -4743,12 +4987,15 @@ mod tests {
 
     /// The limits that excuse the case a kept file holds, as the target finds them: with the tables'
     /// verdict and what Polars does, which no limit's own tests make up.
-    fn excused_by_kept(name: &str) -> Vec<Limit> {
+    fn kept_case(name: &str) -> Case {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/allowed_fuzz/regressions")
             .join(name);
-        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
-        excused_by(&case)
+        Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
+    }
+
+    fn excused_by_kept(name: &str) -> Vec<Limit> {
+        excused_by(&kept_case(name))
     }
 
     fn excused_by(case: &Case) -> Vec<Limit> {
@@ -5858,6 +6105,7 @@ mod tests {
                 "polars.duration",
                 "polars.from_epoch",
                 "polars.lit",
+                "polars.struct",
                 "polars.time",
             ]
         );
@@ -10247,6 +10495,7 @@ mod tests {
         Case {
             receiver: Representative::Date,
             argument: Representative::String,
+            structs: Structs::default(),
             ..sorted
         }
     }
@@ -10623,106 +10872,6 @@ mod tests {
         );
     }
 
-    // ----- A null struct to fill
-
-    const STRATEGY_OF_NOTHING: &str = "fill null strategy not yet supported for dtype: struct[2]";
-
-    fn filled_by(strategy: &str) -> Call {
-        call(
-            "Expr.fill_null",
-            vec![("strategy", Value::Choice(strategy.to_owned()))],
-        )
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_after_a_call_that_makes_a_null_is_excused_for_a_struct() {
-        for maker in [
-            "Expr.shift",
-            "Expr.first",
-            "Expr.last",
-            "Expr.min",
-            "Expr.max",
-        ] {
-            let case = select(vec![chain_of(
-                column("a"),
-                vec![call(maker, Vec::new()), filled_by("one")],
-            )]);
-            for rows in [true, false] {
-                let stage = if rows { Stage::Rows } else { Stage::Empty };
-                assert_eq!(
-                    polars_refuses(&case, None, stage, STRATEGY_OF_NOTHING, Vec::new()),
-                    vec![Limit::ANullStructToFill],
-                    "{maker} rows: {rows}"
-                );
-            }
-        }
-        // And in a pivot's aggregate, after the last of a group.
-        let aggregate = chain_of(
-            column("a"),
-            vec![call("Expr.last", Vec::new()), filled_by("one")],
-        );
-        assert_eq!(
-            polars_refuses(
-                &pivot(aggregate),
-                None,
-                Stage::Rows,
-                STRATEGY_OF_NOTHING,
-                Vec::new()
-            ),
-            vec![Limit::ANullStructToFill]
-        );
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_in_a_condition_is_excused_for_a_struct() {
-        let case = select(vec![chain_of(
-            call(
-                "polars.when",
-                vec![("predicates", many(vec![chain(column("f"), &[])]))],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![(
-                        "statement",
-                        Value::Expression(chain_of(column("a"), vec![filled_by("zero")])),
-                    )],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![("statement", Value::Expression(chain(column("a"), &[])))],
-                ),
-            ],
-        )]);
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, STRATEGY_OF_NOTHING, Vec::new()),
-            vec![Limit::ANullStructToFill]
-        );
-    }
-
-    #[test]
-    fn a_fill_by_a_strategy_is_not_excused_without_a_call_that_makes_a_null_before_it_or_for_a_dtype_that_is_no_struct()
-     {
-        let plain = select(vec![chain_of(column("a"), vec![filled_by("one")])]);
-        assert_eq!(
-            polars_refuses(&plain, None, Stage::Empty, STRATEGY_OF_NOTHING, Vec::new()),
-            vec![]
-        );
-        let after = select(vec![chain_of(
-            column("a"),
-            vec![call("Expr.last", Vec::new()), filled_by("one")],
-        )]);
-        assert_eq!(
-            polars_refuses(
-                &after,
-                None,
-                Stage::Rows,
-                "fill null strategy not yet supported for dtype: list[i64]",
-                Vec::new()
-            ),
-            vec![]
-        );
-    }
     // ----- A drop of NaNs in a window
 
     const NAN_OF_TEXT: &str = "`is_not_nan` operation not supported for dtype `str`";
@@ -10875,7 +11024,6 @@ mod tests {
         assert_eq!(refused_for_lengths_without_drops(&plain), None);
         assert_eq!(refused_for_lengths_without_explodes(&plain), None);
         assert_eq!(refused_for_a_test_of_nan_without_drops(&plain), None);
-        assert_eq!(refused_for_a_strategy_without_nulls_made(&plain), None);
         assert_eq!(refused_for_a_pattern_per_row_without_columns(&plain), None);
         assert_eq!(refused_for_a_failed_conversion_without_bounds(&plain), None);
     }
@@ -11258,6 +11406,149 @@ mod tests {
                 Vec::new()
             ),
             Vec::<Limit>::new()
+        );
+    }
+
+    // ----- Structs
+
+    #[test]
+    fn a_count_no_rows_change_is_a_limit_and_a_count_that_the_rows_decide_is_not() {
+        let place = at(&[
+            Segment::Parameter("predicates".to_owned()),
+            Segment::Item(0),
+        ]);
+        let reason = "it cannot end here: a count of values that the data or the arguments decide, which is neither one value nor the table's rows, may not end an expression in filter: lengths don't match: zip node received non-equal length inputs";
+        // The values of a test of a struct are never null, so their count is one on any rows.
+        let constant = filtered(chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("g"), &[])]))],
+            ),
+            &["Expr.is_null", "Expr.value_counts", "Expr.is_null"],
+        ));
+        assert_eq!(
+            tables_refuse(&constant, place.clone(), Some(TableStage::Rows), reason),
+            vec![Limit::ACountNoRowsChange]
+        );
+        // The values that differ of a column that holds some are two on rows with a null in them,
+        // which is a count that the rows decide, by design and no limit.
+        let decided = filtered(chain(
+            column("g"),
+            &["Expr.is_not_null", "Expr.value_counts", "Expr.is_not_null"],
+        ));
+        assert_eq!(
+            tables_refuse(&decided, place, Some(TableStage::Rows), reason),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn two_counts_that_no_rows_change_are_one_limit_where_every_control_leaves_the_case_allowed() {
+        let place = at(&[
+            Segment::Parameter("predicates".to_owned()),
+            Segment::Item(0),
+        ]);
+        let reason = "it cannot end here: a count of values that the data or the arguments decide, which is neither one value nor the table's rows, may not end an expression in filter: lengths don't match: zip node received non-equal length inputs";
+        let two = filtered(chain(
+            call(
+                "polars.struct",
+                vec![("exprs", many(vec![chain(column("g"), &[])]))],
+            ),
+            &[
+                "Expr.is_null",
+                "Expr.value_counts",
+                "Expr.is_null",
+                "Expr.value_counts",
+                "Expr.is_null",
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(&two, place, Some(TableStage::Rows), reason),
+            vec![Limit::ACountNoRowsChange]
+        );
+    }
+
+    #[test]
+    fn a_struct_compared_in_a_predicate_is_why_polars_allows_a_branch_the_tables_refuse() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-struct-taken-for-a-predicate.case"),
+            vec![Limit::AStructTakenForAPredicate]
+        );
+        // The same branch under a predicate that is no comparison of a struct is no case of it.
+        let text =
+            String::from_utf8(kept_case("uncovered-a-struct-taken-for-a-predicate.case").encode())
+                .expect("text");
+        let plain = text.replace(r#""entry":"Expr.eq""#, r#""entry":"Expr.is_null""#);
+        assert_ne!(plain, text);
+        if let Ok(other) = Case::decode(plain.as_bytes()) {
+            assert!(!excused_by(&other).contains(&Limit::AStructTakenForAPredicate));
+        }
+    }
+
+    #[test]
+    fn a_struct_of_literals_written_as_text_is_one_value_that_a_replacement_does_not_broadcast() {
+        for name in [
+            "uncovered-a-literal-text-beside-many-replacement-values--a-struct-of-literals-written-as-text.case",
+            "uncovered-a-literal-text-beside-many-replacement-values--a-struct-of-literals-written-as-the-prefix.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::ALiteralTextBesideManyReplacementValues],
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_number_written_as_json_is_the_cause_of_a_refusal_to_read_text_as_one_in_a_pivot() {
+        let reason = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let json = chain(
+            call("polars.element", Vec::new()),
+            &["Expr.count", "Expr.struct.json_encode", "Expr.kurtosis"],
+        );
+        let place = at(&[
+            Segment::Parameter("aggregate_function".to_owned()),
+            Segment::Link(2),
+        ]);
+        assert_eq!(
+            tables_refuse(
+                &pivot(json),
+                place.clone(),
+                Some(TableStage::Schema),
+                reason
+            ),
+            vec![Limit::AJsonOfANumberInAPivot]
+        );
+        // Where the text is no cause of the refusal, as the length of it asks none, the json is not
+        // why Polars allows: a text of one value given in its place is allowed as well.
+        let length = chain(
+            call("polars.element", Vec::new()),
+            &[
+                "Expr.count",
+                "Expr.struct.json_encode",
+                "Expr.str.len_chars",
+            ],
+        );
+        assert_eq!(
+            tables_refuse(
+                &pivot(length),
+                at(&[
+                    Segment::Parameter("aggregate_function".to_owned()),
+                    Segment::Link(2)
+                ]),
+                Some(TableStage::Schema),
+                reason
+            ),
+            vec![]
+        );
+        // Without the call, or in a select, the text is not the json of a number.
+        let without = chain(
+            call("polars.element", Vec::new()),
+            &["Expr.count", "Expr.kurtosis"],
+        );
+        assert_eq!(
+            tables_refuse(&pivot(without), place, Some(TableStage::Schema), reason),
+            vec![]
         );
     }
 }

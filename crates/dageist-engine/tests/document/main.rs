@@ -30,6 +30,7 @@ mod reading;
 mod refusals;
 mod shown;
 mod statistics;
+mod structs;
 mod summary;
 mod support;
 mod syntax;

@@ -149,6 +149,19 @@ pub(crate) fn variants() -> RunView {
                     }),
                     None,
                 ],
+                fields: vec![
+                    Some(StructView {
+                        dtype: "Struct(x: Int64)".to_owned(),
+                        fields: Some(vec![FieldView {
+                            name: "x".to_owned(),
+                            dtype: "Int64".to_owned(),
+                        }]),
+                    }),
+                    Some(StructView {
+                        dtype: "Struct".to_owned(),
+                        fields: None,
+                    }),
+                ],
                 ending: Some(EndingView::NotKnown {
                     because: "the dtype is not known".to_owned(),
                 }),

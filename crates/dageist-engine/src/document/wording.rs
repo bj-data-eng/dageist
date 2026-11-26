@@ -27,6 +27,7 @@ pub(super) fn scalar(value: &Value) -> Option<String> {
                     .join(", ")
             ),
         },
+        Value::Field(name) => string(name),
         Value::Integer(number) => number.to_string(),
         Value::Float(number) => float(*number),
         Value::String(text)

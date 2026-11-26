@@ -51,20 +51,27 @@
 #   element-dtype-is-implemented: a method of lists and arrays must be given an element dtype that Polars implements it for: it panics for the others where the rows run, on a thread of its own that its streaming executor may not recover from.
 #   element-dtype-is-measured: a method whose answer depends on the element dtype of a list or an array must be given one the tables measure it on, the whole numbers, the floats, text, booleans, dates and datetimes: Polars is not asked of another, which it may panic on.
 #   element-only-in-pivot-aggregate: `polars.element` stands only in a pivot's aggregate.
+#   field-is-of-the-struct: a field that a method reads or drops must be one of the fields of the struct it follows: Polars refuses a name that is none, as one that was renamed or dropped before is.
+#   field-names-fit-the-struct: the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
 #   folded-function-is-no-join-key: a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join.
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor whole numbers be compared for missing values with a number that has a fraction, nor a replacement take a value that reads a column.
 #   moments-share-a-zone: moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone.
+#   one-column-is-needed: a filter's only predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty, and Polars refuses both; beside another predicate each expression it expands to is a predicate of its own, which it takes.
 #   parameter-takes-one-value: a parameter that Polars reads as one value must be given one: not the rows, nor a count of values that the data or the arguments decide, and, for the count of rows that `shift` and `diff` look back by and the value `shift` fills with, not the one value that a method took of one value either, which Polars cannot tell is one before the rows run.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   range-is-valid: a range or a repeat typed in must be one Polars can make and cut: a step other than nothing, an interval above nothing that its bounds are read in, bounds the dtype holds, a number of values that is not below nothing, and, of it, no length below nothing to cut any value by.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
+#   struct-arithmetic-needs-numbers: arithmetic with a struct needs its fields to be numbers: Polars refuses the absolute value, the negation, the sign, a clip and a power of a struct whatever its fields are, and the sum, the difference, the product and the quotients of one that has a field of text, a date, a moment or a time.
+#   struct-is-filled-forward-or-backward: a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none.
 #   time-zone-is-valid: a time zone must be one Polars reads.
+#   to-struct-names-are-distinct: no two names given to the fields of a struct that a list or an array is made may be alike: Polars 2.2.0 accepts them and builds a struct that disagrees with itself, as its dtype and its series hold two fields of one name, and refuses the same names for a struct made of columns or renamed.
 #   values-meet-in-count: the values a call meets must be one value, which meets each of the others, or as many as one another: a count of values that the data or the arguments decide, as the first values of a column or the values that differ are, is not the table's rows and not another count it is not known to equal.
 #   window-input-is-not-counted: a window takes a value as long as its group, and a count of values that the data or the arguments decide is not, nor is the one value that a method took of one value, unless the window joins the values of a group into a list or explodes them.
 #   window-input-is-not-widened: a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output.
+#   written-names-are-distinct: the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
 # `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved
@@ -74,7 +81,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 16560 combinations: 11273 allowed; 3092 refused when Polars resolved the schema, 2195 when it ran the rows, 0 when it ran the empty table.
+# 17220 combinations: 11685 allowed; 3242 refused when Polars resolved the schema, 2293 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -2236,6 +2243,66 @@ Expr.arr.to_list | sort > over.partition_by | continues | Array(Int64, 2) | - | 
 Expr.arr.to_list | sort > over.partition_by | ends | Array(Int64, 2) | - | - | allowed List(Int64) many
 Expr.arr.to_list | sort | continues | Array(Int64, 2) | - | - | allowed List(Int64) many
 Expr.arr.to_list | sort | ends | Array(Int64, 2) | - | - | allowed List(Int64) many
+Expr.arr.to_struct | filter > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.arr.to_struct | filter > condition.value | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter > condition.value | ends | Array(Int64, 2) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': Int64, 'field_1': Int64})`
+Expr.arr.to_struct | filter > over.order_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter > over.order_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | filter | ends | Array(Int64, 2) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': Int64, 'field_1': Int64})`
+Expr.arr.to_struct | join_left > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_left > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_left > condition.value | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_left > condition.value | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_left > over.order_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_left > over.order_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_left > over.partition_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_left > over.partition_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_left | continues | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_left | ends | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_right > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_right > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `ra`
+Expr.arr.to_struct | join_right > condition.value | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_right > condition.value | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_right > over.order_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_right > over.order_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_right > over.partition_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_right > over.partition_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.arr.to_struct | join_right | continues | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | join_right | ends | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | pivot_aggregate > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | pivot_aggregate > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.arr.to_struct | pivot_aggregate > condition.value | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | pivot_aggregate > condition.value | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | pivot_aggregate > over.order_by | continues | Array(Int64, 2) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arr.to_struct | pivot_aggregate > over.order_by | ends | Array(Int64, 2) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arr.to_struct | pivot_aggregate > over.partition_by | continues | Array(Int64, 2) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arr.to_struct | pivot_aggregate > over.partition_by | ends | Array(Int64, 2) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.arr.to_struct | pivot_aggregate | continues | Array(Int64, 2) | - | pivot-aggregate-gives-one-value | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | pivot_aggregate | ends | Array(Int64, 2) | - | pivot-aggregate-gives-one-value | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.arr.to_struct | select > condition.value | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > condition.value | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > over.order_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > over.order_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | select | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.arr.to_struct | sort > condition.value | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > condition.value | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > over.order_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > over.order_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort | continues | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
+Expr.arr.to_struct | sort | ends | Array(Int64, 2) | - | - | allowed Struct(field_0: Int64, field_1: Int64) many
 Expr.arr.unique | filter > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed List(Int64) many
 Expr.arr.unique | filter > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `a`
 Expr.arr.unique | filter > condition.value | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed List(Int64) many
@@ -10336,6 +10403,66 @@ Expr.list.sum | sort > over.partition_by | continues | List(Int64) | - | - | all
 Expr.list.sum | sort > over.partition_by | ends | List(Int64) | - | - | allowed Int64 many
 Expr.list.sum | sort | continues | List(Int64) | - | - | allowed Int64 many
 Expr.list.sum | sort | ends | List(Int64) | - | - | allowed Int64 many
+Expr.list.to_struct | filter > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.list.to_struct | filter > condition.value | continues | List(Int64) | - | filter-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter > condition.value | ends | List(Int64) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64, 'b': Int64})`
+Expr.list.to_struct | filter > over.order_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter > over.order_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter > over.partition_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter > over.partition_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter | continues | List(Int64) | - | filter-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | filter | ends | List(Int64) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64, 'b': Int64})`
+Expr.list.to_struct | join_left > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_left > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_left > condition.value | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_left > condition.value | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_left > over.order_by | continues | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_left > over.order_by | ends | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_left > over.partition_by | continues | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_left > over.partition_by | ends | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_left | continues | List(Int64) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_left | ends | List(Int64) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_right > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_right > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `ra`
+Expr.list.to_struct | join_right > condition.value | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_right > condition.value | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_right > over.order_by | continues | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_right > over.order_by | ends | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_right > over.partition_by | continues | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_right > over.partition_by | ends | List(Int64) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.list.to_struct | join_right | continues | List(Int64) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | join_right | ends | List(Int64) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | pivot_aggregate > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | pivot_aggregate > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.list.to_struct | pivot_aggregate > condition.value | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | pivot_aggregate > condition.value | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | pivot_aggregate > over.order_by | continues | List(Int64) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.list.to_struct | pivot_aggregate > over.order_by | ends | List(Int64) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.list.to_struct | pivot_aggregate > over.partition_by | continues | List(Int64) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.list.to_struct | pivot_aggregate > over.partition_by | ends | List(Int64) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.list.to_struct | pivot_aggregate | continues | List(Int64) | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | pivot_aggregate | ends | List(Int64) | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.list.to_struct | select > condition.value | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > condition.value | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > over.order_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > over.order_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > over.partition_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select > over.partition_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | select | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.list.to_struct | sort > condition.value | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > condition.value | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > over.order_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > over.order_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > over.partition_by | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort > over.partition_by | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort | continues | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
+Expr.list.to_struct | sort | ends | List(Int64) | - | - | allowed Struct(a: Int64, b: Int64) many
 Expr.list.unique | filter > condition.predicate | continues | List(Int64) | - | condition-predicate-is-boolean | allowed List(Int64) many
 Expr.list.unique | filter > condition.predicate | ends | List(Int64) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `a`
 Expr.list.unique | filter > condition.value | continues | List(Int64) | - | filter-predicate-is-boolean | allowed List(Int64) many
@@ -14176,6 +14303,126 @@ Expr.str.split | sort > over.partition_by | continues | String | String | - | al
 Expr.str.split | sort > over.partition_by | ends | String | String | - | allowed List(String) many
 Expr.str.split | sort | continues | String | String | - | allowed List(String) many
 Expr.str.split | sort | ends | String | String | - | allowed List(String) many
+Expr.str.split_exact | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[3]` for series with name `a`
+Expr.str.split_exact | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': String, 'field_1': String, 'field_2': String})`
+Expr.str.split_exact | filter > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter | continues | String | String | filter-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': String, 'field_1': String, 'field_2': String})`
+Expr.str.split_exact | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_left > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_left > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[3]` for series with name `ra`
+Expr.str.split_exact | join_right > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_right > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split_exact | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[3]` for series with name `a`
+Expr.str.split_exact | pivot_aggregate > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | pivot_aggregate > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split_exact | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split_exact | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split_exact | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split_exact | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[3]` for series with name `a`
+Expr.str.split_exact | select > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | select | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[3]` for series with name `a`
+Expr.str.split_exact | sort > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort | continues | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | sort | ends | String | String | - | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.splitn | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.str.splitn | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': String, 'field_1': String})`
+Expr.str.splitn | filter > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter | continues | String | String | filter-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'field_0': String, 'field_1': String})`
+Expr.str.splitn | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_left > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_left > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `ra`
+Expr.str.splitn | join_right > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_right > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.splitn | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.str.splitn | pivot_aggregate > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | pivot_aggregate > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.splitn | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.splitn | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.splitn | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.splitn | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.str.splitn | select > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | select | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.str.splitn | sort > condition.value | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > condition.value | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > over.order_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > over.order_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > over.partition_by | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort > over.partition_by | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort | continues | String | String | - | allowed Struct(field_0: String, field_1: String) many
+Expr.str.splitn | sort | ends | String | String | - | allowed Struct(field_0: String, field_1: String) many
 Expr.str.starts_with | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
 Expr.str.starts_with | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
 Expr.str.starts_with | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed Boolean many
@@ -14836,6 +15083,306 @@ Expr.str.zfill | sort > over.partition_by | continues | String | Int8 | - | allo
 Expr.str.zfill | sort > over.partition_by | ends | String | Int8 | - | allowed String many
 Expr.str.zfill | sort | continues | String | Int8 | - | allowed String many
 Expr.str.zfill | sort | ends | String | Int8 | - | allowed String many
+Expr.struct.drop | filter > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | filter > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+Expr.struct.drop | filter > condition.value | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | filter > condition.value | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'y': String})`
+Expr.struct.drop | filter > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | filter > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | filter > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | filter > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | filter | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | filter | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'y': String})`
+Expr.struct.drop | join_left > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | join_left > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | join_left > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | join_left > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | join_left > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_left > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_left > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_left > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_left | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(y: String) many
+Expr.struct.drop | join_left | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(y: String) many
+Expr.struct.drop | join_right > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | join_right > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `ra`
+Expr.struct.drop | join_right > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | join_right > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | join_right > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_right > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_right > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_right > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.drop | join_right | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(y: String) many
+Expr.struct.drop | join_right | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(y: String) many
+Expr.struct.drop | pivot_aggregate > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | pivot_aggregate > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+Expr.struct.drop | pivot_aggregate > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | pivot_aggregate > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | pivot_aggregate > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.drop | pivot_aggregate > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.drop | pivot_aggregate > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.drop | pivot_aggregate > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.drop | pivot_aggregate | continues | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Struct(y: String) many
+Expr.struct.drop | pivot_aggregate | ends | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Struct(y: String) many
+Expr.struct.drop | select > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | select > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+Expr.struct.drop | select > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | select | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(y: String) many
+Expr.struct.drop | sort > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+Expr.struct.drop | sort > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.drop | sort | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(y: String) many
+Expr.struct.field | filter > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | filter > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.field | filter > condition.value | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | filter > condition.value | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Int64`
+Expr.struct.field | filter > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | filter > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | filter > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | filter > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | filter | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | filter | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Int64`
+Expr.struct.field | join_left > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | join_left > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | join_left > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | join_left > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | join_left > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_left > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_left > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_left > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_left | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 many
+Expr.struct.field | join_left | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 many
+Expr.struct.field | join_right > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | join_right > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.field | join_right > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | join_right > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | join_right > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_right > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_right > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_right > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.field | join_right | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 many
+Expr.struct.field | join_right | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 many
+Expr.struct.field | pivot_aggregate > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | pivot_aggregate > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.field | pivot_aggregate > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | pivot_aggregate > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | pivot_aggregate > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.field | pivot_aggregate > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.field | pivot_aggregate > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.field | pivot_aggregate > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.field | pivot_aggregate | continues | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Int64 many
+Expr.struct.field | pivot_aggregate | ends | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Int64 many
+Expr.struct.field | select > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | select > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.field | select > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | select | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Int64 many
+Expr.struct.field | sort > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.field | sort > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort | continues | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.field | sort | ends | Struct(x: Int64, y: String) | - | - | allowed Int64 many
+Expr.struct.json_encode | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.struct.json_encode | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.struct.json_encode | filter > over.order_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | filter > over.order_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | filter > over.partition_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | filter > over.partition_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | filter | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.struct.json_encode | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | join_left > condition.value | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | join_left > condition.value | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.struct.json_encode | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.struct.json_encode | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.struct.json_encode | join_right > condition.value | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | join_right > condition.value | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.json_encode | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.struct.json_encode | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.struct.json_encode | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.struct.json_encode | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.json_encode | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.json_encode | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.json_encode | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.json_encode | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.struct.json_encode | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.struct.json_encode | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.struct.json_encode | select > condition.value | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select > condition.value | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select > over.order_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select > over.order_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select > over.partition_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select > over.partition_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | select | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String many
+Expr.struct.json_encode | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.struct.json_encode | sort > condition.value | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > condition.value | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > over.order_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > over.order_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > over.partition_by | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort > over.partition_by | ends | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort | continues | Int64 | - | - | allowed String many
+Expr.struct.json_encode | sort | ends | Int64 | - | - | allowed String many
+Expr.struct.rename_fields | filter > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.struct.rename_fields | filter > condition.value | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter > condition.value | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64, 'b': String})`
+Expr.struct.rename_fields | filter > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | filter | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64, 'b': String})`
+Expr.struct.rename_fields | join_left > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_left > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_left > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_left > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_left > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_left > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_left > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_left > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_left | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_left | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_right > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_right > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `ra`
+Expr.struct.rename_fields | join_right > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_right > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_right > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_right > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_right > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_right > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.struct.rename_fields | join_right | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | join_right | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | pivot_aggregate > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | pivot_aggregate > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.struct.rename_fields | pivot_aggregate > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | pivot_aggregate > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | pivot_aggregate > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.rename_fields | pivot_aggregate > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.rename_fields | pivot_aggregate > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.rename_fields | pivot_aggregate > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.struct.rename_fields | pivot_aggregate | continues | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | pivot_aggregate | ends | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.struct.rename_fields | select > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | select | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[2]` for series with name `a`
+Expr.struct.rename_fields | sort > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort | continues | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.rename_fields | sort | ends | Struct(x: Int64, y: String) | - | - | allowed Struct(a: Int64, b: String) many
+Expr.struct.unnest | filter > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > condition.value | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > condition.value | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter | continues | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | filter | ends | Struct(x: Int64, y: String) | - | filter-predicate-is-boolean | refused schema: The predicate passed to 'LazyFrame.filter' expanded to multiple expressions:
+Expr.struct.unnest | join_left > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > condition.value | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > condition.value | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_left | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: join keys expanded to a different number of expressions (left: 2, right: 1)
+Expr.struct.unnest | join_right > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > condition.value | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > condition.value | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right | continues | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | join_right | ends | Struct(x: Int64, y: String) | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: join keys expanded to a different number of expressions (left: 1, right: 2)
+Expr.struct.unnest | pivot_aggregate > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > condition.value | continues | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > condition.value | ends | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate | continues | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | pivot_aggregate | ends | Struct(x: Int64, y: String) | - | pivot-aggregate-gives-one-value | refused schema: Pivot expression are not allowed to expand to more than 1 expression
+Expr.struct.unnest | select > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: duplicate: projections contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused schema: duplicate: projections contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | select > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | select > over.order_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: duplicate: projections contained duplicate output name 'f'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select > over.order_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: duplicate: projections contained duplicate output name 'f'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | refused schema: duplicate: projections contained duplicate output name 'f'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | refused schema: duplicate: projections contained duplicate output name 'f'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias("new_name")` to avoid duplicate column names.
+Expr.struct.unnest | select | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | select | ends | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > condition.predicate | continues | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | allowed -
+Expr.struct.unnest | sort > condition.predicate | ends | Struct(x: Int64, y: String) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `x`
+Expr.struct.unnest | sort > condition.value | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > condition.value | ends | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > over.order_by | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > over.order_by | ends | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > over.partition_by | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort > over.partition_by | ends | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort | continues | Struct(x: Int64, y: String) | - | - | allowed -
+Expr.struct.unnest | sort | ends | Struct(x: Int64, y: String) | - | - | allowed -
 Expr.sub | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 many
 Expr.sub | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.sub | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 many
@@ -15436,6 +15983,66 @@ Expr.unique_counts | sort > over.partition_by | continues | Int64 | - | - | allo
 Expr.unique_counts | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.unique_counts | sort | continues | Int64 | - | - | allowed UInt32 counted
 Expr.unique_counts | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | filter > over.order_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | filter > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.value_counts | filter > over.partition_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | filter > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | filter | ends | Int64 | - | filter-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left > condition.value | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_left > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > condition.value | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_right > condition.value | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.value_counts | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.value_counts | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.value_counts | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.value_counts | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.value_counts | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > condition.value | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > condition.value | ends | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > over.order_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.value_counts | select > over.partition_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | select | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | select | ends | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | sort > condition.value | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort > condition.value | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | sort > over.order_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+Expr.value_counts | sort > over.partition_by | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.value_counts | sort | continues | Int64 | - | - | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.var | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Float64 one
 Expr.var | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `_POLARS_TMP_PHYS_`
 Expr.var | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Float64 one
@@ -16456,6 +17063,66 @@ polars.repeat | sort > over.partition_by | continues | - | - | - | allowed Int32
 polars.repeat | sort > over.partition_by | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 polars.repeat | sort | continues | - | - | - | allowed Int32 counted
 polars.repeat | sort | ends | - | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+polars.struct | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+polars.struct | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | filter > condition.value | ends | - | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64})`
+polars.struct | filter > over.order_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | filter > over.order_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | filter > over.partition_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | filter > over.partition_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | filter | continues | - | - | filter-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | filter | ends | - | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Struct({'a': Int64})`
+polars.struct | join_left > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | join_left > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | join_left > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | join_left > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | join_left > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
+polars.struct | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
+polars.struct | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `ra`
+polars.struct | join_right > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | join_right > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | join_right > over.order_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
+polars.struct | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
+polars.struct | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Struct(a: Int64) many
+polars.struct | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+polars.struct | pivot_aggregate > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | pivot_aggregate > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | pivot_aggregate > over.order_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.struct | pivot_aggregate > over.order_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.struct | pivot_aggregate > over.partition_by | continues | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.struct | pivot_aggregate > over.partition_by | ends | - | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+polars.struct | pivot_aggregate | continues | - | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64) many
+polars.struct | pivot_aggregate | ends | - | - | pivot-aggregate-gives-one-value | allowed Struct(a: Int64) many
+polars.struct | select > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | select > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+polars.struct | select > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select > over.order_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select > over.order_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select > over.partition_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select > over.partition_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | select | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Struct(a: Int64) many
+polars.struct | sort > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `struct[1]` for series with name `a`
+polars.struct | sort > condition.value | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > condition.value | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > over.order_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > over.order_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > over.partition_by | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort > over.partition_by | ends | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort | continues | - | - | - | allowed Struct(a: Int64) many
+polars.struct | sort | ends | - | - | - | allowed Struct(a: Int64) many
 polars.time | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Time many
 polars.time | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `time` for series with name `datetime`
 polars.time | filter > condition.value | continues | - | - | filter-predicate-is-boolean | allowed Time many

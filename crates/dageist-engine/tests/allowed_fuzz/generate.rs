@@ -14,8 +14,8 @@
 //! is [`super::predict`]'s, and Polars' is [`super::observe`]'s.
 
 use dageist_engine::allowed::{
-    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
-    Representative, Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Fields, Inner, Input, Place as OfferPlace,
+    Position as Slot, Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{
     self, Applies, Counting, Entry, Kind, ParameterDefault, Shape as ParamShape, ValueType,
@@ -25,6 +25,7 @@ use dageist_fuzz::generation::Entropy;
 
 use super::case::{Case, STEP};
 use super::frames::{ON_COLUMNS, OTHER, key_column};
+use super::structs::{Field, Fieldset, Kind as FieldKind, Structs};
 
 /// Fewest bytes of entropy a case is made from. A shorter input is discarded,
 /// for what it lacks would be read as zeros, the same choice every time.
@@ -259,6 +260,8 @@ struct Gen<'a> {
     focus: Option<&'a Focus>,
     receiver: Representative,
     argument: Representative,
+    /// The fields of the struct columns `a` and `b` where the case names them.
+    structs: Structs,
     host: Host,
     /// How many more calls may be added.
     budget: usize,
@@ -269,6 +272,18 @@ struct Gen<'a> {
     /// What the tables said of the function that makes a moment that a chain was just started
     /// from: how many values it gives, or `None` where they refused it.
     started: Option<Option<Shape>>,
+    /// The fields of the struct the call just judged gives, where they are known.
+    next_fields: Option<Fields>,
+    /// What the function that makes a struct, which a chain was just started from, was made of.
+    made_of: Vec<MadeOf>,
+}
+
+/// One input of a call that makes a struct of expressions: the name it is written under, its class
+/// and, where it is a struct, its fields, as far as the generator knows them.
+struct MadeOf {
+    name: Option<String>,
+    class: Option<Representative>,
+    fields: Option<Fields>,
 }
 
 fn entry(id: &str) -> &'static Entry {
@@ -341,6 +356,20 @@ fn is_held_back(entry: &Entry) -> bool {
     catalog::Counting::of(entry, &[]).is_some()
         || entry.id().as_str() == "Expr.is_in"
         || is_of_nested_dtypes(entry)
+        || makes_or_reads_structs(entry)
+}
+
+/// Whether a call reads, names or makes a struct: the methods of the `struct` namespace, the calls
+/// that give a struct of what they are given and `value_counts`. A campaign draws them only where a
+/// focus names them: what they say depends on the fields of a struct, which the walk carries, and
+/// the campaigns that check them are those that focus on them.
+fn makes_or_reads_structs(entry: &Entry) -> bool {
+    let id = entry.id().as_str();
+    id.starts_with("Expr.struct.")
+        || matches!(
+            id,
+            "Expr.value_counts" | "Expr.str.split_exact" | "Expr.str.splitn" | "polars.struct"
+        )
 }
 
 /// Whether a method is one of the `list` or the `arr` namespace, which a campaign draws only where a
@@ -353,16 +382,43 @@ fn is_of_nested_dtypes(entry: &Entry) -> bool {
 }
 
 /// The classes a column under test may have: the measured ones, and where the focus holds a method of
-/// lists or arrays, the lists and arrays of every element dtype too.
+/// lists or arrays, the lists and arrays of every element dtype too. Where it holds a method that reads,
+/// names or makes a struct, the struct is among them often: twice as often as every other class
+/// together where the method reads one, and twice as often as another class where it does not.
 fn receivers(focus: Option<&Focus>) -> Vec<Representative> {
-    if focus.is_some_and(|focus| focus.methods.iter().any(|entry| is_of_nested_dtypes(entry))) {
+    let mut classes = if focus
+        .is_some_and(|focus| focus.methods.iter().any(|entry| is_of_nested_dtypes(entry)))
+    {
         Representative::ALL
             .into_iter()
             .filter(|class| class.is_nested())
             .collect()
     } else {
         Representative::MEASURED.to_vec()
+    };
+    if focus.is_some_and(Focus::is_on_structs) {
+        let own = classes.len();
+        let copies = if focus.is_some_and(Focus::is_on_reading_structs) {
+            2 * own
+        } else {
+            2
+        };
+        // The nested classes hold no struct: a focus on both gives the struct a place of its own.
+        classes.retain(|class| *class != Representative::Struct);
+        classes.extend(std::iter::repeat_n(Representative::Struct, copies));
     }
+    classes
+}
+
+/// The classes the column `b` may have, which stands for an argument: the measured ones, with the
+/// struct among them more often where the focus is on structs, for a struct is made of columns and
+/// is what a column that is one is read by.
+fn arguments(focus: Option<&Focus>) -> Vec<Representative> {
+    let mut classes = Representative::MEASURED.to_vec();
+    if focus.is_some_and(Focus::is_on_structs) {
+        classes.extend(std::iter::repeat_n(Representative::Struct, 12));
+    }
+    classes
 }
 
 /// The functions that start a chain and take expressions, which a chain may start from besides a
@@ -517,6 +573,22 @@ impl Focus {
             .join(", ")
     }
 
+    /// Whether the focus names a call that reads, names or makes a struct: the case then has struct
+    /// columns of fields of their own.
+    fn is_on_structs(&self) -> bool {
+        self.methods
+            .iter()
+            .chain(&self.starts)
+            .any(|entry| makes_or_reads_structs(entry))
+    }
+
+    /// Whether the focus names a method of the `struct` namespace, which reads a struct.
+    fn is_on_reading_structs(&self) -> bool {
+        self.methods
+            .iter()
+            .any(|entry| entry.id().as_str().starts_with("Expr.struct."))
+    }
+
     fn holds(&self, entry: &Entry) -> bool {
         self.methods
             .iter()
@@ -563,7 +635,17 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
     }
     let mut draw = Draw::new(bytes);
     let receiver = draw.pick(&receivers(focus));
-    let argument = draw.pick(&Representative::MEASURED);
+    let argument = draw.pick(&arguments(focus));
+    // A struct column of a campaign focused on structs has fields of its own, drawn for each.
+    let mut structs = Structs::default();
+    if focus.is_some_and(Focus::is_on_structs) {
+        if receiver == Representative::Struct {
+            structs.receiver = Some(draw_fieldset(&mut draw, 0));
+        }
+        if argument == Representative::Struct {
+            structs.argument = Some(draw_fieldset(&mut draw, 0));
+        }
+    }
     let host = draw.weighted(&Host::ALL);
     // A campaign focused on steps draws one of them for most cases, and nothing more is drawn
     // for one that is focused on methods only.
@@ -586,17 +668,73 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         focus,
         receiver,
         argument,
+        structs: structs.clone(),
         host,
         budget: 18,
         untyped_numbers: true,
         started: None,
+        next_fields: None,
+        made_of: Vec::new(),
     };
     let document = generator.document();
     Some(Case {
         receiver,
         argument,
+        structs,
         document,
     })
+}
+
+/// The names of the fields a struct column is drawn with: the names of the columns of the sample
+/// tables, so that a field and a column of one name meet, and names a count and a literal are
+/// given, so that those meet a field too.
+const FIELD_NAMES: [&str; 18] = [
+    "x", "y", "z", "a", "b", "c", "k", "n", "v", "id", "name", "value", "count", "field_0",
+    "field_1", "literal", "s", "t",
+];
+
+/// Names that are no field of any struct column, which a read or a drop is given where it is
+/// given a name that is none.
+const ABSENT_NAMES: [&str; 6] = ["nope", "zz", "missing", "X", "x ", "field_9"];
+
+/// The dtype of a field that a struct column of a campaign is drawn with: the scalars, the common
+/// ones more often.
+fn draw_scalar(draw: &mut Draw<'_>) -> Inner {
+    let weighted: Vec<(usize, Inner)> = Inner::ALL
+        .into_iter()
+        .map(|inner| {
+            let weight = match inner {
+                Inner::Int64 | Inner::String => 4,
+                Inner::Boolean | Inner::Float64 | Inner::Int32 => 2,
+                _ => 1,
+            };
+            (weight, inner)
+        })
+        .collect();
+    draw.weighted(&weighted)
+}
+
+/// The fields of a struct column: none, one, or up to five, of scalars, lists of scalars and
+/// structs of fields of their own up to two deep, each under a name of [`FIELD_NAMES`].
+fn draw_fieldset(draw: &mut Draw<'_>, depth: usize) -> Fieldset {
+    let count = if depth == 0 {
+        draw.weighted(&[(6, 0_usize), (22, 1), (30, 2), (24, 3), (12, 4), (6, 5)])
+    } else {
+        draw.weighted(&[(3, 0_usize), (40, 1), (40, 2), (17, 3)])
+    };
+    let mut pool: Vec<&str> = FIELD_NAMES.to_vec();
+    let mut fields = Vec::new();
+    for _ in 0..count {
+        let name = pool.remove(draw.below(pool.len()));
+        let kind = match draw.below(100) {
+            0..=69 => FieldKind::Scalar(draw_scalar(draw)),
+            70..=87 => FieldKind::List(draw_scalar(draw)),
+            _ if depth < 2 => FieldKind::Struct(draw_fieldset(draw, depth + 1)),
+            _ => FieldKind::Scalar(draw_scalar(draw)),
+        };
+        fields.push(Field::new(name, kind));
+    }
+    Fieldset::new(fields).expect("names drawn from a pool without putting one back are distinct")
 }
 
 impl Gen<'_> {
@@ -623,6 +761,13 @@ impl Gen<'_> {
             Host::JoinLeft | Host::JoinRight | Host::JoinOn => {
                 self.join_keys(first, &mut slots, host == Host::JoinOn)
             }
+            // A filter may hold a predicate beside another, which Polars judges as it does not
+            // judge one alone.
+            Host::Filter if self.draw.chance(30) => {
+                self.budget = 6;
+                let second = self.chain(&mut slots, 0, goal).expression;
+                (vec![first.expression, second], Vec::new())
+            }
             _ => (vec![first.expression], Vec::new()),
         };
         let held_one = || held[0].clone();
@@ -638,7 +783,7 @@ impl Gen<'_> {
         };
         let mut given: Vec<(&str, Value)> = match host {
             Host::Select | Host::WithColumns => vec![("exprs", many(held.clone()))],
-            Host::Filter => vec![("predicates", as_list(held_one()))],
+            Host::Filter => vec![("predicates", many(held.clone()))],
             Host::Sort => vec![("by", as_list(held_one()))],
             Host::JoinLeft => vec![
                 ("other", Value::Table(OTHER.to_owned())),
@@ -871,6 +1016,11 @@ impl Gen<'_> {
             })
             // A fill takes a strategy in place of a value, which `method_call` decides.
             .filter(|parameter| parameter.in_place_of().is_none())
+            // A step is always lazy, so it refuses the series that `eager` makes before it asks
+            // Polars, which says nothing of the tables: a struct is made with the flag unset.
+            .filter(|parameter| {
+                !(entry.id().as_str() == "polars.struct" && parameter.name() == "eager")
+            })
             .collect();
         if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
             && !function_starts()
@@ -1225,7 +1375,7 @@ impl Gen<'_> {
         let (call, operands) = if counted_by_arguments {
             self.range_call(entry)
         } else {
-            self.method_call(entry, slots, depth)?
+            self.method_call(entry, slots, depth, None)?
         };
         let context = Context::from_positions(slots).expect("a position of a step comes first");
         let given: Vec<(&str, Representative)> = operands
@@ -1256,10 +1406,16 @@ impl Gen<'_> {
             }
             _ => true,
         });
+        let made = std::mem::take(&mut self.made_of);
+        let inputs: Vec<Input<'_>> = made
+            .iter()
+            .map(|input| Input::new(input.name.as_deref(), input.class, input.fields.as_ref()))
+            .collect();
         let chosen = Chosen::default()
             .with_arguments(&given)
             .with_options(&words)
-            .with_time_zones(&zones);
+            .with_time_zones(&zones)
+            .with_inputs(&inputs);
         let chosen = if counted_by_arguments {
             chosen.giving_shape(Shape::Counted)
         } else if one {
@@ -1272,8 +1428,10 @@ impl Gen<'_> {
             OfferVerdict::Allowed(allowance) => Some(allowance.shape()),
             OfferVerdict::Refused(_) => None,
         });
+        self.next_fields = None;
         let class = match verdict {
             OfferVerdict::Allowed(allowance) => {
+                self.next_fields = allowance.fields().cloned();
                 allowance.result().and_then(allowed::ResultDtype::class)
             }
             OfferVerdict::Refused(_) => None,
@@ -1544,6 +1702,20 @@ impl Gen<'_> {
         };
         let mut links: Vec<Call> = Vec::new();
         let mut cur_class = class;
+        // What the chain holds of a struct, as far as the generator knows: its fields, and the
+        // name the values are written under.
+        let mut cur_fields = if is_condition {
+            None
+        } else {
+            self.next_fields
+                .take()
+                .or_else(|| self.fields_of_start(&start))
+        };
+        let mut cur_name = if is_condition {
+            None
+        } else {
+            output_name_of_start(&start)
+        };
         let mut shape = Shape::Many;
         let mut alive = true;
         let mut values: Vec<Option<Representative>> = Vec::new();
@@ -1588,11 +1760,22 @@ impl Gen<'_> {
             if !alive || cur_class.is_none() || self.budget == 0 {
                 break;
             }
-            let Some((link, next)) =
-                self.method(slots, depth, context, cur_class.expect("a class"), shape)
-            else {
+            let Some((link, next)) = self.method(
+                slots,
+                depth,
+                context,
+                cur_class.expect("a class"),
+                shape,
+                (cur_fields.as_ref(), cur_name.as_deref()),
+            ) else {
                 break;
             };
+            cur_fields = self.next_fields.take();
+            if link.entry().id().as_str() == "Expr.struct.field"
+                && let Some(Value::Field(read)) = link.argument("name")
+            {
+                cur_name = Some(read.clone());
+            }
             links.push(link);
             match next {
                 Some((next_class, next_shape)) => {
@@ -1722,7 +1905,9 @@ impl Gen<'_> {
         context: Context,
         class: Representative,
         shape: Shape,
+        held: (Option<&Fields>, Option<&str>),
     ) -> Option<(Call, Next)> {
+        let (fields, output_name) = held;
         // The methods of lists and arrays are drawn only where a focus names them, and are not in the
         // pool otherwise, so that the cases of a campaign without one are what they were.
         let methods: Vec<&Entry> = methods()
@@ -1745,7 +1930,7 @@ impl Gen<'_> {
             {
                 chosen = self.draw.pick(&focus.methods);
             }
-            let (call, arguments) = self.method_call(chosen, slots, depth)?;
+            let (call, arguments) = self.method_call(chosen, slots, depth, fields)?;
             let given: Vec<(&str, Representative)> = arguments
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -1755,6 +1940,8 @@ impl Gen<'_> {
                 .iter()
                 .map(|(name, word)| (name.as_str(), word.as_str()))
                 .collect();
+            let names = names_of(&call);
+            let numbers = numbers_of(&call);
             let verdict = allowed::offer(
                 chosen,
                 &OfferPlace::new(
@@ -1766,14 +1953,20 @@ impl Gen<'_> {
                 ),
                 &Chosen::default()
                     .with_arguments(&given)
-                    .with_options(&words),
+                    .with_options(&words)
+                    .following_fields(fields)
+                    .with_names(&names)
+                    .with_numbers(&numbers)
+                    .named(output_name),
             );
             match verdict {
                 OfferVerdict::Allowed(allowance) => {
                     let next = allowance.result().and_then(allowed::ResultDtype::class);
+                    self.next_fields = allowance.fields().cloned();
                     return Some((call, Some((next, allowance.shape()))));
                 }
                 OfferVerdict::Refused(_) if attempt == 5 || self.draw.chance(15) => {
+                    self.next_fields = None;
                     return Some((call, None));
                 }
                 OfferVerdict::Refused(_) => {}
@@ -1803,7 +1996,7 @@ impl Gen<'_> {
             "Expr.le",
         ];
         let chosen = entry(self.draw.pick(&ids));
-        let (call, arguments) = self.method_call(chosen, slots, depth)?;
+        let (call, arguments) = self.method_call(chosen, slots, depth, None)?;
         let given: Vec<(&str, Representative)> = arguments
             .iter()
             .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -1844,10 +2037,14 @@ impl Gen<'_> {
         entry: &'static Entry,
         slots: &mut Vec<Slot>,
         depth: usize,
+        receiver_fields: Option<&Fields>,
     ) -> Option<(Call, Operands)> {
         let id = entry.id().as_str();
         let mut given: Vec<(&'static str, Value)> = Vec::new();
         let mut dtypes: Vec<(String, Option<Representative>)> = Vec::new();
+        if id == "polars.struct" {
+            self.made_of.clear();
+        }
         // Whether a window is given `partition_by`, which Polars takes without
         // `order_by` and `order_by` without it, and refuses neither.
         let mut partitioned = true;
@@ -1869,6 +2066,7 @@ impl Gen<'_> {
             let given_it = match (id, name) {
                 ("Expr.clip", "lower_bound") => bounds != 1,
                 ("Expr.clip", "upper_bound") => bounds != 0,
+                ("polars.struct", "exprs") => true,
                 ("Expr.fill_null", "value") => !fill_by_strategy,
                 // A strict replacement without a default is refused where a value is not listed,
                 // which depends on the rows, so one is sometimes given none and a limit holds the
@@ -1893,6 +2091,14 @@ impl Gen<'_> {
             let built: Vec<Built> = match (id, name) {
                 ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
                     vec![self.scalar(name == "n")]
+                }
+                // The values a struct is made of: one to three, of columns, literals and the fields
+                // of structs, which are each a field of the struct under the name they are written.
+                ("polars.struct", "exprs") => {
+                    let count = self.draw.weighted(&[(35, 1_usize), (40, 2), (25, 3)]);
+                    (0..count)
+                        .map(|_| self.struct_input(slots, depth))
+                        .collect()
                 }
                 // How many values a method keeps, or where it starts: a number typed in, of a
                 // dtype or not, which fixes the count that the walk states for the call.
@@ -1949,7 +2155,9 @@ impl Gen<'_> {
                 }
                 // A separator is often text typed in: a pattern where `literal` is false, which
                 // is then one Polars cannot compile now and then, and plain text where it is not.
-                ("Expr.str.split", "by") if self.draw.chance(50) => {
+                ("Expr.str.split" | "Expr.str.split_exact" | "Expr.str.splitn", "by")
+                    if self.draw.chance(50) =>
+                {
                     let text = if self.draw.chance(40) {
                         self.draw.pick(&INVALID_PATTERNS)
                     } else {
@@ -2046,6 +2254,24 @@ impl Gen<'_> {
             };
             given.push((name, value));
         }
+        if id == "polars.struct" && self.draw.chance(30) {
+            // Values given a name of their own, which a field is named by.
+            let count = 1 + self.draw.below(2);
+            let mut pairs = Vec::new();
+            for _ in 0..count {
+                let name = (*self.draw.pick(&NAMED_VALUES)).to_owned();
+                let built = self.struct_input(slots, depth);
+                if let Some(input) = self.made_of.last_mut() {
+                    input.name = Some(name.clone());
+                }
+                dtypes.push(("named_exprs".to_owned(), built.class));
+                pairs.push((
+                    Value::Columns(vec![name]),
+                    Value::Expression(built.expression),
+                ));
+            }
+            given.push(("named_exprs", Value::Pairs(pairs)));
+        }
         given.extend(self.options(entry));
         if fill_by_strategy
             && let Some(Kind::Choice(words)) = entry
@@ -2060,6 +2286,7 @@ impl Gen<'_> {
             ));
         }
         given.extend(self.dtype_arguments(entry));
+        given.extend(self.struct_arguments(entry, receiver_fields));
         given.extend(self.numbers(entry, &given));
         given.extend(self.texts(entry));
         given.extend(self.patterns(entry));
@@ -2144,6 +2371,15 @@ impl Gen<'_> {
                 "offset" if entry.id().as_str() == "Expr.gather_every" => {
                     Value::Integer(self.draw.pick(&[0, 0, 1, 2, 4]))
                 }
+                // How many parts a text is split into: none, some, and many, which Polars refuses
+                // below zero as a number of parts.
+                "n" if matches!(
+                    entry.id().as_str(),
+                    "Expr.str.split_exact" | "Expr.str.splitn"
+                ) =>
+                {
+                    Value::Integer(self.draw.pick(&[0, 0, 1, 1, 2, 2, 3, 4, 7]))
+                }
                 // How many matches `replace` replaces: none, some, or all of them below zero.
                 "n" => Value::Integer(self.draw.pick(&[-1, 0, 1, 1, 2, 3])),
                 // The seed of a random rank: Polars takes any unsigned number.
@@ -2172,6 +2408,7 @@ impl Gen<'_> {
         let mut texts = Vec::new();
         for parameter in entry.parameters() {
             if parameter.kind() != Kind::Value(ValueType::String)
+                || is_named_by_struct_arguments(entry.id().as_str(), parameter.name())
                 || (!parameter.is_needed() && !self.draw.chance(50))
             {
                 continue;
@@ -2276,6 +2513,277 @@ impl Gen<'_> {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Structs
+
+    /// The fields of the struct column `name` of the sample tables, as the walk reads them from the
+    /// schema, or none for a column that is no struct: the fields the case names, or the ones the
+    /// tables measured.
+    fn column_fields(&self, name: &str) -> Option<Fieldset> {
+        if self.class_of(name) != Some(Representative::Struct) {
+            return None;
+        }
+        let drawn = match name {
+            "a" | "ra" => &self.structs.receiver,
+            _ => &self.structs.argument,
+        };
+        Some(drawn.clone().unwrap_or_else(measured_fields))
+    }
+
+    /// The fields of the struct that a chain starting with `start` has, where the start is a
+    /// column or the values of a group that are one.
+    fn fields_of_start(&self, start: &Call) -> Option<Fields> {
+        let set = match start.entry().id().as_str() {
+            "polars.col" => match start.argument("name") {
+                Some(Value::Columns(names)) => self.column_fields(names.first()?)?,
+                _ => return None,
+            },
+            "polars.element" if self.receiver == Representative::Struct => self
+                .structs
+                .receiver
+                .clone()
+                .unwrap_or_else(measured_fields),
+            _ => return None,
+        };
+        set.as_walked()
+    }
+
+    /// The fields of the struct that `expression` gives, where it is a column or a field of a
+    /// column that holds a struct of fields of its own.
+    fn fields_of(&self, expression: &Expression) -> Option<Fields> {
+        let Start::Call(start) = expression.start() else {
+            return None;
+        };
+        let mut set = match start.argument("name") {
+            Some(Value::Columns(names)) if start.entry().id().as_str() == "polars.col" => {
+                self.column_fields(names.first()?)?
+            }
+            _ => return None,
+        };
+        for link in expression.links() {
+            if link.entry().id().as_str() != "Expr.struct.field" {
+                return None;
+            }
+            let Some(Value::Field(name)) = link.argument("name") else {
+                return None;
+            };
+            let FieldKind::Struct(inner) = set.iter().find(|field| field.name() == name)?.kind()
+            else {
+                return None;
+            };
+            set = inner.clone();
+        }
+        set.as_walked()
+    }
+
+    /// The name of a field a call reads or drops: one of the fields where they are known, mostly,
+    /// and a name that is none of them otherwise.
+    fn field_name(&mut self, fields: Option<&Fields>) -> String {
+        let names: Vec<&str> = fields
+            .map(|fields| fields.names().collect())
+            .unwrap_or_default();
+        let real = if names.is_empty() {
+            self.draw.chance(30)
+        } else {
+            self.draw.chance(72)
+        };
+        if real {
+            if names.is_empty() {
+                (*self.draw.pick(&FIELD_NAMES)).to_owned()
+            } else {
+                (*self.draw.pick(&names)).to_owned()
+            }
+        } else {
+            (*self.draw.pick(&ABSENT_NAMES)).to_owned()
+        }
+    }
+
+    /// `count` names for fields: new ones or those that a field has, no two alike, unless `repeats`
+    /// in a hundred times one is given twice, as Polars refuses.
+    fn field_names(
+        &mut self,
+        count: usize,
+        fields: Option<&Fields>,
+        repeats: usize,
+    ) -> Vec<String> {
+        let own: Vec<&str> = fields
+            .map(|fields| fields.names().collect())
+            .unwrap_or_default();
+        let mut pool: Vec<&str> = FIELD_NAMES.to_vec();
+        let mut names: Vec<String> = Vec::new();
+        for _ in 0..count {
+            let taken = |name: &&str| !names.iter().any(|before| before == name);
+            let name = if !own.is_empty() && self.draw.chance(25) {
+                let available: Vec<&str> = own.iter().copied().filter(taken).collect();
+                (!available.is_empty()).then(|| self.draw.pick(&available))
+            } else {
+                None
+            };
+            let name = name.unwrap_or_else(|| {
+                if pool.is_empty() {
+                    "extra"
+                } else {
+                    pool.remove(self.draw.below(pool.len()))
+                }
+            });
+            pool.retain(|left| *left != name);
+            names.push(name.to_owned());
+        }
+        if repeats > 0 && names.len() >= 2 && self.draw.chance(repeats) {
+            let from = self.draw.below(names.len());
+            let to = self.draw.below(names.len());
+            names[to] = names[from].clone();
+        }
+        names
+    }
+
+    /// An expression a struct is made of: a column, a literal, a chain, or a field of a struct
+    /// that is read, which gives a field its own name.
+    fn struct_input(&mut self, slots: &mut Vec<Slot>, depth: usize) -> Built {
+        let in_group = self.host == Host::Pivot && self.receiver == Representative::Struct;
+        let columns: Vec<&str> = self
+            .host
+            .columns()
+            .iter()
+            .copied()
+            .filter(|name| self.class_of(name) == Some(Representative::Struct))
+            .collect();
+        let built = if (in_group || !columns.is_empty()) && self.draw.chance(40) {
+            let (start, set) = if in_group {
+                (
+                    call("polars.element", Vec::new()),
+                    self.structs
+                        .receiver
+                        .clone()
+                        .unwrap_or_else(measured_fields),
+                )
+            } else {
+                let name = self.draw.pick(&columns);
+                (column(name), self.column_fields(name).expect("a struct"))
+            };
+            let names: Vec<&str> = set.names();
+            let name = if names.is_empty() || self.draw.chance(15) {
+                (*self.draw.pick(&ABSENT_NAMES)).to_owned()
+            } else {
+                // Only the fields of the struct itself are read of it, not those inside its fields.
+                let own: Vec<&Field> = set.iter().collect();
+                own[self.draw.below(own.len())].name().to_owned()
+            };
+            let class =
+                set.iter()
+                    .find(|field| field.name() == name)
+                    .map(|field| match field.kind() {
+                        FieldKind::Scalar(inner) => inner.class(),
+                        FieldKind::List(inner) => Representative::List(*inner),
+                        FieldKind::Struct(_) => Representative::Struct,
+                    });
+            Built {
+                expression: Expression::new(
+                    Start::Call(start),
+                    vec![call(
+                        "Expr.struct.field",
+                        vec![("name", Value::Field(name))],
+                    )],
+                )
+                .expect("a field read"),
+                class,
+            }
+        } else if self.draw.chance(70) {
+            self.operand(slots, depth)
+        } else {
+            let literal = self.literal();
+            Built {
+                expression: Expression::new(Start::Call(literal.0), Vec::new()).expect("a start"),
+                class: literal.1,
+            }
+        };
+        self.made_of.push(MadeOf {
+            name: output_name_of(&built.expression),
+            class: built.class,
+            fields: self.fields_of(&built.expression),
+        });
+        built
+    }
+
+    /// What a call that reads, names or makes the fields of a struct is given beside its
+    /// expressions: the names, drawn as the fields it is judged against are, and the names of a
+    /// count of values. `fields` are those of the struct it follows, where they are known.
+    fn struct_arguments(
+        &mut self,
+        entry: &'static Entry,
+        fields: Option<&Fields>,
+    ) -> Vec<(&'static str, Value)> {
+        match entry.id().as_str() {
+            "Expr.struct.field" => {
+                vec![("name", Value::Field(self.field_name(fields)))]
+            }
+            "Expr.struct.drop" => {
+                let count = self
+                    .draw
+                    .weighted(&[(12, 0_usize), (40, 1), (30, 2), (18, 3)]);
+                let mut names: Vec<String> = (0..count).map(|_| self.field_name(fields)).collect();
+                if names.len() >= 2 && self.draw.chance(10) {
+                    names[1] = names[0].clone();
+                }
+                vec![(
+                    "names",
+                    Value::Many(names.into_iter().map(Value::Field).collect()),
+                )]
+            }
+            "Expr.struct.rename_fields" => {
+                let known = fields.map(Fields::len);
+                let count = match known {
+                    Some(known) => match self.draw.below(100) {
+                        0..=54 => known,
+                        55..=69 => known + 1,
+                        70..=84 => known.saturating_sub(1),
+                        85..=92 => 0,
+                        _ => known + 2,
+                    },
+                    None => self
+                        .draw
+                        .weighted(&[(5, 0_usize), (30, 1), (35, 2), (20, 3), (10, 4)]),
+                };
+                let names = self.field_names(count, fields, 14);
+                vec![(
+                    "names",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            "Expr.value_counts" if self.draw.chance(45) => {
+                // The name of the count, or one that a column or the count has already.
+                let name =
+                    self.draw
+                        .pick(&["count", "proportion", "a", "b", "n", "x", "total", "count"]);
+                vec![("name", Value::String(name.to_owned()))]
+            }
+            "Expr.list.to_struct" => {
+                let count = self
+                    .draw
+                    .weighted(&[(4, 0_usize), (25, 1), (35, 2), (25, 3), (11, 4)]);
+                // A name given twice is never drawn: Polars' plan makes one field of it and its rows
+                // make two of one name, which no column can hold, where the editor refuses it.
+                let names = self.field_names(count, None, 0);
+                vec![(
+                    "fields",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            "Expr.arr.to_struct" if self.draw.chance(55) => {
+                // The arrays of the sample are two wide: names of the width, fewer and more.
+                let count = self
+                    .draw
+                    .weighted(&[(20, 1_usize), (45, 2), (25, 3), (10, 4)]);
+                let names = self.field_names(count, None, 0);
+                vec![(
+                    "fields",
+                    Value::Many(names.into_iter().map(Value::String).collect()),
+                )]
+            }
+            _ => Vec::new(),
+        }
+    }
+
     fn literal_loose_text(&mut self) -> (Call, Option<Representative>) {
         (
             call(
@@ -2285,6 +2793,101 @@ impl Gen<'_> {
             Some(Representative::String),
         )
     }
+}
+
+/// The names a value that a struct is made of is given: those of the columns and of the fields of
+/// the sample, and a word.
+const NAMED_VALUES: [&str; 7] = ["a", "b", "x", "literal", "n", "total", "k"];
+
+/// The fields of the struct that the tables were measured on, which a column of the class `Struct`
+/// has where a case names no others.
+fn measured_fields() -> Fieldset {
+    Fieldset::new(vec![
+        Field::new("x", FieldKind::Scalar(Inner::Int64)),
+        Field::new("y", FieldKind::Scalar(Inner::String)),
+    ])
+    .expect("two names")
+}
+
+/// Whether the parameter `name` of the entry `id` is given its names where the arguments of a call
+/// that names fields are drawn, and not where the texts of the others are.
+fn is_named_by_struct_arguments(id: &str, name: &str) -> bool {
+    matches!(
+        (id, name),
+        ("Expr.struct.rename_fields", "names")
+            | ("Expr.list.to_struct" | "Expr.arr.to_struct", "fields")
+            | ("Expr.value_counts", "name")
+    )
+}
+
+/// The name the values a chain starting with `start` are written under, as Polars names the
+/// output: a column's, the literal's `literal`, and none for what a chain does not name.
+fn output_name_of_start(start: &Call) -> Option<String> {
+    match start.entry().id().as_str() {
+        "polars.col" => match start.argument("name") {
+            Some(Value::Columns(names)) => names.first().cloned(),
+            _ => None,
+        },
+        "polars.lit" => Some("literal".to_owned()),
+        _ => None,
+    }
+}
+
+/// The name an expression's values are written under: that of its start, or of the last field it
+/// reads.
+fn output_name_of(expression: &Expression) -> Option<String> {
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    let mut name = output_name_of_start(start);
+    for link in expression.links() {
+        if link.entry().id().as_str() == "Expr.struct.field"
+            && let Some(Value::Field(read)) = link.argument("name")
+        {
+            name = Some(read.clone());
+        }
+    }
+    name
+}
+
+/// The names a call is given, each by its parameter, as the walk tells the tables of them: the
+/// fields it reads or drops, the names it gives fields and a count.
+fn names_of(call: &Call) -> Vec<(&'static str, &str)> {
+    let mut names = Vec::new();
+    for parameter in call.entry().parameters() {
+        if !matches!(
+            parameter.kind(),
+            Kind::Field | Kind::Value(ValueType::String)
+        ) {
+            continue;
+        }
+        let Some(value) = call.argument(parameter.name()) else {
+            continue;
+        };
+        let items: Vec<&Value> = match value {
+            Value::Many(items) => items.iter().collect(),
+            one => vec![one],
+        };
+        for item in items {
+            if let Value::Field(name) | Value::String(name) = item {
+                names.push((parameter.name(), name.as_str()));
+            }
+        }
+    }
+    names
+}
+
+/// The whole numbers a call is given, each by its parameter.
+fn numbers_of(call: &Call) -> Vec<(&'static str, i64)> {
+    call.entry()
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.kind() == Kind::Value(ValueType::Integer))
+        .filter_map(|parameter| match call.argument(parameter.name())? {
+            Value::Integer(number) => Some((parameter.name(), *number)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Patterns Polars compiles: with and without groups, named groups in both of Rust's spellings,
@@ -3172,5 +3775,456 @@ mod tests {
                 .all(|window| !has(window, "more_exprs") || has(window, "partition_by")),
             "a window is given more_exprs without partition_by"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Structs
+
+    /// The methods and functions a campaign focused on structs names.
+    const STRUCT_FOCUS: &str =
+        "struct.,value_counts,str.split_exact,str.splitn,list.to_struct,arr.to_struct,struct";
+
+    /// The first line of the case, which says what its columns are.
+    fn header_of(case: &Case) -> serde_json::Value {
+        let text = String::from_utf8(case.encode()).expect("a case is text");
+        serde_json::from_str(text.lines().next().expect("a first line")).expect("a header")
+    }
+
+    /// The document of the case as JSON.
+    fn document_of(case: &Case) -> serde_json::Value {
+        serde_json::from_str(case.document.write().as_str()).expect("a document")
+    }
+
+    /// Every call of the entry `id` in `value`, at any depth.
+    fn calls_of<'v>(
+        value: &'v serde_json::Value,
+        id: &str,
+        found: &mut Vec<&'v serde_json::Value>,
+    ) {
+        match value {
+            serde_json::Value::Object(map) => {
+                if map.get("entry").and_then(serde_json::Value::as_str) == Some(id) {
+                    found.push(value);
+                }
+                map.values().for_each(|inside| calls_of(inside, id, found));
+            }
+            serde_json::Value::Array(items) => {
+                items.iter().for_each(|inside| calls_of(inside, id, found));
+            }
+            _ => {}
+        }
+    }
+
+    /// The calls of `id` in the case, with the arguments each is given.
+    fn arguments_of(case: &Case, id: &str) -> Vec<serde_json::Value> {
+        let document = document_of(case);
+        let mut found = Vec::new();
+        calls_of(&document, id, &mut found);
+        found
+            .into_iter()
+            .map(|call| call["arguments"].clone())
+            .collect()
+    }
+
+    /// The name and the kind of each field a header says of a struct column: the kind is the name of
+    /// a dtype, or the fields of a struct that the field is.
+    fn fields_in(
+        header: &serde_json::Value,
+        key: &str,
+    ) -> Option<Vec<(String, serde_json::Value)>> {
+        header.get(key).map(|fields| {
+            fields
+                .as_array()
+                .expect("the fields are a list")
+                .iter()
+                .map(|field| {
+                    let pair = field.as_array().expect("a field is a name and a kind");
+                    assert_eq!(pair.len(), 2, "{field}");
+                    (
+                        pair[0].as_str().expect("a name").to_owned(),
+                        pair[1].clone(),
+                    )
+                })
+                .collect()
+        })
+    }
+
+    /// Every name of a field in `fields`, at any depth.
+    fn names_in(fields: &[(String, serde_json::Value)], names: &mut Vec<String>) {
+        for (name, kind) in fields {
+            names.push(name.clone());
+            if let Some(inner) = kind.as_array() {
+                let inner: Vec<(String, serde_json::Value)> = inner
+                    .iter()
+                    .map(|field| {
+                        (
+                            field[0].as_str().expect("a name").to_owned(),
+                            field[1].clone(),
+                        )
+                    })
+                    .collect();
+                names_in(&inner, names);
+            }
+        }
+    }
+
+    /// The names of the fields of the struct columns of the case, at any depth.
+    fn field_names_of(case: &Case) -> Vec<String> {
+        let header = header_of(case);
+        let mut names = Vec::new();
+        for key in ["a_struct", "b_struct"] {
+            if let Some(fields) = fields_in(&header, key) {
+                names_in(&fields, &mut names);
+            }
+        }
+        names
+    }
+
+    /// The cases that a campaign focused on `text` makes of the first `offsets` entropies.
+    fn focused_cases(text: &str, offsets: u64) -> Vec<Case> {
+        let focus = Focus::parse(text).unwrap().unwrap();
+        (0..offsets)
+            .filter_map(|offset| generate(&entropy(offset), Some(&focus)))
+            .collect()
+    }
+
+    /// The texts of the list a call is given for `parameter`, whatever the kind of each.
+    fn listed(arguments: &serde_json::Value, parameter: &str) -> Option<Vec<String>> {
+        let items = arguments.get(parameter)?["many"].as_array()?;
+        Some(
+            items
+                .iter()
+                .map(|item| {
+                    item.as_object()
+                        .and_then(|object| object.values().next())
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned()
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_focus_on_structs_draws_struct_columns_of_several_field_sets() {
+        let cases = focused_cases(STRUCT_FOCUS, 4000);
+        let mut sets = std::collections::BTreeSet::new();
+        let mut counts = std::collections::BTreeSet::new();
+        let mut kinds = std::collections::BTreeSet::new();
+        let (mut nested, mut lists, mut of_the_argument) = (0, 0, 0);
+        for case in &cases {
+            let header = header_of(case);
+            for key in ["a_struct", "b_struct"] {
+                let column = if key == "a_struct" {
+                    case.receiver
+                } else {
+                    case.argument
+                };
+                let Some(fields) = fields_in(&header, key) else {
+                    continue;
+                };
+                assert_eq!(
+                    column,
+                    Representative::Struct,
+                    "{key} of a column that is none"
+                );
+                sets.insert(serde_json::to_string(&header[key]).expect("JSON"));
+                counts.insert(fields.len());
+                of_the_argument += usize::from(key == "b_struct");
+                for (_, kind) in &fields {
+                    match kind {
+                        serde_json::Value::String(name) => {
+                            kinds.insert(name.clone());
+                            lists += usize::from(name.starts_with("List("));
+                        }
+                        _ => nested += 1,
+                    }
+                }
+            }
+        }
+        assert!(
+            sets.len() >= 40,
+            "{} field sets in {} cases",
+            sets.len(),
+            cases.len()
+        );
+        assert!(
+            counts.contains(&0)
+                && counts.contains(&1)
+                && counts.contains(&2)
+                && counts.contains(&3),
+            "struct columns of {counts:?} fields"
+        );
+        assert!(kinds.len() >= 12, "fields of only {kinds:?}");
+        assert!(nested > 20, "{nested} fields are a struct");
+        assert!(lists > 20, "{lists} fields are a list");
+        assert!(
+            of_the_argument > 20,
+            "{of_the_argument} columns `b` are structs"
+        );
+    }
+
+    #[test]
+    fn a_campaign_without_a_focus_draws_only_the_struct_that_the_tables_measured() {
+        for offset in 0..3000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let header = header_of(&case);
+            assert!(
+                header.get("a_struct").is_none() && header.get("b_struct").is_none(),
+                "offset {offset}: {header}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_focus_on_a_field_read_draws_names_that_are_fields_and_names_that_are_not() {
+        let (mut fields, mut absent, mut read) = (0, 0, 0);
+        for case in focused_cases("struct.field", 3000) {
+            let names = field_names_of(&case);
+            for arguments in arguments_of(&case, "Expr.struct.field") {
+                let name = arguments["name"]["field"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("a field is read by no name: {arguments}"));
+                read += 1;
+                if names.iter().any(|field| field == name) {
+                    fields += 1;
+                } else {
+                    absent += 1;
+                }
+            }
+        }
+        assert!(read > 500, "{read} fields read");
+        assert!(fields > 100, "{fields} names are fields");
+        assert!(absent > 40, "{absent} names are no field");
+    }
+
+    #[test]
+    fn a_focus_on_naming_fields_draws_names_of_each_number_repeated_names_and_both_strictnesses() {
+        let (mut counts, mut repeated, mut absent) = (std::collections::BTreeSet::new(), 0, 0);
+        let (mut strict, mut lenient, mut unset) = (0, 0, 0);
+        let mut dropped = 0;
+        for case in focused_cases("struct.rename_fields,struct.drop", 3000) {
+            let names = field_names_of(&case);
+            for arguments in arguments_of(&case, "Expr.struct.rename_fields") {
+                let given = listed(&arguments, "names")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                counts.insert(given.len());
+                repeated +=
+                    usize::from((1..given.len()).any(|at| given[..at].contains(&given[at])));
+            }
+            for arguments in arguments_of(&case, "Expr.struct.drop") {
+                let given = listed(&arguments, "names")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                dropped += 1;
+                absent += given.iter().filter(|name| !names.contains(name)).count();
+                match &arguments.get("strict").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => strict += 1,
+                    Some(serde_json::Value::Bool(false)) => lenient += 1,
+                    _ => unset += 1,
+                }
+            }
+        }
+        assert!(
+            counts.contains(&1) && counts.contains(&2) && counts.contains(&3) && counts.len() >= 4,
+            "renames of {counts:?} names"
+        );
+        assert!(repeated > 10, "{repeated} renames repeat a name");
+        assert!(dropped > 100, "{dropped} drops");
+        assert!(absent > 20, "{absent} dropped names are no field");
+        assert!(
+            strict > 10 && lenient > 10 && unset > 10,
+            "{strict} {lenient} {unset}"
+        );
+    }
+
+    #[test]
+    fn a_focus_on_value_counts_draws_it_with_each_option() {
+        let (mut sorted, mut unsorted, mut normalized, mut counted) = (0, 0, 0, 0);
+        let (mut named, mut named_as_the_column, mut named_as_the_count, mut unnamed) =
+            (0, 0, 0, 0);
+        for case in focused_cases("value_counts", 2000) {
+            for arguments in arguments_of(&case, "Expr.value_counts") {
+                match arguments.get("sort").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => sorted += 1,
+                    Some(serde_json::Value::Bool(false)) => unsorted += 1,
+                    _ => {}
+                }
+                match arguments.get("normalize").map(|flag| &flag["flag"]) {
+                    Some(serde_json::Value::Bool(true)) => normalized += 1,
+                    Some(serde_json::Value::Bool(false)) => counted += 1,
+                    _ => {}
+                }
+                match arguments
+                    .get("name")
+                    .and_then(|name| name["string"].as_str())
+                {
+                    Some("a" | "b") => {
+                        named += 1;
+                        named_as_the_column += 1;
+                    }
+                    Some("count" | "proportion") => {
+                        named += 1;
+                        named_as_the_count += 1;
+                    }
+                    Some(_) => named += 1,
+                    None => unnamed += 1,
+                }
+            }
+        }
+        assert!(
+            sorted > 30 && unsorted > 30,
+            "{sorted} sorted, {unsorted} not"
+        );
+        assert!(
+            normalized > 30 && counted > 30,
+            "{normalized} normalized, {counted} not"
+        );
+        assert!(named > 50 && unnamed > 50, "{named} named, {unnamed} not");
+        assert!(
+            named_as_the_column > 5,
+            "{named_as_the_column} named as the column"
+        );
+        assert!(
+            named_as_the_count > 5,
+            "{named_as_the_count} named as the count"
+        );
+    }
+
+    #[test]
+    fn a_focus_on_the_splits_into_fields_draws_every_small_number_of_parts_from_nought() {
+        for method in ["Expr.str.split_exact", "Expr.str.splitn"] {
+            let mut parts = std::collections::BTreeSet::new();
+            let mut inclusive = 0;
+            for case in focused_cases("str.split_exact,str.splitn", 2000) {
+                for arguments in arguments_of(&case, method) {
+                    parts.insert(
+                        arguments["n"]["integer"]
+                            .as_i64()
+                            .expect("a number of parts"),
+                    );
+                    inclusive += usize::from(arguments.get("inclusive").is_some());
+                }
+            }
+            assert!(
+                [0, 1, 2, 3].iter().all(|n| parts.contains(n)),
+                "{method} splits into {parts:?} parts"
+            );
+            assert!(method.ends_with("splitn") || inclusive > 10, "{inclusive}");
+        }
+    }
+
+    #[test]
+    fn a_focus_on_the_conversions_to_a_struct_draws_names_of_the_width_of_an_array_and_of_others() {
+        let mut lists = std::collections::BTreeSet::new();
+        let mut arrays = std::collections::BTreeSet::new();
+        let (mut repeated, mut unnamed) = (0, 0);
+        for case in focused_cases("list.to_struct,arr.to_struct", 3000) {
+            for arguments in arguments_of(&case, "Expr.list.to_struct") {
+                let given = listed(&arguments, "fields")
+                    .unwrap_or_else(|| panic!("a call with no names: {arguments}"));
+                lists.insert(given.len());
+                repeated +=
+                    usize::from((1..given.len()).any(|at| given[..at].contains(&given[at])));
+            }
+            for arguments in arguments_of(&case, "Expr.arr.to_struct") {
+                match listed(&arguments, "fields") {
+                    Some(given) => {
+                        arrays.insert(given.len());
+                        repeated += usize::from(
+                            (1..given.len()).any(|at| given[..at].contains(&given[at])),
+                        );
+                    }
+                    None => unnamed += 1,
+                }
+            }
+        }
+        assert!(
+            lists.contains(&1) && lists.contains(&2) && lists.contains(&3),
+            "{lists:?}"
+        );
+        // The arrays of the sample are two wide: the width, narrower names and wider ones.
+        assert!(
+            arrays.contains(&1) && arrays.contains(&2) && arrays.contains(&3),
+            "{arrays:?}"
+        );
+        assert!(unnamed > 20, "{unnamed} arrays are named by their places");
+        // Polars' plan makes one field of a name given twice and its rows two of one name, which
+        // no column can hold: the editor refuses it, and a campaign does not draw it.
+        assert_eq!(repeated, 0, "{repeated} conversions are given a name twice");
+    }
+
+    #[test]
+    fn a_focus_on_polars_struct_draws_columns_literals_fields_of_structs_and_named_values() {
+        let (mut made, mut several, mut columns, mut literals, mut fields, mut named) =
+            (0, 0, 0, 0, 0, 0);
+        for case in focused_cases("struct", 3000) {
+            for arguments in arguments_of(&case, "polars.struct") {
+                made += 1;
+                let written = arguments.to_string();
+                several += usize::from(
+                    arguments["exprs"]["many"]
+                        .as_array()
+                        .is_some_and(|items| items.len() >= 2),
+                );
+                columns += usize::from(written.contains("polars.col"));
+                literals += usize::from(written.contains("polars.lit"));
+                fields += usize::from(written.contains("Expr.struct.field"));
+                named += usize::from(
+                    arguments["named_exprs"]["pairs"]
+                        .as_array()
+                        .is_some_and(|pairs| !pairs.is_empty()),
+                );
+            }
+        }
+        assert!(made > 300, "{made} structs made");
+        assert!(several > 100, "{several} are made of several");
+        assert!(
+            columns > 100 && literals > 50,
+            "{columns} columns, {literals} literals"
+        );
+        assert!(fields > 30, "{fields} hold the field of a struct");
+        assert!(named > 30, "{named} hold a named value");
+    }
+
+    #[test]
+    fn a_focus_on_structs_makes_most_cases_with_a_struct_to_read() {
+        // The methods that read a struct follow one, so most of the cases of a focus on them have a
+        // column that is.
+        let cases = focused_cases("struct.", 1500);
+        let with = cases
+            .iter()
+            .filter(|case| case.receiver == Representative::Struct)
+            .count();
+        assert!(
+            with * 100 > cases.len() * 40,
+            "{with} of {} cases",
+            cases.len()
+        );
+    }
+
+    #[test]
+    fn a_filter_is_drawn_with_several_predicates_where_polars_judges_them_beside_one_another() {
+        // Polars refuses an expression that expands to none or to several as the one predicate of
+        // a filter, and takes it beside others, so a campaign needs both kinds of filter.
+        let mut alone = 0;
+        let mut several = 0;
+        for offset in 0..3000 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let step = case.document.steps()[0].call();
+            if step.entry().id().as_str() != "LazyFrame.filter" {
+                continue;
+            }
+            match step.argument("predicates") {
+                Some(Value::Many(items)) if items.len() >= 2 => several += 1,
+                Some(Value::Many(_)) => alone += 1,
+                _ => {}
+            }
+        }
+        assert!(alone > 0, "a filter of one predicate is drawn");
+        assert!(several > 0, "a filter of several predicates is drawn");
     }
 }

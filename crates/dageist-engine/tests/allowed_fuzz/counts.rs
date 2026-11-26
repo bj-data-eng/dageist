@@ -9,13 +9,16 @@
 //!
 //! What shows that the count is why Polars allows the case is the case run again with the count
 //! made another, and nothing else changed: Polars then refuses it for lengths that do not meet.
-//! The count is made another by the rows the tables hold, in two ways, and by the number that the
+//! The count is made another by the rows the tables hold, in three ways, and by the number that the
 //! case types in where one decides the count:
 //!
 //! - twelve rows, which are the sample's three four times over: the first values that a number
 //!   takes, and the values of a table that are unchanged, are then neither the rows nor one value;
 //! - four rows that tie, the second and third twice: the values that differ and the values that
 //!   occur most are then two, where the sample's columns leave one value, or all of them;
+//! - three rows with a null in the middle one of every column that holds none: a test of a column,
+//!   a comparison and a length, which the sample's rows leave as one value, give two then, and so
+//!   do the values that differ of them;
 //! - the number of `head`, `tail`, `limit`, `top_k`, `bottom_k`, `gather_every`, `slice` and
 //!   `repeat` made 2 values, which is neither one value, which Polars broadcasts, nor the three
 //!   rows.
@@ -34,8 +37,8 @@ use dageist_engine::document::{Call, Document, Expression, Segment, Start, Step,
 
 use super::case::Case;
 use super::limits::{case_changed, changed};
-use super::observe::{Rows, Tables, observe, observe_probe};
-use super::predict::{Refused, Source, Verdict, predict};
+use super::observe::{Observed, Rows, Tables, observe, observe_probe};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{counts_alone, is_a_count_that_may_not_end, is_a_refusal_of_lengths};
 
 /// What the outcome of a case says where the tables refuse a count that Polars allows because the
@@ -144,6 +147,11 @@ fn refused_for_lengths_once_the_count_is_another(case: &Case) -> Option<Settled>
     let controls = [
         ("on twelve rows", Some(case.clone()), Rows::Repeated),
         ("on four rows that tie", Some(case.clone()), Rows::Tied),
+        (
+            "on three rows where every column holds a null",
+            Some(case.clone()),
+            Rows::Nulled,
+        ),
         (
             "with the number of each count made 2",
             case_with_other_counts(case),
@@ -262,6 +270,7 @@ fn only_the_item(case: &Case, refused: &Refused) -> Option<Case> {
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
+        structs: case.structs.clone(),
         document: Document::new(vec![Step::new(step.id().clone(), rebuilt).ok()?]).ok()?,
     })
 }
@@ -272,6 +281,60 @@ fn is_asked_of_one_count(case: &Case) -> bool {
     counting_places(case) == 1
         && observe(case).refusal.is_none()
         && matches!(&predict(case).verdict, Verdict::Refuses(refused) if is_a_count_refusal(refused))
+}
+
+/// Whether the count the tables refuse is no count the rows decide: Polars allows the case on the
+/// sample's rows and on every control above that makes a count another, so what is counted is
+/// one value, or the rows, by what it is made of, as a test of a struct, which is never null, a
+/// comparison with a null and a column of nulls are. The tables cannot know it, and no rows show it
+/// by chance, so it is no count that is by design the rows by chance: it is what the rows cannot
+/// change. `false` where the tables' refusal is not of a count, the case holds no count, or Polars
+/// refuses the case on the sample's rows or on any control.
+pub fn is_a_count_no_rows_change(
+    case: &Case,
+    refused: &Refused,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> bool {
+    if !is_a_count_refusal(refused) {
+        return false;
+    }
+    // A count that a control makes another, or a part that Polars does not evaluate, which a probe
+    // of the part alone shows, is settled by that evidence and is no limit.
+    if settle(case, refused).is_some()
+        || super::probe::settle(case, refused).is_some()
+        || super::probe::settle_apart(case, refused, prediction, observed).is_some()
+    {
+        return false;
+    }
+    // The controls change every count the case holds, which is no matter where none of them makes a
+    // count another: Polars allowing the case with all of them changed shows that no count is the
+    // rows by chance, whatever their number.
+    let Some(item) = only_the_item(case, refused).filter(|item| {
+        counting_places(item) >= 1
+            && observe(item).refusal.is_none()
+            && matches!(&predict(item).verdict, Verdict::Refuses(refused) if is_a_count_refusal(refused))
+    }) else {
+        return false;
+    };
+    let unchanged = |case: &Case, rows: Rows| {
+        let tables = Tables {
+            rows,
+            ..Tables::default()
+        };
+        (0..RUNS).all(|_| {
+            let observed = if rows == Rows::Sample {
+                observe(case)
+            } else {
+                observe_probe(case, tables)
+            };
+            observed.refusal.is_none()
+        })
+    };
+    [Rows::Repeated, Rows::Tied, Rows::Nulled]
+        .into_iter()
+        .all(|rows| unchanged(&item, rows))
+        && case_with_other_counts(&item).is_none_or(|other| unchanged(&other, Rows::Sample))
 }
 
 /// Whether the tables' refusal of a count that Polars allows is by design, shown by Polars
@@ -301,6 +364,23 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
                     reason: format!("{}, of the part alone", settled.reason),
                 })
         })
+}
+
+/// Whether the tables' refusal of a count that Polars allows is in an item that holds a count in
+/// more than one place, where Polars refuses the item for lengths once its counts are made another:
+/// a count is then the rows by chance, and no control tells which. `false` where the tables'
+/// refusal is not of a count, the item holds a count in one place, or Polars refuses it on the
+/// sample's rows or does not on any control.
+pub fn is_a_count_among_counts(case: &Case, refused: &Refused) -> bool {
+    if !is_a_count_refusal(refused) {
+        return false;
+    }
+    only_the_item(case, refused).is_some_and(|item| {
+        counting_places(&item) >= 2
+            && observe(&item).refusal.is_none()
+            && matches!(&predict(&item).verdict, Verdict::Refuses(said) if is_a_count_refusal(said))
+            && refused_for_lengths_once_the_count_is_another(&item).is_some()
+    })
 }
 
 #[cfg(test)]
@@ -340,6 +420,26 @@ mod tests {
                 "{name}: {settled:?}"
             );
         }
+    }
+
+    #[test]
+    fn counts_in_more_than_one_place_of_an_item_are_not_told_apart_by_a_control() {
+        // Each control makes every count of the item another, so what is shown is that a count is
+        // the rows by chance, and not the refused one.
+        for name in [
+            "uncovered-several-counts-in-one-item.case",
+            "uncovered-several-counts-in-one-item--a-count-in-a-sort-key.case",
+        ] {
+            let case = kept(name);
+            let refused = refusal(&case);
+            assert_eq!(settle(&case, &refused), None, "{name}");
+            assert!(is_a_count_among_counts(&case, &refused), "{name}");
+        }
+        // A count in one place is settled by a control, and is no count among counts.
+        let case = kept("by-design-a-count-of-one-by-chance-as-a-sort-key.case");
+        let refused = refusal(&case);
+        assert!(settle(&case, &refused).is_some());
+        assert!(!is_a_count_among_counts(&case, &refused));
     }
 
     #[test]

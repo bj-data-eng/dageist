@@ -11,8 +11,8 @@
 //! one with a duration. It refuses a receiver only when it refuses every column.
 
 use polars::prelude::{
-    DataType, Expr, LazyFrame, NonExistent, PolarsError, PolarsResult, TimeZone, col, concat_list,
-    lit,
+    DataType, Expr, LazyFrame, NonExistent, PolarsError, PolarsResult, TimeZone, as_struct, col,
+    concat_list, lit,
 };
 
 use crate::catalog::{
@@ -31,7 +31,8 @@ fn group(key: &str) -> Dtypes {
 }
 
 /// The sample table with a column of `Time`, one of a `Datetime` in a time zone, a column of lists
-/// of two whole numbers and one of arrays of two, which it lacks.
+/// of two whole numbers, one of arrays of two and one of structs of a whole number `x` and text `y`,
+/// which it lacks.
 fn typed_sample() -> LazyFrame {
     sample().with_columns([
         concat_list([col("i"), col("i") * lit(10)])
@@ -42,6 +43,7 @@ fn typed_sample() -> LazyFrame {
             .list()
             .to_array(2)
             .alias("ar"),
+        as_struct(vec![col("i").alias("x"), col("s").alias("y")]).alias("st"),
         col("ts").dt().time().alias("tm"),
         col("ts")
             .dt()
@@ -78,12 +80,14 @@ fn columns() -> Vec<(&'static str, Vec<Dtypes>)> {
         ("b", vec![Dtypes::Boolean]),
         ("l", vec![group("List")]),
         ("ar", vec![group("Array")]),
+        ("st", vec![group("Struct")]),
     ]
 }
 
 /// The methods that Python Polars 2.2.0 takes a list and an array for, which the catalogue does not
 /// offer: the greatest and the least list, and the approximate quantile of each place across the
-/// rows. What a method of lists says is what the values of a list are asked.
+/// rows. What a method of lists says is what the values of a list are asked, and what a struct says
+/// is what its fields are asked.
 const TAKEN_OF_NESTED_VALUES: [&str; 5] = [
     "Expr.approx_quantile",
     "Expr.max",
@@ -91,6 +95,15 @@ const TAKEN_OF_NESTED_VALUES: [&str; 5] = [
     "Expr.nan_max",
     "Expr.nan_min",
 ];
+
+/// The methods that give a column for each field of a struct, which the one column `out` the
+/// sample is asked for cannot hold: `unnest` is `field("*")`, and what Polars takes of it is asked of
+/// documents, in `tests/document/structs.rs`.
+const GIVE_SEVERAL_COLUMNS: [&str; 1] = ["Expr.struct.unnest"];
+
+/// The methods of the `struct` namespace that Polars takes a column of any dtype for: it encodes
+/// a whole number or text as JSON as it does a struct, and the catalogue offers it after a struct.
+const TAKEN_OF_ANY_DTYPE: [&str; 1] = ["Expr.struct.json_encode"];
 
 /// The methods that read a time zone a `Datetime` has: Polars refuses the sample's `ts`, which has
 /// none, and the sample's `tz` is the column of the group they take.
@@ -158,6 +171,17 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Expression(_) => expression_arg(col(column)),
                 // `round_sig_figs`'s `digits`: any whole number it takes will do.
                 Kind::Value(ValueType::Integer) => Argument::Integer(2),
+                // The name of a field of the struct of the sample: its first.
+                Kind::Field => Argument::Field("x".to_owned()),
+                // The names that a struct of two fields, and a list of two values, are given.
+                Kind::Value(ValueType::String)
+                    if matches!(parameter.name(), "names" | "fields") =>
+                {
+                    many(vec![
+                        Argument::String("a".to_owned()),
+                        Argument::String("b".to_owned()),
+                    ])
+                }
                 // `cast`'s `dtype`: the dtype the column has, which converts to itself.
                 Kind::Dtype => Argument::Dtype(dtype_of(column)),
                 // The format that every dtype of a date or a time takes.
@@ -170,7 +194,9 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Pattern => Argument::Pattern("(a)".to_owned()),
                 other => panic!("{} takes {other:?}", entry.id().as_str()),
             };
-            let value = if parameter.variadic() == Some(Variadic::Args)
+            let value = if matches!(value, Argument::Many(_)) {
+                value
+            } else if parameter.variadic() == Some(Variadic::Args)
                 || parameter.shape() == Shape::Many
             {
                 many(vec![value])
@@ -260,6 +286,9 @@ fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
             if *column == "ts" && ONLY_WITH_A_ZONE.contains(&entry.id().as_str()) {
                 continue;
             }
+            if GIVE_SEVERAL_COLUMNS.contains(&entry.id().as_str()) {
+                continue;
+            }
             if accepted(entry.accepts(), groups) {
                 let results: Vec<_> = operands(entry, column)
                     .into_iter()
@@ -299,6 +328,7 @@ fn first_line(error: &PolarsError) -> String {
 #[test]
 fn polars_refuses_each_method_on_a_dtype_it_does_not_accept() {
     let mut refused = 0;
+    let mut taken = Vec::new();
     for entry in entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
@@ -307,21 +337,23 @@ fn polars_refuses_each_method_on_a_dtype_it_does_not_accept() {
         let Some((column, _)) = columns().into_iter().find(|(column, groups)| {
             !accepted(entry.accepts(), groups)
                 && !(TAKEN_OF_NESTED_VALUES.contains(&entry.id().as_str())
-                    && matches!(*column, "l" | "ar"))
+                    && matches!(*column, "l" | "ar" | "st"))
+                && !TAKEN_OF_ANY_DTYPE.contains(&entry.id().as_str())
         }) else {
             continue;
         };
         for operand in operands(entry, column) {
             let result = polars_resolves(built(entry, column, operand));
-            assert!(
-                result.is_err(),
-                "{} does not claim {column}, which Polars resolves to {:?} beside {operand}",
-                entry.id().as_str(),
-                result.unwrap()
-            );
+            if let Ok(dtype) = result {
+                taken.push(format!(
+                    "{} does not claim {column}, which Polars resolves to {dtype:?} beside {operand}",
+                    entry.id().as_str(),
+                ));
+            }
         }
         refused += 1;
     }
+    assert!(taken.is_empty(), "{}", taken.join("\n"));
     assert!(refused >= 5, "{refused} methods were refused a dtype");
 }
 

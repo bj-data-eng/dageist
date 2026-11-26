@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13868 combinations: 6806 allowed; 4545 refused when Polars resolved the schema, 2517 when it ran the rows, 0 when it ran the empty table.
+# 14336 combinations: 7148 allowed; 4621 refused when Polars resolved the schema, 2567 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -9224,6 +9224,110 @@ Expr.str.split | UInt8 | literal=false, strict=false | refused rows: invalid ser
 Expr.str.split | UInt8 | literal=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.split | UInt8 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.split | UInt8 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split_exact | Array(Int64, 2) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split_exact | Array(Int64, 2) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split_exact | Boolean | inclusive=false | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split_exact | Boolean | inclusive=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split_exact | Date | inclusive=false | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split_exact | Date | inclusive=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split_exact | Datetime(us) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split_exact | Datetime(us) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split_exact | Datetime(us, UTC) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split_exact | Datetime(us, UTC) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split_exact | Decimal(10, 2) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split_exact | Decimal(10, 2) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split_exact | Duration(us) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split_exact | Duration(us) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split_exact | Float16 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split_exact | Float16 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split_exact | Float32 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split_exact | Float32 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split_exact | Float64 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split_exact | Float64 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split_exact | Int128 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split_exact | Int128 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split_exact | Int16 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split_exact | Int16 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split_exact | Int32 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split_exact | Int32 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split_exact | Int64 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split_exact | Int64 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split_exact | Int8 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split_exact | Int8 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split_exact | List(Int64) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split_exact | List(Int64) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split_exact | List(String) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split_exact | List(String) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split_exact | Null | inclusive=false | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split_exact | Null | inclusive=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split_exact | String | inclusive=false | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | String | inclusive=true | allowed Struct(field_0: String, field_1: String, field_2: String) many
+Expr.str.split_exact | Struct(x: Int64, y: String) | inclusive=false | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split_exact | Struct(x: Int64, y: String) | inclusive=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split_exact | Time | inclusive=false | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split_exact | Time | inclusive=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split_exact | UInt128 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split_exact | UInt128 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split_exact | UInt16 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split_exact | UInt16 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split_exact | UInt32 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split_exact | UInt32 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split_exact | UInt64 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split_exact | UInt64 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split_exact | UInt8 | inclusive=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split_exact | UInt8 | inclusive=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.struct.drop | Array(Int64, 2) | strict=false | refused schema: struct.drop operation not supported for dtype `array[i64, 2]` (expected: Struct)
+Expr.struct.drop | Array(Int64, 2) | strict=true | refused schema: struct.drop operation not supported for dtype `array[i64, 2]` (expected: Struct)
+Expr.struct.drop | Boolean | strict=false | refused schema: struct.drop operation not supported for dtype `bool` (expected: Struct)
+Expr.struct.drop | Boolean | strict=true | refused schema: struct.drop operation not supported for dtype `bool` (expected: Struct)
+Expr.struct.drop | Date | strict=false | refused schema: struct.drop operation not supported for dtype `date` (expected: Struct)
+Expr.struct.drop | Date | strict=true | refused schema: struct.drop operation not supported for dtype `date` (expected: Struct)
+Expr.struct.drop | Datetime(us) | strict=false | refused schema: struct.drop operation not supported for dtype `datetime[μs]` (expected: Struct)
+Expr.struct.drop | Datetime(us) | strict=true | refused schema: struct.drop operation not supported for dtype `datetime[μs]` (expected: Struct)
+Expr.struct.drop | Datetime(us, UTC) | strict=false | refused schema: struct.drop operation not supported for dtype `datetime[μs, UTC]` (expected: Struct)
+Expr.struct.drop | Datetime(us, UTC) | strict=true | refused schema: struct.drop operation not supported for dtype `datetime[μs, UTC]` (expected: Struct)
+Expr.struct.drop | Decimal(10, 2) | strict=false | refused schema: struct.drop operation not supported for dtype `decimal[10,2]` (expected: Struct)
+Expr.struct.drop | Decimal(10, 2) | strict=true | refused schema: struct.drop operation not supported for dtype `decimal[10,2]` (expected: Struct)
+Expr.struct.drop | Duration(us) | strict=false | refused schema: struct.drop operation not supported for dtype `duration[μs]` (expected: Struct)
+Expr.struct.drop | Duration(us) | strict=true | refused schema: struct.drop operation not supported for dtype `duration[μs]` (expected: Struct)
+Expr.struct.drop | Float16 | strict=false | refused schema: struct.drop operation not supported for dtype `f16` (expected: Struct)
+Expr.struct.drop | Float16 | strict=true | refused schema: struct.drop operation not supported for dtype `f16` (expected: Struct)
+Expr.struct.drop | Float32 | strict=false | refused schema: struct.drop operation not supported for dtype `f32` (expected: Struct)
+Expr.struct.drop | Float32 | strict=true | refused schema: struct.drop operation not supported for dtype `f32` (expected: Struct)
+Expr.struct.drop | Float64 | strict=false | refused schema: struct.drop operation not supported for dtype `f64` (expected: Struct)
+Expr.struct.drop | Float64 | strict=true | refused schema: struct.drop operation not supported for dtype `f64` (expected: Struct)
+Expr.struct.drop | Int128 | strict=false | refused schema: struct.drop operation not supported for dtype `i128` (expected: Struct)
+Expr.struct.drop | Int128 | strict=true | refused schema: struct.drop operation not supported for dtype `i128` (expected: Struct)
+Expr.struct.drop | Int16 | strict=false | refused schema: struct.drop operation not supported for dtype `i16` (expected: Struct)
+Expr.struct.drop | Int16 | strict=true | refused schema: struct.drop operation not supported for dtype `i16` (expected: Struct)
+Expr.struct.drop | Int32 | strict=false | refused schema: struct.drop operation not supported for dtype `i32` (expected: Struct)
+Expr.struct.drop | Int32 | strict=true | refused schema: struct.drop operation not supported for dtype `i32` (expected: Struct)
+Expr.struct.drop | Int64 | strict=false | refused schema: struct.drop operation not supported for dtype `i64` (expected: Struct)
+Expr.struct.drop | Int64 | strict=true | refused schema: struct.drop operation not supported for dtype `i64` (expected: Struct)
+Expr.struct.drop | Int8 | strict=false | refused schema: struct.drop operation not supported for dtype `i8` (expected: Struct)
+Expr.struct.drop | Int8 | strict=true | refused schema: struct.drop operation not supported for dtype `i8` (expected: Struct)
+Expr.struct.drop | List(Int64) | strict=false | refused schema: struct.drop operation not supported for dtype `list[i64]` (expected: Struct)
+Expr.struct.drop | List(Int64) | strict=true | refused schema: struct.drop operation not supported for dtype `list[i64]` (expected: Struct)
+Expr.struct.drop | List(String) | strict=false | refused schema: struct.drop operation not supported for dtype `list[str]` (expected: Struct)
+Expr.struct.drop | List(String) | strict=true | refused schema: struct.drop operation not supported for dtype `list[str]` (expected: Struct)
+Expr.struct.drop | Null | strict=false | refused schema: struct.drop operation not supported for dtype `null` (expected: Struct)
+Expr.struct.drop | Null | strict=true | refused schema: struct.drop operation not supported for dtype `null` (expected: Struct)
+Expr.struct.drop | String | strict=false | refused schema: struct.drop operation not supported for dtype `str` (expected: Struct)
+Expr.struct.drop | String | strict=true | refused schema: struct.drop operation not supported for dtype `str` (expected: Struct)
+Expr.struct.drop | Struct(x: Int64, y: String) | strict=false | allowed Struct(y: String) many
+Expr.struct.drop | Struct(x: Int64, y: String) | strict=true | allowed Struct(y: String) many
+Expr.struct.drop | Time | strict=false | refused schema: struct.drop operation not supported for dtype `time` (expected: Struct)
+Expr.struct.drop | Time | strict=true | refused schema: struct.drop operation not supported for dtype `time` (expected: Struct)
+Expr.struct.drop | UInt128 | strict=false | refused schema: struct.drop operation not supported for dtype `u128` (expected: Struct)
+Expr.struct.drop | UInt128 | strict=true | refused schema: struct.drop operation not supported for dtype `u128` (expected: Struct)
+Expr.struct.drop | UInt16 | strict=false | refused schema: struct.drop operation not supported for dtype `u16` (expected: Struct)
+Expr.struct.drop | UInt16 | strict=true | refused schema: struct.drop operation not supported for dtype `u16` (expected: Struct)
+Expr.struct.drop | UInt32 | strict=false | refused schema: struct.drop operation not supported for dtype `u32` (expected: Struct)
+Expr.struct.drop | UInt32 | strict=true | refused schema: struct.drop operation not supported for dtype `u32` (expected: Struct)
+Expr.struct.drop | UInt64 | strict=false | refused schema: struct.drop operation not supported for dtype `u64` (expected: Struct)
+Expr.struct.drop | UInt64 | strict=true | refused schema: struct.drop operation not supported for dtype `u64` (expected: Struct)
+Expr.struct.drop | UInt8 | strict=false | refused schema: struct.drop operation not supported for dtype `u8` (expected: Struct)
+Expr.struct.drop | UInt8 | strict=true | refused schema: struct.drop operation not supported for dtype `u8` (expected: Struct)
 Expr.unique | Array(Int64, 2) | maintain_order=false | allowed Array(Int64, 2) counted
 Expr.unique | Array(Int64, 2) | maintain_order=true | allowed Array(Int64, 2) counted
 Expr.unique | Boolean | maintain_order=false | allowed Boolean counted
@@ -9276,6 +9380,318 @@ Expr.unique | UInt64 | maintain_order=false | allowed UInt64 counted
 Expr.unique | UInt64 | maintain_order=true | allowed UInt64 counted
 Expr.unique | UInt8 | maintain_order=false | allowed UInt8 counted
 Expr.unique | UInt8 | maintain_order=true | allowed UInt8 counted
+Expr.value_counts | Array(Int64, 2) | parallel=false, normalize=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | parallel=false, normalize=true | allowed Struct(a: Array(Int64, 2), proportion: Float64) counted
+Expr.value_counts | Array(Int64, 2) | parallel=true, normalize=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | parallel=true, normalize=true | allowed Struct(a: Array(Int64, 2), proportion: Float64) counted
+Expr.value_counts | Array(Int64, 2) | sort=false, normalize=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | sort=false, normalize=true | allowed Struct(a: Array(Int64, 2), proportion: Float64) counted
+Expr.value_counts | Array(Int64, 2) | sort=false, parallel=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | sort=false, parallel=true | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | sort=true, normalize=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | sort=true, normalize=true | allowed Struct(a: Array(Int64, 2), proportion: Float64) counted
+Expr.value_counts | Array(Int64, 2) | sort=true, parallel=false | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Array(Int64, 2) | sort=true, parallel=true | allowed Struct(a: Array(Int64, 2), count: UInt32) counted
+Expr.value_counts | Boolean | parallel=false, normalize=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | parallel=false, normalize=true | allowed Struct(a: Boolean, proportion: Float64) counted
+Expr.value_counts | Boolean | parallel=true, normalize=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | parallel=true, normalize=true | allowed Struct(a: Boolean, proportion: Float64) counted
+Expr.value_counts | Boolean | sort=false, normalize=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | sort=false, normalize=true | allowed Struct(a: Boolean, proportion: Float64) counted
+Expr.value_counts | Boolean | sort=false, parallel=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | sort=false, parallel=true | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | sort=true, normalize=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | sort=true, normalize=true | allowed Struct(a: Boolean, proportion: Float64) counted
+Expr.value_counts | Boolean | sort=true, parallel=false | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Boolean | sort=true, parallel=true | allowed Struct(a: Boolean, count: UInt32) counted
+Expr.value_counts | Date | parallel=false, normalize=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | parallel=false, normalize=true | allowed Struct(a: Date, proportion: Float64) counted
+Expr.value_counts | Date | parallel=true, normalize=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | parallel=true, normalize=true | allowed Struct(a: Date, proportion: Float64) counted
+Expr.value_counts | Date | sort=false, normalize=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | sort=false, normalize=true | allowed Struct(a: Date, proportion: Float64) counted
+Expr.value_counts | Date | sort=false, parallel=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | sort=false, parallel=true | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | sort=true, normalize=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | sort=true, normalize=true | allowed Struct(a: Date, proportion: Float64) counted
+Expr.value_counts | Date | sort=true, parallel=false | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Date | sort=true, parallel=true | allowed Struct(a: Date, count: UInt32) counted
+Expr.value_counts | Datetime(us) | parallel=false, normalize=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | parallel=false, normalize=true | allowed Struct(a: Datetime(us), proportion: Float64) counted
+Expr.value_counts | Datetime(us) | parallel=true, normalize=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | parallel=true, normalize=true | allowed Struct(a: Datetime(us), proportion: Float64) counted
+Expr.value_counts | Datetime(us) | sort=false, normalize=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | sort=false, normalize=true | allowed Struct(a: Datetime(us), proportion: Float64) counted
+Expr.value_counts | Datetime(us) | sort=false, parallel=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | sort=false, parallel=true | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | sort=true, normalize=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | sort=true, normalize=true | allowed Struct(a: Datetime(us), proportion: Float64) counted
+Expr.value_counts | Datetime(us) | sort=true, parallel=false | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us) | sort=true, parallel=true | allowed Struct(a: Datetime(us), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | parallel=false, normalize=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | parallel=false, normalize=true | allowed Struct(a: Datetime(us, UTC), proportion: Float64) counted
+Expr.value_counts | Datetime(us, UTC) | parallel=true, normalize=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | parallel=true, normalize=true | allowed Struct(a: Datetime(us, UTC), proportion: Float64) counted
+Expr.value_counts | Datetime(us, UTC) | sort=false, normalize=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | sort=false, normalize=true | allowed Struct(a: Datetime(us, UTC), proportion: Float64) counted
+Expr.value_counts | Datetime(us, UTC) | sort=false, parallel=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | sort=false, parallel=true | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | sort=true, normalize=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | sort=true, normalize=true | allowed Struct(a: Datetime(us, UTC), proportion: Float64) counted
+Expr.value_counts | Datetime(us, UTC) | sort=true, parallel=false | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Datetime(us, UTC) | sort=true, parallel=true | allowed Struct(a: Datetime(us, UTC), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | parallel=false, normalize=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | parallel=false, normalize=true | allowed Struct(a: Decimal(10, 2), proportion: Float64) counted
+Expr.value_counts | Decimal(10, 2) | parallel=true, normalize=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | parallel=true, normalize=true | allowed Struct(a: Decimal(10, 2), proportion: Float64) counted
+Expr.value_counts | Decimal(10, 2) | sort=false, normalize=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | sort=false, normalize=true | allowed Struct(a: Decimal(10, 2), proportion: Float64) counted
+Expr.value_counts | Decimal(10, 2) | sort=false, parallel=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | sort=false, parallel=true | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | sort=true, normalize=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | sort=true, normalize=true | allowed Struct(a: Decimal(10, 2), proportion: Float64) counted
+Expr.value_counts | Decimal(10, 2) | sort=true, parallel=false | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Decimal(10, 2) | sort=true, parallel=true | allowed Struct(a: Decimal(10, 2), count: UInt32) counted
+Expr.value_counts | Duration(us) | parallel=false, normalize=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | parallel=false, normalize=true | allowed Struct(a: Duration(us), proportion: Float64) counted
+Expr.value_counts | Duration(us) | parallel=true, normalize=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | parallel=true, normalize=true | allowed Struct(a: Duration(us), proportion: Float64) counted
+Expr.value_counts | Duration(us) | sort=false, normalize=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | sort=false, normalize=true | allowed Struct(a: Duration(us), proportion: Float64) counted
+Expr.value_counts | Duration(us) | sort=false, parallel=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | sort=false, parallel=true | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | sort=true, normalize=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | sort=true, normalize=true | allowed Struct(a: Duration(us), proportion: Float64) counted
+Expr.value_counts | Duration(us) | sort=true, parallel=false | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Duration(us) | sort=true, parallel=true | allowed Struct(a: Duration(us), count: UInt32) counted
+Expr.value_counts | Float16 | parallel=false, normalize=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | parallel=false, normalize=true | allowed Struct(a: Float16, proportion: Float64) counted
+Expr.value_counts | Float16 | parallel=true, normalize=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | parallel=true, normalize=true | allowed Struct(a: Float16, proportion: Float64) counted
+Expr.value_counts | Float16 | sort=false, normalize=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | sort=false, normalize=true | allowed Struct(a: Float16, proportion: Float64) counted
+Expr.value_counts | Float16 | sort=false, parallel=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | sort=false, parallel=true | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | sort=true, normalize=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | sort=true, normalize=true | allowed Struct(a: Float16, proportion: Float64) counted
+Expr.value_counts | Float16 | sort=true, parallel=false | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float16 | sort=true, parallel=true | allowed Struct(a: Float16, count: UInt32) counted
+Expr.value_counts | Float32 | parallel=false, normalize=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | parallel=false, normalize=true | allowed Struct(a: Float32, proportion: Float64) counted
+Expr.value_counts | Float32 | parallel=true, normalize=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | parallel=true, normalize=true | allowed Struct(a: Float32, proportion: Float64) counted
+Expr.value_counts | Float32 | sort=false, normalize=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | sort=false, normalize=true | allowed Struct(a: Float32, proportion: Float64) counted
+Expr.value_counts | Float32 | sort=false, parallel=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | sort=false, parallel=true | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | sort=true, normalize=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | sort=true, normalize=true | allowed Struct(a: Float32, proportion: Float64) counted
+Expr.value_counts | Float32 | sort=true, parallel=false | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float32 | sort=true, parallel=true | allowed Struct(a: Float32, count: UInt32) counted
+Expr.value_counts | Float64 | parallel=false, normalize=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | parallel=false, normalize=true | allowed Struct(a: Float64, proportion: Float64) counted
+Expr.value_counts | Float64 | parallel=true, normalize=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | parallel=true, normalize=true | allowed Struct(a: Float64, proportion: Float64) counted
+Expr.value_counts | Float64 | sort=false, normalize=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | sort=false, normalize=true | allowed Struct(a: Float64, proportion: Float64) counted
+Expr.value_counts | Float64 | sort=false, parallel=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | sort=false, parallel=true | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | sort=true, normalize=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | sort=true, normalize=true | allowed Struct(a: Float64, proportion: Float64) counted
+Expr.value_counts | Float64 | sort=true, parallel=false | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Float64 | sort=true, parallel=true | allowed Struct(a: Float64, count: UInt32) counted
+Expr.value_counts | Int128 | parallel=false, normalize=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | parallel=false, normalize=true | allowed Struct(a: Int128, proportion: Float64) counted
+Expr.value_counts | Int128 | parallel=true, normalize=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | parallel=true, normalize=true | allowed Struct(a: Int128, proportion: Float64) counted
+Expr.value_counts | Int128 | sort=false, normalize=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | sort=false, normalize=true | allowed Struct(a: Int128, proportion: Float64) counted
+Expr.value_counts | Int128 | sort=false, parallel=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | sort=false, parallel=true | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | sort=true, normalize=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | sort=true, normalize=true | allowed Struct(a: Int128, proportion: Float64) counted
+Expr.value_counts | Int128 | sort=true, parallel=false | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int128 | sort=true, parallel=true | allowed Struct(a: Int128, count: UInt32) counted
+Expr.value_counts | Int16 | parallel=false, normalize=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | parallel=false, normalize=true | allowed Struct(a: Int16, proportion: Float64) counted
+Expr.value_counts | Int16 | parallel=true, normalize=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | parallel=true, normalize=true | allowed Struct(a: Int16, proportion: Float64) counted
+Expr.value_counts | Int16 | sort=false, normalize=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | sort=false, normalize=true | allowed Struct(a: Int16, proportion: Float64) counted
+Expr.value_counts | Int16 | sort=false, parallel=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | sort=false, parallel=true | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | sort=true, normalize=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | sort=true, normalize=true | allowed Struct(a: Int16, proportion: Float64) counted
+Expr.value_counts | Int16 | sort=true, parallel=false | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int16 | sort=true, parallel=true | allowed Struct(a: Int16, count: UInt32) counted
+Expr.value_counts | Int32 | parallel=false, normalize=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | parallel=false, normalize=true | allowed Struct(a: Int32, proportion: Float64) counted
+Expr.value_counts | Int32 | parallel=true, normalize=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | parallel=true, normalize=true | allowed Struct(a: Int32, proportion: Float64) counted
+Expr.value_counts | Int32 | sort=false, normalize=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | sort=false, normalize=true | allowed Struct(a: Int32, proportion: Float64) counted
+Expr.value_counts | Int32 | sort=false, parallel=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | sort=false, parallel=true | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | sort=true, normalize=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | sort=true, normalize=true | allowed Struct(a: Int32, proportion: Float64) counted
+Expr.value_counts | Int32 | sort=true, parallel=false | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int32 | sort=true, parallel=true | allowed Struct(a: Int32, count: UInt32) counted
+Expr.value_counts | Int64 | parallel=false, normalize=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | parallel=false, normalize=true | allowed Struct(a: Int64, proportion: Float64) counted
+Expr.value_counts | Int64 | parallel=true, normalize=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | parallel=true, normalize=true | allowed Struct(a: Int64, proportion: Float64) counted
+Expr.value_counts | Int64 | sort=false, normalize=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | sort=false, normalize=true | allowed Struct(a: Int64, proportion: Float64) counted
+Expr.value_counts | Int64 | sort=false, parallel=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | sort=false, parallel=true | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | sort=true, normalize=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | sort=true, normalize=true | allowed Struct(a: Int64, proportion: Float64) counted
+Expr.value_counts | Int64 | sort=true, parallel=false | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int64 | sort=true, parallel=true | allowed Struct(a: Int64, count: UInt32) counted
+Expr.value_counts | Int8 | parallel=false, normalize=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | parallel=false, normalize=true | allowed Struct(a: Int8, proportion: Float64) counted
+Expr.value_counts | Int8 | parallel=true, normalize=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | parallel=true, normalize=true | allowed Struct(a: Int8, proportion: Float64) counted
+Expr.value_counts | Int8 | sort=false, normalize=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | sort=false, normalize=true | allowed Struct(a: Int8, proportion: Float64) counted
+Expr.value_counts | Int8 | sort=false, parallel=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | sort=false, parallel=true | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | sort=true, normalize=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | sort=true, normalize=true | allowed Struct(a: Int8, proportion: Float64) counted
+Expr.value_counts | Int8 | sort=true, parallel=false | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | Int8 | sort=true, parallel=true | allowed Struct(a: Int8, count: UInt32) counted
+Expr.value_counts | List(Int64) | parallel=false, normalize=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | parallel=false, normalize=true | allowed Struct(a: List(Int64), proportion: Float64) counted
+Expr.value_counts | List(Int64) | parallel=true, normalize=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | parallel=true, normalize=true | allowed Struct(a: List(Int64), proportion: Float64) counted
+Expr.value_counts | List(Int64) | sort=false, normalize=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | sort=false, normalize=true | allowed Struct(a: List(Int64), proportion: Float64) counted
+Expr.value_counts | List(Int64) | sort=false, parallel=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | sort=false, parallel=true | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | sort=true, normalize=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | sort=true, normalize=true | allowed Struct(a: List(Int64), proportion: Float64) counted
+Expr.value_counts | List(Int64) | sort=true, parallel=false | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(Int64) | sort=true, parallel=true | allowed Struct(a: List(Int64), count: UInt32) counted
+Expr.value_counts | List(String) | parallel=false, normalize=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | parallel=false, normalize=true | allowed Struct(a: List(String), proportion: Float64) counted
+Expr.value_counts | List(String) | parallel=true, normalize=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | parallel=true, normalize=true | allowed Struct(a: List(String), proportion: Float64) counted
+Expr.value_counts | List(String) | sort=false, normalize=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | sort=false, normalize=true | allowed Struct(a: List(String), proportion: Float64) counted
+Expr.value_counts | List(String) | sort=false, parallel=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | sort=false, parallel=true | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | sort=true, normalize=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | sort=true, normalize=true | allowed Struct(a: List(String), proportion: Float64) counted
+Expr.value_counts | List(String) | sort=true, parallel=false | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | List(String) | sort=true, parallel=true | allowed Struct(a: List(String), count: UInt32) counted
+Expr.value_counts | Null | parallel=false, normalize=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | parallel=false, normalize=true | allowed Struct(a: Null, proportion: Float64) counted
+Expr.value_counts | Null | parallel=true, normalize=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | parallel=true, normalize=true | allowed Struct(a: Null, proportion: Float64) counted
+Expr.value_counts | Null | sort=false, normalize=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | sort=false, normalize=true | allowed Struct(a: Null, proportion: Float64) counted
+Expr.value_counts | Null | sort=false, parallel=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | sort=false, parallel=true | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | sort=true, normalize=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | sort=true, normalize=true | allowed Struct(a: Null, proportion: Float64) counted
+Expr.value_counts | Null | sort=true, parallel=false | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | Null | sort=true, parallel=true | allowed Struct(a: Null, count: UInt32) counted
+Expr.value_counts | String | parallel=false, normalize=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | parallel=false, normalize=true | allowed Struct(a: String, proportion: Float64) counted
+Expr.value_counts | String | parallel=true, normalize=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | parallel=true, normalize=true | allowed Struct(a: String, proportion: Float64) counted
+Expr.value_counts | String | sort=false, normalize=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | sort=false, normalize=true | allowed Struct(a: String, proportion: Float64) counted
+Expr.value_counts | String | sort=false, parallel=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | sort=false, parallel=true | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | sort=true, normalize=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | sort=true, normalize=true | allowed Struct(a: String, proportion: Float64) counted
+Expr.value_counts | String | sort=true, parallel=false | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | String | sort=true, parallel=true | allowed Struct(a: String, count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | parallel=false, normalize=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | parallel=false, normalize=true | allowed Struct(a: Struct(x: Int64, y: String), proportion: Float64) counted
+Expr.value_counts | Struct(x: Int64, y: String) | parallel=true, normalize=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | parallel=true, normalize=true | allowed Struct(a: Struct(x: Int64, y: String), proportion: Float64) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=false, normalize=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=false, normalize=true | allowed Struct(a: Struct(x: Int64, y: String), proportion: Float64) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=false, parallel=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=false, parallel=true | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=true, normalize=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=true, normalize=true | allowed Struct(a: Struct(x: Int64, y: String), proportion: Float64) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=true, parallel=false | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Struct(x: Int64, y: String) | sort=true, parallel=true | allowed Struct(a: Struct(x: Int64, y: String), count: UInt32) counted
+Expr.value_counts | Time | parallel=false, normalize=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | parallel=false, normalize=true | allowed Struct(a: Time, proportion: Float64) counted
+Expr.value_counts | Time | parallel=true, normalize=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | parallel=true, normalize=true | allowed Struct(a: Time, proportion: Float64) counted
+Expr.value_counts | Time | sort=false, normalize=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | sort=false, normalize=true | allowed Struct(a: Time, proportion: Float64) counted
+Expr.value_counts | Time | sort=false, parallel=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | sort=false, parallel=true | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | sort=true, normalize=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | sort=true, normalize=true | allowed Struct(a: Time, proportion: Float64) counted
+Expr.value_counts | Time | sort=true, parallel=false | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | Time | sort=true, parallel=true | allowed Struct(a: Time, count: UInt32) counted
+Expr.value_counts | UInt128 | parallel=false, normalize=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | parallel=false, normalize=true | allowed Struct(a: UInt128, proportion: Float64) counted
+Expr.value_counts | UInt128 | parallel=true, normalize=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | parallel=true, normalize=true | allowed Struct(a: UInt128, proportion: Float64) counted
+Expr.value_counts | UInt128 | sort=false, normalize=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | sort=false, normalize=true | allowed Struct(a: UInt128, proportion: Float64) counted
+Expr.value_counts | UInt128 | sort=false, parallel=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | sort=false, parallel=true | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | sort=true, normalize=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | sort=true, normalize=true | allowed Struct(a: UInt128, proportion: Float64) counted
+Expr.value_counts | UInt128 | sort=true, parallel=false | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt128 | sort=true, parallel=true | allowed Struct(a: UInt128, count: UInt32) counted
+Expr.value_counts | UInt16 | parallel=false, normalize=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | parallel=false, normalize=true | allowed Struct(a: UInt16, proportion: Float64) counted
+Expr.value_counts | UInt16 | parallel=true, normalize=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | parallel=true, normalize=true | allowed Struct(a: UInt16, proportion: Float64) counted
+Expr.value_counts | UInt16 | sort=false, normalize=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | sort=false, normalize=true | allowed Struct(a: UInt16, proportion: Float64) counted
+Expr.value_counts | UInt16 | sort=false, parallel=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | sort=false, parallel=true | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | sort=true, normalize=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | sort=true, normalize=true | allowed Struct(a: UInt16, proportion: Float64) counted
+Expr.value_counts | UInt16 | sort=true, parallel=false | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt16 | sort=true, parallel=true | allowed Struct(a: UInt16, count: UInt32) counted
+Expr.value_counts | UInt32 | parallel=false, normalize=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | parallel=false, normalize=true | allowed Struct(a: UInt32, proportion: Float64) counted
+Expr.value_counts | UInt32 | parallel=true, normalize=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | parallel=true, normalize=true | allowed Struct(a: UInt32, proportion: Float64) counted
+Expr.value_counts | UInt32 | sort=false, normalize=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | sort=false, normalize=true | allowed Struct(a: UInt32, proportion: Float64) counted
+Expr.value_counts | UInt32 | sort=false, parallel=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | sort=false, parallel=true | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | sort=true, normalize=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | sort=true, normalize=true | allowed Struct(a: UInt32, proportion: Float64) counted
+Expr.value_counts | UInt32 | sort=true, parallel=false | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt32 | sort=true, parallel=true | allowed Struct(a: UInt32, count: UInt32) counted
+Expr.value_counts | UInt64 | parallel=false, normalize=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | parallel=false, normalize=true | allowed Struct(a: UInt64, proportion: Float64) counted
+Expr.value_counts | UInt64 | parallel=true, normalize=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | parallel=true, normalize=true | allowed Struct(a: UInt64, proportion: Float64) counted
+Expr.value_counts | UInt64 | sort=false, normalize=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | sort=false, normalize=true | allowed Struct(a: UInt64, proportion: Float64) counted
+Expr.value_counts | UInt64 | sort=false, parallel=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | sort=false, parallel=true | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | sort=true, normalize=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | sort=true, normalize=true | allowed Struct(a: UInt64, proportion: Float64) counted
+Expr.value_counts | UInt64 | sort=true, parallel=false | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt64 | sort=true, parallel=true | allowed Struct(a: UInt64, count: UInt32) counted
+Expr.value_counts | UInt8 | parallel=false, normalize=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | parallel=false, normalize=true | allowed Struct(a: UInt8, proportion: Float64) counted
+Expr.value_counts | UInt8 | parallel=true, normalize=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | parallel=true, normalize=true | allowed Struct(a: UInt8, proportion: Float64) counted
+Expr.value_counts | UInt8 | sort=false, normalize=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | sort=false, normalize=true | allowed Struct(a: UInt8, proportion: Float64) counted
+Expr.value_counts | UInt8 | sort=false, parallel=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | sort=false, parallel=true | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | sort=true, normalize=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | sort=true, normalize=true | allowed Struct(a: UInt8, proportion: Float64) counted
+Expr.value_counts | UInt8 | sort=true, parallel=false | allowed Struct(a: UInt8, count: UInt32) counted
+Expr.value_counts | UInt8 | sort=true, parallel=true | allowed Struct(a: UInt8, count: UInt32) counted
 LazyFrame.drop | - | strict=false | allowed -
 LazyFrame.drop | - | strict=true | allowed -
 LazyFrame.join | - | allow_parallel=false, force_parallel=false | allowed -
@@ -13694,6 +14110,58 @@ polars.repeat | UInt8 | dtype=UInt64, eager=false | allowed UInt64 counted
 polars.repeat | UInt8 | dtype=UInt64, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.repeat | UInt8 | dtype=UInt8, eager=false | allowed UInt8 counted
 polars.repeat | UInt8 | dtype=UInt8, eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Array(Int64, 2) | eager=false | allowed Struct(a: Array(Int64, 2)) many
+polars.struct | Array(Int64, 2) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Boolean | eager=false | allowed Struct(a: Boolean) many
+polars.struct | Boolean | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Date | eager=false | allowed Struct(a: Date) many
+polars.struct | Date | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Datetime(us) | eager=false | allowed Struct(a: Datetime(us)) many
+polars.struct | Datetime(us) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Datetime(us, UTC) | eager=false | allowed Struct(a: Datetime(us, UTC)) many
+polars.struct | Datetime(us, UTC) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Decimal(10, 2) | eager=false | allowed Struct(a: Decimal(10, 2)) many
+polars.struct | Decimal(10, 2) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Duration(us) | eager=false | allowed Struct(a: Duration(us)) many
+polars.struct | Duration(us) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Float16 | eager=false | allowed Struct(a: Float16) many
+polars.struct | Float16 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Float32 | eager=false | allowed Struct(a: Float32) many
+polars.struct | Float32 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Float64 | eager=false | allowed Struct(a: Float64) many
+polars.struct | Float64 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Int128 | eager=false | allowed Struct(a: Int128) many
+polars.struct | Int128 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Int16 | eager=false | allowed Struct(a: Int16) many
+polars.struct | Int16 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Int32 | eager=false | allowed Struct(a: Int32) many
+polars.struct | Int32 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Int64 | eager=false | allowed Struct(a: Int64) many
+polars.struct | Int64 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Int8 | eager=false | allowed Struct(a: Int8) many
+polars.struct | Int8 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | List(Int64) | eager=false | allowed Struct(a: List(Int64)) many
+polars.struct | List(Int64) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | List(String) | eager=false | allowed Struct(a: List(String)) many
+polars.struct | List(String) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Null | eager=false | allowed Struct(a: Null) many
+polars.struct | Null | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | String | eager=false | allowed Struct(a: String) many
+polars.struct | String | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Struct(x: Int64, y: String) | eager=false | allowed Struct(a: Struct(x: Int64, y: String)) many
+polars.struct | Struct(x: Int64, y: String) | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | Time | eager=false | allowed Struct(a: Time) many
+polars.struct | Time | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | UInt128 | eager=false | allowed Struct(a: UInt128) many
+polars.struct | UInt128 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | UInt16 | eager=false | allowed Struct(a: UInt16) many
+polars.struct | UInt16 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | UInt32 | eager=false | allowed Struct(a: UInt32) many
+polars.struct | UInt32 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | UInt64 | eager=false | allowed Struct(a: UInt64) many
+polars.struct | UInt64 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
+polars.struct | UInt8 | eager=false | allowed Struct(a: UInt8) many
+polars.struct | UInt8 | eager=true | refused schema: eager makes a series where a step makes a plan, so a step is always lazy
 polars.time_range | Array(Int64, 2) | closed=both, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
 polars.time_range | Array(Int64, 2) | closed=both, eager=true | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
 polars.time_range | Array(Int64, 2) | closed=left, eager=false | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported

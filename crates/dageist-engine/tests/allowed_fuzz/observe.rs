@@ -17,6 +17,7 @@ use super::ask_polars::{self, Connected};
 use super::asked::{self, Walked};
 use super::case::Case;
 use super::frames::{Frames, key_column_index};
+use super::structs::Structs;
 
 /// How a reason that is the target's own comparison of a step's schema with its
 /// rows begins: it is no refusal of Polars, and shows only where the method that
@@ -91,7 +92,8 @@ pub struct Observed {
     /// The dtypes of the expressions, as far as they could be built.
     pub expressions: Vec<SeenExpression>,
     /// Whether a column of the other table is paired with keys that Polars gives different
-    /// dtypes. Polars refuses the join for that when no dtype of the column fits them all, which
+    /// dtypes, or with a key of a dtype that no column can have, a struct with two fields of one
+    /// name. Polars refuses the join for that when no dtype of the column fits them all, which
     /// the tables are not asked about, and joins whole numbers of different widths.
     pub keys_conflict: bool,
     /// Where the step engine and [`asked`] differ in what they say of a step the walk allows, when
@@ -441,6 +443,24 @@ fn key_dtypes(case: &Case, first: &Observed) -> (Vec<DataType>, bool) {
     )
 }
 
+/// Whether `dtype` is, or holds, a struct of which two fields have one name: Polars gives some of
+/// its calls such a dtype in a schema, and cannot make a column of it.
+fn has_repeated_field_names(dtype: &DataType) -> bool {
+    match dtype {
+        DataType::Struct(fields) => {
+            fields.iter().enumerate().any(|(at, field)| {
+                fields[..at]
+                    .iter()
+                    .any(|before| before.name() == field.name())
+            }) || fields
+                .iter()
+                .any(|field| has_repeated_field_names(field.dtype()))
+        }
+        DataType::List(inner) | DataType::Array(inner, _) => has_repeated_field_names(inner),
+        _ => false,
+    }
+}
+
 /// How many columns that stand in for a value a probe may read.
 pub const MAX_STAND_INS: usize = 4;
 
@@ -467,6 +487,10 @@ pub enum Rows {
     /// The three rows again, [`MORE_ROWS`] times over, one after another: twelve rows, where the
     /// values that differ and the values that occur most are as few as they were.
     Repeated,
+    /// The three rows with a null in the middle one of every column that holds none: a test of a
+    /// column, a comparison and a length, which the sample's rows leave as one value, then give
+    /// more.
+    Nulled,
     /// The second and third rows, twice over: four rows in which every value that the sample's
     /// columns hold twice or once occurs as often as the other one does, so that the values that
     /// occur most are two, and the values that differ are two, which no column's sample has.
@@ -495,7 +519,7 @@ impl Tables {
     }
 
     fn of(self, case: &Case, keys: &[DataType]) -> Frames {
-        let frames = Frames::new(case.receiver, case.argument, keys);
+        let frames = Frames::new(case.receiver, case.argument, &case.structs, keys);
         let frames = if self.other_as_left {
             frames.other_as_left()
         } else {
@@ -505,6 +529,7 @@ impl Tables {
         let frames = frames.with_stand_ins(&classes);
         match self.rows {
             Rows::Sample => frames,
+            Rows::Nulled => frames.with_nulls(),
             Rows::Repeated => frames.picked(&(0..MORE_ROWS).flat_map(|_| 0..3).collect::<Vec<_>>()),
             Rows::Tied => frames.picked(&[1, 2, 1, 2]),
         }
@@ -554,6 +579,13 @@ fn observe_on(case: &Case, tables: Tables, check: bool) -> Observed {
         return observed;
     }
     let (keys, conflict) = key_dtypes(case, &observed);
+    // A key of a dtype that no column can have has no column of the other table to be matched with.
+    if keys.iter().any(has_repeated_field_names) {
+        return Observed {
+            keys_conflict: true,
+            ..observed
+        };
+    }
     if keys == [DataType::Int64] {
         return Observed {
             keys_conflict: conflict,
@@ -731,6 +763,7 @@ mod tests {
         Case {
             receiver,
             argument: Representative::String,
+            structs: Structs::default(),
             document: Document::read(&text).expect("a document"),
         }
     }
@@ -819,7 +852,12 @@ mod tests {
         let observed = observe_checked(&case);
         assert_eq!((&observed.refusal, &observed.drift), (&None, &None));
         // Both say so for real: the asker, run apart from the engine, allows it as well.
-        let frames = Frames::with_key(case.receiver, case.argument, Some(&[DataType::Int64]));
+        let frames = Frames::with_key(
+            case.receiver,
+            case.argument,
+            &case.structs,
+            Some(&[DataType::Int64]),
+        );
         let asked = asked::ask(&case.document, &frames).expect("a step that can be asked");
         assert_eq!(asked.refusal, None);
     }

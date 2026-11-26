@@ -131,6 +131,10 @@ const FLAG_NOT_SHOWN =
 const SEVERAL_NOT_SHOWN =
   'the editor shows the dtype after a chain only where it gives one column; the dtypes of a chain that gives several are not shown (#177)';
 
+/** Why the name of a field of a struct is offered only where the walk reports the fields. */
+const FIELDS_LOST =
+  'the editor offers the names of the fields the walk reports for the struct the method follows; where the walk lost them, as after a condition of structs or in the values of a pivot, none is offered and the engine refuses a name that is no field (#185)';
+
 /** Why a step the editor draws by its parameters alone is not added from the list of steps. */
 const NOT_A_STEP_OF_THE_LIST =
   'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
@@ -167,8 +171,12 @@ export const GAPS: readonly Gap[] = [
   entryGap('polars.int_range', NOT_A_START),
   entryGap('polars.linear_space', NOT_A_START),
   entryGap('polars.repeat', NOT_A_START),
+  entryGap('polars.struct', NOT_A_START),
   entryGap('polars.time', NOT_A_START),
   entryGap('polars.time_range', NOT_A_START),
+  // The names of a struct's fields, which are offered where the walk reports them.
+  parameterGap('Expr.struct.drop', 'names', FIELDS_LOST),
+  parameterGap('Expr.struct.field', 'name', FIELDS_LOST),
   // The steps no list adds: the editor adds the seven it has heads for.
   stepGap('LazyFrame.drop'),
   stepGap('LazyFrame.drop_nans'),

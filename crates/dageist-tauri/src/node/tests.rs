@@ -607,6 +607,44 @@ fn a_step_with_something_still_to_be_picked_is_incomplete_at_it_and_the_next_is_
 }
 
 #[test]
+fn the_walk_reports_the_fields_of_the_struct_each_place_follows() {
+    let text = json!({ "version": 1, "steps": [
+        { "id": "counts", "call": { "entry": "LazyFrame.select", "arguments": {
+            "exprs": { "many": [{ "expression": { "start": {
+                "entry": "polars.col",
+                "arguments": { "name": { "columns": ["dcn"] } }
+            }, "then": [{ "entry": "Expr.value_counts", "arguments": {} }] } }] }
+        } } }
+    ] })
+    .to_string();
+    let answer = run_text(text);
+    let item = answer["steps"][0]["walk"]["expressions"]
+        .as_array()
+        .expect("expressions")
+        .iter()
+        .find(|expression| {
+            expression["place"]["path"]
+                .as_array()
+                .is_some_and(|path| path.len() == 2)
+        })
+        .expect("the item");
+    // The first place follows the column of text, which holds no fields; the one a link added at
+    // the end would follow is the struct of the values and their counts, written as the engine
+    // writes it.
+    assert_eq!(item["fields"][0], Value::Null);
+    assert_eq!(
+        item["fields"][1],
+        json!({
+            "dtype": "Struct(dcn: String, count: UInt32)",
+            "fields": [
+                { "name": "dcn", "dtype": "String" },
+                { "name": "count", "dtype": "UInt32" }
+            ]
+        })
+    );
+}
+
+#[test]
 fn the_rows_of_an_incomplete_step_are_refused_and_those_after_it_are_not_run() {
     let rows = |step: &str| {
         invoke_on(

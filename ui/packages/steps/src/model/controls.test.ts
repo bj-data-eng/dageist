@@ -37,6 +37,8 @@ describe('how an argument of one kind is drawn', () => {
   it('is by its own control for every kind that holds one value', () => {
     expect(oneControlOf({ kind: 'expression' })).toEqual({ control: 'expression' });
     expect(oneControlOf({ kind: 'column' })).toEqual({ control: 'column' });
+    // The name of a field of a struct is picked among the fields the engine says the value has.
+    expect(oneControlOf({ kind: 'field' })).toEqual({ control: 'field' });
     expect(oneControlOf({ kind: 'flag' })).toEqual({ control: 'flag' });
     expect(oneControlOf({ kind: 'dtype' })).toEqual({ control: 'dtype' });
     expect(oneControlOf({ kind: 'table' })).toEqual({ control: 'table' });

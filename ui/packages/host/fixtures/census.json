@@ -61,6 +61,10 @@
     },
     {
       "kind": "function",
+      "entry": "polars.struct"
+    },
+    {
+      "kind": "function",
       "entry": "polars.time"
     },
     {
@@ -236,6 +240,7 @@
   "parameterKinds": [
     "expression",
     "column",
+    "field",
     "value",
     "flag",
     "choice",
@@ -260,6 +265,19 @@
       "shape": "many",
       "kind": {
         "kind": "expression"
+      }
+    },
+    {
+      "shape": "many",
+      "kind": {
+        "kind": "field"
+      }
+    },
+    {
+      "shape": "many",
+      "kind": {
+        "kind": "value",
+        "type": "string"
       }
     },
     {
@@ -290,6 +308,12 @@
       "shape": "one",
       "kind": {
         "kind": "expression"
+      }
+    },
+    {
+      "shape": "one",
+      "kind": {
+        "kind": "field"
       }
     },
     {
@@ -493,6 +517,14 @@
       "statement": "`polars.element` stands only in a pivot's aggregate"
     },
     {
+      "name": "field-is-of-the-struct",
+      "statement": "a field that a method reads or drops must be one of the fields of the struct it follows: Polars refuses a name that is none, as one that was renamed or dropped before is"
+    },
+    {
+      "name": "field-names-fit-the-struct",
+      "statement": "the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name"
+    },
+    {
       "name": "filter-predicate-is-boolean",
       "statement": "a filter's predicate must be Boolean"
     },
@@ -511,6 +543,10 @@
     {
       "name": "moments-share-a-zone",
       "statement": "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
+    },
+    {
+      "name": "one-column-is-needed",
+      "statement": "a filter's only predicate must be one column: an expression that gives several, as the unnest of a struct of several fields does, is ambiguous, and one that gives none, as the unnest of a struct of no field does, is empty, and Polars refuses both; beside another predicate each expression it expands to is a predicate of its own, which it takes"
     },
     {
       "name": "parameter-takes-one-value",
@@ -533,8 +569,20 @@
       "statement": "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
     },
     {
+      "name": "struct-arithmetic-needs-numbers",
+      "statement": "arithmetic with a struct needs its fields to be numbers: Polars refuses the absolute value, the negation, the sign, a clip and a power of a struct whatever its fields are, and the sum, the difference, the product and the quotients of one that has a field of text, a date, a moment or a time"
+    },
+    {
+      "name": "struct-is-filled-forward-or-backward",
+      "statement": "a struct is filled by a strategy only forward or backward: Polars refuses the smallest, the largest, the mean, zero and one where the struct holds a null, which a pivot's missing cells make, and does nothing where it holds none"
+    },
+    {
       "name": "time-zone-is-valid",
       "statement": "a time zone must be one Polars reads"
+    },
+    {
+      "name": "to-struct-names-are-distinct",
+      "statement": "no two names given to the fields of a struct that a list or an array is made may be alike: Polars 2.2.0 accepts them and builds a struct that disagrees with itself, as its dtype and its series hold two fields of one name, and refuses the same names for a struct made of columns or renamed"
     },
     {
       "name": "values-meet-in-count",
@@ -547,6 +595,52 @@
     {
       "name": "window-input-is-not-widened",
       "statement": "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
+    },
+    {
+      "name": "written-names-are-distinct",
+      "statement": "the columns that the items of a select or of with_columns write must be named differently: an unnest and a field read write the names of the fields, and Polars refuses two items that write one name"
+    }
+  ],
+  "notKnown": [
+    {
+      "name": "the-starts-dtype",
+      "because": "the dtype of the start is not given"
+    },
+    {
+      "name": "the-results-dtype",
+      "because": "the dtype that the arguments decide is not known"
+    },
+    {
+      "name": "the-fields-of-a-struct",
+      "because": "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said"
+    },
+    {
+      "name": "an-unnest-as-a-key",
+      "because": "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known"
+    },
+    {
+      "name": "an-unnest-of-no-field",
+      "because": "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings"
+    },
+    {
+      "name": "an-open-number-in-a-key",
+      "because": "a number typed without a dtype stays open in a struct that is a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to"
+    },
+    {
+      "name": "several-columns-of-a-field-read",
+      "because": "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort"
+    },
+    {
+      "name": "an-unnest-among-predicates",
+      "because": "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come"
+    },
+    {
+      "name": "arithmetic-on-a-struct",
+      "because": "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly"
+    },
+    {
+      "name": "structs-of-other-fields-meet",
+      "because": "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are"
     }
   ],
   "outcomes": ["valid", "refused", "incomplete", "notRun"],
@@ -699,6 +793,7 @@
   "valueKinds": [
     "expression",
     "columns",
+    "field",
     "integer",
     "float",
     "string",

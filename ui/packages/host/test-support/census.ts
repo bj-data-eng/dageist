@@ -66,6 +66,12 @@ export interface CensusRule {
   readonly statement: string;
 }
 
+/** A reason the engine says it cannot tell whether an expression may end. */
+export interface CensusNotKnown {
+  readonly name: string;
+  readonly because: string;
+}
+
 /** A state a step can be reported in. */
 export interface CensusState {
   readonly outcome: string;
@@ -97,6 +103,7 @@ export interface Census {
   readonly refusalSources: readonly string[];
   readonly stages: readonly string[];
   readonly rules: readonly CensusRule[];
+  readonly notKnown: readonly CensusNotKnown[];
   readonly outcomes: readonly string[];
   readonly rowsStates: readonly string[];
   readonly changes: readonly string[];
@@ -138,6 +145,7 @@ function readKind(value: unknown, path: string): CensusKind {
       [
         'expression',
         'column',
+        'field',
         'flag',
         'choice',
         'dtype',
@@ -224,6 +232,11 @@ const readRule: Decode<CensusRule> = readRecord(['name', 'statement'], (fields, 
   statement: readField(fields, path, 'statement', readString),
 }));
 
+const readNotKnown: Decode<CensusNotKnown> = readRecord(['name', 'because'], (fields, path) => ({
+  name: readField(fields, path, 'name', readString),
+  because: readField(fields, path, 'because', readString),
+}));
+
 const readState: Decode<CensusState> = readRecord(
   ['outcome', 'cause', 'rows', 'after'],
   (fields, path) => ({
@@ -255,6 +268,7 @@ const readCensus: Decode<Census> = readRecord(
     'refusalSources',
     'stages',
     'rules',
+    'notKnown',
     'outcomes',
     'rowsStates',
     'changes',
@@ -288,6 +302,7 @@ const readCensus: Decode<Census> = readRecord(
     refusalSources: readField(fields, path, 'refusalSources', readWords),
     stages: readField(fields, path, 'stages', readWords),
     rules: readField(fields, path, 'rules', readList(readRule)),
+    notKnown: readField(fields, path, 'notKnown', readList(readNotKnown)),
     outcomes: readField(fields, path, 'outcomes', readWords),
     rowsStates: readField(fields, path, 'rowsStates', readWords),
     changes: readField(fields, path, 'changes', readWords),

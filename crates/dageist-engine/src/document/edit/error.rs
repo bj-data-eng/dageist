@@ -186,6 +186,8 @@ pub enum ValueKind {
     Expression,
     /// Names of input columns.
     Columns,
+    /// The name of a field of a struct.
+    Field,
     /// A whole number.
     Integer,
     /// A number.
@@ -221,6 +223,7 @@ impl ValueKind {
         match value {
             Value::Expression(_) => Self::Expression,
             Value::Columns(_) => Self::Columns,
+            Value::Field(_) => Self::Field,
             Value::Integer(_) => Self::Integer,
             Value::Float(_) => Self::Float,
             Value::String(_) => Self::String,
@@ -241,6 +244,7 @@ impl ValueKind {
         match self {
             Self::Expression => "an expression",
             Self::Columns => "column names",
+            Self::Field => "a field name",
             Self::Integer => "a whole number",
             Self::Float => "a number",
             Self::String => "text",

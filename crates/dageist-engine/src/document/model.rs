@@ -73,6 +73,8 @@ pub enum Value {
     Expression(Expression),
     /// Names of input columns.
     Columns(Vec<String>),
+    /// The name of a field of a struct.
+    Field(String),
     /// A whole number.
     Integer(i64),
     /// A number. It is finite.
@@ -110,6 +112,7 @@ impl Value {
                 Argument::Expression(polars::prelude::lit(polars::prelude::NULL))
             }
             Self::Columns(names) => Argument::Columns(names.clone()),
+            Self::Field(name) => Argument::Field(name.clone()),
             Self::Integer(value) => Argument::Integer(*value),
             Self::Float(value) => Argument::Float(*value),
             Self::String(text) => Argument::String(text.clone()),
@@ -283,6 +286,47 @@ impl Call {
             .filter(|parameter| parameter.kind() == Kind::TimeZone)
             .filter_map(|parameter| match self.argument(parameter.name())? {
                 Value::TimeZone(zone) => Some((parameter.name(), zone.as_deref())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The names the call was given for the parameters that hold names: the field of a struct to
+    /// read or drop, the names to give the fields of a struct or the places of an array, and the
+    /// name of a count, each by its parameter's name, in order.
+    pub(crate) fn names(&self) -> Vec<(&'static str, &str)> {
+        let mut names = Vec::new();
+        for parameter in self.entry.parameters() {
+            let Some(value) = self.argument(parameter.name()) else {
+                continue;
+            };
+            let held = match (parameter.kind(), value) {
+                (Kind::Field | Kind::Value(ValueType::String), Value::Many(items)) => {
+                    items.iter().collect::<Vec<_>>()
+                }
+                (Kind::Field | Kind::Value(ValueType::String), one) => vec![one],
+                _ => continue,
+            };
+            for item in held {
+                if let (Kind::Field, Value::Field(name))
+                | (Kind::Value(ValueType::String), Value::String(name)) =
+                    (parameter.kind(), item)
+                {
+                    names.push((parameter.name(), name.as_str()));
+                }
+            }
+        }
+        names
+    }
+
+    /// The whole numbers the call was given, each by its parameter's name.
+    pub(crate) fn numbers(&self) -> Vec<(&'static str, i64)> {
+        self.entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::Value(ValueType::Integer))
+            .filter_map(|parameter| match self.argument(parameter.name())? {
+                Value::Integer(number) => Some((parameter.name(), *number)),
                 _ => None,
             })
             .collect()
@@ -821,6 +865,7 @@ impl Value {
             (Literal::String(text), Kind::Pattern) => Self::Pattern(text.clone()),
             (Literal::String(text), Kind::TimeZone) => Self::TimeZone(Some(text.clone())),
             (Literal::String(text), Kind::Path) => Self::Path(text.clone()),
+            (Literal::String(text), Kind::Field) => Self::Field(text.clone()),
             (Literal::String(text), _) => Self::String(text.clone()),
         }
     }

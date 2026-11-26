@@ -864,6 +864,19 @@ pub(super) fn restored(
                 shape: produces.shape,
             }));
         }
+        // A struct that holds the class read, as the counts of values do, holds the one asked.
+        if let (Some(asked), Some(read)) = (asked, read)
+            && asked != read
+            && produces.result.class() == Some(Representative::Struct)
+            && produces.result.name().contains(read.name())
+        {
+            return Outcome::Allowed(Some(Produces {
+                result: ResultDtype::from_name(
+                    &produces.result.name().replace(read.name(), asked.name()),
+                ),
+                shape: produces.shape,
+            }));
+        }
     }
     outcome.clone()
 }

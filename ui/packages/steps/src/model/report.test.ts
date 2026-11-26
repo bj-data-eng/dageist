@@ -9,7 +9,7 @@ import refusedFixture from '../../../host/fixtures/step-report-refused.json';
 import variantsFixture from '../../../host/fixtures/step-report-variants.json';
 import type { Path } from './doc';
 import { linkSegment, parameterSegment, pathKey, valueSegment } from './doc';
-import type { PreparedRun, PreparedStep } from './report';
+import type { ChainDtypes, PreparedRun, PreparedStep } from './report';
 import {
   isChanged,
   linkHint,
@@ -196,6 +196,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
         selectAfter('UInt32', 'many'),
         selectAfter('UInt32', 'many'),
       ],
+      // No value there is a struct.
+      fields: [null, null, null],
     });
     expect(stepOf(prepared, 'resolved_day').chains.get(pathKey(COLUMN))).toMatchObject({
       source: 'Datetime(us)',
@@ -223,6 +225,7 @@ describe('the dtype the editor shows after each link of a chain', () => {
       links: ['UInt32'],
       // A list of dates is a count of values of its own; its length is one value.
       places: [selectAfter('Date', 'counted'), selectAfter('UInt32', 'one')],
+      fields: [null, null],
     });
   });
 
@@ -284,6 +287,29 @@ describe('a refusal', () => {
     // The sum of a text column: the walk puts the sum after a value of the class String.
     expect(refusedChain?.places[0]).toEqual(selectAfter('String', 'many'));
     expect(linkHint(refusedChain, 0)).toBe('after a value of the class String');
+  });
+
+  it('says a struct by the fields the walk gives it, not by the class the tables measured', () => {
+    const chain: ChainDtypes = {
+      source: null,
+      links: [],
+      places: [selectAfter('Struct(x: Int64, y: String)', 'many')],
+      fields: [
+        {
+          dtype: 'Struct(dcn: String, count: UInt32)',
+          fields: [
+            { name: 'dcn', dtype: 'String' },
+            { name: 'count', dtype: 'UInt32' },
+          ],
+        },
+      ],
+    };
+    expect(linkHint(chain, 0)).toBe(
+      'after a value of the class Struct(dcn: String, count: UInt32)',
+    );
+    expect(linkHint({ ...chain, fields: [{ dtype: 'Struct', fields: null }] }, 0)).toBe(
+      'after a value of the class Struct',
+    );
   });
 
   it('shows the dtype in and the dtype out of a link of a step that was planned, not a class', () => {

@@ -47,7 +47,8 @@ impl Counting {
             "Expr.top_k" | "Expr.bottom_k" => Self::AtMost("k"),
             "Expr.slice" => Self::FromAPlace,
             "Expr.gather_every" => Self::EveryNth,
-            "Expr.unique" | "Expr.mode" | "Expr.arg_unique" | "Expr.unique_counts" => Self::TheData,
+            "Expr.unique" | "Expr.mode" | "Expr.arg_unique" | "Expr.unique_counts"
+            | "Expr.value_counts" => Self::TheData,
             "Expr.filter" => Self::TheCondition,
             "Expr.gather" => Self::TheArgument("indices"),
             "Expr.search_sorted" => Self::TheArgument("element"),

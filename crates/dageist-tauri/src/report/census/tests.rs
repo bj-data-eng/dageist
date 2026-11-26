@@ -262,9 +262,9 @@ fn the_forms_of_parameter_are_those_of_the_committed_catalogue() {
         .map(Value::to_string)
         .collect();
     assert_eq!(held_forms, forms);
-    // Every kind the catalogue uses is listed, and the list has the twelve of the contract.
+    // Every kind the catalogue uses is listed, and the list has the thirteen of the contract.
     assert!(kinds.is_subset(&listed(&held, "parameterKinds")));
-    assert_eq!(listed(&held, "parameterKinds").len(), 12);
+    assert_eq!(listed(&held, "parameterKinds").len(), 13);
     assert_eq!(
         listed(&held, "optionKinds"),
         BTreeSet::from(["flag".to_owned(), "choice".to_owned()])

@@ -25,6 +25,7 @@ use polars::prelude::{
 use polars::series::ops::NullBehavior;
 
 use super::nested;
+use super::structs;
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
     EntryId, Family, Kind, Laziness, OneValue, Parameter, ParameterDefault, PatternMeans, Role,
@@ -37,6 +38,7 @@ const BOOLEAN: &[Dtypes] = &[Dtypes::Boolean];
 const STRING: &[Dtypes] = &[Dtypes::String];
 const LIST: &[Dtypes] = &[Dtypes::List];
 const ARRAY: &[Dtypes] = &[Dtypes::Array];
+const STRUCT: &[Dtypes] = &[Dtypes::Struct];
 
 // What Polars accepts on the receiver, from the functions that run it: `cum_sum` adds
 // numbers, durations and (as counts of true) booleans; `cum_max` orders anything with a
@@ -49,8 +51,8 @@ const CUM_MAX: &[Dtypes] = &[
     Dtypes::String,
     Dtypes::Boolean,
 ];
-// What Polars replaces the values of: every dtype it orders, and a list and an array, whose values it
-// meets one whole.
+// What Polars replaces the values of: every dtype it orders, and a list, an array and a struct, whose
+// values it meets one whole.
 const REPLACEABLE: &[Dtypes] = &[
     Dtypes::Numeric,
     Dtypes::Temporal,
@@ -58,6 +60,7 @@ const REPLACEABLE: &[Dtypes] = &[
     Dtypes::Boolean,
     Dtypes::List,
     Dtypes::Array,
+    Dtypes::Struct,
 ];
 const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
 const DATE_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Date];
@@ -2299,7 +2302,7 @@ fn polars_from_epoch(arguments: &Arguments) -> Result<Expr, BuildError> {
 }
 
 /// `eager` is Python's choice of a series over a plan, which a step never makes.
-fn lazily(arguments: &Arguments) -> Result<(), BuildError> {
+pub(super) fn lazily(arguments: &Arguments) -> Result<(), BuildError> {
     if arguments.flag("eager", false)? {
         return Err(refused(
             "eager makes a series where a step makes a plan, so a step is always lazy",
@@ -2754,6 +2757,19 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(nested::arr_to_list),
+    },
+    Entry {
+        id: EntryId("Expr.arr.to_struct"),
+        family: Family::Conversion,
+        accepts: ARRAY,
+        parameters: &[optional(
+            "fields",
+            Kind::Value(ValueType::String),
+            Shape::Many,
+            "None",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::arr_to_struct),
     },
     Entry {
         id: EntryId("Expr.arr.unique"),
@@ -3715,6 +3731,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(nested::list_sum),
     },
     Entry {
+        id: EntryId("Expr.list.to_struct"),
+        family: Family::Conversion,
+        accepts: LIST,
+        parameters: &[required(
+            "fields",
+            Kind::Value(ValueType::String),
+            Shape::Many,
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::list_to_struct),
+    },
+    Entry {
         id: EntryId("Expr.list.unique"),
         family: Family::Rows,
         accepts: LIST,
@@ -4362,6 +4390,31 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(str_split),
     },
     Entry {
+        id: EntryId("Expr.str.split_exact"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[
+            // Polars refuses a text of one value beside a column of separators where the table has
+            // no rows, so a separator is one value or as many as the text.
+            required("by", EXPRESSION, Shape::One).not_broadcasting(),
+            required("n", Kind::Value(ValueType::Integer), Shape::One),
+            flag("inclusive", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::str_split_exact),
+    },
+    Entry {
+        id: EntryId("Expr.str.splitn"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[
+            required("by", EXPRESSION, Shape::One).not_broadcasting(),
+            required("n", Kind::Value(ValueType::Integer), Shape::One),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::str_splitn),
+    },
+    Entry {
         id: EntryId("Expr.str.starts_with"),
         family: Family::Compare,
         accepts: STRING,
@@ -4450,6 +4503,57 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(str_zfill),
     },
     Entry {
+        id: EntryId("Expr.struct.drop"),
+        family: Family::Structs,
+        accepts: STRUCT,
+        parameters: &[
+            required("names", Kind::Field, Shape::Many),
+            flag("strict", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::struct_drop),
+    },
+    Entry {
+        id: EntryId("Expr.struct.field"),
+        family: Family::Structs,
+        accepts: STRUCT,
+        parameters: &[
+            required("name", Kind::Field, Shape::One),
+            // Several names are several columns, which no editor's place holds one of.
+            starred("more_names", Kind::Field).not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::struct_field),
+    },
+    Entry {
+        id: EntryId("Expr.struct.json_encode"),
+        family: Family::Structs,
+        accepts: STRUCT,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::struct_json_encode),
+    },
+    Entry {
+        id: EntryId("Expr.struct.rename_fields"),
+        family: Family::Structs,
+        accepts: STRUCT,
+        parameters: &[required(
+            "names",
+            Kind::Value(ValueType::String),
+            Shape::Many,
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::struct_rename_fields),
+    },
+    Entry {
+        id: EntryId("Expr.struct.unnest"),
+        family: Family::Structs,
+        accepts: STRUCT,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::struct_unnest),
+    },
+    Entry {
         id: EntryId("Expr.sub"),
         family: Family::Arithmetic,
         accepts: SUBTRACTABLE,
@@ -4533,6 +4637,19 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(unique_counts),
+    },
+    Entry {
+        id: EntryId("Expr.value_counts"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[
+            flag("sort", "False").keyword_only(),
+            flag("parallel", "False").keyword_only().not_offered(),
+            optional("name", Kind::Value(ValueType::String), Shape::One, "None").keyword_only(),
+            flag("normalize", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(structs::value_counts),
     },
     Entry {
         id: EntryId("Expr.var"),
@@ -5006,6 +5123,26 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_repeat),
+    },
+    Entry {
+        id: EntryId("polars.struct"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            starred("exprs", EXPRESSION).with_at_least_one(),
+            optional(
+                "schema",
+                Kind::Pairs(&Kind::Column, &Kind::Dtype),
+                Shape::One,
+                "None",
+            )
+            .keyword_only()
+            .not_offered(),
+            flag("eager", "False").keyword_only().not_offered(),
+            double_starred("named_exprs"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(structs::polars_struct),
     },
     Entry {
         id: EntryId("polars.time"),
