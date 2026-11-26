@@ -264,3 +264,31 @@ fn names_given_to_an_array_of_no_known_width_are_not_judged_and_fields_are_not_m
         "{known:?}"
     );
 }
+
+#[test]
+fn arithmetic_on_a_struct_is_refused_where_the_context_refuses_every_method() {
+    // The tables say nothing of arithmetic on a struct, but a context that refuses methods whatever
+    // they follow refuses this one too.
+    let context = Context::inside(Outer::JoinLeft, Nested::PartitionBy);
+    let after = |dtype| {
+        Place::new(
+            context,
+            After::Value {
+                dtype,
+                shape: Shape::Many,
+            },
+        )
+    };
+    let number = offer(
+        entry("Expr.add"),
+        &after(Representative::Int64),
+        &Chosen::default(),
+    );
+    assert!(number.refusal().is_some(), "{number:?}");
+    let on_a_struct = offer(
+        entry("Expr.add"),
+        &after(Representative::Struct),
+        &Chosen::default(),
+    );
+    assert!(on_a_struct.refusal().is_some(), "{on_a_struct:?}");
+}
