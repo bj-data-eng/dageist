@@ -624,7 +624,7 @@
     },
     {
       "name": "an-open-number-in-a-key",
-      "because": "a number typed without a dtype stays open in a struct that is a join's key, and Polars does not match it with the other table's key as its dtype resolves (Polars issue draft 23)"
+      "because": "a number typed without a dtype stays open in a struct that is a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to"
     },
     {
       "name": "several-columns-of-a-field-read",
