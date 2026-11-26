@@ -2465,6 +2465,19 @@ mod tests {
         assert!(found.reason.contains("compare"), "{}", found.reason);
     }
 
+    #[test]
+    fn two_fields_named_alike_are_probed_by_the_inputs_that_write_the_name_alone() {
+        // The struct holds a part that Polars refuses first, a field read of text, so the whole of
+        // it is refused for another reason: the two literals that write one name are the probe.
+        let found =
+            settled("stricter-two-fields-named-alike-in-a-struct-with-a-part-no-table-judges.case");
+        assert!(
+            found.reason.contains("multiple fields with name"),
+            "{}",
+            found.reason
+        );
+    }
+
     /// A case that selects the chain `a` followed by the `links` (calls with no
     /// arguments) on columns of `receiver`.
     fn chain_of(receiver: &str, start: &str, links: &[&str]) -> Case {
