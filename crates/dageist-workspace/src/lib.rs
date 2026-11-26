@@ -4,7 +4,9 @@
 //! A workspace holds `workspace.json` with the version of its format, `layout.json` with the boxes
 //! of every node, and a folder for each node under `nodes/`, named by the node's id, which holds
 //! `node.json` and, for a transform, `steps.json`, its step document. Its `.dageist/` folder holds
-//! the application's own state and is never committed.
+//! the application's own state, and its `data/` folder the data files its sources read; neither is
+//! committed. [`Workspace::create_from_folder`] makes a workspace from such files in a folder that
+//! is not a repository, such as a sample shipped with the application.
 //!
 //! [`Workspace::save`] writes a graph, its layout and its documents as those files and commits
 //! them as one commit on the branch, then makes the files on disk match it. Saving and committing

@@ -107,12 +107,7 @@ impl Workspace {
         author: Author,
         options: Options,
     ) -> Result<Self, WorkspaceError> {
-        if root.exists() {
-            let mut entries = std::fs::read_dir(root).map_err(io(root))?;
-            if entries.next().is_some() {
-                return Err(WorkspaceError::NotEmpty(root.to_path_buf()));
-            }
-        }
+        ensure_empty(root)?;
         std::fs::create_dir_all(root).map_err(io(root))?;
         let root = root.canonicalize().map_err(io(root))?;
         // What is saved is checked before the repository is made, so a refusal leaves the
@@ -132,6 +127,49 @@ impl Workspace {
         };
         workspace.save(saved, "Make the workspace")?;
         Ok(workspace)
+    }
+
+    /// Makes a workspace in `root` from the files of a workspace in `source`, a folder that is
+    /// not a repository, such as a sample shipped with the application, and copies the data files
+    /// under its `data/` folder across. Paths of data files written relative to `source` are read
+    /// against `root`, so the workspace made reads its own copies. `root` is made when it is
+    /// missing and must be empty.
+    ///
+    /// `source`'s own `.gitignore` is not read: the workspace made has the one every workspace
+    /// has. Its `.git` and `.dageist` folders at the top are passed by. A path to a data file
+    /// outside its `data/` folder is read against `root` all the same, and finds no file there
+    /// until one is put there. Symbolic links are refused, not followed.
+    ///
+    /// # Errors
+    ///
+    /// When `source`'s files are not of the format or describe a graph no edit could make,
+    /// `root` holds anything, or a file cannot be read or written. Whatever the failure, `root` is
+    /// left as it was found: missing, or empty.
+    pub fn create_from_folder(
+        source: &Path,
+        root: &Path,
+        author: Author,
+        options: Options,
+    ) -> Result<(Self, Saved), WorkspaceError> {
+        let files = folder_files(source)?;
+        ensure_empty(root)?;
+        let existed = root.exists();
+        let made = (|| {
+            std::fs::create_dir_all(root).map_err(io(root))?;
+            let canonical = root.canonicalize().map_err(io(root))?;
+            let saved = files::saved_of(&files, &canonical)?;
+            let workspace = Self::create(&canonical, &saved, author, options)?;
+            copy_tree(&source.join(files::DATA), &canonical.join(files::DATA))?;
+            Ok((workspace, saved))
+        })();
+        if made.is_err() {
+            // Nothing of a workspace half made is left: the folder goes back to how it was.
+            let _ = std::fs::remove_dir_all(root);
+            if existed {
+                let _ = std::fs::create_dir(root);
+            }
+        }
+        made
     }
 
     /// Opens the workspace in `root` and reads what its branch's latest commit holds. The files on
@@ -840,6 +878,83 @@ impl Workspace {
         self.repo = gix::open(&self.root).map_err(|error| git("opening the repository")(&error))?;
         Ok(())
     }
+}
+
+/// Refuses `root` when it holds anything; a folder that is missing or empty is one a workspace
+/// can be made in.
+fn ensure_empty(root: &Path) -> Result<(), WorkspaceError> {
+    if root.exists() {
+        let mut entries = std::fs::read_dir(root).map_err(io(root))?;
+        if entries.next().is_some() {
+            return Err(WorkspaceError::NotEmpty(root.to_path_buf()));
+        }
+    }
+    Ok(())
+}
+
+/// Refuses the entry at `path` when it is a symbolic link, which a workspace's folder does not
+/// hold: a link would make a file of the workspace one that lies elsewhere.
+fn refuse_link(kind: std::fs::FileType, path: &Path) -> Result<(), WorkspaceError> {
+    if kind.is_symlink() {
+        return Err(WorkspaceError::Io {
+            path: path.to_path_buf(),
+            message: "it is a symbolic link, which a workspace's folder does not hold".to_owned(),
+        });
+    }
+    Ok(())
+}
+
+/// The files of the workspace written in `folder`, a folder that is not a repository, by their
+/// paths in it. Its `.git`, `.dageist` and `data` folders at the top hold no file of the format
+/// and are passed by; anywhere else, they are files the format has no place for.
+fn folder_files(folder: &Path) -> Result<Files, WorkspaceError> {
+    let mut found = Files::new();
+    let mut folders = vec![(folder.to_path_buf(), String::new())];
+    while let Some((at, path)) = folders.pop() {
+        for entry in std::fs::read_dir(&at).map_err(io(&at))? {
+            let entry = entry.map_err(io(&at))?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let inside = if path.is_empty() {
+                name.clone()
+            } else {
+                format!("{path}/{name}")
+            };
+            let kind = entry.file_type().map_err(io(&entry.path()))?;
+            if path.is_empty() && [".git", files::LOCAL, files::DATA].contains(&name.as_str()) {
+                continue;
+            }
+            refuse_link(kind, &entry.path())?;
+            if kind.is_dir() {
+                folders.push((entry.path(), inside));
+            } else {
+                found.insert(
+                    inside,
+                    std::fs::read(entry.path()).map_err(io(&entry.path()))?,
+                );
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// Copies every file under `from` to the same place under `to`; nothing when `from` is missing.
+fn copy_tree(from: &Path, to: &Path) -> Result<(), WorkspaceError> {
+    if !from.is_dir() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(to).map_err(io(to))?;
+    for entry in std::fs::read_dir(from).map_err(io(from))? {
+        let entry = entry.map_err(io(from))?;
+        let target = to.join(entry.file_name());
+        let kind = entry.file_type().map_err(io(&entry.path()))?;
+        refuse_link(kind, &entry.path())?;
+        if kind.is_dir() {
+            copy_tree(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), &target).map_err(io(&target))?;
+        }
+    }
+    Ok(())
 }
 
 /// The id git gives `bytes` as a file.

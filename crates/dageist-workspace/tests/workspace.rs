@@ -283,7 +283,7 @@ fn the_files_are_text_in_a_folder_for_each_node_with_paths_inside_the_workspace_
         read("workspace.json".to_owned()),
         "{\n  \"version\": 1\n}\n"
     );
-    assert_eq!(read(".gitignore".to_owned()), ".dageist/\n");
+    assert_eq!(read(".gitignore".to_owned()), ".dageist/\ndata/\n");
     let claims = read(format!("nodes/{}/node.json", nodes.claims));
     assert!(
         claims.contains("\"path\": \"data/claims.parquet\""),
@@ -699,4 +699,111 @@ fn packing_whole_keeps_what_git_still_uses_a_staged_file_a_stash_and_orig_head()
         "commit"
     );
     git_as_person(&root, &["commit", "-q", "-m", "Staged"]);
+}
+
+/// Copies every file under `from` to `to`, leaving out `.git`.
+fn copy_without_git(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).expect("a folder");
+    for entry in std::fs::read_dir(from).expect("the folder") {
+        let entry = entry.expect("an entry");
+        if entry.file_name() == ".git" {
+            continue;
+        }
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("a kind").is_dir() {
+            copy_without_git(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).expect("copied");
+        }
+    }
+}
+
+#[test]
+fn a_workspace_is_made_from_a_plain_folder_with_its_data_read_where_it_is_copied() {
+    let base = folder("from-folder");
+    // A plain folder of a workspace's files, as a sample is shipped: no repository, and its data
+    // under data/, which the graph names by a path relative to the folder.
+    let first = base.join("first");
+    let (saved, nodes) = sample(&first);
+    Workspace::create(&first, &saved, author(), Options::default()).expect("made");
+    let plain = base.join("plain");
+    copy_without_git(&first, &plain);
+    std::fs::create_dir_all(plain.join("data").join("more")).expect("a folder");
+    std::fs::write(plain.join("data").join("claims.parquet"), b"rows").expect("written");
+    std::fs::write(plain.join("data").join("more").join("notes.csv"), b"a\n").expect("written");
+    // What the format has no place for at the top is passed by, and a .gitignore of its own is
+    // not read.
+    std::fs::create_dir_all(plain.join(".git")).expect("a folder");
+    std::fs::write(plain.join(".git").join("HEAD"), b"junk").expect("written");
+    std::fs::create_dir_all(plain.join(".dageist")).expect("a folder");
+    std::fs::write(plain.join(".dageist").join("state"), b"junk").expect("written");
+    std::fs::write(plain.join(".gitignore"), b"everything\n").expect("written");
+
+    let copy = base.join("copy");
+    let (_, opened) =
+        Workspace::create_from_folder(&plain, &copy, author(), Options::default()).expect("made");
+    let copy = copy.canonicalize().expect("the folder");
+    // The source's file is now read from the copy's data folder, which holds the copied file.
+    let dageist_graph::Body::Source { file: Some(file) } =
+        opened.graph.node(&nodes.claims).expect("the node").body()
+    else {
+        panic!("the source has no file");
+    };
+    assert_eq!(
+        Path::new(&file.path),
+        copy.join("data").join("claims.parquet")
+    );
+    assert_eq!(
+        std::fs::read(copy.join("data").join("claims.parquet")).expect("copied"),
+        b"rows"
+    );
+    assert_eq!(
+        std::fs::read(copy.join("data").join("more").join("notes.csv")).expect("copied"),
+        b"a\n"
+    );
+    assert!(!copy.join(".dageist").exists());
+    assert_eq!(
+        git(&copy, &["show", "HEAD:.gitignore"]),
+        ".dageist/\ndata/\n"
+    );
+    let tracked = git(&copy, &["ls-tree", "-r", "--name-only", "HEAD"]);
+    assert!(
+        !tracked.contains("data/") && !tracked.contains(".dageist"),
+        "{tracked}"
+    );
+    assert_eq!(opened.graph.len(), saved.graph.len());
+    assert_eq!(opened.documents, saved.documents);
+    // One commit, and git does not see the data.
+    assert_eq!(commits(&copy), 1);
+    assert_eq!(git(&copy, &["status", "--porcelain", "--ignored=no"]), "");
+    assert_eq!(
+        git(&copy, &["status", "--porcelain", "--ignored"]).trim(),
+        "!! data/"
+    );
+    // A folder holding something else is refused, and so is making a copy where files are.
+    std::fs::write(plain.join("notes.txt"), b"mine").expect("written");
+    assert!(matches!(
+        Workspace::create_from_folder(&plain, &base.join("again"), author(), Options::default()),
+        Err(WorkspaceError::Format { path, .. }) if path == "notes.txt"
+    ));
+    assert!(!base.join("again").exists());
+    std::fs::remove_file(plain.join("notes.txt")).expect("removed");
+    // A failure after the workspace is made leaves the folder as it was found, here empty: a
+    // symbolic link in the data is refused once the workspace is committed.
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("/elsewhere", plain.join("data").join("link")).expect("a link");
+        let empty = base.join("empty");
+        std::fs::create_dir_all(&empty).expect("a folder");
+        assert!(matches!(
+            Workspace::create_from_folder(&plain, &empty, author(), Options::default()),
+            Err(WorkspaceError::Io { .. })
+        ));
+        assert_eq!(std::fs::read_dir(&empty).expect("the folder").count(), 0);
+        std::fs::remove_file(plain.join("data").join("link")).expect("removed");
+    }
+    assert!(matches!(
+        Workspace::create_from_folder(&plain, &copy, author(), Options::default()),
+        Err(WorkspaceError::NotEmpty(_))
+    ));
 }

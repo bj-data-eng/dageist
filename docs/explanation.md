@@ -176,8 +176,9 @@ committed, and the files on disk are a copy of the latest commit.
 ```text
 my-workspace/
   .git/
-  .gitignore          .dageist/
+  .gitignore          .dageist/ and data/
   .dageist/           the application's own state, never committed
+  data/               data files the sources read, never committed
   workspace.json      the version of the format
   layout.json         the box of every node that has been placed
   nodes/
@@ -194,7 +195,12 @@ read by id. The layout is a file of its own, so moving a box is not a change to
 what the pipeline does. The path of a data file inside the workspace is written
 relative to it, with `/` between folders, so a workspace can be moved or cloned
 whole; a path outside it is written whole, and a relative path is refused
-when saved. The files are JSON, laid out two
+when saved. Data files kept with a workspace go in its `data/` folder, which
+git does not see: a workspace's history holds its graph, not its data. A
+workspace can be made from its files in a plain folder that is not a
+repository, such as a sample shipped with the application: its data is copied
+across, and the paths written relative to the folder are read against the
+copy. The files are JSON, laid out two
 spaces deep. They are read strictly: a field the format lacks, a value left out,
 a key written twice, or a file the format has no place for is refused, with the
 path of the file it was found in.
