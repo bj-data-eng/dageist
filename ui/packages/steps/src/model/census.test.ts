@@ -138,9 +138,9 @@ describe('a variant the census gains that the editor lacks', () => {
   });
 
   it('fails the check where it is a reason the walk cannot tell that says nothing', () => {
-    expect(
-      planFor(plus('notKnown', { name: 'a-new-reason', because: ' ' })).unplanned,
-    ).toEqual(['not known a-new-reason: says nothing']);
+    expect(planFor(plus('notKnown', { name: 'a-new-reason', because: ' ' })).unplanned).toEqual([
+      'not known a-new-reason: says nothing',
+    ]);
   });
 
   it('fails the check where it is a class of dtype, a shape or a state of a condition the grid has no place for', () => {
