@@ -127,18 +127,22 @@ pub enum Limit {
     /// a column compared with a null, is refused by a named rule, and is not
     /// this.
     ASingleValueInAKey,
-    /// Polars folds a comparison with a null literal into a null, before it asks
-    /// whether a join's key is elementwise, and what it leaves depends on the
-    /// dtypes and on what the comparison follows, which the tables did not
-    /// measure and the named rule, which holds what the evidence settles, does
-    /// not model: a column compared with a null is refused by the rule, and an
-    /// aggregate compared with a null, or a comparison that follows one, is
-    /// found by running. It decides at once, too, an `eq_missing` or an `ne_missing`
-    /// of a value and a whole number that some dtype cannot hold, below zero or
-    /// above 127, where the dtype of the value cannot hold it, as an unsigned
-    /// count cannot, and so leaves a literal where an aggregate was. Polars
-    /// refusing the join as not elementwise, with no place, in a case whose join
-    /// key holds a comparison with a null literal, or one of those, at any depth.
+    /// Polars decides some comparisons while it coerces the types, before it asks whether a
+    /// join's key is elementwise, and what it leaves depends on the dtypes and on what the
+    /// comparison follows, which the tables did not measure and the named rule, which holds what
+    /// the evidence settles, does not model. A comparison with a null literal becomes a null
+    /// repeated to the length of what is compared, which is not elementwise, or a plain null
+    /// where that is one value: a column compared with a null is refused by the rule, and an
+    /// aggregate compared with a null, or a comparison that follows one, is found by running. An
+    /// `eq_missing` or an `ne_missing` of a value and a whole number that some dtype cannot
+    /// hold, below zero or above 127, is decided the same way where the dtype of the value cannot
+    /// hold the number, and kept where it can. The rule refuses it where the value is a column of
+    /// a dtype it knows, which is a constant repeated to the length of the column; it does not
+    /// where the value is one value, as an aggregate is, for Polars gives a plain constant that a
+    /// key may be where the dtype cannot hold the number, as an unsigned count cannot, and keeps
+    /// the comparison, with the aggregate beside the column that makes the key not elementwise,
+    /// where it can. Polars refusing the join as not elementwise, with no place, in a case whose
+    /// join key holds a comparison with a null literal, or one of those, at any depth.
     ANullComparisonInAKey,
     /// The tables ran every call on columns that hold values, so what Polars does
     /// with a call that has only nulls to meet was not measured: it does not meet
@@ -613,7 +617,7 @@ impl Limit {
                 "a shift leaves nulls, which Polars does not meet with the dtype the tables refuse"
             }
             Self::ANullComparisonInAKey => {
-                "Polars folds a comparison with a null in a join key into a null, which the rule does not wholly model"
+                "Polars decides a comparison with a null in a join key, or of one value with a number its dtype cannot hold, while it coerces the types, and leaves a constant that a key may be or not by the dtype, which the rule does not wholly model"
             }
             Self::ASingleValueInAKey => {
                 "a key that is wholly a single value, an aggregate or a null, need not be elementwise in what it holds"
@@ -1463,7 +1467,7 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
     };
     // A whole number that some dtype cannot hold, below zero or above what an `Int8` holds, is
     // one that Polars decides at once for a comparison of missing values where the dtype of what
-    // it is compared with cannot hold it, so it folds the comparison as it does a null.
+    // it is compared with cannot hold it, as it decides a comparison with a null.
     let is_a_number_some_dtype_lacks = |expression: &Expression| {
         expression.links().is_empty()
             && matches!(expression.start(), Start::Call(start)
@@ -1494,11 +1498,20 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
                     && operands(link)
                         .into_iter()
                         .any(|(_, operand)| is_below_zero(operand)))
+                // Where what is compared is a value for each row, the rule decides it by the dtype
+                // of the column, so only what is one value is left here: the dtype of an aggregate
+                // decides whether Polars keeps the comparison, and the rule does not follow it.
                 || (matches!(id, "Expr.eq_missing" | "Expr.ne_missing")
-                    && (operands(link)
-                        .into_iter()
-                        .any(|(_, operand)| is_a_number_some_dtype_lacks(operand))
-                        || (number_start && expression.links()[..at].is_empty())))
+                    && ((wholly_single(expression, at, true)
+                        && operands(link)
+                            .into_iter()
+                            .any(|(_, operand)| is_a_number_some_dtype_lacks(operand)))
+                        || (number_start
+                            && at == 0
+                            && operands(link).into_iter().any(|(name, operand)| {
+                                name == "other"
+                                    && wholly_single(operand, operand.links().len(), true)
+                            }))))
         })
     };
     fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {

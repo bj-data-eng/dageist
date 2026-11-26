@@ -836,13 +836,14 @@ fn a_predicate_that_is_no_boolean_in_a_joins_key_is_refused_where_the_other_tabl
 #[test]
 fn a_missing_comparison_of_whole_numbers_with_a_fraction_is_no_elementwise_key_as_polars_takes_it()
 {
-    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers at once, for none is 1.5,
-    // and refuses the join for a key that is not elementwise, in both engines. Polars swaps the
-    // operands when it coerces them, so `lit(1.5).ne_missing(k)` is decided the same way. A number
-    // with no fraction is held by whole numbers, so the comparison is kept and the key is taken, and
-    // so is a number given the dtype of whole numbers, which makes `1.5` the whole number 1, and a
-    // key that is one value, as the count of a column or an aggregate of the comparison is, and the
-    // same comparison in no join.
+    // Python Polars 2.2.0 decides `k.ne_missing(1.5)` of whole numbers while it coerces the types,
+    // for none is 1.5, and what it leaves is a constant repeated to the length of `k`, which the
+    // join refuses as not elementwise, in both engines. Polars swaps the operands when it coerces
+    // them, so `lit(1.5).ne_missing(k)` is decided the same way. A number with no fraction is held
+    // by whole numbers, so the comparison is kept and the key is taken, and so is a number given the
+    // dtype of whole numbers, which makes `1.5` the whole number 1, and a key that is one value, as
+    // the count of a column or an aggregate of the comparison is, for the constant is no longer
+    // repeated, and the same comparison in no join.
     let number = |value: f64, whole_dtype: Option<&str>| {
         let mut arguments = json!({ "value": { "float": value } });
         if let Some(name) = whole_dtype {
@@ -1256,6 +1257,37 @@ fn a_missing_comparison_of_a_field_read_from_a_struct_or_with_a_number_given_its
 }
 
 #[test]
+fn a_missing_comparison_of_a_column_whose_dtype_is_not_known_is_not_judged_in_a_joins_key() {
+    // A list of lists is no representative dtype, so the dtype of what a cast to it gives is not
+    // known and whether it holds the number cannot be said: the walk neither refuses the key nor
+    // takes it, but says that it cannot tell.
+    let cast = || {
+        call(
+            "Expr.cast",
+            json!({ "dtype": dtype("List(List(Float64))") }),
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        let beside = chain(
+            col_call("x"),
+            vec![cast(), call(method, json!({ "other": whole(300) }))],
+        );
+        let swapped = chain(
+            call("polars.lit", json!({ "value": { "integer": 300 } })),
+            vec![call(
+                method,
+                json!({ "other": field_then("x", vec![cast()]) }),
+            )],
+        );
+        for (form, key) in [("beside", beside), ("swapped", swapped)] {
+            let report = join_on_a_column_of(&DataType::Int64, key);
+            assert_eq!(walk(&report).refusal(), None, "{method} {form}");
+            assert!(walk(&report).not_known().is_some(), "{method} {form}");
+        }
+    }
+}
+
+#[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
     // what its other bound reads is not met, where the interval of a count and a column bounded
@@ -1599,8 +1631,9 @@ fn a_count_compared_with(entry: &str, number: i64) -> Value {
 fn a_count_compared_as_a_value_with_a_number_no_dtype_holds_is_one_polars_may_fold_in_a_joins_key()
 {
     // Polars decides a comparison that takes a missing value as a value, of an unsigned count
-    // with a number below zero, at once, so what it follows is a literal and no aggregate, and the
-    // key is taken. It does not decide a comparison that is not of missing values so.
+    // with a number below zero, while it coerces the types. What is compared is one value, so it
+    // leaves a plain constant, with no length to repeat it to and no aggregate, and the key is
+    // taken. It does not decide a comparison that is not of missing values so.
     for entry in ["Expr.ne_missing", "Expr.eq_missing"] {
         let report = join_on(a_count_compared_with(entry, -1));
         assert!(
