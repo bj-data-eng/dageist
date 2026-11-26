@@ -383,10 +383,6 @@ const NOT_HELD: &[(&str, &str)] = &[
         "no document the corpus plans names the fields of a struct a list or an array is made alike; one was not tried, and may be built",
     ),
     (
-        "struct-arithmetic-needs-numbers",
-        "no document the corpus plans calculates with a struct; one was not tried, and may be built",
-    ),
-    (
         "struct-is-filled-forward-or-backward",
         "no document the corpus plans fills a struct by a strategy; one was not tried, and may be built",
     ),
