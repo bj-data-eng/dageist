@@ -1288,6 +1288,105 @@ fn a_missing_comparison_of_a_column_whose_dtype_is_not_known_is_not_judged_in_a_
 }
 
 #[test]
+fn a_missing_comparison_that_polars_keeps_leaves_the_rest_of_a_joins_key_to_the_rules() {
+    // A column that holds the number is compared as it is, so an aggregate of the comparison beside
+    // a column makes the key not elementwise, as an aggregate of any other value does, and so does one
+    // of a comparison that Polars decides, for the aggregate is still beside a column.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let beside_the_column = |method: &str, number: Value| {
+        chain(
+            col_call("x"),
+            vec![
+                cast(),
+                call(
+                    "Expr.add",
+                    json!({ "other": chain(
+                        col_call("x"),
+                        vec![
+                            call(method, json!({ "other": number })),
+                            call("Expr.sum", json!({})),
+                            cast(),
+                        ],
+                    ) }),
+                ),
+            ],
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        for (held, number) in [
+            (DataType::Int16, 300),
+            (DataType::Int64, 70_000),
+            (DataType::UInt8, 200),
+            (DataType::Int8, 300),
+            (DataType::Int8, 100),
+        ] {
+            assert_refused_by_both(
+                &format!("{method} {number} of {held}, summed beside the column"),
+                &join_on_a_column_of(&held, beside_the_column(method, whole(number))),
+            );
+        }
+    }
+}
+
+#[test]
+fn a_missing_comparison_that_polars_decides_in_what_a_joins_key_holds_is_no_elementwise_key() {
+    // The constant repeated to the length of the column is no elementwise key wherever it stands
+    // in the key: as an operand of arithmetic, or as the predicate of a condition.
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let compared = |method: &str, number: Value| {
+        chain(
+            col_call("x"),
+            vec![call(method, json!({ "other": number })), cast()],
+        )
+    };
+    let fraction = || {
+        chain(
+            call("polars.lit", json!({ "value": { "float": 1.5 } })),
+            Vec::new(),
+        )
+    };
+    for method in ["Expr.eq_missing", "Expr.ne_missing"] {
+        for (said, held, number) in [
+            ("a number the dtype cannot hold", DataType::Int8, whole(300)),
+            ("a number with a fraction", DataType::Int64, fraction()),
+        ] {
+            let operand = join_on_a_column_of(
+                &held,
+                chain(
+                    col_call("x"),
+                    vec![
+                        cast(),
+                        call(
+                            "Expr.add",
+                            json!({ "other": compared(method, number.clone()) }),
+                        ),
+                    ],
+                ),
+            );
+            assert_refused_by_both(&format!("{method} with {said}, an operand"), &operand);
+            let predicate = join_on_a_column_of(
+                &held,
+                chain(
+                    call(
+                        "polars.when",
+                        json!({ "predicates": many(vec![chain(
+                            col_call("x"),
+                            vec![call(method, json!({ "other": number }))],
+                        )]) }),
+                    ),
+                    vec![
+                        call("When.then", json!({ "statement": whole(1) })),
+                        call("Then.otherwise", json!({ "statement": whole(0) })),
+                        cast(),
+                    ],
+                ),
+            );
+            assert_refused_by_both(&format!("{method} with {said}, a predicate"), &predicate);
+        }
+    }
+}
+
+#[test]
 fn an_interval_with_a_negative_bound_of_a_count_is_decided_and_is_not_refused_in_a_joins_key() {
     // A count is unsigned, so no count is at most -1: Polars decides the interval at once, and
     // what its other bound reads is not met, where the interval of a count and a column bounded
