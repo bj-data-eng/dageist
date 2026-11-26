@@ -385,6 +385,18 @@ fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
         )),
         "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come"
     );
+    // A struct met by a struct whose fields differ.
+    assert_eq!(
+        cannot_tell(&offer(
+            entry("Expr.eq"),
+            &select,
+            &Chosen::default()
+                .following_fields(Some(&fields))
+                .with_arguments(&[("other", Representative::Struct)])
+                .with_argument_fields(&[("other", &flags)]),
+        )),
+        "structs whose fields differ meet, which Polars casts field by field and refuses or not by what the fields are"
+    );
     // A struct met by a struct, which Polars does field by field.
     assert_eq!(
         cannot_tell(&offer(

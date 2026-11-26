@@ -442,14 +442,6 @@ pub enum Limit {
     /// the case run again with each gather told to is no longer refused for them: the places the
     /// rows leave it are why.
     AGatherBeyondTheRows,
-    /// Polars meets two structs, as a fill of nulls by another column does, by casting one to the
-    /// dtype of the other, and refuses it where their fields are not the same. The tables measured
-    /// a struct met by the struct measured, which has the same fields as itself. Polars refusing
-    /// the plan with the refusal that it cannot cast a struct to another, naming both, or the rows
-    /// with the refusal that structs do not have the same number of fields, that two structs cannot
-    /// be compared or that a struct cannot be cast to other types, which only structs of other
-    /// fields meet.
-    AStructMetByAStructOfOtherFields,
     /// A count of values that the data or the arguments decide is one value, or the rows, by what
     /// the values are made of, as a test of a struct is, which is never null, a comparison with a
     /// null, and a column of the dtype Null: no rows the sample can give, nor ties, nor a null in
@@ -490,7 +482,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 39] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -525,7 +517,6 @@ impl Limit {
         Self::AMomentOfOneValueFilledInAnotherZone,
         Self::APartPolarsFoldsToANull,
         Self::AGatherBeyondTheRows,
-        Self::AStructMetByAStructOfOtherFields,
         Self::ACountNoRowsChange,
         Self::AJsonOfANumberInAPivot,
         Self::SeveralCountsInOneItem,
@@ -580,7 +571,6 @@ impl Limit {
             }
             Self::APartPolarsFoldsToANull => "a-part-polars-folds-to-a-null",
             Self::AGatherBeyondTheRows => "a-gather-beyond-the-rows",
-            Self::AStructMetByAStructOfOtherFields => "a-struct-met-by-a-struct-of-other-fields",
             Self::ACountNoRowsChange => "a-count-no-rows-change",
             Self::AJsonOfANumberInAPivot => "json-of-a-number-in-a-pivot",
             Self::SeveralCountsInOneItem => "several-counts-in-one-item",
@@ -681,9 +671,6 @@ impl Limit {
             }
             Self::ACountNoRowsChange => {
                 "a count of values that the data decide is one value by what they are made of, which no rows, ties or nulls in the columns change, where the tables measured counts that the rows decide"
-            }
-            Self::AStructMetByAStructOfOtherFields => {
-                "Polars refuses to meet two structs of other fields, which it casts to one another, where the tables measured a struct met by the struct measured"
             }
             Self::AGatherBeyondTheRows => {
                 "a gather refuses a place beyond the rows it follows when they run, and every place where the table has none, where the tables measured a gather that gives a null for it"
@@ -4347,34 +4334,6 @@ fn applies(
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "Expr.struct.json_encode")))
                 && refused_for_a_conversion_of_text_without_the_json(case) == Some(true)
-        }
-        (Limit::AStructMetByAStructOfOtherFields, Disagreement::PolarsRefuses(refusal)) => {
-            // At the plan, as a fill casts one struct to the other's dtype, and at the rows, as a
-            // replacement casts what it replaces.
-            (refusal.stage == Stage::Schema
-                && refusal.reason.starts_with("casting from Struct(")
-                && refusal.reason.contains(") to Struct(")
-                && refusal.reason.contains("not supported"))
-                || (unplaced(refusal)
-                    && refusal.reason.starts_with("cast from `struct[")
-                    && refusal
-                        .reason
-                        .contains("structs do not have the same number of fields"))
-                // A comparison of two structs, which Polars meets as a cast does, and a cast of one to
-                // another dtype, as a replacement makes of what it replaces.
-                || (unplaced(refusal)
-                    && refusal
-                        .reason
-                        .starts_with("could not evaluate comparison between series")
-                    && refusal.reason.matches("Struct(").count() >= 2)
-                || (unplaced(refusal) && refusal.reason == "Cannot cast from struct to other types")
-                // A cast of one struct to another whose fields have other names.
-                || (unplaced(refusal)
-                    && refusal.reason.starts_with("cast from `struct[")
-                    && refusal.reason.contains("structs field name mismatch"))
-                // The values of a condition are structs that Polars finds no dtype of both for.
-                || (refusal.reason.starts_with("failed to determine supertype of struct[")
-                    && refusal.reason.contains(" and struct["))
         }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
@@ -11447,41 +11406,6 @@ mod tests {
     // ----- Structs
 
     #[test]
-    fn a_cast_between_structs_polars_refuses_is_the_cause_of_its_refusal_of_a_struct_met_by_another()
-     {
-        let case = select(vec![chain(column("a"), &["Expr.fill_null"])]);
-        let reason = "casting from Struct({'field_0': String}) to Struct({'field_0': String, 'x': Int64}) not supported";
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(at(&[
-                    Segment::Parameter("exprs".to_owned()),
-                    Segment::Item(0)
-                ])),
-                Stage::Schema,
-                reason,
-                Vec::new()
-            ),
-            vec![Limit::AStructMetByAStructOfOtherFields]
-        );
-        // The rows' refusal and the cast of a struct that is no struct are no cause.
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Schema,
-                "casting from String to Int64 not supported",
-                Vec::new()
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
     fn a_count_no_rows_change_is_a_limit_and_a_count_that_the_rows_decide_is_not() {
         let place = at(&[
             Segment::Parameter("predicates".to_owned()),
@@ -11618,83 +11542,6 @@ mod tests {
         );
         assert_eq!(
             tables_refuse(&pivot(without), place, Some(TableStage::Schema), reason),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_replacement_given_a_struct_is_excused_for_its_cast() {
-        let operand = chain(
-            call(
-                "polars.struct",
-                vec![("exprs", many(vec![chain(column("rk"), &[])]))],
-            ),
-            &[],
-        );
-        let case = select(vec![
-            Expression::new(
-                Start::Call(column("rk")),
-                vec![call(
-                    "Expr.add",
-                    vec![("other", Value::Expression(operand))],
-                )],
-            )
-            .expect("a chain"),
-        ]);
-        let replacement = "cast from `struct[2]` to `struct[1]` failed in column 'a': structs do not have the same number of fields: 2 vs 1";
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, replacement, Vec::new()),
-            vec![Limit::AStructMetByAStructOfOtherFields]
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Rows,
-                "cast from `i64` to `struct[1]` failed",
-                Vec::new()
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn two_structs_of_other_fields_compared_or_a_struct_cast_to_another_dtype_are_the_same_cause() {
-        let case = select(vec![chain(column("a"), &["Expr.eq"])]);
-        let compared = "could not evaluate comparison between series 'b' of dtype: Struct({'literal': Duration('μs')}) and series 'a' of dtype: Struct({'literal': Int8})";
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, compared, Vec::new()),
-            vec![Limit::AStructMetByAStructOfOtherFields]
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Rows,
-                "Cannot cast from struct to other types",
-                Vec::new()
-            ),
-            vec![Limit::AStructMetByAStructOfOtherFields]
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Schema,
-                "failed to determine supertype of struct[2] and struct[1]",
-                Vec::new()
-            ),
-            vec![Limit::AStructMetByAStructOfOtherFields]
-        );
-        // A comparison of two series that are no structs is no cause.
-        assert_eq!(
-            polars_refuses(
-                &case,
-                None,
-                Stage::Rows,
-                "could not evaluate comparison between series 'b' of dtype: Date and series 'a' of dtype: Int8",
-                Vec::new()
-            ),
             vec![]
         );
     }

@@ -402,6 +402,9 @@ enum Cur {
         zones: Vec<Option<Zone>>,
         /// The width of each value, where it is an array whose width is known, in the order of `values`.
         widths: Vec<Option<usize>>,
+        /// The fields of each value, where it is a struct whose fields are known, in the order of
+        /// `values`.
+        structs: Vec<Option<Fields>>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -1066,6 +1069,20 @@ fn arrays_of_other_widths(values: &[Valued], widths: &[Option<usize>]) -> bool {
         && !arrays
             .iter()
             .all(|width| width.is_some() && *width == arrays[0])
+}
+
+/// Whether the values of a condition that are structs are not all of one set of fields that is known.
+fn structs_of_other_fields(values: &[Valued], structs: &[Option<Fields>]) -> bool {
+    let held: Vec<&Option<Fields>> = values
+        .iter()
+        .zip(structs)
+        .filter(|((class, _), _)| *class == Some(Representative::Struct))
+        .map(|(_, fields)| fields)
+        .collect();
+    held.len() > 1
+        && !held
+            .iter()
+            .all(|fields| fields.is_some() && **fields == *held[0])
 }
 
 /// The class every value of a condition has, when they have the same one. A
@@ -1785,6 +1802,13 @@ impl Walker<'_> {
         (items("predicates") + items("constraints")).saturating_sub(1)
     }
 
+    /// The fields of the struct an operand is, where it is one whose fields the walk knows.
+    fn fields_of(&self, operand: Option<&Operand>) -> Option<Fields> {
+        operand
+            .and_then(|operand| operand.fields)
+            .map(|at| self.fieldsets[at.0].clone())
+    }
+
     /// The zone the walk holds under `name`.
     fn zone_named(&mut self, name: &str) -> Zone {
         let at = self
@@ -2081,6 +2105,7 @@ impl Walker<'_> {
                                     }),
                                 zones: Vec::new(),
                                 widths: Vec::new(),
+                                structs: Vec::new(),
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
@@ -3173,6 +3198,7 @@ impl Walker<'_> {
                     mut values,
                     mut zones,
                     mut widths,
+                    mut structs,
                     single,
                     values_single,
                     known,
@@ -3224,24 +3250,33 @@ impl Walker<'_> {
                 }
                 let single = single && given_single;
                 let values_single = values_single && given_values_single;
-                let known = known && given_known;
+                let mut known = known && given_known;
                 let state = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
                         widths.push(statement.and_then(|operand| operand.width));
+                        structs.push(self.fields_of(statement.as_ref()));
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
                         values.push(statement_class);
                         zones.push(statement.and_then(|operand| operand.zone));
                         widths.push(statement.and_then(|operand| operand.width));
+                        structs.push(self.fields_of(statement.as_ref()));
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
                         values.push(statement_class);
                         widths.push(statement.and_then(|operand| operand.width));
+                        structs.push(self.fields_of(statement.as_ref()));
+                        // Structs of other fields that are the values of a condition meet as
+                        // Polars casts them, which it refuses or not by what the fields are.
+                        if structs_of_other_fields(&values, &structs) {
+                            known = false;
+                            *last_end = Some(Ending::NotKnown(Unknown::StructsOfOtherFieldsMeet));
+                        }
                         // Arrays that are the values of a condition are an array where they are
                         // of one width, which is known, and a list where they are not.
                         if arrays_of_other_widths(&values, &widths)
@@ -3301,6 +3336,7 @@ impl Walker<'_> {
                     taken,
                     zones,
                     widths,
+                    structs,
                     single,
                     values_single,
                     known,

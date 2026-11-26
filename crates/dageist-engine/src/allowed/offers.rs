@@ -1144,6 +1144,16 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 .arguments
                 .iter()
                 .any(|(_, class)| *class == Representative::Struct));
+    // A struct met by a struct whose fields differ is cast field by field, and Polars refuses or
+    // not by what the fields are, which the tables, measured on one struct, do not say.
+    let meets_other_fields = is_method(entry)
+        && receiver_class == Some(Representative::Struct)
+        && chosen.fields.is_some_and(|receiver| {
+            chosen
+                .argument_fields
+                .iter()
+                .any(|(_, argument)| *argument != receiver)
+        });
     // What Polars always refuses of it is refused, in its words.
     if struct_arithmetic
         && let Some(said) = fields::arithmetic_refused(entry, receiver_class, chosen)
@@ -1202,7 +1212,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         ));
     }
     // What the options set are refused for, on the dtype of the value the method follows.
-    if is_method(entry) && !struct_arithmetic {
+    if is_method(entry) && !struct_arithmetic && !meets_other_fields {
         let receiver = match place.after {
             After::Value { dtype, .. } => Some(dtype),
             _ => None,
@@ -1279,8 +1289,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             shape: receiver_shape,
         },
         true,
-    ) = (place.after, is_method(entry) && !struct_arithmetic)
-    {
+    ) = (
+        place.after,
+        is_method(entry) && !struct_arithmetic && !meets_other_fields,
+    ) {
         let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
@@ -1390,7 +1402,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
     }
     // What follows a struct by arithmetic keeps its shape and has no dtype the tables say.
-    if struct_arithmetic && let After::Value { shape: kept, .. } = place.after {
+    if (struct_arithmetic || meets_other_fields)
+        && let After::Value { shape: kept, .. } = place.after
+    {
         shape = kept;
     }
     // What the call says of what it gives, where the tables do not.
@@ -1613,6 +1627,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if struct_arithmetic {
         result = None;
         ending = Ending::NotKnown(Unknown::ArithmeticOnAStruct);
+    } else if meets_other_fields {
+        result = None;
+        ending = Ending::NotKnown(Unknown::StructsOfOtherFieldsMeet);
     }
     Ok(Allowance {
         result,
