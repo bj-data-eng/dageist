@@ -1447,6 +1447,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         && chosen.among_others > 0;
     // Each field is a predicate then, which must be a flag.
     if unnested_among_predicates
+        && matches!(
+            place.after,
+            After::Value {
+                shape: Shape::Many,
+                ..
+            }
+        )
         && let Some(field) = struct_gives.columns().and_then(|columns| {
             columns.iter().find(|field| {
                 field

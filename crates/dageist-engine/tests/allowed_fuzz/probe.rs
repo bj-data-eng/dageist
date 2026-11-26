@@ -514,6 +514,11 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         // A name that is no field is one Polars did not find, and a field named twice or names of
         // another number are refused in its own words.
         Source::Rule(rule) if *rule == FIELD_RULE => probe.contains(NOT_FOUND),
+        // The operation Polars does not do on a struct, or the field it cannot do it with.
+        Source::Rule(rule) if *rule == STRUCT_ARITHMETIC_RULE => {
+            probe.contains("operation not supported for dtype `struct")
+                || probe.contains("a struct with non-numeric field")
+        }
         Source::Rule(rule) if *rule == FIELD_NAMES_RULE || *rule == TO_STRUCT_NAMES_RULE => {
             probe.contains("multiple fields with name")
                 || probe.contains("different number of fields")
@@ -720,6 +725,7 @@ fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
                 || *rule == ZONE_RULE
                 || *rule == FIELD_RULE
                 || *rule == FIELD_NAMES_RULE
+                || *rule == STRUCT_ARITHMETIC_RULE
                 || COUNT_MEETING_RULES.contains(rule) =>
         {
             chain_probe(found)
@@ -757,6 +763,10 @@ const STRUCT_FILL_RULE: &str = "struct-is-filled-forward-or-backward";
 /// The rule that no two names alike be given to the fields of a struct a list or an array is made,
 /// which Polars accepts and, where it refuses the names, shows as it does for `FIELD_NAMES_RULE`.
 const TO_STRUCT_NAMES_RULE: &str = "to-struct-names-are-distinct";
+
+/// The rule that arithmetic with a struct needs its fields to be numbers, whose refusal Polars
+/// shows by the operation it does not do on a struct or by the field that is no number.
+const STRUCT_ARITHMETIC_RULE: &str = "struct-arithmetic-needs-numbers";
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.

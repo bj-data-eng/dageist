@@ -4319,9 +4319,15 @@ fn applies(
                     .any(|(_, held)| any_call(held, &is_a_condition_of_a_compared_struct))
                 && refused_when_the_predicates_are_true(case, refused) == Some(true)
         }
-        (Limit::AJoinKeyPolarsDoesNotRun, Disagreement::PolarsAllows(refused)) => {
+        (
+            Limit::AJoinKeyPolarsDoesNotRun,
+            Disagreement::PolarsAllows(refused) | Disagreement::RuleRefuses(refused),
+        ) => {
             is(step, "LazyFrame.join")
-                && matches!(refused.source, Source::Polars)
+                && matches!(
+                    refused.source,
+                    Source::Polars | Source::Rule("struct-arithmetic-needs-numbers")
+                )
                 && matches!(refused.place.path().first(),
                     Some(Segment::Parameter(name)) if ["on", "left_on", "right_on"].contains(&name.as_str()))
                 && refused_when_the_join_keeps_the_left_rows(case, refused) == Some(true)
