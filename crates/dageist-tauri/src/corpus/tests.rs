@@ -73,7 +73,9 @@ fn calls_of(document: &Document) -> Vec<&Call> {
     }
     let mut found = Vec::new();
     for step in document.steps() {
-        in_call(step.call(), &mut found);
+        for call in step.calls() {
+            in_call(call, &mut found);
+        }
     }
     found
 }
@@ -168,7 +170,7 @@ fn every_function_that_starts_a_chain_and_every_link_of_a_condition_is_held_wher
                     "{id} is not held in a condition where the engine allows it"
                 );
             }
-            Applies::Expression | Applies::Function | Applies::Frame => {}
+            Applies::Expression | Applies::Function | Applies::Frame | Applies::Grouped => {}
         }
     }
 }
@@ -223,13 +225,15 @@ fn every_context_where_the_engine_allows_a_method_holds_one() {
 
 #[test]
 fn every_step_of_the_catalogue_is_held() {
+    // A step is held by the call that makes it, and by the calls on a group by that follow `group_by`.
     let held_steps: HashSet<&str> = documents()
         .iter()
         .flat_map(|held| held.model.steps())
-        .map(|step| step.call().entry().id().as_str())
+        .flat_map(|step| step.calls())
+        .map(|call| call.entry().id().as_str())
         .collect();
     for entry in catalog::entries() {
-        if entry.applies() == Applies::Frame {
+        if entry.applies().is_of_a_step() {
             assert!(
                 held_steps.contains(entry.id().as_str()),
                 "no document holds a step {}",
@@ -330,8 +334,10 @@ fn starts_of(document: &Document, found: &mut HashSet<String>) {
         }
     }
     for step in document.steps() {
-        for given in step.call().arguments() {
-            in_value(given.value(), found);
+        for call in step.calls() {
+            for given in call.arguments() {
+                in_value(given.value(), found);
+            }
         }
     }
 }

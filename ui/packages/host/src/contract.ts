@@ -215,8 +215,11 @@ export interface ParameterView {
   readonly offered: boolean;
 }
 
-/** What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of `when`, `then` and `otherwise`. */
-export const APPLIES = ['expression', 'frame', 'function', 'condition'] as const;
+/**
+ * What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of
+ * `when`, `then` and `otherwise`, and `grouped` one call on a group by, after `group_by`.
+ */
+export const APPLIES = ['expression', 'frame', 'grouped', 'function', 'condition'] as const;
 
 /** What an entry is applied to. */
 export type AppliesView = (typeof APPLIES)[number];
@@ -579,6 +582,9 @@ export const OUTER_POSITIONS = [
   'join_left',
   'join_right',
   'pivot_aggregate',
+  'group_key',
+  'aggregate',
+  'having',
 ] as const;
 
 /** The position of a step that holds an expression. */
@@ -643,6 +649,9 @@ export const RULE_NAMES = [
   'struct-arithmetic-needs-numbers',
   'to-struct-names-are-distinct',
   'is-in-takes-a-list',
+  'having-gives-one-value',
+  'having-casts-to-boolean',
+  'grouped-names-are-distinct',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */
@@ -887,10 +896,16 @@ export type ArgumentView =
   | { readonly kind: 'pairs'; readonly entries: readonly PairsEntryView[] }
   | { readonly kind: 'many'; readonly items: readonly ArgumentView[] };
 
-/** One step of the document: its name, and the call it makes. */
+/**
+ * One step of the document: its name, and the call it makes. A step that groups makes `group_by`
+ * and holds the calls on the group by that follow it as its links, as an expression holds its
+ * links: at most one `having`, then the call that finishes the grouping. A step that does not
+ * group has none. A place in a link starts with a `link` segment.
+ */
 export interface DocumentStepView {
   readonly id: string;
   readonly call: CallView;
+  readonly links: readonly CallView[];
 }
 
 /** The steps of a document, in the order they run. */
@@ -963,6 +978,7 @@ export const WANTED = [
   'item',
   'entryPart',
   'link',
+  'groupCall',
   'expression',
   'list',
   'pairs',
@@ -1147,7 +1163,18 @@ export type EditRequest =
       readonly standing: PlaceRequest | null;
     }
   | { readonly kind: 'removeLink'; readonly link: EditPlace }
-  | { readonly kind: 'moveLink'; readonly link: EditPlace; readonly to: number };
+  | { readonly kind: 'moveLink'; readonly link: EditPlace; readonly to: number }
+  /** A call of a group by, such as `having`, put into a step that groups, as the `at`th after `group_by`. */
+  | {
+      readonly kind: 'insertGroupCall';
+      readonly step: EditPlace;
+      readonly at: number;
+      readonly entry: string;
+    }
+  /** A call after `group_by` made a call of another entry. */
+  | { readonly kind: 'swapGroupCall'; readonly call: EditPlace; readonly entry: string }
+  /** A call after `group_by` taken away. */
+  | { readonly kind: 'removeGroupCall'; readonly call: EditPlace };
 
 /**
  * Where a call would stand, as a request names it: the positions that hold

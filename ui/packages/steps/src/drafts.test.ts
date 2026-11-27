@@ -45,7 +45,10 @@ describe('a draft that is half done', () => {
   it('is kept when something elsewhere in the document changes, as a step added before its step', () => {
     // The place of a draft is the step by its name, so a step in front of it does not move it.
     const moved = {
-      steps: [{ id: 'new', call: { entry: 'LazyFrame.head', arguments: [] } }, ...document.steps],
+      steps: [
+        { id: 'new', call: { entry: 'LazyFrame.head', arguments: [] }, links: [] },
+        ...document.steps,
+      ],
     };
 
     expect(stillWanted(moved, item('sort', [parameterSegment('by')]))).toBe(true);

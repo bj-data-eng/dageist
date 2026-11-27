@@ -501,11 +501,117 @@ fn every_edit_the_engine_makes_is_a_request_the_host_reads() {
         json!({ "kind": "swapLink", "link": step_place(0, "sort"), "entry": "Expr.abs", "standing": null }),
         json!({ "kind": "removeLink", "link": step_place(0, "sort") }),
         json!({ "kind": "moveLink", "link": step_place(0, "sort"), "to": 0 }),
+        json!({ "kind": "insertGroupCall", "step": step_place(0, "sort"), "at": 0, "entry": "LazyGroupBy.having" }),
+        json!({ "kind": "swapGroupCall", "call": step_place(0, "sort"), "entry": "LazyGroupBy.sum" }),
+        json!({ "kind": "removeGroupCall", "call": step_place(0, "sort") }),
     ];
     for request in requests {
         serde_json::from_value::<EditRequest>(request.clone())
             .unwrap_or_else(|error| panic!("{request}: {error}"));
     }
+}
+
+/// A grouping of the documents by `document_id` that counts the rows of each group.
+fn grouped_text() -> String {
+    json!({ "version": 1, "steps": [
+        { "id": "group_by", "call": { "entry": "LazyFrame.group_by", "arguments": {
+            "by": { "many": [column("document_id")] }
+        } }, "then": [
+            { "entry": "LazyGroupBy.len", "arguments": { "name": { "string": "rows" } } }
+        ] }
+    ] })
+    .to_string()
+}
+
+#[test]
+fn a_step_that_groups_is_sent_with_the_calls_after_group_by_and_a_step_that_does_not_with_none() {
+    let sent = state(&documents_of(&grouped_text()));
+    let step = &sent["document"]["steps"][0];
+    assert_eq!(step["call"]["entry"], "LazyFrame.group_by");
+    // The calls after group_by are sent as the links of an expression are, in order.
+    assert_eq!(
+        step["links"],
+        json!([{ "entry": "LazyGroupBy.len", "arguments": [
+            { "parameter": "name", "value": { "kind": "string", "value": "rows" } }
+        ] }])
+    );
+    // The run names the table the chain gives.
+    let run = &sent["run"]["steps"][0];
+    assert_eq!(run["outcome"]["status"], "valid");
+    let sorted = state(&documents_of(&small_text()));
+    assert_eq!(sorted["document"]["steps"][0]["links"], json!([]));
+}
+
+#[test]
+fn the_calls_after_group_by_are_edited_by_their_places_in_the_step() {
+    let documents = documents_of(&grouped_text());
+    // A having goes in before the call that finishes the grouping, started by the engine.
+    let answer = edit(
+        documents_clone(&documents),
+        1,
+        json!({ "kind": "insertGroupCall", "step": step_place(0, "group_by"),
+            "at": 0, "entry": "LazyGroupBy.having" }),
+    )
+    .expect("an answer");
+    assert_eq!(answer["status"], "edited");
+    assert_eq!(answer["revision"], 2);
+    let links = answer["document"]["steps"][0]["links"]
+        .as_array()
+        .expect("links");
+    let entries: Vec<&str> = links
+        .iter()
+        .filter_map(|link| link["entry"].as_str())
+        .collect();
+    assert_eq!(entries, ["LazyGroupBy.having", "LazyGroupBy.len"]);
+    // The step is incomplete, for the test of the having is still to be picked.
+    assert_eq!(answer["run"]["steps"][0]["outcome"]["status"], "incomplete");
+    // The call that finishes the grouping is swapped for another, which keeps nothing of the first
+    // that it has no parameter for.
+    let answer = edit(
+        documents_clone(&documents),
+        1,
+        json!({ "kind": "swapGroupCall",
+            "call": place(0, "group_by", json!([{ "kind": "link", "index": 0 }])),
+            "entry": "LazyGroupBy.sum" }),
+    )
+    .expect("an answer");
+    assert_eq!(answer["status"], "edited");
+    assert_eq!(
+        answer["document"]["steps"][0]["links"],
+        json!([{ "entry": "LazyGroupBy.sum", "arguments": [] }])
+    );
+    // An argument of a call after group_by is set at the place of the call.
+    let answer = edit(
+        documents_clone(&documents),
+        1,
+        json!({ "kind": "setArgument",
+            "place": place(0, "group_by", json!([
+                { "kind": "link", "index": 0 }, { "kind": "parameter", "name": "name" }
+            ])),
+            "value": { "kind": "string", "value": "count" } }),
+    )
+    .expect("an answer");
+    assert_eq!(
+        answer["document"]["steps"][0]["links"][0]["arguments"][0]["value"],
+        json!({ "kind": "string", "value": "count" })
+    );
+    // Taking away the call that finishes the grouping leaves it unfinished, which is refused.
+    let refused = edit(
+        documents_clone(&documents),
+        1,
+        json!({ "kind": "removeGroupCall",
+            "call": place(0, "group_by", json!([{ "kind": "link", "index": 0 }])) }),
+    )
+    .expect("an answer");
+    assert_eq!(refused["status"], "refused");
+    assert_eq!(refused["revision"], 1);
+    assert_eq!(refused["problem"]["kind"], "refused");
+    assert!(
+        refused["message"]
+            .as_str()
+            .is_some_and(|words| words.contains("needs a call that finishes it")),
+        "{refused}"
+    );
 }
 
 #[test]

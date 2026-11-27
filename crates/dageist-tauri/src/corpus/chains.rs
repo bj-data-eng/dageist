@@ -332,7 +332,7 @@ pub(super) fn entry_cases(
                     functions.push(function_starts(planner, id, context));
                 }
             }
-            Applies::Frame => {}
+            Applies::Frame | Applies::Grouped => {}
         }
     }
     (cases, functions)
@@ -812,7 +812,7 @@ pub(super) fn parameter_cases(planner: &mut Planner<'_>, coverage: &mut Coverage
                 let call = hosted.at.then(Segment::Start);
                 with_all_parameters(&filled(&document), &call, Outer::Select)
             }
-            Applies::Frame => continue,
+            Applies::Frame | Applies::Grouped => continue,
         };
         for parameter in missing {
             coverage.parameters.insert((id, parameter));

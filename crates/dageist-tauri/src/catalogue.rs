@@ -282,6 +282,8 @@ struct ParameterView {
 enum AppliesView {
     Expression,
     Frame,
+    /// A call on a group by, after `group_by`: `having`, or one that finishes the grouping.
+    Grouped,
     Function,
     /// One link of `when`, `then` and `otherwise`.
     Condition,
@@ -358,6 +360,7 @@ const fn applies_view(applies: Applies) -> AppliesView {
     match applies {
         Applies::Expression => AppliesView::Expression,
         Applies::Frame => AppliesView::Frame,
+        Applies::Grouped => AppliesView::Grouped,
         Applies::Function => AppliesView::Function,
         Applies::Condition => AppliesView::Condition,
     }
@@ -995,6 +998,7 @@ mod tests {
                 "pieces",
                 "search",
                 "window",
+                "grouped",
                 "compare",
                 "checks",
                 "logic",

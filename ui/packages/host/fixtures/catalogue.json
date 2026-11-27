@@ -61,6 +61,10 @@
       "title": "Window"
     },
     {
+      "key": "grouped",
+      "title": "Grouped · filter the groups, finish the grouping"
+    },
+    {
       "key": "compare",
       "title": "Comparison · true or false"
     },
@@ -7686,6 +7690,84 @@
       ]
     },
     {
+      "id": "LazyFrame.group_by",
+      "applies": "frame",
+      "family": "steps",
+      "name": "group_by",
+      "hint": "the rows gathered into groups by some keys, and a value for each group",
+      "head": "Group table",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "group by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": {
+            "kind": "outer",
+            "name": "group_key"
+          },
+          "offered": true
+        },
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order of the groups",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "named_by",
+          "shown": "named_by",
+          "label": "named keys",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": {
+            "kind": "outer",
+            "name": "group_key"
+          },
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "LazyFrame.head",
       "applies": "frame",
       "family": "steps",
@@ -8749,6 +8831,401 @@
             "kind": "integer",
             "value": 0,
             "shown": "0"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.agg",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "agg",
+      "hint": "one value for each group from a chain that aggregates, and a list of its values for each group from one that does not",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "aggs",
+          "shown": "aggs",
+          "label": "values for each group",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": {
+            "kind": "outer",
+            "name": "aggregate"
+          },
+          "offered": true
+        },
+        {
+          "name": "named_aggs",
+          "shown": "named_aggs",
+          "label": "named values for each group",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": {
+            "kind": "outer",
+            "name": "aggregate"
+          },
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.all",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "all",
+      "hint": "the values of each group in a list, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.first",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "first",
+      "hint": "the first value of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.having",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "having",
+      "hint": "only the groups for which every condition holds",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions on the group",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "position": {
+            "kind": "outer",
+            "name": "having"
+          },
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.head",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "head",
+      "hint": "the first rows of each group",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows of each group",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.last",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "last",
+      "hint": "the last value of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.len",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "len",
+      "hint": "the number of rows of each group",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "name",
+          "shown": "name",
+          "label": "name of the count",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.max",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "max",
+      "hint": "the largest value of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.mean",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "mean",
+      "hint": "the mean of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.median",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "median",
+      "hint": "the median of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.min",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "min",
+      "hint": "the smallest value of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.n_unique",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "n_unique",
+      "hint": "how many different values each group has, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.quantile",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "quantile",
+      "hint": "the value a share of each group falls below, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "quantile",
+          "shown": "quantile",
+          "label": "share from 0 to 1",
+          "kind": {
+            "kind": "value",
+            "type": "float"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "interpolation",
+          "shown": "interpolation",
+          "label": "between two values",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "nearest",
+                "shown": "nearest"
+              },
+              {
+                "word": "higher",
+                "shown": "higher"
+              },
+              {
+                "word": "lower",
+                "shown": "lower"
+              },
+              {
+                "word": "midpoint",
+                "shown": "midpoint"
+              },
+              {
+                "word": "linear",
+                "shown": "linear"
+              },
+              {
+                "word": "equiprobable",
+                "shown": "equiprobable"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "nearest"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "nearest"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyGroupBy.sum",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "sum",
+      "hint": "the sum of each group, for every column that is not a key",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyGroupBy.tail",
+      "applies": "grouped",
+      "family": "grouped",
+      "name": "tail",
+      "hint": "the last rows of each group",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows of each group",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
           },
           "position": null,
           "offered": true

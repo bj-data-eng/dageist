@@ -66,6 +66,7 @@ describe('the catalogue the host sends', () => {
       'pieces',
       'search',
       'window',
+      'grouped',
       'compare',
       'checks',
       'logic',
@@ -238,7 +239,7 @@ describe('the catalogue the host sends', () => {
   it('is refused where an entry names an applies the engine does not have', () => {
     const at0 = entryAt(catalogue, 'Expr.shift');
     expect(refusal(replaced(catalogue, ['entries', at0, 'applies'], 'method')).message).toBe(
-      `$.entries[${String(at0)}].applies: must be one of "expression", "frame", "function", "condition", not "method"`,
+      `$.entries[${String(at0)}].applies: must be one of "expression", "frame", "grouped", "function", "condition", not "method"`,
     );
   });
 

@@ -319,6 +319,9 @@ const fn starts_a_chain(build: Build) -> bool {
         Build::Function(_) | Build::Condition(_) => true,
         Build::Expression(_)
         | Build::Frame(_)
+        | Build::Grouping(_)
+        | Build::GroupedStep(_)
+        | Build::GroupedEnd(_)
         | Build::ConditionStep(_)
         | Build::ConditionEnd(_) => false,
     }
@@ -783,6 +786,7 @@ fn wanted() -> Vec<WantedView> {
         Item => [WantedView::Item],
         EntryPart => [WantedView::EntryPart],
         Link => [WantedView::Link],
+        GroupCall => [WantedView::GroupCall],
         Expression => [WantedView::Expression],
         List => [WantedView::List],
         Pairs => [WantedView::Pairs],

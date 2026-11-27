@@ -22,6 +22,9 @@
       "entry": "LazyFrame.gather_every"
     },
     {
+      "entry": "LazyFrame.group_by"
+    },
+    {
       "entry": "LazyFrame.head"
     },
     {

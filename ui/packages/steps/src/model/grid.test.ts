@@ -38,11 +38,11 @@ const found = findGaps(grid, catalogue, STARTS, grid.contexts);
 
 describe('the places the engine was asked about', () => {
   it('are every context, and for each of them nothing, each dtype in three shapes, and each state of a condition', () => {
-    // Six positions of a step, alone and with each of four positions inside an expression.
-    expect(grid.contexts).toHaveLength(30);
+    // Nine positions of a step, alone and with each of four positions inside an expression.
+    expect(grid.contexts).toHaveLength(45);
     // Nothing; sixty-seven classes of dtypes, each of one value, of many and of a count; four states of a condition.
     expect(grid.afters).toHaveLength(1 + 67 * 3 + 4);
-    expect(found.cells).toBe(30 * 206);
+    expect(found.cells).toBe(45 * 206);
     // The classes are the 26 the tables hold lines for, and the lists and arrays of each of 22 scalar
     // dtypes besides, which the view reads by the names the engine writes them with.
     const classes = new Set(
@@ -168,7 +168,7 @@ describe('the starts that are typed in', () => {
 
 describe('the grid, run through the functions the components call', () => {
   it('runs every cell of the grid', () => {
-    expect(found.cells).toBe(30 * 206);
+    expect(found.cells).toBe(45 * 206);
   });
 
   it('finds the gaps that are declared, and no gap that is not declared', () => {
@@ -218,7 +218,8 @@ describe('the grid, run through the functions the components call', () => {
 
   it('finds a further case of a condition in the 24 contexts where the engine allows one', () => {
     // The engine allows the links of a further case in every context but the keys of a window in a
-    // join key or a pivot's aggregate, 24 of the 30; each shows in one place of each.
+    // join key or a pivot's aggregate, 24 of the 30 that the editor draws; each shows in one place of
+    // each. The 15 of a step that groups are not drawn, and are one gap each.
     for (const id of [
       'ChainedThen.otherwise',
       'ChainedThen.when',
@@ -246,11 +247,18 @@ describe('the grid, run through the functions the components call', () => {
     ]);
   });
 
-  it('finds no kind of parameter without a drawing and no place that no word stands at', () => {
+  it('finds no kind of parameter without a drawing and no place that no word stands at but the 15 of a step that groups', () => {
     expect([...found.gaps.values()].filter((gap) => gap.cover.kind === 'parameterKind')).toEqual(
       [],
     );
-    expect([...found.gaps.values()].filter((gap) => gap.cover.kind === 'place')).toEqual([]);
+    // The keys, the aggregates and the having of a step that groups are not drawn yet, each alone and
+    // inside each of the four nested positions.
+    const places = [...found.gaps.values()].flatMap((gap) =>
+      gap.cover.kind === 'place' ? [gap.cover.outer] : [],
+    );
+    expect(sorted(places)).toEqual(
+      sorted(['group_key', 'aggregate', 'having'].flatMap((outer) => Array<string>(5).fill(outer))),
+    );
   });
 });
 
@@ -316,7 +324,8 @@ describe('a gap that is found and not declared, or declared and not found', () =
     };
     const run = findGaps(grid, sparse, STARTS, grid.contexts);
 
-    expect([...run.gaps.values()].filter((gap) => gap.cover.kind === 'place')).toHaveLength(5);
+    // The five of the filter position, and the fifteen of a step that groups, which are not drawn.
+    expect([...run.gaps.values()].filter((gap) => gap.cover.kind === 'place')).toHaveLength(20);
     expect(run.gaps.has('place filter alone')).toBe(true);
     expect(run.gaps.has('place filter over.order_by')).toBe(true);
   });

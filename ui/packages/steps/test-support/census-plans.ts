@@ -518,6 +518,7 @@ function saidOf(run: RunView): ReturnType<typeof sayingOf> {
   const steps = run.steps.map((step) => ({
     id: step.id,
     call: { entry: 'LazyFrame.select', arguments: [] },
+    links: [],
   }));
   const last = prepareRun(steps, run).steps.at(-1);
   if (last === undefined) throw new Error('the run has no step');

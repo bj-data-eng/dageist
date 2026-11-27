@@ -11,7 +11,7 @@
 //!
 //! One command takes every edit, tagged by its kind, so that the check of the revision,
 //! the run of the edited document and the answer are written once, not for each of the
-//! nineteen edits the engine makes.
+//! twenty-two edits the engine makes.
 //!
 //! The document the view receives is not its JSON text: it is a tree of the calls the
 //! document holds, with the words the engine shows each number as, so that the view
@@ -109,11 +109,13 @@ pub enum ArgumentView {
     Many { items: Vec<ArgumentView> },
 }
 
-/// One step of the document.
+/// One step of the document: its call, and, for a step that groups, the calls on the group by that
+/// follow `group_by`, which an expression holds as its links. A step that does not group has none.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StepView {
     id: String,
     call: CallView,
+    links: Vec<CallView>,
 }
 
 /// The steps of a document, in the order they run.
@@ -199,6 +201,7 @@ pub fn document_view(document: &Document) -> DocumentView {
             .map(|step| StepView {
                 id: step.id().as_str().to_owned(),
                 call: call_view(step.call()),
+                links: step.links().iter().map(call_view).collect(),
             })
             .collect(),
     }
@@ -451,6 +454,16 @@ pub(crate) enum EditRequest {
     RemoveLink { link: EditPlace },
     /// A link moved to the position `to`.
     MoveLink { link: EditPlace, to: usize },
+    /// A call of a group by, such as `having`, put into a step that groups.
+    InsertGroupCall {
+        step: EditPlace,
+        at: usize,
+        entry: String,
+    },
+    /// A call of a group by made a call of another entry.
+    SwapGroupCall { call: EditPlace, entry: String },
+    /// A call of a group by taken away.
+    RemoveGroupCall { call: EditPlace },
 }
 
 fn bad_place(error: impl std::fmt::Display) -> ErrorView {
@@ -539,6 +552,11 @@ impl EditRequest {
             } => document.swap_link(&place(link)?, entry, standing(at_place)?.as_ref()),
             Self::RemoveLink { link } => document.remove_link(&place(link)?),
             Self::MoveLink { link, to } => document.move_link(&place(link)?, *to),
+            Self::InsertGroupCall { step, at, entry } => {
+                document.insert_group_call(&place(step)?, *at, entry)
+            }
+            Self::SwapGroupCall { call, entry } => document.swap_group_call(&place(call)?, entry),
+            Self::RemoveGroupCall { call } => document.remove_group_call(&place(call)?),
         })
     }
 }
@@ -675,6 +693,7 @@ pub(crate) enum WantedView {
     Item,
     EntryPart,
     Link,
+    GroupCall,
     Expression,
     List,
     Pairs,
@@ -689,6 +708,7 @@ const fn wanted_view(wanted: Wanted) -> WantedView {
         Wanted::Item => WantedView::Item,
         Wanted::EntryPart => WantedView::EntryPart,
         Wanted::Link => WantedView::Link,
+        Wanted::GroupCall => WantedView::GroupCall,
         Wanted::Expression => WantedView::Expression,
         Wanted::List => WantedView::List,
         Wanted::Pairs => WantedView::Pairs,
@@ -699,13 +719,14 @@ const fn wanted_view(wanted: Wanted) -> WantedView {
 #[cfg(test)]
 impl WantedView {
     /// Every word, in the order the contract lists them, for the vocabulary snapshot.
-    pub(crate) const ALL: [Self; 10] = [
+    pub(crate) const ALL: [Self; 11] = [
         Self::Call,
         Self::Argument,
         Self::Parameter,
         Self::Item,
         Self::EntryPart,
         Self::Link,
+        Self::GroupCall,
         Self::Expression,
         Self::List,
         Self::Pairs,

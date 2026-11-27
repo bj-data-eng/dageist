@@ -34,7 +34,11 @@ function stepOf(run: PreparedRun, id: string): PreparedStep {
 
 /** Steps with these names, which is all a report of them needs of the document. */
 function named(...ids: string[]): DocumentStepView[] {
-  return ids.map((id) => ({ id, call: { entry: 'DataFrame.select', arguments: [] } }));
+  return ids.map((id) => ({
+    id,
+    call: { entry: 'DataFrame.select', arguments: [] },
+    links: [],
+  }));
 }
 
 /** The way to the expression a column is made from, in a `with_columns`. */
