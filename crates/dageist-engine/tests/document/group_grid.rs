@@ -601,7 +601,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 17] = [
+const PREDICATES: [&str; 18] = [
     "the values",
     "all null",
     "first",
@@ -619,6 +619,7 @@ const PREDICATES: [&str; 17] = [
     "first then head 1",
     "first then sort",
     "literal null then drop_nulls",
+    "a condition of one value twice",
 ];
 
 fn predicate_of(column: &Col, form: &str) -> Value {
@@ -654,6 +655,24 @@ fn predicate_of(column: &Col, form: &str) -> Value {
             ],
         ),
         "first then sort" => of(column, vec![one("Expr.first"), one("Expr.sort")]),
+        // Polars may drop the predicate of a select where both values are the one value, and does
+        // not where a group evaluates it: what it gives is a list for each group.
+        "a condition of one value twice" => crate::support::chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![of(column, vec![one("Expr.is_null")])]) }),
+            ),
+            vec![
+                call(
+                    "When.then",
+                    json!({ "statement": lit(json!({ "flag": true })) }),
+                ),
+                call(
+                    "Then.otherwise",
+                    json!({ "statement": lit(json!({ "flag": true })) }),
+                ),
+            ],
+        ),
         "literal null then drop_nulls" => crate::support::chain(
             call("polars.lit", json!({ "value": { "flag": null } })),
             vec![one("Expr.drop_nulls")],
