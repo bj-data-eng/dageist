@@ -621,7 +621,7 @@ fn shortcuts_known() -> Vec<Known> {
             Known::new(
                 Kind::PolarsRefusesOnly,
                 Pattern::new().is("shortcut", shortcut),
-                "Polars refuses a share outside 0 to 1 as it builds the step, and the walk reads no number of a share, so only the run says so",
+                "Polars refuses a share outside 0 to 1 as it builds the step, and the walk reads no number of a share, so only the run says so (the values no table holds are tracked by #224)",
             )
             .saying("should be between")
         })

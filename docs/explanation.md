@@ -2286,24 +2286,37 @@ and its aggregates, are named differently, whether by the name a pair gives them
 chain reads, and `grouped-names-are-distinct` refuses two of one name, as Polars does when it works out
 the schema.
 
-A focused campaign draws the step where `DAGEIST_FUZZ_FOCUS` names `LazyFrame.group_by`, and no campaign
-without a focus does. A disagreement of a step that groups is excused by the limits that excuse the same
-expression alone in a `select`, where that disagrees the same way, for the limits are about what an
-expression is given and not where it stands. A campaign of 8000 cases so focused, at two seeds, leaves
-disagreements that nothing excuses. They are open, and of these kinds:
+The keys of a group by are met as the items of a `select` are: a key that takes some of the values, as
+`head` and `filter` do, and a key that drops the nulls or the NaNs it reads, as `drop_nulls` does, give a count the
+arguments or the data decide, so Polars refuses them beside a key of another length. Where `maintain_order` keeps
+the order of the groups, `kept-order-needs-keys-of-the-rows` refuses such a key alone too, for Polars fails it
+when the rows run unless by chance its count is one or the rows': the rule is stricter by design where a sample
+makes it so, as the counts of a select are. A step with no key, and one with no aggregate, are what Polars says:
+a table of one row for `len`, and the keys alone for an empty `agg`.
 
-- a key that drops the values it reads, as `drop_nulls` does, where `maintain_order` keeps the order of the
-  groups: Polars refuses it for lengths that differ where the table holds a null, and the tables measured
-  the key with the default order;
-- a replacement given old and new values that are the values of the group, which Polars does not yet
-  implement in an aggregate or a `having`, though it does in a select;
-- a null literal of a dtype that Polars cannot cast, followed by an aggregate that keeps it null, as a
-  predicate of a `having`: the rule judges the dtype of the chain, where Polars casts the nulls;
-- a method of numbers or of comparison given a null literal or a column of `Null` in an aggregate, where the
-  tables measured the context with columns and Polars refuses it, or allows it, as it does not in the
-  tables' line;
-- the share of `quantile` given a value outside 0 to 1, which Polars reads as it builds the step and the
-  tables do not hold, as they do not for the share of any method.
+A call on a group by says what it is in the catalogue view, `having` or one that finishes the grouping, so the
+editor does not key on the identifier of an entry.
+
+A focused campaign draws the step where `DAGEIST_FUZZ_FOCUS` names `LazyFrame.group_by`, and no campaign
+without a focus does. What it finds is settled, by a fix or by a limit that names why, in these ways:
+
+- An expression of a group by that disagrees as it does alone in a `select`, at the same stage and for the
+  same reason, is excused by the limits that excuse it there.
+- What Polars does with the values of each group, where it runs a pivot's aggregate and the aggregate and
+  the `having` of a group by with kernels of their own, is one limit, `a-group-aggregate`: the empty table has no
+  groups and an operation on the values of none is refused for a dtype; a replacement that lists the values of a group
+  is not yet implemented by Polars for each row, which its own message says, and a strict one finds its mapping
+  incomplete as it runs them; a window partitioned by a column and a comparison that the tables measured with
+  the rows' columns are accepted. Its cause is not the typed null literal that #228 tracks: it is where the
+  expression is evaluated, and the nulls it shows in the tables' empty runs are the empty groups'.
+- A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
+- A key that drops values, and the keys a count of which is the data's, are stricter by design, as counts are.
+
+Seeds 1140027 and 2718281 of 8000 cases, focused so, end with no disagreement. Two more, 3141592 and 5772156,
+leave three each, which no fix or limit settles yet, of these kinds: a window of a literal that explodes, which
+Polars gives a list for each group where the walk says one value; a null that a call makes of one value, as the
+difference of one value or a date made with a null part is, which a `having` casts as it casts any null; and a
+condition in the predicate of a condition, in an aggregate, whose one value the walk gives a list.
 
 A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
 the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the
@@ -3185,14 +3198,15 @@ helper: a receiver of every dtype crossed with every form of what it looks up in
 key.
 
 `tests/document/group_grid.rs` holds the grids of [a step that groups](#the-step-that-groups), on the same
-helper, over a table with a column of every class and two to group by: a key of every class in twelve
-forms (a column, a named key, an expression, an aggregate, a literal, a window, two of one name) with
+helper, over a table with a column of every class and two to group by: a key of every class in eighteen
+forms (a column, a named key, an expression, an aggregate, a literal, a window, two of one name, what takes some of the values and two keys of other lengths) with
 `maintain_order` unset, true and false; every method of the family of aggregates, and the first, the last
 and the gathering of the values, in `agg`, over every class, by position and by name; what does not aggregate
 in `agg`, over every class; every shortcut with each of its options over every class, grouped by another
-column and by the one it aggregates; a `having` predicate of every class in twenty-three forms (the values
-of the group, an aggregate, a literal, what takes some of the values of one value, a condition and a null of each
-kind of dtype), none, one or two of them; and the chains
+column and by the one it aggregates; a `having` predicate of every class in thirty-five forms (the values
+of the group, an aggregate, a literal, what takes some of the values of one value, a condition, a null of each
+kind of dtype and what keeps it null), none, one or two of them; a group by of no key, one and two, finished by a
+count, an empty `agg`, an aggregate of a count and `head`; and the chains
 that do not end in one finishing call, which the document refuses before Polars is asked. What the grids
 leave is named in the test with its reason: the reverse of an array whose element Polars panics on, on a
 thread of its own that no test can catch, the element dtypes the tables do not measure, what a select refuses
