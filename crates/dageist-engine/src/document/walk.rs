@@ -4304,14 +4304,20 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
 /// alone: what comes before the last that does is not evaluated. A side that is more is
 /// evaluated, and what it holds counts.
 fn holds_what_polars_evaluates(expression: &Expression, is_held: &dyn Fn(&Call) -> bool) -> bool {
-    // Polars folds the values of literals gathered into a list into a literal, which is no aggregate
-    // of the key where it stands: `a.is_in(lit(1).implode())` is elementwise.
-    let from_a_literal = matches!(
-        expression.start(),
-        Start::Call(start) if start.entry().id().as_str() == "polars.lit"
-    );
+    // Polars folds a literal gathered into a list into a literal, which is no aggregate of the key
+    // where it stands: `a.is_in(lit(1).implode())` is elementwise. It does not fold what a method
+    // made of the literal first, as `lit(1).abs().implode()`, which is one.
+    let folded = match (expression.start(), expression.links().first()) {
+        (Start::Call(start), Some(first))
+            if start.entry().id().as_str() == "polars.lit"
+                && first.entry().id().as_str() == "Expr.implode" =>
+        {
+            Some(first)
+        }
+        _ => None,
+    };
     let evaluated = |call: &Call| {
-        (is_held(call) && !(from_a_literal && call.entry().id().as_str() == "Expr.implode"))
+        (is_held(call) && !folded.is_some_and(|gathered| std::ptr::eq(gathered, call)))
             || operands(call)
                 .into_iter()
                 .any(|operand| holds_what_polars_evaluates(operand, is_held))

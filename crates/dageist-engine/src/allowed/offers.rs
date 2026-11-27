@@ -14,7 +14,7 @@ use super::fields::{self, Fields, Gives, Input};
 use super::rules::Rule;
 use super::table::{
     Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables, has_a_subject,
-    is_method, is_of_nested_dtypes, read_as, restored, subject_of,
+    is_method, is_of_nested_dtypes, measured_classes, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -847,7 +847,14 @@ fn on_receiver(
         }
         let mut refusal: Option<Refusal> = None;
         let mut fitting: Vec<Fit> = Vec::new();
-        for argument in Representative::MEASURED {
+        // `is_in` looks a value up in a list of its own dtype, whose class is one of the core lists
+        // that it is measured on, besides the lists the other methods are given.
+        let tried: &[Representative] = if id == "Expr.is_in" {
+            measured_classes(id)
+        } else {
+            &Representative::MEASURED
+        };
+        for argument in tried.iter().copied() {
             match line(Some(parameter), Some(argument)) {
                 Ok(found) => fitting.push(found),
                 // The first refusal is the one told, but not the rule that asks for a list, which

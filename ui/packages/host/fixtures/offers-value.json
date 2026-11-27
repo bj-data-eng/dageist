@@ -2054,13 +2054,11 @@
     {
       "entry": "Expr.is_in",
       "verdict": {
-        "kind": "refused",
-        "refusal": {
-          "source": {
-            "by": "polars",
-            "stage": "schema"
-          },
-          "reason": "'is_in' cannot check for Datetime('μs') values in List(Int64) data"
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
