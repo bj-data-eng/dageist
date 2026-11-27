@@ -888,7 +888,19 @@ fn predicate_case(point: &Predicated) -> Result<Case, String> {
 }
 
 fn predicates_known() -> Vec<Known> {
-    Vec::new()
+    ["List(", "Array("]
+        .into_iter()
+        .map(|prefix| {
+            Known::new(
+                Kind::WalkRefusesOnly,
+                Pattern::new()
+                    .is("predicate", "the first, diff")
+                    .starts("class", prefix),
+                "the tables do not measure diff on a list or an array of that element dtype, which Polars may panic on, so the rule element-dtype-is-measured leaves it out, though the difference of one value is a null that a having casts",
+            )
+            .saying("rule element-dtype-is-measured")
+        })
+        .collect()
 }
 
 #[test]

@@ -2569,6 +2569,16 @@ impl Walker<'_> {
         // Whether a link unnests a struct that has no field: it gives no expression, and what
         // follows it is none either.
         let mut gives_no_expression = false;
+        // Whether the value the chain has so far is a null: a null literal, a moment made with a
+        // null part, and a condition whose values are all nulls are, and what keeps a null keeps it.
+        let mut null_so_far = starts_from_a_null(expression)
+            || starts_from_a_moment_with_a_null_part(expression)
+            || (matches!(expression.start(), Start::Call(start)
+                if start.entry().id().as_str() == "polars.when")
+                && !statements.is_empty()
+                && statements.iter().all(|statement| {
+                    starts_from_a_null(statement) && statement.links().iter().all(keeps_a_null)
+                }));
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let none_before_the_arguments = self.gave_no_expression;
@@ -2621,6 +2631,12 @@ impl Walker<'_> {
             gives_no_expression |= link.entry().id().as_str() == "Expr.struct.unnest"
                 && fields_followed.as_ref().is_some_and(Fields::is_empty);
             let name_before = name.clone();
+            // The difference of one value is a null, as nothing comes before it.
+            let null_kept = (null_so_far
+                && (keeps_a_null(link) || link.entry().applies() == Applies::Condition))
+                || (link.entry().id().as_str() == "Expr.diff"
+                    && receiver_shape == Some(Shape::One));
+            null_so_far = null_kept;
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -2637,16 +2653,7 @@ impl Walker<'_> {
                     fields,
                     from_a_list,
                     output_name: name_before.as_deref(),
-                    null_kept: (starts_from_a_null(expression)
-                        && expression.links()[..=at].iter().all(keeps_a_null))
-                        // A condition whose values are all nulls gives a null.
-                        || (matches!(expression.start(), Start::Call(start)
-                            if start.entry().id().as_str() == "polars.when")
-                            && !statements.is_empty()
-                            && statements.iter().all(|statement| {
-                                starts_from_a_null(statement)
-                                    && statement.links().iter().all(keeps_a_null)
-                            })),
+                    null_kept,
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -4751,6 +4758,18 @@ fn keeps_a_null(link: &Call) -> bool {
             | "Expr.kurtosis"
             | "Expr.sort"
             | "Expr.reverse"
+            | "Expr.diff"
+    )
+}
+
+/// Whether an expression starts from a function that makes a moment of parts, one of which is a
+/// null literal: the moment is a null.
+fn starts_from_a_moment_with_a_null_part(expression: &Expression) -> bool {
+    matches!(
+        expression.start(),
+        Start::Call(start)
+            if matches!(start.entry().id().as_str(), "polars.date" | "polars.datetime" | "polars.time")
+                && operands(start).into_iter().any(is_a_null)
     )
 }
 
