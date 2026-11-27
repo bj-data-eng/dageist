@@ -391,6 +391,33 @@ static WORLD: LazyLock<World> = LazyLock::new(|| {
             });
         }
     }
+    // A literal that a call is made of, and then gathered: Polars folds some of these into a literal,
+    // which a join's key may hold, and not others.
+    let whole = typed_literal(Representative::Int64).expect("a whole number typed in");
+    let made = |links: Vec<Value>| chain(whole.clone(), links);
+    let cast = || call("Expr.cast", json!({ "dtype": { "dtype": "Int64" } }));
+    let list = gathered(&DataType::Int64);
+    for (what, links) in [
+        ("cast", vec![cast(), implode()]),
+        ("cast twice", vec![cast(), cast(), implode()]),
+        (
+            "added to a literal",
+            vec![
+                call("Expr.add", json!({ "other": chain(whole.clone(), vec![]) })),
+                implode(),
+            ],
+        ),
+        (
+            "made absolute",
+            vec![call("Expr.abs", json!({})), implode()],
+        ),
+    ] {
+        forms.push(Form {
+            label: labelled(&list, &format!("a literal {what}, imploded")),
+            other: made(links),
+            list: None,
+        });
+    }
     forms.push(Form {
         label: labelled(&DataType::Null, "a null"),
         other: chain(
