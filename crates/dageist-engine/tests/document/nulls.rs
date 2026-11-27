@@ -1657,14 +1657,14 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
     verdicts.assert_agree(
         &[
             Known::new(
-                Kind::SetAside,
+                Kind::BuildRefusesOnly,
                 Pattern::new(),
                 "the value does not fit the dtype it is given, so the catalogue builds no literal \
                  to compare and the step engine refuses the step before the walk is asked",
             )
             .saying("conversion from"),
             Known::new(
-                Kind::SetAside,
+                Kind::BuildRefusesOnly,
                 Pattern::new(),
                 "a text is given the dtype Boolean, which Polars cannot cast a text to, so the \
                  step engine refuses the step when it builds the literal",

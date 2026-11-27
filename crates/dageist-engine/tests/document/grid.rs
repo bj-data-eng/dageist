@@ -455,6 +455,10 @@ pub enum Outcome {
     /// The walk panicked.
     WalkPanicked(String),
     Unbuildable(String),
+    /// The catalogue refuses to build the step, which the step engine refuses before the walk is
+    /// asked, and the walk allows it: a literal whose value does not cast to its dtype, a count
+    /// the catalogue takes in a narrower range than Python does.
+    BuildRefusesOnly(String),
     /// Polars refused it for another reason than the one the grid asks about.
     SetAside(String),
 }
@@ -468,17 +472,19 @@ pub enum Kind {
     PolarsRefusesOnly,
     WalkPanicked,
     Unbuildable,
+    BuildRefusesOnly,
     SetAside,
 }
 
 impl Kind {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::BothAllow,
         Self::BothRefuse,
         Self::WalkRefusesOnly,
         Self::PolarsRefusesOnly,
         Self::WalkPanicked,
         Self::Unbuildable,
+        Self::BuildRefusesOnly,
         Self::SetAside,
     ];
 
@@ -490,6 +496,7 @@ impl Kind {
             Self::PolarsRefusesOnly => "Polars refuses only",
             Self::WalkPanicked => "the walk panicked",
             Self::Unbuildable => "unbuildable",
+            Self::BuildRefusesOnly => "the catalogue refuses only",
             Self::SetAside => "set aside",
         }
     }
@@ -510,6 +517,7 @@ impl Outcome {
             Self::PolarsRefusesOnly { .. } => Kind::PolarsRefusesOnly,
             Self::WalkPanicked(_) => Kind::WalkPanicked,
             Self::Unbuildable(_) => Kind::Unbuildable,
+            Self::BuildRefusesOnly(_) => Kind::BuildRefusesOnly,
             Self::SetAside(_) => Kind::SetAside,
         }
     }
@@ -522,6 +530,9 @@ impl Outcome {
             Self::WalkRefusesOnly { walk } => format!("walk: {walk}; Polars allows it"),
             Self::PolarsRefusesOnly { polars } => format!("Polars: {polars}; the walk allows it"),
             Self::WalkPanicked(reason) => format!("the walk panicked: {reason}"),
+            Self::BuildRefusesOnly(reason) => {
+                format!("the catalogue refuses to build the step: {reason}; the walk allows it")
+            }
             Self::Unbuildable(reason) | Self::SetAside(reason) => reason.clone(),
         }
     }
@@ -651,11 +662,11 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
         ),
     };
     let outcome = match (walk_said, polars) {
-        // The catalogue refuses the step itself where it cannot build it, which the walk does not
-        // say: the step is refused whatever the walk says, with the words of the build.
-        (_, Some(reason)) if at_build => {
-            Outcome::SetAside(format!("refused when the step is built: {reason}"))
-        }
+        // The catalogue refuses the step itself where it cannot build it, before the walk is asked
+        // and whatever Polars would say: the cell is both refuse where the walk refuses it too, and
+        // the catalogue's own kind where the walk allows it.
+        (Some(_), Some(_)) if at_build => Outcome::BothRefuse,
+        (None, Some(reason)) if at_build => Outcome::BuildRefusesOnly(reason),
         (_, Some(reason)) if !(question.polars_counts)(&reason) => Outcome::SetAside(reason),
         (None, None) => Outcome::BothAllow,
         (Some(_), Some(_)) => Outcome::BothRefuse,
@@ -846,9 +857,9 @@ pub struct Known {
     pub pattern: Pattern,
     /// Why, in words of the test's author.
     pub reason: &'static str,
-    /// Words that what was said of each cell holds, so that a cell that is set aside or
+    /// Words of which what was said of each cell holds one, so that a cell that is set aside or
     /// unbuildable for another reason than the one given is not passed over.
-    pub saying: Option<&'static str>,
+    pub saying: Vec<&'static str>,
 }
 
 impl Known {
@@ -858,14 +869,21 @@ impl Known {
             kind,
             pattern,
             reason,
-            saying: None,
+            saying: Vec::new(),
         }
     }
 
     /// The same line, which names only the cells whose words hold `words`.
     #[must_use]
-    pub const fn saying(mut self, words: &'static str) -> Self {
-        self.saying = Some(words);
+    pub fn saying(mut self, words: &'static str) -> Self {
+        self.saying = vec![words];
+        self
+    }
+
+    /// The same line, which names only the cells whose words hold one of `words`.
+    #[must_use]
+    pub fn saying_one_of(mut self, words: &[&'static str]) -> Self {
+        self.saying = words.to_vec();
         self
     }
 
@@ -873,15 +891,16 @@ impl Known {
     /// cell is named by more than one line, the most specific one counts it, so that a wide line
     /// cannot starve a narrow one.
     fn specificity(&self) -> usize {
-        self.pattern.parts.len() + usize::from(self.saying.is_some())
+        self.pattern.parts.len() + usize::from(!self.saying.is_empty())
     }
 
     fn names(&self, cell: &Cell) -> bool {
         self.kind == cell.outcome.kind()
             && self.pattern.matches(cell)
-            && self
-                .saying
-                .is_none_or(|words| cell.outcome.said().contains(words))
+            && (self.saying.is_empty() || {
+                let said = cell.outcome.said();
+                self.saying.iter().any(|word| said.contains(word))
+            })
     }
 }
 

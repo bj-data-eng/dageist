@@ -48,19 +48,22 @@ fn words() -> Vec<Option<&'static str>> {
 }
 
 /// The cells whose literal the catalogue cannot build: Python's `lit` casts the value to the dtype
-/// it is given strictly, so a value that does not fit, a text that is no number of the dtype or
-/// a float with a fraction given to whole numbers is refused when the step is built, with
-/// Polars' words for the cast, before the walk is asked, and every step that holds it is
-/// refused the same.
+/// it is given strictly, so a value that does not fit, a text that is no number of the dtype or a
+/// text given `Boolean` is refused when the step is built, with Polars' words for the cast, before
+/// the walk is asked, and every step that holds it is refused the same. A float with a fraction
+/// given to whole numbers is cut, and is no such value.
 fn known_casts() -> Vec<Known> {
     vec![
         Known::new(
-            Kind::SetAside,
+            Kind::BuildRefusesOnly,
             Pattern::new(),
-            "the value does not cast to the dtype it is given, and the step engine refuses the \
-             step when it builds the literal",
+            "the value does not cast to the dtype it is given: a whole number past its edges, a \
+             text that is no number of it, a text given Boolean, a float that overflows it. The \
+             step engine refuses the step when it builds the literal, as Python's lit does, and \
+             the walk allows it, though it could foretell it by casting the value as the \
+             catalogue does (candidate to file)",
         )
-        .saying("refused when the step is built"),
+        .saying_one_of(&["conversion from `", "casting from ", "cannot cast "]),
     ]
 }
 
@@ -431,7 +434,23 @@ fn a_step_that_cuts_a_table_by_a_whole_number_polars_cannot_cut_by_is_refused() 
     // Polars takes every nth row for an n above nothing. A slice that is given no length runs to the
     // end of the table, whatever its place is, and one that is given a length is refused where its
     // place and length together run past the last row number Polars counts, 2^63 - 1.
-    counted_grid().assert_agree(&known_casts(), 150);
+    let known = vec![
+        Known::new(
+            Kind::BuildRefusesOnly,
+            Pattern::new().starts("number", "-"),
+            "a count or a place below nothing is refused by Python's binding too, as an overflow \
+             of an unsigned number, which the walk does not read (candidate to file)",
+        )
+        .saying("takes a whole number from"),
+        Known::new(
+            Kind::BuildRefusesOnly,
+            Pattern::new().is("step", "LazyFrame.tail(n)"),
+            "the rows a tail takes are an index, 32 bits wide in the Polars the engine builds and \
+             in Python's, which refuses a count above 4294967295 too, as the catalogue does",
+        )
+        .saying("to 4294967295"),
+    ];
+    counted_grid().assert_agree(&known, 150);
 }
 
 // ---------------------------------------------------------------------------
