@@ -2312,11 +2312,17 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
 - A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
 - A key that drops values, and the keys a count of which is the data's, are stricter by design, as counts are.
 
-Seeds 1140027 and 2718281 of 8000 cases, focused so, end with no disagreement. Two more, 3141592 and 5772156,
-leave three each, which no fix or limit settles yet, of these kinds: a window of a literal that explodes, which
-Polars gives a list for each group where the walk says one value; a null that a call makes of one value, as the
-difference of one value or a date made with a null part is, which a `having` casts as it casts any null; and a
-condition in the predicate of a condition, in an aggregate, whose one value the walk gives a list.
+- A having predicate that the rule of the cast refuses and Polars casts, because it is null in every group, is
+  `a-having-predicate-of-nulls` where the group by run with the predicate, tested for being no null, finds none that
+  is. The walk itself follows the nulls it can see: a null literal, a moment made with a null part, the difference of
+  one value and a condition whose values are nulls, through the calls that keep a null.
+
+Campaigns of 8000 cases focused so, at the seeds 7, 13, 1140027, 2718281 and 5772156, end with no disagreement.
+Two are known and open. The seed 3141592 finds a condition in the predicate of a condition, in an aggregate, whose
+one value the walk gives a list where Polars gives one value: the walk takes a method that makes a list of one value
+as many values. The seed 11 finds two refusals in one key, an out of range date and the format of a time zone, which
+Polars names in either order from run to run, so the asker and the engine differ in which it names, which is a
+property of Polars' threads and not of the step.
 
 A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
 the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the
