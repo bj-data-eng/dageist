@@ -934,32 +934,6 @@ fn known_role_limits(scale: Scale) -> Vec<Known> {
         ]),
         Known::new(
             Kind::PolarsRefusesOnly,
-            Pattern::new().one_of("method", &["Expr.and_(others)", "Expr.or_(others)"]).is("column", "Boolean"),
-            "Polars refuses to meet a Boolean with a number typed without a dtype in a bitwise call, \
-             on either side, which the walk leaves not known as it does the arithmetic of text \
-             (candidate to file)",
-        )
-        .saying_one_of(&["on Boolean and Unknown(", "and Boolean is not supported"]),
-        Known::new(
-            Kind::WalkRefusesOnly,
-            Pattern::new().starts("method", "Expr.fill_nan"),
-            "the walk refuses fill_nan of a date, a moment, a length of time or a time of day filled \
-             with a number typed without a dtype at the schema, as no supertype of the two, where \
-             Polars gets to the rows and refuses them there, as it refuses any value, for the test of \
-             NaN is not supported for them: the verdict is right and its stage is not (the refusal \
-             comes from the tables' offer of the call for an argument of no known dtype, and was \
-             there before the grids) (candidate to file)",
-        )
-        .saying("failed to determine supertype of"),
-        Known::new(
-            Kind::PolarsRefusesOnly,
-            Pattern::new().starts("method", "Expr.fill_nan"),
-            "Polars casts the value fill_nan fills with to the dtype of the column and refuses one \
-             that dtype cannot hold, which the walk does not read (candidate to file)",
-        )
-        .saying("failed in column 'scalar'"),
-        Known::new(
-            Kind::PolarsRefusesOnly,
             Pattern::new().starts("method", "Expr.str.pad_start"),
             "Polars converts the length of a padding to an unsigned 32 bit number and refuses a \
              number below nothing, which the walk does not read (candidate to file)",
@@ -977,8 +951,8 @@ fn known_role_limits(scale: Scale) -> Vec<Known> {
             Kind::PolarsRefusesOnly,
             Pattern::new().starts("method", "Expr.pow"),
             "Polars panics in a debug build where whole numbers raised to a power overflow, the \
-             same as a plain overflow of arithmetic, which is no refusal the walk can foretell \
-             (a Polars bug candidate)",
+             same as a plain overflow of arithmetic, which is no refusal the walk can foretell: \
+             the release builds run the same cells without the check",
         )
         .saying("attempt to exponentiate with overflow"),
         Known::new(
@@ -1067,9 +1041,95 @@ fn known_a_null_converted_to_null() -> Known {
     .saying("conversion from `i")
 }
 
+/// The limits of the grid of the roles the others do not cross.
+fn known_more_role_limits() -> Vec<Known> {
+    vec![
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().one_of("method", &["Expr.and_(others)", "Expr.or_(others)"]).is("column", "Boolean"),
+            "Polars refuses to meet a Boolean with a number typed without a dtype in a bitwise call, \
+             on either side, which the walk leaves not known as it does the arithmetic of text \
+             (candidate to file)",
+        )
+        .saying_one_of(&["on Boolean and Unknown(", "and Boolean is not supported"]),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().starts("method", "Expr.fill_nan"),
+            "the walk refuses fill_nan of a date, a moment, a length of time or a time of day filled \
+             with a number typed without a dtype at the schema, as no supertype of the two, where \
+             Polars gets to the rows and refuses them there, as it refuses any value, for the test of \
+             NaN is not supported for them: the verdict is right and its stage is not (the refusal \
+             comes from the tables' offer of the call for an argument of no known dtype, and was \
+             there before the grids; where the rows are asked too, as the large grid does, both \
+             refuse) (candidate to file)",
+        )
+        .saying("failed to determine supertype of")
+        .shared(),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().starts("method", "Expr.fill_nan"),
+            "Polars casts the value fill_nan fills with to the dtype of the column and refuses one \
+             that dtype cannot hold, which the walk does not read (candidate to file)",
+        )
+        .saying("failed in column 'scalar'"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .one_of("method", &["Expr.and_(others)", "Expr.or_(others)"])
+                .is("order", "the literal first"),
+            "Polars refuses a bitwise call of a number typed without a dtype that follows a float or a \
+             text, which the walk leaves not known (candidate to file)",
+        )
+        .saying("operation not supported for dtype `f")
+        .shared(),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().one_of(
+                "method",
+                &[
+                    "Expr.top_k(k)",
+                    "Expr.bottom_k(k)",
+                    "Expr.shift(n)",
+                    "Expr.diff(n)",
+                    "Expr.str.slice(length)",
+                ],
+            ),
+            "Polars reads the count of top_k, bottom_k and shift as a whole number that fits an index \
+             and is no null, and casts the count of diff and the length of str.slice to a whole \
+             number strictly, when the rows run, and refuses a float, a text, a null or a number \
+             beyond them; the walk reads no value of a count (candidate to file)",
+        )
+        .saying_one_of(&[
+            "invalid value of 'k' in top_k",
+            "invalid value of 'n' in shift",
+            "must not be null",
+            "failed in column 'literal'",
+        ])
+        .shared(),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().is("method", "Expr.pct_change(n)"),
+            "Polars negates the count of pct_change, which overflows for the lowest whole number: a \
+             check of the debug build, and the release builds run the same cells",
+        )
+        .saying("attempt to negate with overflow")
+        .shared(),
+    ]
+}
+
 /// The limits of the large grid of the roles that the normal one does not reach.
 fn known_large_role_limits() -> Vec<Known> {
     vec![
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .is("column", "Boolean")
+                .is("order", "the literal first")
+                .starts("method", "Expr.floordiv"),
+            "Polars panics where a number typed without a dtype is floor divided by a Boolean, an \
+             implementation error that is no check of the debug build (a Polars bug candidate)",
+        )
+        .saying("implementation error"),
         Known::new(
             Kind::WalkRefusesOnly,
             Pattern::new().is("column", "Boolean").is("value", "null"),
@@ -1130,6 +1190,7 @@ fn the_walk_takes_the_other_literal_roles_as_polars_does() {
             .into_iter()
             .map(Known::shared),
     );
+    known.extend(known_more_role_limits());
     more_roles_grid(Scale::Normal).assert_agree(&known, 5_000);
 }
 
@@ -1185,8 +1246,8 @@ fn the_large_grid_of_shift_with_a_literal_fill_value_is_taken_as_polars_does() {
         Pattern::new().one_of("column", &["Date", "Datetime(time_unit='us', time_zone=None)", "Duration(time_unit='us')", "Time"]),
         "Polars panics when the rows run, in a debug build, where a date, a moment, a length of \
          time or a time of day is shifted and filled with a number typed without a dtype: it \
-         builds the fill as a number of the dtype of the number and meets the dtype of the column \
-         (a Polars bug candidate)",
+         builds the fill as a number of the dtype of the number and meets the dtype of the column: \
+         a check of the debug build, and the release builds run the same cells",
     )
     .saying("should not fail: SchemaMismatch"));
     shift_grid(Scale::Large).assert_agree(&known, 15_000);
@@ -1250,5 +1311,6 @@ fn the_large_grid_of_the_other_literal_roles_is_taken_as_polars_does() {
             .map(Known::shared),
     );
     known.extend(known_large_role_limits().into_iter().map(Known::shared));
+    known.extend(known_more_role_limits());
     more_roles_grid(Scale::Large).assert_agree(&known, 100_000);
 }
