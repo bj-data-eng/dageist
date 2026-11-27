@@ -700,8 +700,11 @@ the target draws for itself, as it holds no chain (`reverse`, `head`, `limit`, `
 `last`, `gather_every`, `drop`, `drop_nulls`, `drop_nans`, `fill_nan` and `with_row_index`), is named by
 its identifier, `LazyFrame.head`, and `LazyFrame.` names all of them, for a name such as `reverse` is that
 of the method of an expression. The pivot, whose aggregate is evaluated against the values of a group and so
-starts from `element` most of the time, is named by `LazyFrame.pivot` alone. A campaign focused on steps draws one
-of them for six cases of ten.
+starts from `element` most of the time, is named by `LazyFrame.pivot` alone. A step that groups, whose keys, aggregates
+and `having` predicates are chains and whose shortcuts are steps of their own, is named by `LazyFrame.group_by` alone:
+the target draws it only where it is named, for a campaign without a focus finds the disagreements that the
+[grids of the grouping](explanation.md#grids-settle-what-a-campaign-does-not-reach) and the limits do not settle. A
+campaign focused on steps draws one of them for six cases of ten.
 
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the

@@ -104,6 +104,15 @@ enum Host {
     /// A join's `on`, which both tables read.
     JoinOn,
     Pivot,
+    /// A key of `group_by`, finished by an aggregation of nothing.
+    GroupKey,
+    /// An aggregate of `agg`, in a grouping by the column `k`.
+    Aggregate,
+    /// A predicate of `having`, in a grouping by the column `k` that `agg` of nothing finishes.
+    Having,
+    /// A grouping finished by a shortcut, which aggregates every column that is not a key: the
+    /// step itself is what is under test, with the keys and the options it is given.
+    Shortcut,
     /// A step that holds no chain: the step itself is what is under test.
     Plain(Plain),
 }
@@ -169,6 +178,9 @@ impl Plain {
 const PLAIN_WEIGHT: usize = 2;
 
 impl Host {
+    /// The hosts a case is drawn for where no focus names a step: the grouping is drawn only where
+    /// `DAGEIST_FUZZ_FOCUS` names `LazyFrame.group_by`, for a campaign without a focus finds
+    /// disagreements that the grids and the limits of the grouping do not settle.
     const ALL: [(usize, Self); 21] = [
         (22, Self::Select),
         (8, Self::WithColumns),
@@ -202,6 +214,9 @@ impl Host {
             Self::Sort => "LazyFrame.sort",
             Self::JoinLeft | Self::JoinRight | Self::JoinOn => "LazyFrame.join",
             Self::Pivot => "LazyFrame.pivot",
+            Self::GroupKey | Self::Shortcut => "LazyFrame.group_by",
+            Self::Aggregate => "LazyGroupBy.agg",
+            Self::Having => "LazyGroupBy.having",
         }
     }
 
@@ -215,6 +230,10 @@ impl Host {
             Self::JoinRight => "right_on",
             Self::JoinOn => "on",
             Self::Pivot => "aggregate_function",
+            Self::GroupKey => "by",
+            Self::Aggregate => "aggs",
+            Self::Having => "predicates",
+            Self::Shortcut => unreachable!("a shortcut holds no chain"),
             Self::Plain(plain) => unreachable!("{} holds no chain", plain.id()),
         }
     }
@@ -228,7 +247,9 @@ impl Host {
         match self {
             Self::JoinRight => &["ra", "rb", "rf", "rk", "rg", "rh"],
             Self::JoinOn => &["u", "u", "u", "u", "u", "u", "u", "a", "k"],
-            Self::Pivot | Self::Plain(_) => &[],
+            Self::Pivot | Self::Shortcut | Self::Plain(_) => &[],
+            // The aggregates and the predicates are of the columns the grouping is not by.
+            Self::Aggregate | Self::Having => &["a", "b", "f", "g", "h"],
             _ => &["a", "b", "f", "k", "g", "h"],
         }
     }
@@ -507,13 +528,14 @@ const FOCUS_PERCENT: usize = 25;
 const FOCUS_STEP_PERCENT: usize = 60;
 
 /// The steps a case may be drawn for, which a focus names by their identifiers: the steps that
-/// hold no chain, which `LazyFrame.` names together, and the pivot, whose aggregate starts from the
-/// values of a group and which only its own identifier names.
+/// hold no chain, which `LazyFrame.` names together, the pivot, whose aggregate starts from the
+/// values of a group, and the grouping, whose keys, aggregates and predicates are chains and whose
+/// shortcuts are steps of their own: each of the two is named by its own identifier alone.
 fn focus_steps() -> Vec<&'static Entry> {
     Plain::ALL
         .iter()
         .map(|plain| entry(plain.id()))
-        .chain([entry(Host::Pivot.step())])
+        .chain([entry(Host::Pivot.step()), entry(Host::GroupKey.step())])
         .collect()
 }
 
@@ -577,7 +599,7 @@ impl Focus {
             named.extend(steps.iter().copied().filter(|entry| {
                 let id = entry.id().as_str();
                 if name == "LazyFrame." {
-                    id != Host::Pivot.step()
+                    id != Host::Pivot.step() && id != Host::GroupKey.step()
                 } else {
                     id == name
                 }
@@ -652,7 +674,7 @@ impl Focus {
         document
             .steps()
             .iter()
-            .any(|step| self.is_in_call(step.call()))
+            .any(|step| step.calls().any(|call| self.is_in_call(call)))
     }
 
     fn is_in_call(&self, call: &Call) -> bool {
@@ -703,6 +725,13 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
             let step = draw.pick(&focus.steps);
             if step.id().as_str() == Host::Pivot.step() {
                 Host::Pivot
+            } else if step.id().as_str() == Host::GroupKey.step() {
+                draw.pick(&[
+                    Host::GroupKey,
+                    Host::Aggregate,
+                    Host::Having,
+                    Host::Shortcut,
+                ])
             } else {
                 Plain::ALL
                     .into_iter()
@@ -792,12 +821,15 @@ impl Gen<'_> {
         if let Host::Plain(plain) = self.host {
             return self.plain_document(plain);
         }
+        if self.host == Host::Shortcut {
+            return self.shortcut_document();
+        }
         let host = self.host;
         let step_id = host.step();
         let mut slots = vec![
             Slot::of_parameter(step_id, host.parameter()).expect("a host holds a named position"),
         ];
-        let goal = if host == Host::Filter {
+        let goal = if matches!(host, Host::Filter | Host::Having) {
             Goal::Boolean
         } else {
             Goal::Anything
@@ -811,9 +843,9 @@ impl Gen<'_> {
             Host::JoinLeft | Host::JoinRight | Host::JoinOn => {
                 self.join_keys(first, &mut slots, host == Host::JoinOn)
             }
-            // A filter may hold a predicate beside another, which Polars judges as it does not
-            // judge one alone.
-            Host::Filter if self.draw.chance(30) => {
+            // A filter, and a having, may hold a predicate beside another, which Polars judges as
+            // it does not judge one alone. A grouping may be by more than one key.
+            Host::Filter | Host::Having | Host::GroupKey if self.draw.chance(30) => {
                 self.budget = 6;
                 let second = self.chain(&mut slots, 0, goal).expression;
                 (vec![first.expression, second], Vec::new())
@@ -856,7 +888,13 @@ impl Gen<'_> {
                 ("values", Value::Columns(vec!["a".to_owned()])),
                 ("aggregate_function", Value::Expression(held_one())),
             ],
-            Host::Plain(_) => unreachable!("a step without a chain is drawn apart"),
+            // The calls of a group by, which `grouped_document` makes of what they hold.
+            Host::GroupKey | Host::Aggregate | Host::Having => {
+                return self.grouped_document(host, held);
+            }
+            Host::Shortcut | Host::Plain(_) => {
+                unreachable!("a step without a chain is drawn apart")
+            }
         };
         given.extend(self.options(entry(step_id)));
         let step = Step::new(
@@ -864,6 +902,117 @@ impl Gen<'_> {
             call(step_id, given),
         )
         .expect("a step of a lazy frame");
+        Document::new(vec![step]).expect("one step")
+    }
+
+    // -----------------------------------------------------------------------
+    // A step that groups
+
+    /// The document of a grouping whose chains are `held`, in the position `host` names: its keys,
+    /// or its aggregates, or its predicates, in a grouping that is by `k` and finished by an `agg`
+    /// that holds nothing where the chains are not the aggregates.
+    fn grouped_document(&mut self, host: Host, held: Vec<Expression>) -> Document {
+        let many = |expressions: Vec<Expression>| {
+            Value::Many(expressions.into_iter().map(Value::Expression).collect())
+        };
+        let key =
+            |name: &str| Expression::new(Start::Call(column(name)), Vec::new()).expect("a column");
+        let (keys, links) = match host {
+            Host::GroupKey => (many(held), vec![call("LazyGroupBy.agg", Vec::new())]),
+            Host::Aggregate => (
+                many(vec![key("k")]),
+                vec![call("LazyGroupBy.agg", vec![("aggs", many(held))])],
+            ),
+            _ => (
+                many(vec![key("k")]),
+                vec![
+                    call("LazyGroupBy.having", vec![("predicates", many(held))]),
+                    call("LazyGroupBy.agg", Vec::new()),
+                ],
+            ),
+        };
+        let mut given: Vec<(&str, Value)> = vec![("by", keys)];
+        given.extend(self.options(entry(Host::GroupKey.step())));
+        let step = Step::chain(
+            StepId::new(STEP).expect("an identifier"),
+            call(Host::GroupKey.step(), given),
+            links,
+        )
+        .expect("a step that groups");
+        Document::new(vec![step]).expect("one step")
+    }
+
+    /// The document of a grouping finished by a shortcut: one key or two, a column or the same
+    /// twice, and the shortcut with the options Polars takes of it, which are the share of a
+    /// quantile, how it is read between two values, whether a first or a last skips what is empty,
+    /// the name of a count and the number of rows of a head and of a tail.
+    fn shortcut_document(&mut self) -> Document {
+        let columns = ["a", "b", "f", "k", "g", "h"];
+        let key = |name: &str| {
+            Value::Expression(
+                Expression::new(Start::Call(column(name)), Vec::new()).expect("a column"),
+            )
+        };
+        let first = self.draw.pick(&columns);
+        let mut keys = vec![key(first)];
+        if self.draw.chance(25) {
+            let second = self.draw.pick(&columns);
+            keys.push(key(second));
+        }
+        let mut given: Vec<(&str, Value)> = vec![("by", Value::Many(keys))];
+        given.extend(self.options(entry(Host::GroupKey.step())));
+        let shortcuts = [
+            "LazyGroupBy.len",
+            "LazyGroupBy.sum",
+            "LazyGroupBy.mean",
+            "LazyGroupBy.median",
+            "LazyGroupBy.min",
+            "LazyGroupBy.max",
+            "LazyGroupBy.n_unique",
+            "LazyGroupBy.first",
+            "LazyGroupBy.last",
+            "LazyGroupBy.quantile",
+            "LazyGroupBy.all",
+            "LazyGroupBy.head",
+            "LazyGroupBy.tail",
+        ];
+        let id = self.draw.pick(&shortcuts);
+        let mut finishing: Vec<(&str, Value)> = Vec::new();
+        match id {
+            "LazyGroupBy.len" if self.draw.chance(50) => {
+                let name = self.draw.pick(&["len", "rows", "a", "k", "n"]);
+                finishing.push(("name", Value::String(name.to_owned())));
+            }
+            "LazyGroupBy.first" | "LazyGroupBy.last" if self.draw.chance(50) => {
+                finishing.push(("ignore_nulls", Value::Flag(Some(self.draw.chance(50)))));
+            }
+            "LazyGroupBy.quantile" => {
+                let share = self.draw.pick(&[0.0, 0.25, 0.5, 0.75, 1.0, 1.5, -0.5]);
+                finishing.push(("quantile", Value::Float(share)));
+                if self.draw.chance(70) {
+                    let how = self.draw.pick(&[
+                        "nearest",
+                        "higher",
+                        "lower",
+                        "midpoint",
+                        "linear",
+                        "equiprobable",
+                    ]);
+                    finishing.push(("interpolation", Value::Choice(how.to_owned())));
+                }
+            }
+            "LazyGroupBy.head" | "LazyGroupBy.tail" if self.draw.chance(70) => {
+                let rows = self.draw.pick(&[0_i64, 1, 2, 5, 9]);
+                finishing.push(("n", Value::Integer(rows)));
+            }
+            _ => {}
+        }
+        let step = Step::chain(
+            StepId::new(STEP).expect("an identifier"),
+            call(Host::GroupKey.step(), given),
+            vec![call(id, finishing)],
+        )
+        .expect("a step that groups");
         Document::new(vec![step]).expect("one step")
     }
 

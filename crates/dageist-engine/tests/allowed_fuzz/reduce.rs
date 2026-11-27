@@ -67,10 +67,24 @@ pub fn candidates(case: &Case) -> Vec<Case> {
         });
     }
     let step = &case.document.steps()[0];
+    // The step with its call made smaller, with one of its links made smaller, and with a link left
+    // out where the grouping stays finished.
+    let mut steps: Vec<Result<Step, _>> = Vec::new();
     for call in call_alternatives(step.call()) {
-        if let Ok(step) = Step::new(step.id().clone(), call)
-            && let Ok(document) = Document::new(vec![step])
-        {
+        steps.push(Step::chain(step.id().clone(), call, step.links().to_vec()));
+    }
+    for at in 0..step.links().len() {
+        for changed in call_alternatives(&step.links()[at]) {
+            let mut links = step.links().to_vec();
+            links[at] = changed;
+            steps.push(Step::chain(step.id().clone(), step.call().clone(), links));
+        }
+        let mut links = step.links().to_vec();
+        links.remove(at);
+        steps.push(Step::chain(step.id().clone(), step.call().clone(), links));
+    }
+    for step in steps.into_iter().flatten() {
+        if let Ok(document) = Document::new(vec![step]) {
             found.push(Case {
                 document,
                 ..case.clone()
