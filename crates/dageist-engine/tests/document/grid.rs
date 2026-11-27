@@ -416,6 +416,29 @@ impl Case {
     }
 }
 
+impl Case {
+    /// The case of the step that groups by `arguments` and goes on with the calls `then`, the
+    /// last of which finishes the grouping, run on `working`.
+    ///
+    /// # Errors
+    ///
+    /// The words of why the document cannot be read, which makes the cell unbuildable.
+    pub fn of_grouping(
+        arguments: Value,
+        then: Vec<Value>,
+        working: DataFrame,
+        connections: Connections,
+    ) -> Result<Self, String> {
+        let text = document(vec![crate::support::grouping("s", arguments, then)]);
+        let document = Document::read(&text).map_err(|error| format!("not a document: {error}"))?;
+        Ok(Self {
+            document,
+            working,
+            connections,
+        })
+    }
+}
+
 /// How far Polars is asked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Depth {

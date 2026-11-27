@@ -57,7 +57,7 @@ fn name_of(label: &str) -> String {
 
 /// Three values of the dtype of `class`: one, a null and another, where it can be made of whole
 /// numbers.
-fn values_of(class: Representative, name: &str) -> Option<Series> {
+pub fn values_of(class: Representative, name: &str) -> Option<Series> {
     if let Some(inner) = class.element() {
         let is_array = matches!(class, Representative::Array(_));
         let rows: [Option<Vec<i64>>; 3] = [
