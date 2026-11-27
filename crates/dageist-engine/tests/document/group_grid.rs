@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 35] = [
+const PREDICATES: [&str; 38] = [
     "the values",
     "all null",
     "first",
@@ -693,6 +693,9 @@ const PREDICATES: [&str; 35] = [
     "a null of dates, quantile",
     "a null of dates, std",
     "a condition of nulls of lists, with an otherwise",
+    "the first, diff",
+    "a null of times, diff",
+    "a date made with a null day, max",
 ];
 
 fn typed_null_then(dtype: &str, entry: &str) -> Value {
@@ -842,6 +845,20 @@ fn predicate_of(column: &Col, form: &str) -> Value {
                     json!({ "statement": typed_null("List(Int64)") }),
                 ),
             ],
+        ),
+        // The difference of one value from the one before it is a null, as there is none before.
+        "the first, diff" => of(column, vec![one("Expr.first"), one("Expr.diff")]),
+        "a null of times, diff" => typed_null_then("Time", "Expr.diff"),
+        "a date made with a null day, max" => crate::support::chain(
+            call(
+                "polars.date",
+                json!({
+                    "year": lit(json!({ "integer": 2000 })),
+                    "month": lit(json!({ "integer": 1 })),
+                    "day": lit(json!({ "flag": null })),
+                }),
+            ),
+            vec![one("Expr.max")],
         ),
         "a null of dates, std" => typed_null_then("Date", "Expr.std"),
         "a null of text" => typed_null("String"),
