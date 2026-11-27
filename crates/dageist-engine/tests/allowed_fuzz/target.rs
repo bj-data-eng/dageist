@@ -19,7 +19,8 @@ use super::limits::{
     is_the_same_objection, keys_as_a_select, strict,
 };
 use super::observe::{
-    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
+    NAMINGS, Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked,
+    refused_in_memory,
 };
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{
@@ -29,8 +30,6 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const NAMINGS: usize = 8;
-
 const STRICTER_BY_DESIGN: [(&str, &str); 8] = [
     (
         "pivot-aggregate-gives-one-value",

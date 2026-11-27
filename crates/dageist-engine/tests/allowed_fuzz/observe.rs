@@ -166,8 +166,10 @@ fn run_on(document: &Document, frames: &Frames, check: bool) -> Observed {
     observed
 }
 
-/// How often a step is run again to see which refusal Polars names of the rows.
-const NAMINGS: usize = 8;
+/// How often a step is run again to see which refusal Polars names of the rows. A run again is a
+/// sample, so what it settles is statistical: a refusal that Polars names in none of the runs is
+/// not seen (the issue 234).
+pub const NAMINGS: usize = 8;
 
 /// A step that groups may hold two refusals of the rows, as two parts of its keys that Polars
 /// evaluates at once, and it names either from run to run. The step is run again and the refusal
