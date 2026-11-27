@@ -1898,10 +1898,16 @@ fn frame_slice(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, Bui
         Some(Argument::Integer(offset)) => *offset,
         Some(other) => return Err(Arguments::wrong("offset", "a whole number", other)),
     };
-    // Python leaves the length out as the most rows an index holds, and refuses a negative one.
-    let length =
-        optional_unsigned(arguments, "length")?.map_or(u32::MAX as usize, |length| length as usize);
-    Ok(frame.slice((offset, length)))
+    // Python runs a slice that is given no length to the end of the table, and refuses a length
+    // below nothing; a slice of nothing is the table.
+    let length = match arguments.get("length") {
+        None => None,
+        Some(_) => Some(index(arguments, "length", 0)?),
+    };
+    Ok(match Slice::new(offset, length) {
+        Some(slice) => frame.slice(slice),
+        None => frame,
+    })
 }
 
 fn frame_first(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {

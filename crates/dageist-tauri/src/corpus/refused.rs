@@ -39,9 +39,30 @@ pub(super) fn cause_cases() -> Vec<Case> {
             )]),
         )],
     );
-    // Polars accepts a step that takes every row of a zero, and cannot run it on the rows: no table
-    // says so, and the steps after it are not counted.
-    let failed_on_the_rows = one_step("LazyFrame.gather_every", vec![("n", Value::Integer(0))]);
+    // Polars accepts whole numbers raised to a power below nothing when it works out the schema, and
+    // cannot run it on the rows, for it takes the exponent as an unsigned number: no table says so,
+    // and the steps after it are not counted. A step that takes every 0th row is refused by a rule
+    // and is no such step.
+    let below_nothing = Expression::new(
+        Start::Call(call("polars.lit", vec![("value", Value::Integer(-1))])),
+        vec![],
+    )
+    .expect("a literal");
+    let raised = Expression::new(
+        Start::Call(call(
+            "polars.col",
+            vec![("name", Value::Columns(vec![whole.clone()]))],
+        )),
+        vec![call(
+            "Expr.pow",
+            vec![("exponent", Value::Expression(below_nothing))],
+        )],
+    )
+    .expect("a chain");
+    let failed_on_the_rows = one_step(
+        "LazyFrame.select",
+        vec![("exprs", Value::Many(vec![Value::Expression(raised)]))],
+    );
     let mut after_failure = failed_on_the_rows.steps().to_vec();
     after_failure.extend(one_step("LazyFrame.head", vec![]).steps().to_vec());
     let after_failure = Document::new(after_failure).expect("two steps");

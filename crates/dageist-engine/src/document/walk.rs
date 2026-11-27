@@ -256,6 +256,7 @@ impl Step {
         walker.written_names_are_distinct();
         walker.step_options(self.call());
         walker.nan_test_columns();
+        walker.cut_by_a_number();
         walker.key_names();
         Walk {
             expressions: walker.walked,
@@ -1204,6 +1205,43 @@ impl Walker<'_> {
                 self.path.clear();
                 return;
             }
+        }
+    }
+
+    /// Asks whether the table is cut by numbers Polars cannot cut it by: every 0th row, and a slice
+    /// that is given a length whose place and length together run past the last row number that
+    /// Polars counts, which is a whole number of 63 bits. A slice given no length runs to the end.
+    fn cut_by_a_number(&mut self) {
+        let (parameter, said) = match self.step.entry().id().as_str() {
+            "LazyFrame.gather_every" => match self.step.argument("n") {
+                Some(Value::Integer(0)) => (
+                    "n",
+                    "gather_every needs n above nothing: Polars refuses to take every 0th row",
+                ),
+                _ => return,
+            },
+            "LazyFrame.slice" => {
+                let Some(Value::Integer(offset)) = self.step.argument("offset") else {
+                    return;
+                };
+                // A slice given no length runs to the end of the table, whatever its place is.
+                let Some(Value::Integer(length)) = self.step.argument("length") else {
+                    return;
+                };
+                if i128::from(*offset) + i128::from(*length) <= i128::from(i64::MAX) {
+                    return;
+                }
+                (
+                    "offset",
+                    "a slice cannot start where it runs past the last row Polars counts, which is row 9223372036854775807",
+                )
+            }
+            _ => return,
+        };
+        if let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(said) {
+            self.path = vec![Segment::Parameter(parameter.to_owned())];
+            self.refuse(&refusal, false);
+            self.path.clear();
         }
     }
 
@@ -3646,6 +3684,12 @@ fn cut_below_nothing(link: &Call) -> Option<String> {
     let parameters: &[&str] = match link.entry().id().as_str() {
         "Expr.head" | "Expr.limit" | "Expr.tail" => &["n"],
         "Expr.slice" => &["offset", "length"],
+        "Expr.gather_every" => {
+            return matches!(link.argument("n"), Some(Value::Integer(0))).then(|| {
+                "gather_every needs n above nothing: Polars refuses to take every 0th value"
+                    .to_owned()
+            });
+        }
         _ => return None,
     };
     parameters.iter().find_map(|parameter| {
