@@ -30,7 +30,7 @@
 //! `is_in` has no grid here. Its deprecated form is removed with #203, which builds the grid of
 //! what it is given on [`crate::grid`], so a grid written for it now would be written twice.
 
-use polars::prelude::DataType;
+use polars::prelude::{DataFrame, DataType, NamedFrom, Series, TimeUnit};
 use serde_json::{Value, json};
 
 use crate::grid::literals::{self, Written};
@@ -151,6 +151,110 @@ fn a_number_typed_without_a_dtype_that_meets_a_date_or_a_time_is_refused_as_pola
         method_given_the_literal,
     );
     verdicts.assert_agree(&[], 50);
+}
+
+// ---------------------------------------------------------------------------
+// Parts of a moment typed in, in a join's key
+
+/// Which function makes the moment or the length of time, and which of its parts the literal is.
+#[derive(Default)]
+struct Made {
+    function: &'static str,
+    literal: Chosen,
+}
+
+impl HoldsLiteral for Made {
+    fn literal_mut(&mut self) -> &mut Chosen {
+        &mut self.literal
+    }
+}
+
+fn parts_of_a_moment_grid(values: Vec<Written>) -> Verdicts {
+    let functions: Vec<(String, &'static str)> =
+        ["polars.duration(weeks)", "polars.datetime(year)"]
+            .into_iter()
+            .map(|function| (function.to_owned(), function))
+            .collect();
+    let grid = Grid::<Made>::new()
+        .axis("function", functions, |point, function| {
+            point.function = function;
+        })
+        .literal_axes(values, &words());
+    grid.judge(&Question::any_refusal(), |point| {
+        let literal = point.literal.expression();
+        let whole = |number: i64| literals::expression(&Written::Integer(number), None);
+        let made = if point.function == "polars.duration(weeks)" {
+            call("polars.duration", json!({ "weeks": literal }))
+        } else {
+            call(
+                "polars.datetime",
+                json!({ "year": literal, "month": whole(1), "day": whole(1) }),
+            )
+        };
+        let working = one_column_table(&DataType::Int64)?;
+        // The other table holds a key of the dtype each function makes, so that a call that is not
+        // folded is paired with a key of its own dtype.
+        let ints = Series::new("ints".into(), [1_i64, 2, 3]);
+        let key = |name: &str, dtype: &DataType| {
+            ints.cast(dtype)
+                .map(|series| series.with_name(name.into()).into())
+                .map_err(|error| error.to_string())
+        };
+        let other = DataFrame::new(
+            3,
+            vec![
+                key("rt", &DataType::Datetime(TimeUnit::Microseconds, None))?,
+                key("rd", &DataType::Duration(TimeUnit::Microseconds))?,
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+        let right = if point.function == "polars.duration(weeks)" {
+            "rd"
+        } else {
+            "rt"
+        };
+        Case::of_step(
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "other" },
+                "left_on": many(vec![chain(made, Vec::new())]),
+                "right_on": many(vec![field(right)]),
+            }),
+            working,
+            Connections::new().table("other", other),
+        )
+    })
+}
+
+#[test]
+fn a_moment_or_a_length_of_time_made_of_numbers_typed_in_is_no_join_key_however_they_are_written() {
+    // Polars folds the call into a literal where every part is a number, as the step engine makes
+    // it of a value given a dtype: a whole float or a text of a number given a dtype of numbers is
+    // one. The literal is named by an alias, which a key may not hold, so the join is refused.
+    let mut values = literals::edge_integers();
+    values.extend(literals::edge_floats());
+    values.extend(literals::edge_texts());
+    let mut known = known_casts();
+    known.push(
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().is("function", "polars.datetime(year)"),
+            "a year the calendar cannot hold makes no moment, so Polars keeps the call and does not \
+             fold it, which the document does not decide (the walk takes every number as a part \
+             that folds)",
+        )
+        .saying("rule folded-function-is-no-join-key"),
+    );
+    known.push(
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().is("function", "polars.duration(weeks)"),
+            "Polars cannot make the weeks of a length of time of a number of 128 bits that does not \
+             fit 64, which the walk does not read (candidate to file)",
+        )
+        .saying("failed in column 'scalar'"),
+    );
+    parts_of_a_moment_grid(values).assert_agree(&known, 500);
 }
 
 // ---------------------------------------------------------------------------
