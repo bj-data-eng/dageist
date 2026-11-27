@@ -2302,8 +2302,10 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
   the `having` of a group by with kernels of its own, is one limit, `a-group-aggregate`: the empty table has no
   groups and an operation on the values of none is refused for a dtype; a replacement that lists the values of a group
   is not yet implemented by Polars for each row, which its own message says, and a strict one finds its mapping
-  incomplete as it runs them; a window partitioned by a column and a comparison that the tables measured with
-  the rows' columns are accepted. What it refuses of a null literal or a column of `Null` there, the empty table's
+  incomplete as it runs them; a part of a moment or a replacement given the values of a group is refused for
+  the output length of the map, for a function that should apply element-wise or for a scalar that was expected;
+  a count a call takes of them is converted for each group; a window partitioned by a column and a comparison that
+  the tables measured with the rows' columns are accepted. What it refuses of a null literal or a column of `Null` there, the empty table's
   refusals and the kernels' dtypes against the plan, is #245; its cause is where the expression is evaluated, not
   the typing of a null literal that #228 tracks.
 - A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
