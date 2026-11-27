@@ -196,6 +196,13 @@ pub enum Limit {
     /// take the values of a column below zero; the sample's rows are 1, a null and 3, which a
     /// sum or a product of them does not.
     ANegativeExponent,
+    /// Polars reads how many values `top_k` and `bottom_k` keep as an index of 32 bits, so it
+    /// refuses a count below zero or beyond that when the rows run, in some of the places a
+    /// step puts them and not in others (a plain column of a `select` it allows, a literal or a
+    /// group it refuses), which the tables measured with the number 1. Polars refusing the rows
+    /// with a failed conversion to `u32`, which has no place, in a case that holds a `top_k` or
+    /// a `bottom_k` whose count is a whole number typed below zero or beyond 4294967295.
+    ACountNoIndexHolds,
     /// A literal is given a dtype that its value does not cast to: a whole number past the
     /// dtype's edges, a float that overflows it, a text that is no number of it, a text given
     /// `Boolean`. A float with a fraction given to whole numbers is cut by the cast and is no such
@@ -501,7 +508,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 41] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -511,6 +518,7 @@ impl Limit {
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::ANegativeExponent,
+        Self::ACountNoIndexHolds,
         Self::ALiteralThatDoesNotCast,
         Self::ABitwiseCallOnANull,
         Self::ADivisionByZero,
@@ -556,6 +564,7 @@ impl Limit {
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
+            Self::ACountNoIndexHolds => "a-count-no-index-holds",
             Self::ALiteralThatDoesNotCast => "a-literal-that-does-not-cast",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::ADivisionByZero => "a-division-by-zero",
@@ -614,6 +623,9 @@ impl Limit {
             }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
+            }
+            Self::ACountNoIndexHolds => {
+                "Polars reads the count of top_k and bottom_k as an index of 32 bits and refuses a number below zero or beyond it where the rows are run, in some places a step puts them and not in others, which the tables measured with the number 1"
             }
             Self::ALiteralThatDoesNotCast => {
                 "the step engine casts the value of a literal to its dtype strictly when it builds the step, and refuses one that does not fit, before the tables are asked, where they were measured with literals of a dtype that holds the number 1"
@@ -1160,6 +1172,31 @@ fn is_a_whole_number_below_zero(call: &Call) -> bool {
         .and_then(Result::ok)
         .and_then(|cast| cast.get(0).ok()?.try_extract::<f64>().ok())
         .is_some_and(|number| number < 0.0)
+}
+
+/// Whether `call` is a literal that is a whole number beyond what an index of 32 bits holds, as
+/// written or as it casts to its dtype.
+fn is_a_whole_number_beyond_an_index(call: &Call) -> bool {
+    if !is(call, "polars.lit") {
+        return false;
+    }
+    if let Some(Value::Integer(number)) = call.argument("value") {
+        return *number > i64::from(u32::MAX);
+    }
+    cast_of_a_literal(call)
+        .and_then(Result::ok)
+        .and_then(|cast| cast.get(0).ok()?.try_extract::<f64>().ok())
+        .is_some_and(|number| number > f64::from(u32::MAX))
+}
+
+/// Whether `call` is a `top_k` or a `bottom_k` whose count holds a whole number typed below zero
+/// or beyond an index of 32 bits.
+fn is_a_count_no_index_holds(call: &Call) -> bool {
+    (is(call, "Expr.top_k") || is(call, "Expr.bottom_k"))
+        && matches!(call.argument("k"), Some(Value::Expression(count))
+        if any_call(count, &|inner| {
+            is_a_whole_number_below_zero(inner) || is_a_whole_number_beyond_an_index(inner)
+        }))
 }
 
 /// Whether `call` is a `pow` whose exponent holds a value that may be below zero: a whole number
@@ -4477,6 +4514,15 @@ fn applies(
                     any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
                 })
         }
+        (Limit::ACountNoIndexHolds, Disagreement::PolarsRefuses(refusal)) => {
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.starts_with("conversion from `")
+                && refusal.reason.contains("` to `u32` failed")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_count_no_index_holds))
+        }
         (Limit::ALiteralThatDoesNotCast, Disagreement::PolarsRefuses(refusal)) => {
             // The refusal is of the schema, for the step is refused when it is built, and is a
             // failed conversion or a cast that Polars does not support.
@@ -6967,6 +7013,66 @@ mod tests {
         assert_eq!(
             polars_refuses(&nested, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
             vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_top_k_is_given_a_count_no_index_holds() {
+        const BEYOND: &str = "conversion from `i64` to `u32` failed in column 'literal' for 1 out of 1 values: [4294967296]";
+        let top_k = |count: i64, method: &str| {
+            select(vec![chain_of(
+                column("a"),
+                vec![call(method, vec![("k", Value::Expression(whole(count)))])],
+            )])
+        };
+        for method in ["Expr.top_k", "Expr.bottom_k"] {
+            for count in [4_294_967_296, i64::MAX, -1] {
+                assert_eq!(
+                    polars_refuses(&top_k(count, method), None, Stage::Rows, BEYOND, Vec::new()),
+                    vec![Limit::ACountNoIndexHolds],
+                    "{method} {count}"
+                );
+            }
+        }
+        // A count an index holds is no such count, so the same refusal is not excused by it.
+        for count in [0, 1, 4_294_967_295] {
+            assert_eq!(
+                polars_refuses(
+                    &top_k(count, "Expr.top_k"),
+                    None,
+                    Stage::Rows,
+                    BEYOND,
+                    Vec::new()
+                ),
+                Vec::<Limit>::new(),
+                "{count}"
+            );
+        }
+        // A count beyond an index of another call, or one that is no refusal of the rows, is not.
+        let head = select(vec![chain_of(
+            column("a"),
+            vec![call(
+                "Expr.head",
+                vec![("n", Value::Expression(whole(4_294_967_296)))],
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&head, None, Stage::Rows, BEYOND, Vec::new()),
+            Vec::<Limit>::new()
+        );
+        assert_eq!(
+            polars_refuses(
+                &top_k(i64::MAX, "Expr.top_k"),
+                None,
+                Stage::Schema,
+                BEYOND,
+                Vec::new()
+            ),
+            Vec::<Limit>::new()
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-count-no-index-holds.case"),
+            vec![Limit::ACountNoIndexHolds]
         );
     }
 
