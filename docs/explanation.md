@@ -2275,12 +2275,35 @@ A predicate of a `having` needs one value for each group, which Polars casts to 
 the group or not: the rule `having-gives-one-value` refuses the values of the group, which it cannot cast
 when the rows run, and `having-casts-to-boolean` refuses a dtype that it cannot cast, such as text, a date,
 a list or a struct. A number or null is cast where the predicate stands alone, as Polars does, and beside
-another predicate it must be a `Boolean`, for Polars combines the predicates as a filter's are. Whether
+another predicate it must be a `Boolean`, for Polars combines the predicates as a filter's are. A null
+literal is cast whatever dtype it is given, as every value of it is null. A condition that stands as the
+predicate gives the value of its branches as the predicate, so each branch is judged as a predicate is,
+and a condition whose predicates and values are each one value is one value for each group, with an
+`otherwise` or without one. Whether
 a predicate may end is what the rules say and not what the table recorded for a column, which gives the
 values of a group. The columns a group by gives, its keys
 and its aggregates, are named differently, whether by the name a pair gives them or by the column the
 chain reads, and `grouped-names-are-distinct` refuses two of one name, as Polars does when it works out
 the schema.
+
+A focused campaign draws the step where `DAGEIST_FUZZ_FOCUS` names `LazyFrame.group_by`, and no campaign
+without a focus does. A disagreement of a step that groups is excused by the limits that excuse the same
+expression alone in a `select`, where that disagrees the same way, for the limits are about what an
+expression is given and not where it stands. A campaign of 8000 cases so focused, at two seeds, leaves
+disagreements that nothing excuses. They are open, and of these kinds:
+
+- a key that drops the values it reads, as `drop_nulls` does, where `maintain_order` keeps the order of the
+  groups: Polars refuses it for lengths that differ where the table holds a null, and the tables measured
+  the key with the default order;
+- a replacement given old and new values that are the values of the group, which Polars does not yet
+  implement in an aggregate or a `having`, though it does in a select;
+- a null literal of a dtype that Polars cannot cast, followed by an aggregate that keeps it null, as a
+  predicate of a `having`: the rule judges the dtype of the chain, where Polars casts the nulls;
+- a method of numbers or of comparison given a null literal or a column of `Null` in an aggregate, where the
+  tables measured the context with columns and Polars refuses it, or allows it, as it does not in the
+  tables' line;
+- the share of `quantile` given a value outside 0 to 1, which Polars reads as it builds the step and the
+  tables do not hold, as they do not for the share of any method.
 
 A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
 the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the
@@ -3167,7 +3190,9 @@ forms (a column, a named key, an expression, an aggregate, a literal, a window, 
 `maintain_order` unset, true and false; every method of the family of aggregates, and the first, the last
 and the gathering of the values, in `agg`, over every class, by position and by name; what does not aggregate
 in `agg`, over every class; every shortcut with each of its options over every class, grouped by another
-column and by the one it aggregates; a `having` predicate of every class, one or two of them; and the chains
+column and by the one it aggregates; a `having` predicate of every class in twenty-three forms (the values
+of the group, an aggregate, a literal, what takes some of the values of one value, a condition and a null of each
+kind of dtype), none, one or two of them; and the chains
 that do not end in one finishing call, which the document refuses before Polars is asked. What the grids
 leave is named in the test with its reason: the reverse of an array whose element Polars panics on, on a
 thread of its own that no test can catch, the element dtypes the tables do not measure, what a select refuses
