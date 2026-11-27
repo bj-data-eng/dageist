@@ -379,6 +379,13 @@ impl Refusal {
     }
 
     fn polars(reason: &Reason) -> Self {
+        // A line of the tables that a rule wrote, because the tables never run what it refuses,
+        // is the rule's refusal: its name begins the text, and what follows says what is the matter.
+        if let Some((name, said)) = reason.text.split_once(": ")
+            && let Some(rule) = Rule::from_name(name)
+        {
+            return Self::rule_because(rule, &said);
+        }
         Self {
             source: RefusalSource::Polars(reason.stage),
             reason: reason.text.clone(),
@@ -740,6 +747,17 @@ fn on_receiver(
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    // `is_in` follows a list or an array only looking up in a collection of lists, which no class of
+    // the tables is: no argument of a class fits, and one that has none is not judged.
+    if id == "Expr.is_in"
+        && receiver.is_some_and(Representative::is_nested)
+        && !arguments.iter().any(|(name, _)| *name == "other")
+    {
+        return Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &"Expr.is_in follows a list or an array only given a collection of lists, which the tables do not measure",
+        ));
+    }
     // A method that depends on the element is refused after a class it is not measured on, whether
     // it is given an expression or an option in place of one, which no line of the dtype table says.
     if let Some(class) = receiver

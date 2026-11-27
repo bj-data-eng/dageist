@@ -960,9 +960,12 @@ approximations and the bitwise methods are more of three families that exist. Ag
 
 `implode` is an aggregate of its own kind: it gathers the values into one list of their dtype, and gives that one
 value for every dtype, a list and a struct included, whose own dtype has no class of its own, so the value that
-follows one of lists is read as no class. A join's key may hold it alone and not beside a column. `maintain_order` is
-true unless it is told, as in Python, and keeps the order of the values. It is what `is_in` is given where the values
-to look up in are a column's own: the column imploded.
+follows one of lists is read as no class. A join's key may hold it alone and not beside a column, unless it gathers the
+values of a literal, which Polars folds into a literal: the key `a.is_in(lit(1).implode())` is elementwise, and
+`a.is_in(a.implode())` is not. `maintain_order` is true unless it is told, as in Python, and keeps the order of the
+values. It is what `is_in` is given where the values to look up in are a column's own: the column imploded. `is_in`
+follows a list or an array only given a collection of lists, which no class of the tables is, so the tables do not
+measure it and the engine does not offer it.
 
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
