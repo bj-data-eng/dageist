@@ -397,6 +397,9 @@ struct Around<'a> {
     null_kept: bool,
     /// Whether the value the link follows is made of literals alone.
     literal: bool,
+    /// Whether the chain the link is part of stands alone where it is held, as what `agg` or
+    /// `having` is given, and is no operand of another call.
+    alone: bool,
 }
 
 /// What a chain has so far.
@@ -2661,6 +2664,7 @@ impl Walker<'_> {
                     output_name: name_before.as_deref(),
                     null_kept,
                     literal: is_made_of_literals(expression, at),
+                    alone: held.is_some(),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2995,6 +2999,7 @@ impl Walker<'_> {
             output_name,
             null_kept,
             literal: receiver_is_literal,
+            alone,
         } = around;
         // What the call says of a struct: the fields it follows, the names and numbers it is given.
         let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
@@ -3074,7 +3079,7 @@ impl Walker<'_> {
             && receiver_is_literal
             && matches!(context.outer(), Outer::Aggregate | Outer::Having)
             && let Some((parameter, given)) =
-                given_values_beside_a_literal(entry, arguments, context.outer())
+                given_values_beside_a_literal(entry, arguments, context.outer(), alone)
             && let Err(refusal) =
                 allowed::rule_forbids_a_literal_beside_values_in_a_group(parameter, given)
         {
@@ -4512,13 +4517,16 @@ fn is_made_of_literals(expression: &Expression, upto: usize) -> bool {
 }
 
 /// Where Polars refuses values beside a literal in what a group by evaluates, as a method maps the
-/// literal or replaces the values of it: the values of the group, and one value that an aggregate
-/// gave, in `agg` and in `having`.
+/// literal or replaces the values of it: the values of the group, where the call stands alone as
+/// what `agg` or `having` is given and where it stands beside others as an operand, and one value
+/// that an aggregate gave.
 #[allow(clippy::struct_excessive_bools)]
 struct Beside {
-    rows_in_agg: bool,
+    rows_in_agg_alone: bool,
+    rows_in_agg_beside: bool,
+    rows_in_having_alone: bool,
+    rows_in_having_beside: bool,
     one_in_agg: bool,
-    rows_in_having: bool,
     one_in_having: bool,
 }
 
@@ -4526,37 +4534,47 @@ struct Beside {
 /// of the methods that are given values beside what they follow shows.
 fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
     match (entry, parameter) {
-        // The methods that map a literal take the values of a group beside it in `agg` as a map of
-        // one value beside many, and one value that an aggregate gave in a `having` only.
+        // The methods that map a literal take the values of a group beside it as a map of one
+        // value beside many, in `agg` and, beside another, in a `having`, and one value that an
+        // aggregate gave in a `having` only.
         ("Expr.dt.replace", _) | ("Expr.str.splitn" | "Expr.str.split_exact", "by") => {
             Some(Beside {
-                rows_in_agg: true,
+                rows_in_agg_alone: true,
+                rows_in_agg_beside: true,
+                rows_in_having_alone: false,
+                rows_in_having_beside: true,
                 one_in_agg: false,
-                rows_in_having: false,
                 one_in_having: true,
             })
         }
-        // What sorts a literal by the values of the group is as long as they are, not as it is.
+        // What sorts a literal by the values of the group is as long as they are, not as it is,
+        // where it stands alone and not where it stands beside another.
         ("Expr.sort_by", "by") => Some(Beside {
-            rows_in_agg: true,
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: false,
+            rows_in_having_alone: false,
+            rows_in_having_beside: false,
             one_in_agg: false,
-            rows_in_having: false,
             one_in_having: false,
         }),
         // A replacement of a literal by values for each row is not yet implemented.
         ("Expr.replace" | "Expr.replace_strict", "old" | "new") => Some(Beside {
-            rows_in_agg: true,
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: true,
+            rows_in_having_alone: true,
+            rows_in_having_beside: true,
             one_in_agg: true,
-            rows_in_having: true,
             one_in_having: true,
         }),
         // What fills a literal replaced takes one value of an aggregate in `having` as the others
         // take it, and in `agg` takes the values of the group too.
         ("Expr.replace_strict", "default")
         | ("Expr.str.replace" | "Expr.str.replace_all", "value") => Some(Beside {
-            rows_in_agg: true,
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: true,
+            rows_in_having_alone: false,
+            rows_in_having_beside: true,
             one_in_agg: true,
-            rows_in_having: false,
             one_in_having: true,
         }),
         _ => None,
@@ -4564,12 +4582,13 @@ fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
 }
 
 /// The first parameter of `entry` that a literal receiver is given values beside, in what a group by
-/// evaluates in `outer`, which Polars refuses, with what it was given: the values of the group, or
-/// one value that an aggregate gave.
+/// evaluates in `outer`, standing alone or not, which Polars refuses, with what it was given: the
+/// values of the group, or one value that an aggregate gave.
 fn given_values_beside_a_literal<'a>(
     entry: &Entry,
     arguments: &'a [(String, Operand)],
     outer: Outer,
+    alone: bool,
 ) -> Option<(&'a str, &'static str)> {
     arguments.iter().find_map(|(name, operand)| {
         let refused = beside_a_literal(entry.id().as_str(), name)?;
@@ -4577,12 +4596,14 @@ fn given_values_beside_a_literal<'a>(
             return None;
         }
         let having = outer == Outer::Having;
+        let rows = match (having, alone) {
+            (false, true) => refused.rows_in_agg_alone,
+            (false, false) => refused.rows_in_agg_beside,
+            (true, true) => refused.rows_in_having_alone,
+            (true, false) => refused.rows_in_having_beside,
+        };
         match operand.shape {
-            Shape::Many
-                if (refused.rows_in_having && having) || (refused.rows_in_agg && !having) =>
-            {
-                Some((name.as_str(), "the values of the group"))
-            }
+            Shape::Many if rows => Some((name.as_str(), "the values of the group")),
             Shape::One
                 if !operand.literal
                     && ((refused.one_in_having && having) || (refused.one_in_agg && !having)) =>
