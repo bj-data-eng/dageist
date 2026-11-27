@@ -7,7 +7,7 @@ use polars::prelude::{DataType, TimeUnit, TimeZone};
 
 use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
-use super::adapt::could_be_taken_by_a_number;
+use super::adapt::{Loose, could_be_taken_by_a_number};
 use super::context::{Context, Outer};
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::fields::{self, Fields, Gives, Input};
@@ -1067,6 +1067,140 @@ pub(crate) fn same_for_any_number(
         }
     }
     found
+}
+
+/// Why Polars refuses a call whose argument `parameter` is a number typed without a dtype, where no
+/// dtype the number could take lets the call stand: the number adapts to a number the call meets
+/// and to nothing else, so beside a date, a moment, a length of time, a time of day or a text it
+/// has no dtype, and the call is refused whatever the number is. The words are the tables' for the
+/// dtype the number has alone, a whole number's `Int64` and a number with a fraction's `Float64`, or
+/// for the first dtype that fits where the tables say nothing of them. `None` where some dtype
+/// lets the call stand or one is refused only when the rows run, or none fits.
+pub(crate) fn refused_for_every_number(
+    entry: &'static Entry,
+    place: &Place,
+    chosen: &Chosen<'_>,
+    parameter: &str,
+    number: Loose,
+) -> Option<Refusal> {
+    if !follows_a_moment(place) {
+        return None;
+    }
+    refused_for_every_dtype(number, |class| {
+        let mut arguments = chosen.arguments.to_vec();
+        arguments.push((parameter, class));
+        offer(entry, place, &chosen.with_arguments(&arguments))
+    })
+}
+
+/// Why Polars refuses a call that follows a number typed without a dtype and is given a date, a
+/// moment, a length of time or a time of day as `argument`, where no dtype the number could take
+/// lets the call stand: the number is the other side of the arithmetic of a moment, and has no
+/// dtype beside it, whichever of the two the other is given to. As [`refused_for_every_number`]
+/// says it for the number that is given, this says it for the number that is followed. `None`
+/// where some dtype lets the call stand, as a length of time multiplied by a number does.
+pub(crate) fn refused_for_every_receiver_number(
+    entry: &'static Entry,
+    context: Context,
+    shape: Shape,
+    argument: (&str, Representative),
+    number: Loose,
+) -> Option<Refusal> {
+    if !is_a_moment(argument.1) {
+        return None;
+    }
+    refused_for_every_dtype(number, |class| {
+        let place = Place::new(
+            context,
+            After::Value {
+                dtype: class,
+                shape,
+            },
+        );
+        offer(
+            entry,
+            &place,
+            &Chosen::default().with_arguments(&[argument]),
+        )
+    })
+}
+
+/// The refusal for the dtype a number typed without a dtype has alone, where the tables refuse the
+/// call for every dtype it could take, and only for what Polars refuses when it works out the
+/// schema: what it refuses when the rows run is the table of rows' to say, as it is for a number of a
+/// dtype. `None` where some dtype lets the call stand.
+fn refused_for_every_dtype(
+    number: Loose,
+    mut offered: impl FnMut(Representative) -> Verdict,
+) -> Option<Refusal> {
+    let alone = if number.is_whole() {
+        Representative::Int64
+    } else {
+        Representative::Float64
+    };
+    let mut refusals: Vec<(Representative, Refusal)> = Vec::new();
+    for class in Representative::ALL
+        .into_iter()
+        .filter(|class| could_be_taken_by_a_number(*class) && number.fits(*class))
+    {
+        match offered(class) {
+            Verdict::Allowed(_) => return None,
+            Verdict::Refused(refusal) => refusals.push((class, refusal)),
+        }
+    }
+    if refusals
+        .iter()
+        .any(|(_, refusal)| refusal.source != RefusalSource::Polars(Stage::Schema))
+    {
+        return None;
+    }
+    let at = refusals
+        .iter()
+        .position(|(class, _)| *class == alone)
+        .unwrap_or(0);
+    refusals.into_iter().nth(at).map(|(_, refusal)| refusal)
+}
+
+/// Whether the dtype is a date, a moment, a length of time or a time of day.
+const fn is_a_moment(dtype: Representative) -> bool {
+    matches!(
+        dtype,
+        Representative::Date
+            | Representative::Time
+            | Representative::Datetime
+            | Representative::DatetimeZoned
+            | Representative::Duration
+    )
+}
+
+/// Whether the call follows a date, a moment, a length of time or a time of day, which a number
+/// typed without a dtype has no dtype beside, where it has one beside every other number.
+fn follows_a_moment(place: &Place) -> bool {
+    matches!(place.after(), After::Value { dtype, .. } if is_a_moment(dtype))
+}
+
+/// Why Polars refuses the value `fill_null` fills with, where it is a number typed without a
+/// dtype and the call follows a date, a moment, a length of time or a time of day: the number has
+/// the dtype of a number it follows and none beside these, so Polars finds the dtypes ambiguous
+/// where a number of a dtype is taken. `None` where the call follows another dtype, and for the
+/// other methods that fill, of which `shift` takes such a number as it takes any other.
+pub(crate) fn refused_as_ambiguous(
+    entry: &'static Entry,
+    place: &Place,
+    parameter: &str,
+) -> Option<Refusal> {
+    let After::Value { dtype, .. } = place.after() else {
+        return None;
+    };
+    (entry.id().as_str() == "Expr.fill_null" && follows_a_moment(place)).then(|| Refusal {
+        source: RefusalSource::Polars(Stage::Schema),
+        reason: format!(
+            "{parameter} of {} is a number typed without a dtype, which has the dtype of a number \
+             it follows and none beside {}: Polars finds the dtypes ambiguous",
+            entry.id().as_str(),
+            dtype.name()
+        ),
+    })
 }
 
 fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Allowance, Refusal> {

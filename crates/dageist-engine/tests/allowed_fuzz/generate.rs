@@ -307,6 +307,45 @@ fn dtype_value(class: Representative) -> Option<Value> {
     Dtype::new(class.dtype()).ok().map(Value::Dtype)
 }
 
+/// The whole numbers at the edges of a numeric dtype that the document can write as a whole
+/// number: its lowest and highest value, zero, and for the floats the numbers around the limit
+/// below which a whole number casts to them exactly, 2^24 and 2^53.
+fn edge_numbers(class: Representative) -> Vec<i64> {
+    match class {
+        Representative::Int8 => vec![i64::from(i8::MIN), i64::from(i8::MAX), 0, -1],
+        Representative::Int16 => vec![i64::from(i16::MIN), i64::from(i16::MAX), 0, -1],
+        Representative::Int32 => vec![i64::from(i32::MIN), i64::from(i32::MAX), 0, -1],
+        Representative::Int64 => vec![i64::MIN, i64::MAX, 0, -1],
+        Representative::UInt8 => vec![0, i64::from(u8::MAX)],
+        Representative::UInt16 => vec![0, i64::from(u16::MAX)],
+        Representative::UInt32 => vec![0, i64::from(u32::MAX)],
+        Representative::UInt64 => vec![0, i64::MAX],
+        Representative::Int128 => vec![i64::MIN, i64::MAX, 0, -1],
+        Representative::UInt128 => vec![0, i64::MAX],
+        Representative::Float16 => vec![2048, 2049, 65_504, 0, -1],
+        Representative::Float32 => vec![1 << 24, (1 << 24) + 1, 1 << 53, 0, -1],
+        Representative::Float64 => vec![1 << 53, (1 << 53) + 1, (1 << 24) + 1, 0, -1],
+        _ => vec![0, 1],
+    }
+}
+
+/// The whole numbers one past the edges of a numeric dtype, which no value of the dtype is: the
+/// step engine casts a literal's value to its dtype strictly, so a document that writes one is
+/// refused when the step is built.
+fn past_the_edges(class: Representative) -> Vec<i64> {
+    match class {
+        Representative::Int8 => vec![i64::from(i8::MIN) - 1, i64::from(i8::MAX) + 1],
+        Representative::Int16 => vec![i64::from(i16::MIN) - 1, i64::from(i16::MAX) + 1],
+        Representative::Int32 => vec![i64::from(i32::MIN) - 1, i64::from(i32::MAX) + 1],
+        Representative::UInt8 => vec![-1, i64::from(u8::MAX) + 1],
+        Representative::UInt16 => vec![-1, i64::from(u16::MAX) + 1],
+        Representative::UInt32 => vec![-1, i64::from(u32::MAX) + 1],
+        Representative::UInt64 | Representative::UInt128 => vec![-1],
+        Representative::Float16 => vec![65_520, 70_000],
+        _ => vec![300],
+    }
+}
+
 /// The classes a document can hold as a dtype, which a literal may be given.
 fn literal_classes() -> Vec<Representative> {
     Representative::MEASURED
@@ -315,11 +354,15 @@ fn literal_classes() -> Vec<Representative> {
         .collect()
 }
 
+/// How many cases in a hundred write the number of a literal of a dtype at an edge or as another
+/// kind than its dtype, where a case has one.
+const EDGE_PERCENT: usize = 25;
+
 /// How many of the first of the [`NUMBERED`] classes are numbers.
-const NUMERIC_CLASSES: usize = 10;
+const NUMERIC_CLASSES: usize = 13;
 
 /// The classes the whole number 1 is cast to as a literal, the numbers first.
-const NUMBERED: [Representative; 17] = [
+const NUMBERED: [Representative; 20] = [
     Representative::Int8,
     Representative::Int16,
     Representative::Int32,
@@ -330,6 +373,9 @@ const NUMBERED: [Representative; 17] = [
     Representative::UInt64,
     Representative::Float32,
     Representative::Float64,
+    Representative::Float16,
+    Representative::Int128,
+    Representative::UInt128,
     Representative::Boolean,
     Representative::String,
     Representative::Date,
@@ -1100,13 +1146,13 @@ impl Gen<'_> {
             0..=3 => {
                 let class = self.draw.pick(&NUMBERED);
                 match dtype_value(class) {
-                    Some(dtype) => (
-                        call(
-                            "polars.lit",
-                            vec![("value", Value::Integer(1)), ("dtype", dtype)],
-                        ),
-                        Some(class),
-                    ),
+                    Some(dtype) => {
+                        let value = self.written_as_a_number_of(class);
+                        (
+                            call("polars.lit", vec![("value", value), ("dtype", dtype)]),
+                            Some(class),
+                        )
+                    }
                     None => self.literal_loose(),
                 }
             }
@@ -1125,6 +1171,74 @@ impl Gen<'_> {
         }
     }
 
+    /// What a literal of the numeric class is written as: the whole number 1 as a rule, and
+    /// otherwise a value at an edge of the dtype, the same written as another kind than the
+    /// dtype (a whole float, or a text of the number), and now and then a value the cast to the
+    /// dtype refuses, which the step engine refuses when it builds the step. The tables were
+    /// measured with the number 1, so these are what the rules that read a literal's value must
+    /// settle.
+    fn written_as_a_number_of(&mut self, class: Representative) -> Value {
+        if !self.draw.chance(EDGE_PERCENT) {
+            return Value::Integer(1);
+        }
+        if class == Representative::Boolean {
+            // A flag is the number 0 or 1, a text of one or of a word, and a number that is neither.
+            return match self.draw.below(9) {
+                0 => Value::Integer(0),
+                1 => Value::Integer(2),
+                2 => Value::Float(0.5),
+                3 => Value::Float(1.0),
+                4 => Value::String("true".to_owned()),
+                5 => Value::String("1".to_owned()),
+                6 => Value::String(String::new()),
+                7 => Value::String("abc".to_owned()),
+                _ => Value::Flag(Some(true)),
+            };
+        }
+        if !NUMBERED[..NUMERIC_CLASSES].contains(&class) {
+            return Value::Integer(1);
+        }
+        // A number of 128 bits above 64 bits can only be written as a text or a float.
+        if matches!(class, Representative::Int128 | Representative::UInt128) && self.draw.chance(40)
+        {
+            let wide: &[&str] = if class == Representative::Int128 {
+                &[
+                    "170141183460469231731687303715884105727",
+                    "-170141183460469231731687303715884105728",
+                    "170141183460469231731687303715884105728",
+                ]
+            } else {
+                &[
+                    "340282366920938463463374607431768211455",
+                    "170141183460469231731687303715884105728",
+                    "340282366920938463463374607431768211456",
+                ]
+            };
+            return Value::String(self.draw.pick(wide).to_owned());
+        }
+        let number = if self.draw.chance(8) {
+            self.draw.pick(&past_the_edges(class))
+        } else {
+            self.draw.pick(&edge_numbers(class))
+        };
+        match self.draw.below(10) {
+            // A float that is the whole number, which the cast to a dtype of whole numbers takes,
+            // where it is exact.
+            0..=2 if number.unsigned_abs() <= 1 << 53 => Value::Float(number as f64),
+            // A text of the number.
+            3..=4 => Value::String(number.to_string()),
+            // A number with a fraction, which the cast cuts where the dtype is one of whole numbers,
+            // a text of one, which it refuses, and a word and an empty text, which it refuses.
+            5 if self.draw.chance(30) => match self.draw.below(4) {
+                0 => Value::Float(1.5),
+                1 => Value::String("1.5".to_owned()),
+                2 => Value::String("abc".to_owned()),
+                _ => Value::String(String::new()),
+            },
+            _ => Value::Integer(number),
+        }
+    }
+
     fn literal_loose(&mut self) -> (Call, Option<Representative>) {
         match self.draw.below(if self.untyped_numbers { 5 } else { 3 }) {
             // A number typed without a dtype adapts to the operand it is used with, so its class
@@ -1132,26 +1246,58 @@ impl Gen<'_> {
             // the case is held to what Polars gives. The numbers are ones that fit a narrow
             // column and ones that do not.
             3 => {
-                let number = self.draw.pick(&[1_i64, 1, 300, -1, 70_000]);
+                let number = self.draw.pick(&[
+                    1_i64,
+                    1,
+                    300,
+                    -1,
+                    70_000,
+                    0,
+                    128,
+                    255,
+                    1 << 24,
+                    (1 << 24) + 1,
+                    1 << 53,
+                    (1 << 53) + 1,
+                    i64::MAX,
+                ]);
                 (
                     call("polars.lit", vec![("value", Value::Integer(number))]),
                     None,
                 )
             }
             4 => {
-                let number = self.draw.pick(&[1.5_f64, 1.5, 1e40]);
+                let number = self.draw.pick(&[
+                    1.5_f64,
+                    1.5,
+                    1e40,
+                    0.0,
+                    -0.0,
+                    1.0,
+                    300.0,
+                    16_777_216.0,
+                    9_007_199_254_740_992.0,
+                    0.999_999_9,
+                ]);
                 (
                     call("polars.lit", vec![("value", Value::Float(number))]),
                     None,
                 )
             }
-            0 => (
-                call(
-                    "polars.lit",
-                    vec![("value", Value::String("1d".to_owned()))],
-                ),
-                Some(Representative::String),
-            ),
+            0 => {
+                // Text that a rule may read as a number or as nothing: one that is a number, an
+                // empty one and a word, besides the duration the rules that read one are given.
+                let text = self
+                    .draw
+                    .pick(&["1d", "1d", "1d", "", "0", "-1", "1.5", "255", "abc"]);
+                (
+                    call(
+                        "polars.lit",
+                        vec![("value", Value::String(text.to_owned()))],
+                    ),
+                    Some(Representative::String),
+                )
+            }
             1 => (
                 call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
                 Some(Representative::Boolean),
@@ -1255,10 +1401,32 @@ impl Gen<'_> {
         let number = if from_the_end && self.draw.chance(25) {
             -1
         } else {
-            self.draw.pick(&[0_i64, 1, 1, 2, 2, 3, 5])
+            self.draw.pick(&[
+                0_i64,
+                1,
+                1,
+                2,
+                2,
+                3,
+                5,
+                i64::from(u32::MAX),
+                i64::from(u32::MAX) + 1,
+                i64::MAX,
+            ])
         };
         let typed = !from_the_end || number >= 0;
-        let class = self.draw.pick(&NUMBERED[..4]);
+        // A dtype that holds the number: a cast to one that does not is refused when the step is
+        // built, which the grid of the cuts settles.
+        let first = if number > i64::from(i32::MAX) {
+            3
+        } else if number > i64::from(i16::MAX) {
+            2
+        } else if number > i64::from(i8::MAX) {
+            1
+        } else {
+            0
+        };
+        let class = NUMBERED[first + self.draw.below(4 - first)];
         let literal = match dtype_value(class) {
             Some(dtype) if typed && self.draw.chance(50) => call(
                 "polars.lit",
@@ -3638,9 +3806,9 @@ mod tests {
     /// Whether every share a quantile is given in the JSON `value` is a literal alone of a numeric
     /// dtype, or of none, which is a number typed in.
     fn shares_are_numbers(value: &serde_json::Value, found: &mut usize) -> bool {
-        const NUMERIC: [&str; 10] = [
-            "Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float32",
-            "Float64",
+        const NUMERIC: [&str; 13] = [
+            "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64",
+            "UInt128", "Float16", "Float32", "Float64",
         ];
         match value {
             serde_json::Value::Object(map) => {

@@ -84,6 +84,9 @@ pub struct Traced {
 pub struct Refused {
     pub place: Place,
     pub reason: String,
+    /// Whether the catalogue refused to build the step, and Polars was not asked: a value that
+    /// does not cast to the dtype it is given, a pattern that is no pattern.
+    pub at_build: bool,
 }
 
 /// What Polars did when the step was planned.
@@ -150,6 +153,29 @@ pub fn plan(step: &Step, index: usize, source: &DataFrame, tables: Tables) -> Op
         schema,
         traces: asking.traces,
     })
+}
+
+/// Whether Polars accepts `step`, the `index`th of a document, on the schema of `source` when it
+/// works out the schema: nothing is traced and no row is read, so a grid of many cells asks it
+/// cheaply. `None` for a step that cannot be asked.
+pub fn schema_of(
+    step: &Step,
+    index: usize,
+    source: &DataFrame,
+    tables: Tables,
+) -> Option<Result<SchemaRef, Refused>> {
+    let mut asking = Asking::new(step, index, source, tables, false);
+    let built = match asking.step(step.call(), source.clone().lazy()) {
+        Ok(frame) => frame,
+        Err(Stop::CannotAsk) => return None,
+        Err(Stop::Refused(refused)) => return Some(Err(refused)),
+    };
+    Some(
+        built
+            .clone()
+            .collect_schema()
+            .map_err(|error| asking.polars_refusal(&error)),
+    )
 }
 
 /// The first `limit` rows of the table `step` gives on `working`, or the first line of why not.
@@ -260,6 +286,7 @@ impl<'a> Asking<'a> {
         Err(Stop::Refused(Refused {
             place: self.here(),
             reason: first_line(&reason.to_string()),
+            at_build: false,
         }))
     }
 
@@ -283,6 +310,7 @@ impl<'a> Asking<'a> {
             Stop::Refused(Refused {
                 place: path.into_iter().fold(self.base.clone(), Place::then),
                 reason: first_line(&error.to_string()),
+                at_build: true,
             })
         })
     }
@@ -307,12 +335,14 @@ impl<'a> Asking<'a> {
                 return Refused {
                     place: trace.place.clone().then(segment),
                     reason,
+                    at_build: false,
                 };
             }
         }
         Refused {
             place: self.base.clone(),
             reason: first_line(&error.to_string()),
+            at_build: false,
         }
     }
 

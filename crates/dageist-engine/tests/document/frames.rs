@@ -142,9 +142,11 @@ fn head_and_limit_refuse_a_negative_count_as_python_does() {
             gives_no_table(&one(entry, json!({ "n": whole(-1) }))),
             "{entry}"
         );
-        // Python's binding takes the count as an unsigned 32-bit number: `OverflowError`.
-        assert!(
-            gives_no_table(&one(entry, json!({ "n": whole(4_294_967_296) }))),
+        // Python takes the count as the length of a slice, a whole number of the platform, so a
+        // count above 32 bits keeps every row; only `tail` takes an index of 32 bits.
+        assert_eq!(
+            rows(&one(entry, json!({ "n": whole(4_294_967_296) }))),
+            all_rows(),
             "{entry}"
         );
     }

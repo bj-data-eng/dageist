@@ -256,6 +256,7 @@ impl Step {
         walker.written_names_are_distinct();
         walker.step_options(self.call());
         walker.nan_test_columns();
+        walker.cut_by_a_number();
         walker.key_names();
         Walk {
             expressions: walker.walked,
@@ -729,10 +730,10 @@ fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) ->
             part.links().is_empty()
                 && matches!(part.start(), Start::Call(call)
                 if call.entry().id().as_str() == "polars.lit"
-                    && matches!(
+                    && (matches!(
                         call.argument("value"),
                         Some(Value::Integer(_) | Value::Float(_) | Value::Flag(Some(_)))
-                    ))
+                    ) || is_a_number_of_a_dtype(call)))
         }
         Some(_) => false,
     };
@@ -743,6 +744,42 @@ fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) ->
         Some(Value::Expression(part)) => key_name(part),
         _ => Some("literal".to_owned()),
     }
+}
+
+/// Whether the literal is a text of a number given no dtype, which Polars reads as the number it
+/// is where a part of a moment is given one.
+fn is_a_text_of_a_number(call: &Call) -> bool {
+    call.argument("dtype").is_none()
+        && matches!(call.argument("value"), Some(Value::String(text))
+            if text.trim().parse::<f64>().is_ok_and(f64::is_finite))
+}
+
+/// Whether the literal is a number given a dtype of numbers, as the step engine makes it: the value
+/// cast strictly to the dtype, so a float or a text of a number given a dtype of whole numbers is
+/// the whole number it casts to, which Polars folds as it does a number typed in.
+fn is_a_number_of_a_dtype(call: &Call) -> bool {
+    use polars::prelude::DataType as D;
+    let (Some(value), Some(Value::Dtype(dtype))) = (call.argument("value"), call.argument("dtype"))
+    else {
+        return false;
+    };
+    matches!(
+        dtype.as_polars(),
+        D::Int8
+            | D::Int16
+            | D::Int32
+            | D::Int64
+            | D::Int128
+            | D::UInt8
+            | D::UInt16
+            | D::UInt32
+            | D::UInt64
+            | D::UInt128
+            | D::Float16
+            | D::Float32
+            | D::Float64
+    ) && catalog::typed_literal(&value.placeholder(), dtype.as_polars())
+        .is_ok_and(|scalar| !scalar.is_null())
 }
 
 /// Whether Polars folds the call into a literal, which it names by an alias: a moment, with no
@@ -764,7 +801,9 @@ fn is_folded_into_a_literal(start: &Call) -> bool {
             part.links().is_empty()
                 && matches!(part.start(), Start::Call(call)
                     if call.entry().id().as_str() == "polars.lit"
-                        && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+                        && (matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_)))
+                            || is_a_text_of_a_number(call)
+                            || is_a_number_of_a_dtype(call)))
         }
         Some(_) => false,
     };
@@ -1204,6 +1243,43 @@ impl Walker<'_> {
                 self.path.clear();
                 return;
             }
+        }
+    }
+
+    /// Asks whether the table is cut by numbers Polars cannot cut it by: every 0th row, and a slice
+    /// that is given a length whose place and length together run past the last row number that
+    /// Polars counts, which is a whole number of 63 bits. A slice given no length runs to the end.
+    fn cut_by_a_number(&mut self) {
+        let (parameter, said) = match self.step.entry().id().as_str() {
+            "LazyFrame.gather_every" => match self.step.argument("n") {
+                Some(Value::Integer(0)) => (
+                    "n",
+                    "gather_every needs n above nothing: Polars refuses to take every 0th row",
+                ),
+                _ => return,
+            },
+            "LazyFrame.slice" => {
+                let Some(Value::Integer(offset)) = self.step.argument("offset") else {
+                    return;
+                };
+                // A slice given no length runs to the end of the table, whatever its place is.
+                let Some(Value::Integer(length)) = self.step.argument("length") else {
+                    return;
+                };
+                if i128::from(*offset) + i128::from(*length) <= i128::from(i64::MAX) {
+                    return;
+                }
+                (
+                    "offset",
+                    "a slice cannot start where it runs past the last row Polars counts, which is row 9223372036854775807",
+                )
+            }
+            _ => return,
+        };
+        if let Err(refusal) = allowed::rule_forbids_a_range_that_cannot_be_made(said) {
+            self.path = vec![Segment::Parameter(parameter.to_owned())];
+            self.refuse(&refusal, false);
+            self.path.clear();
         }
     }
 
@@ -2771,6 +2847,36 @@ impl Walker<'_> {
                 count,
                 taken,
             } => {
+                // A number typed without a dtype that the call follows has none beside a date, a
+                // moment, a length of time or a time of day it is given, where no dtype it could
+                // take lets the call stand: Polars refuses it as it refuses it given to them.
+                let refused = receiver_loose.and_then(|number| {
+                    arguments
+                        .iter()
+                        .filter(|(name, operand)| {
+                            operand.loose.is_none()
+                                && receiver_beside(entry, name, number) == Some(Receiver::Adapts)
+                        })
+                        .find_map(|(name, operand)| {
+                            allowed::refused_for_every_receiver_number(
+                                entry,
+                                context,
+                                *shape,
+                                (name.as_str(), operand.dtype?),
+                                number,
+                            )
+                        })
+                });
+                if let Some(refusal) = refused {
+                    self.refuse(&refusal, false);
+                    return (
+                        Cur::Dead,
+                        Standing {
+                            follows: None,
+                            verdict: Some(Verdict::Refused(refusal)),
+                        },
+                    );
+                }
                 self.blind(format!(
                     "the dtype before {} is not known",
                     entry.id().as_str()
@@ -2960,6 +3066,29 @@ impl Walker<'_> {
                     .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
+            // A number typed without a dtype that adapts to what the call follows has none beside
+            // what is no number, so where no dtype it could take lets the call stand, Polars
+            // refuses it whatever the number is.
+            let refused_for_a_number = match (&verdict, missing.as_slice()) {
+                (Verdict::Allowed(_), [name]) if operand_adapts(entry, name) => resolved
+                    .iter()
+                    .find(|(given, _, _)| given == name)
+                    .and_then(|(_, _, number)| *number)
+                    .and_then(|number| {
+                        allowed::refused_for_every_number(
+                            entry,
+                            &place,
+                            &Chosen::default()
+                                .with_arguments(&given)
+                                .with_options(&words),
+                            name,
+                            number,
+                        )
+                        .or_else(|| allowed::refused_as_ambiguous(entry, &place, name))
+                    }),
+                _ => None,
+            };
+            let verdict = refused_for_a_number.map_or(verdict, Verdict::Refused);
             let standing = Standing {
                 follows: Some(after),
                 verdict: Some(verdict.clone()),
@@ -3614,18 +3743,66 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
 }
 
 /// Why a method that cuts the values it follows may not cut them by what it is given, where it is a
-/// number typed in below nothing: how many values the first, the last and `limit` keep, and the length
-/// of a slice.
+/// number typed in that Polars cannot cut by: below nothing for how many values the first, the last
+/// and `limit` keep and for the length of a slice, and for every place and count one with a
+/// fraction, which Polars refuses as no whole number, whatever its value is. The number is read as
+/// the step engine makes it, so a float or a text given the dtype of whole numbers is the whole
+/// number it casts to.
 fn cut_below_nothing(link: &Call) -> Option<String> {
-    let parameter = match link.entry().id().as_str() {
-        "Expr.head" | "Expr.limit" | "Expr.tail" => "n",
-        "Expr.slice" => "length",
+    let parameters: &[&str] = match link.entry().id().as_str() {
+        "Expr.head" | "Expr.limit" | "Expr.tail" => &["n"],
+        "Expr.slice" => &["offset", "length"],
+        "Expr.gather_every" => {
+            return matches!(link.argument("n"), Some(Value::Integer(0))).then(|| {
+                "gather_every needs n above nothing: Polars refuses to take every 0th value"
+                    .to_owned()
+            });
+        }
         _ => return None,
     };
-    let number = whole_number(link, parameter).filter(|number| *number < 0)?;
-    Some(format!(
-        "values cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from them"
-    ))
+    parameters.iter().find_map(|parameter| {
+        match cut_number(link, parameter)? {
+            CutNumber::Whole(number) if number < 0 && *parameter != "offset" => Some(format!(
+                "values cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from them"
+            )),
+            CutNumber::Fraction => Some(format!(
+                "values cannot be cut by {parameter} given as a number with a fraction: Polars needs it to be integral"
+            )),
+            CutNumber::Whole(_) => None,
+        }
+    })
+}
+
+/// A number typed in that a cut reads.
+enum CutNumber {
+    /// A whole number, as written or as a dtype of whole numbers makes it.
+    Whole(i128),
+    /// A number with a fraction typed without a dtype, which Polars does not read as a whole number.
+    Fraction,
+}
+
+/// The number the call is given for `parameter` where it is a literal alone, and what it is.
+fn cut_number(link: &Call, parameter: &str) -> Option<CutNumber> {
+    let literal = match link.argument(parameter)? {
+        Value::Integer(number) => return Some(CutNumber::Whole(i128::from(*number))),
+        Value::Expression(expression) if expression.links().is_empty() => {
+            match expression.start() {
+                Start::Call(start) if start.entry().id().as_str() == "polars.lit" => start,
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    let value = literal.argument("value")?;
+    match (literal.argument("dtype"), value) {
+        (None, Value::Integer(number)) => Some(CutNumber::Whole(i128::from(*number))),
+        (None, Value::Float(_)) => Some(CutNumber::Fraction),
+        (Some(Value::Dtype(dtype)), value) => {
+            let scalar = catalog::typed_literal(&value.placeholder(), dtype.as_polars()).ok()?;
+            whole_value(scalar.value()).map(CutNumber::Whole)
+        }
+        _ => None,
+    }
 }
 
 /// A whole number the call is given for `parameter`, typed in, where it is one.

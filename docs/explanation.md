@@ -1072,11 +1072,14 @@ is two rows, as the report counts them.
 
 What Polars does with each is what the document tests say, and some of it is not what a name suggests:
 
-- `head`, `limit` and `tail` take `n`, which Python's binding passes on as an unsigned 32-bit number, so a
-  build refuses a negative one and one above it; Python refuses them as `ValueError` and `OverflowError`.
+- `head`, `limit` and `tail` take `n`. `head` is the slice of the first `n` rows and Python gives a slice
+  its length as a whole number of the platform, so a count above 32 bits keeps every row and a negative
+  one is refused as `ValueError`; `tail` takes an index, an unsigned 32-bit number, so a build refuses a
+  negative one and one above it, as Python refuses it as `OverflowError`.
   `limit` is `head` under another name, and both are offered because both are Polars' names. `slice`
-  takes a signed `offset`, counted from the end where it is negative, and a `length` that is left out
-  as the most rows an index holds; a negative length is refused. `first` is the slice of the first row
+  takes a signed `offset`, counted from the end where it is negative, and a `length` that is a whole number
+  of the platform and is not given is the end of the table, whatever the `offset` is; a negative length is
+  refused. `first` is the slice of the first row
   and `last` the tail of one, so a table with no rows has none.
 - `gather_every` takes `n` and `offset` as unsigned numbers and gathers the rows `offset`, `offset + n`,
   and so on, of every column. Polars refuses an `n` of zero when it runs rows. Python runs it, as it runs
@@ -2841,6 +2844,8 @@ These are what remains of the fuzz items of #129. The gate is lifted when a camp
 | A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |
 | A hidden schema | The tables hold the schema of a method and what its rows give as one thing, and refuse a method whose plan says another dtype than its rows give. That is the target's own comparison, not a refusal of Polars, and it shows only where the method is the output of the step: inside an expression that goes on from it or compares it, Polars evaluates the method and the step's rows do not show the difference. The tables refusing, with the reason that the schema says one dtype and the rows give another, at a call that is not the last of the step's own expression, which Polars allows. A sort key and a join's key are no output of the step either, so the same reason at the last call of one is excused, unless a probe of the call on a column in the key settles it, which says more of it and is asked first. |
 | A negative exponent | Polars raises an integer to a power by taking the exponent as a `UInt32`, so it refuses a negative whole number as the exponent of an integer when the rows run. The exponent is a value, which the tables measured as the dtype and the number 1. Polars refusing the rows with a failed conversion to `u32`, in a case with a `pow` whose exponent is a whole number typed below zero or holds a subtraction, a negation, a not or a difference, which can take the values of a column below zero (no place). The sample's rows are 1, a null and 3, so a sum or a product of them, a power of a positive number or of a column is not this. |
+| A count no index holds | Polars reads how many values `top_k` and `bottom_k` keep as an index of 32 bits, so it refuses a count below nothing or beyond 4294967295 when the rows run, in some places a step puts them (a literal, a group, an aggregate) and not in others (a plain column of a `select`), where the tables measured the number 1. Polars refusing the rows with a failed conversion to `u32`, in a case with a `top_k` or a `bottom_k` whose count is a whole number typed below nothing or beyond that (no place). The walk reads no value of the count, and the grid of the literal roles names it. |
+| A literal that does not cast | The step engine builds a literal given a dtype by casting its value to the dtype strictly, as Python's `lit` does, so a whole number past the dtype's edges, a float that is such a number, a text that is no number of the dtype and a text given `Boolean` are refused when the step is built, before the tables are asked, and the tables measured literals of a dtype that holds the number 1. Polars refusing the schema with a failed conversion or a cast it does not support, in a case that holds such a literal: the case run again with each such literal made the number 1 of its dtype is not refused for a failed conversion. A float with a fraction is no such literal, for the cast cuts it. |
 | A null in a bitwise call | A value of the dtype Null, a column or a literal (typed as it or not) or what a call gives that dtype, is an operand of `and_`, `or_` and `xor` that the tables allow, giving a `Boolean`, as `select` shows, and Polars meets it where `select` hides it. It negates what a bitwise call combines operand by operand, so a `not_` meets each operand and refuses the dtype Null: Polars refusing the rows with the dtype Null not supported in `not`, in a case with a `not_` after a run of `and_` and `or_`, any call of which meets a null, as the receiver or an operand, by the dtypes the tables give and as a null goes on through the calls after it, which the negation is pushed through (no place); an `xor` or any other call ends the run. It gives a filter's predicate the dtype Null: Polars refusing the rows with a predicate that must be a `Boolean`, got `Null`, in a filter with a predicate that ends in bitwise calls the first of which meets a null (no place). An `and_` with a null on either side gives Null, so does an `or_` of nulls, and the dtype goes on through an `and_`, and an `or_` of another null, that follows; an `or_` or an `xor` of a `Boolean` and a null is a `Boolean` and is not this, nor is a predicate that a call other than a bitwise one ends. |
 | A division by zero | Polars refuses to divide a `Decimal` by zero, where a whole number divided by zero is null and a float is infinite. The divisor is a value, which the tables measured as the dtype and the sample's values, none of them zero; a remainder or a difference of them can be, and the sum of no rows is. Polars refusing the rows or the empty table with the reason that it divides a `Decimal` by zero, in a case with a `Decimal` as a column that holds a division, a floor division or a remainder (no place). |
 | A bound the dtype cannot hold | Polars casts a bound of `clip` to the dtype it clips as strictly as it can, and refuses the rows when the bound holds a value that dtype cannot hold: a number typed without a dtype that is out of its range or below zero beside an unsigned dtype, or a value of a float that is no whole number it can hold, such as the infinity and the not-a-number that a logarithm to the base 1 or a root of a negative number gives beside whole numbers. The tables measured a bound as a column of the sample's rows, whose numbers every number dtype holds. Polars refusing the rows, with a failed conversion that has no place, in a case whose bound is why: the case run again with the bounds of every `clip` undone is not refused for a failed conversion, which is also why a failed conversion that another call causes, and a clip with no bound, are not excused. The table with no rows holds no value to convert, except for a bound that holds an aggregate, whose value of nothing, as the not-a-number of an entropy, is there. The values a `replace` or a `replace_strict` lists, what it replaces and what replaces it, are cast to the dtype it follows in the same way, and are bounds here: the run again makes each of them a null. |
@@ -2880,8 +2885,16 @@ tables take for one class, and that Polars refuses for the dtypes of the keys no
 is no case at all: no dtype of the column fits both, and the target counts it apart
 (`join keys of different dtypes share a column`) and does not compare it. Polars joins whole
 numbers of different widths with one column, so a join it accepts is compared. The
-generator keeps to what the tables measured where a value, not a dtype, decides: a
-`shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
+generator keeps to what the tables measured where a value, not a dtype, decides, except for the
+literals, which [grids](#grids-settle-what-a-campaign-does-not-reach) settle for the rules that read
+one and which a campaign draws, a quarter of the time, at an edge of their dtype (its lowest and highest
+value, zero and minus one, the numbers 2^24 and 2^53 and one past them for the floats), written as a
+whole float or as a text of the number, and now and then as a value that the cast to the dtype refuses,
+which a limit holds; a number typed without a dtype is drawn from 1, 0, 300, -1, 128, 255, 70000, 2^24,
+2^53, their successors and the greatest whole number, or from 1.5, 1e40, 0.0, minus zero, whole floats, 2^24
+and 2^53 as floats; a text is `"1d"` in three draws of nine and otherwise empty, a number, a fraction or a word; a literal given `Boolean` is the number 1, 0 or 2, a fraction, a flag, or a text of a number, an empty text or a word, and the 128 bit and half float dtypes are drawn at their edges too, the 128 bit ones as a text above 64 bits; the
+count a cut is given reaches 2^32 and the greatest whole number. Elsewhere it keeps to what the
+tables measured: a `shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
 tables measured the dtype, which the sign does not change), a number of significant figures
 of one or more, durations that are text of `b`, two values of a condition of one dtype, a join
 without `validate`, a tolerance of `is_close` from zero, a fill of a value or of a strategy and
@@ -2902,6 +2915,63 @@ the column of the table that stands for an argument, whose text is the durations
 with. A time zone is drawn from eight names and offsets that Polars reads, four texts that it does not,
 and, for a method that takes a zone off, none, and a method that must be given a time zone or a unit
 is always given one.
+
+### Grids Settle What A Campaign Does Not Reach
+
+A campaign draws a literal from a few values, so a rule that reads a literal's value or dtype is
+reached only by the values the generator happens to write: the disagreements of #207 were found by
+grids built by hand, in three rounds, and not by a campaign. A grid is the product of named axes,
+the dtype of the column, the kind of value and the dtype a literal is given, which parameter or
+method, the order of the operands, and Polars judges every cell. The helper is
+`tests/document/grid.rs`: it makes the cells from their number, so a grid of millions never lies in
+memory, judges them on every core the host gives, and keeps only the cells that are not agreed on. A
+cell is judged from the schema Polars works out of the step on the table's schema, with no row read,
+and the rows of a table of three are run only where a grid asks for them (a strict cast of a value, a
+length, a panic) or where the walk says Polars refuses the step on rows; the tally says how many cells
+each decided and how many cells a second the grid ran at, which is a few hundred to a few thousand in a
+debug build, the walk being most of the time. A panic of Polars is the cell's outcome, and a cell that
+does not end names itself and ends the run.
+
+Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk
+panicked, unbuildable (the case cannot be made, such as a text of a length no memory holds, or a step
+Polars cannot be asked of), the catalogue refuses only (the catalogue cannot build the step, so the
+step engine refuses it before the walk is asked, and the walk allows it: a value that does not cast to
+the dtype it is given, a count below nothing), or set aside (Polars refuses it for another reason than
+the grid asks about). The walk must take what Polars takes and refuse what Polars refuses. A cell where
+it does not is fixed, with the failing grid committed first, or named in the test by the pattern of its
+axes with a reason; a cell that two lines name is counted by the more specific, and a line that
+matches no cell fails as stale, so a limit that has gone does not stay.
+
+`tests/document/literal_grid.rs` holds the grids of every rule that reads a literal, which is each
+role the catalogue gives a parameter: what a number is added to, subtracted from, multiplied, divided
+by, raised to, a logarithm is taken to, a bound it is cut to, a share, a count, a length, a value that
+fills (`fill_null`, `fill_nan`, `shift`), the operands of `and_` and `or_`; the values `replace` and
+`replace_strict` list; the counts and places that `head`, `tail`, `slice`, `top_k`, `diff`,
+`pct_change` and `gather_every` cut or look back by, as methods and as steps; and the comparisons with a
+number in a filter and in a condition. The operands are crossed in both orders, the column first and the
+literal first. The grid of #207's missing comparisons in `nulls.rs` is judged by it too. The grids found
+differences that are fixed: a number typed without a dtype beside a date, a moment, a length of time
+or a time of day, which `fill_null` and the arithmetic refuse, on either side, and the walk allowed; a
+count or a place with a fraction, and a length below nothing written as a float or a text given a
+dtype of whole numbers; every 0th row, and a slice that is given a length and runs past row 2^63 - 1,
+where one given none runs to the end of the table, as Python builds it, and the count `head` and
+`limit` take, a whole number of the platform where the catalogue took 32 bits; and a part of a moment
+or of a length of time that a float or a text of a number given a dtype of numbers makes, which Polars
+folds into a literal that a join's key may not hold. What they leave is named in the tests, each with
+its reason, and is not settled here: the value of a share outside 0 to 1, a length of padding or an
+exponent below nothing or beyond 32 bits, a bound or a listed value that its dtype cannot hold when
+the rows run, a text of a number where Polars casts it to the dtype it meets, a typed null that meets a
+date, text and a number typed without a dtype where the rows run, a Boolean and a number typed without
+a dtype in a bitwise call, a literal that does not cast to its dtype, which the walk could foretell by
+casting the value as the catalogue does, and what Polars panics on in a debug build or never ends on
+(a text padded to a length no memory holds). `is_in` has no grid there: its deprecated form is removed
+with #203, which builds its grid on the helper.
+
+A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
+the campaigns explore how calls compose, in the background, and a finding that is about the value of a
+literal becomes a new choice or a new axis of a grid, as [the how-to](how-to.md#check-a-rule-that-reads-a-literal-with-a-grid)
+says. The grids of the normal tests run in seconds to a minute each; the large ones cross every value
+with every dtype, ask the rows of every cell, and run on request.
 
 ## What The Step Editor Storyboard Has Settled
 

@@ -906,6 +906,69 @@ another reason is no finding: the allowance is right, but Polars never judged wh
 the tables refused, so it is not counted as agreement, and its outcome names both
 reasons.
 
+## Check A Rule That Reads A Literal With A Grid
+
+A random campaign draws a literal from a few values, so it does not reach the ones a rule is about:
+the edges of a dtype, a value written as another kind than its dtype, a text that is a number. A
+grid crosses them all at once and has Polars judge every cell, so a gap is one named cell and not one
+review round later. The helper is `tests/document/grid.rs`, and the grids of the rules that read a
+literal, which the [explanation](explanation.md#grids-settle-what-a-campaign-does-not-reach) lists,
+are in `tests/document/literal_grid.rs`. The grids of the normal tests take seconds to a minute each:
+
+```sh
+cargo test --offline --locked -p dageist-engine --test document literal_grid
+```
+
+The large grids cross every value with every dtype and ask Polars the rows of every cell. They are
+ignored in the normal run, as a campaign is, and take minutes each; run them alone:
+
+```sh
+cargo test --offline --locked -p dageist-engine --test document the_large_grid \
+  -- --ignored --nocapture --test-threads 1
+```
+
+`DAGEIST_GRID_THREADS` sets how many threads judge the cells (the cores the host has, up to 8),
+`DAGEIST_GRID_DEADLINE_SECS` how long a cell may take before the run ends naming it (60), and
+`DAGEIST_GRID_ALL=1` names every cell of a failure and not the first 80. With `--nocapture` each grid
+prints its tally, how many cells the schema decided and how many the rows, and how many cells a second it
+was judged at.
+
+To write the grid of a new rule:
+
+1. Write a struct that holds what varies and derives `Default`, the point: the dtype of the column,
+   the literal as a `Chosen`, which parameter or method, the order of the operands. Implement
+   `HoldsLiteral` and `HoldsColumn` for it if it holds them, so that `literal_axes` and `column_axis`
+   add their axes.
+2. Add an axis for each thing that varies with `Grid::axis(name, labelled choices, set)`. Any axes
+   work: a membership grid is the dtype of the receiver crossed with the forms a parameter is given in
+   (a column, an imploded list, a list column, an array column, a typed literal, a list typed in, a
+   null). The values to cross are in `grid::literals`: `edge_integers`, `edge_floats` and `edge_texts`.
+3. Give `judge` the `Question` the grid asks and a function that builds the `Case` of a point through
+   `Case::of_step`, or says why it cannot, which makes the cell unbuildable. Ask only the schema of
+   Polars unless the outcome depends on execution, a strict cast of a value, a length, a panic: then
+   ask `Depth::Rows`. A cell that the walk
+   refuses on rows is asked them whatever the depth is.
+4. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of
+   its axes, the words of what was said (`saying`, or `saying_one_of`) and a reason written for a
+   reader: the walk refuses only, Polars refuses only, the catalogue refuses only, and every
+   unbuildable cell and every cell set aside. A line that several grids hold is `shared`. A line that matches no cell fails as stale, so a limit
+   that has gone is found. A disagreement is fixed, with a failing grid test committed first, or it is
+   listed with its reason and filed.
+
+A cell that Polars panics on or never ends is no crash of the run: a panic is Polars' answer, and a
+cell that does not end names itself and ends the run, so build it as unbuildable with the reason
+`Polars never ends` and list it.
+
+When a campaign finds a case that a rule that reads a literal disagrees on, reduce it as described
+above and then add it to the grid. The value of its literal is a new choice on the axis of the values; a
+kind of literal, a place the literal stands or a parameter the grid does not vary is a new axis or a
+new value of the axis that names it. The grid then holds the finding and every neighbour of it, and the
+campaign need not find the next one.
+
+`is_in` has no grid in `literal_grid.rs`. Its deprecated form is removed with #203, and the grid of what
+it is given (a column, an imploded list, a list column, an array column, a typed literal, a list typed in,
+a null, against each dtype of the receiver) is built on this helper there.
+
 ## Check The Build Against The Polars Release
 
 The engine builds Polars from `vendor/polars` with the same features, crate
