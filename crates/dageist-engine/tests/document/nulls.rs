@@ -13,6 +13,8 @@ use polars::prelude::*;
 use serde_json::{Value, json};
 
 use crate::ask_polars::{self, Connected};
+use crate::grid::literals::{self as written_literals, Written};
+use crate::grid::{Case, Connections, Depth, Grid, Kind, Known, Pattern, Question};
 use crate::support::{call, chain, col_call, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
@@ -1256,6 +1258,37 @@ fn a_missing_comparison_of_a_field_read_from_a_struct_or_with_a_number_given_its
     }
 }
 
+/// What a cell of the grid of missing comparisons chooses.
+#[derive(Default)]
+struct Point {
+    held: Option<DataType>,
+    literal: Option<Value>,
+    method: &'static str,
+    swapped: bool,
+}
+
+/// The case of a join of the table `x` of the dtype `held` whose key is `key`.
+fn join_case(held: &DataType, key: Value) -> Case {
+    let working = df!("x" => [1_i64, 1, 2])
+        .expect("the table")
+        .lazy()
+        .select([col("x").cast(held.clone())])
+        .collect()
+        .expect("the column cast to its dtype");
+    let given = json!({
+        "left_on": many(vec![key]),
+        "right_on": many(vec![field("rk")]),
+        "other": { "table": "other" },
+    });
+    Case::of_step(
+        "LazyFrame.join",
+        given,
+        working,
+        Connections::new().table("other", other()),
+    )
+    .expect("a document")
+}
+
 /// A literal of `value` (`{"integer": n}` or `{"float": f}`), given the dtype `word` where it is
 /// one.
 fn literal_of(value: Value, word: Option<&str>) -> Value {
@@ -1548,69 +1581,97 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
         Some("UInt64"),
         Some("UInt128"),
     ];
-    let mut literals: Vec<Value> = Vec::new();
+    // Every kind of literal: the whole numbers and the floats with each dtype or none, and the
+    // texts with each dtype. A text only makes a literal where it casts to its dtype, and the
+    // cells where it does not are set aside.
+    let mut literals: Vec<(String, Value)> = Vec::new();
+    let mut add = |written: Written, word: Option<&str>| {
+        literals.push((
+            written_literals::label(&written, word),
+            written_literals::call(&written, word),
+        ));
+    };
     for number in integers {
         for word in dtypes {
-            literals.push(literal_of(json!({ "integer": number }), word));
+            add(Written::Integer(number), word);
         }
     }
     for number in floats {
         for word in dtypes {
-            literals.push(literal_of(json!({ "float": number }), word));
+            add(Written::Float(number), word);
         }
     }
-    // Text only makes a literal where it casts to its dtype.
     for text in texts {
         for word in dtypes.into_iter().flatten() {
-            literals.push(literal_of(json!({ "string": text }), Some(word)));
+            add(Written::Text(text), Some(word));
         }
     }
-    let mut differences: Vec<String> = Vec::new();
-    let mut compared = 0;
-    for held in &columns {
-        for literal in &literals {
-            for method in ["Expr.eq_missing", "Expr.ne_missing"] {
-                for swapped in [false, true] {
-                    let report = join_on_a_column_of(
-                        held,
-                        compared_with_a_literal(method, literal, swapped),
-                    );
-                    let said = polars_says(&report);
-                    if said
-                        .as_ref()
-                        .is_some_and(|reason| !reason.contains("elementwise"))
-                    {
-                        continue;
-                    }
-                    compared += 1;
-                    let refused_by_polars = said.is_some();
-                    let refused_by_the_walk = walk(&report).refusal().is_some_and(|refusal| {
-                        matches!(
-                            refusal.refusal().source(),
-                            RefusalSource::Rule(Rule::KeyIsElementwise)
-                        )
-                    });
-                    if refused_by_polars != refused_by_the_walk {
-                        differences.push(format!(
-                            "{method} {literal} of a column of {held}, swapped: {swapped}: \
-                             Polars refuses: {refused_by_polars}, the walk: {refused_by_the_walk}"
-                        ));
-                    }
-                }
-            }
-        }
-    }
-    assert!(compared > 5_000, "only {compared} keys were compared");
-    assert!(
-        differences.is_empty(),
-        "{} of {compared} differ:\n{}",
-        differences.len(),
-        differences
-            .iter()
-            .take(40)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join("\n")
+    let grid = Grid::<Point>::new()
+        .axis(
+            "column",
+            columns
+                .iter()
+                .map(|held| (held.to_string(), held.clone()))
+                .collect(),
+            |point, held| point.held = Some(held.clone()),
+        )
+        .axis("literal", literals, |point, literal| {
+            point.literal = Some(literal.clone());
+        })
+        .axis(
+            "method",
+            ["Expr.eq_missing", "Expr.ne_missing"]
+                .map(|method| (method.to_owned(), method))
+                .to_vec(),
+            |point, method| point.method = method,
+        )
+        .axis(
+            "order",
+            vec![
+                ("the column first".to_owned(), false),
+                ("the literal first".to_owned(), true),
+            ],
+            |point, swapped| point.swapped = *swapped,
+        );
+    assert_eq!(grid.size(), 22_520);
+    let verdicts = grid.judge(
+        &Question {
+            walk_counts: |refusal| {
+                matches!(
+                    refusal.refusal().source(),
+                    RefusalSource::Rule(Rule::KeyIsElementwise)
+                )
+            },
+            polars_counts: |reason| reason.contains("elementwise"),
+            depth: Depth::Plan,
+        },
+        |point| {
+            let held = point.held.as_ref().expect("a column");
+            let literal = point.literal.as_ref().expect("a literal");
+            Ok(join_case(
+                held,
+                compared_with_a_literal(point.method, literal, point.swapped),
+            ))
+        },
+    );
+    verdicts.assert_agree(
+        &[
+            Known::new(
+                Kind::SetAside,
+                Pattern::new(),
+                "the value does not fit the dtype it is given, so the catalogue builds no literal \
+                 to compare and the step engine refuses the step before the walk is asked",
+            )
+            .saying("conversion from"),
+            Known::new(
+                Kind::SetAside,
+                Pattern::new(),
+                "a text is given the dtype Boolean, which Polars cannot cast a text to, so the \
+                 step engine refuses the step when it builds the literal",
+            )
+            .saying("casting from"),
+        ],
+        15_760,
     );
 }
 

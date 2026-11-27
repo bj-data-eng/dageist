@@ -12,6 +12,7 @@ mod dtypes;
 mod edits;
 mod floats;
 mod frames;
+mod grid;
 mod holes;
 mod inputs;
 mod join_keys;
