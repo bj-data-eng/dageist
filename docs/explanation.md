@@ -1796,11 +1796,7 @@ three do not: see [the corpus of step documents](#the-corpus-of-step-documents).
 Today the declared gaps are these:
 
 - A further case of a condition, which the editor draws as a `when` after
-  `otherwise`, in the 24 contexts where the engine allows one.
-- A step that groups: the step, and the fifteen places of its keys, its aggregates and its `having`,
-  each alone and inside each of the four positions inside an expression. A place no word draws is one gap
-  that covers every entry the engine allows there, so the entries are not declared one by one. The
-  editor draws the step in a later change on [#114](https://github.com/bj-data-eng/dageist/issues/114).
+  `otherwise`, in the 38 contexts where the engine allows one.
 - The functions the editor does not start a chain from: `date`, `date_range`,
   `datetime`, `datetime_range`, `duration`, `from_epoch`, `int_range`,
   `linear_space`, `repeat`, `struct`, `time` and `time_range`. It starts a chain from a
@@ -1808,8 +1804,8 @@ Today the declared gaps are these:
 - The parameters of a start or a condition that it does not set: `col`'s further
   names, `lit`'s dtype and its object flag, and the keyword constraints of a
   condition.
-- The thirteen steps no list adds: the list holds the seven the editor has heads
-  for, `with_columns`, `filter`, `sort`, `select`, `rename`, `join` and `pivot`,
+- The thirteen steps no list adds: the list holds the eight the editor has heads
+  for, `with_columns`, `filter`, `sort`, `group_by`, `select`, `rename`, `join` and `pivot`,
   and `drop`, `drop_nans`, `drop_nulls`, `fill_nan`, `first`, `gather_every`,
   `head`, `last`, `limit`, `reverse`, `slice`, `tail` and `with_row_index` are
   drawn by their parameters alone, so a document may hold one and nothing adds it
@@ -3243,11 +3239,20 @@ engine. The decisions below are the ones the core is expected to carry.
   window is the one whose rows the table shows, and a change in one window
   shows in the other at once.
 - **Words.** A step is named for what it does to the table: Add column,
-  Filter table, Sort table, Select, Rename, Join table, Pivot table. Methods
+  Filter table, Sort table, Group table, Select, Rename, Join table, Pivot table. Methods
   keep their Polars names, such as `shift`, `cum_sum` and `over`, because a
   plainer word would only rename them. A type is always shown by its exact
   dtype name, such as `Int64`, because dtypes decide which tables and values
   can meet.
+- **A step that groups.** Group table is written as `by` and its keys, which are fields or expressions as
+  the fields of Sort are, with a key that is named written as an Add column writes a new column: a name,
+  `=` and what it holds. Beneath it stand an optional `having`, which holds predicates as a filter does and
+  is taken away from its own word, a faint `+ having` where there is none, and the one call that finishes
+  the grouping: its word lists the calls the catalogue says finish a grouping and changes it, its aggregates
+  are drawn as the keys are, and its other parameters, such as `len`'s name, the `ignore_nulls` of `first`
+  and `last`, the share and interpolation of `quantile` and the `n` of `head` and `tail`, are options of its
+  word. The view decides none of it: the engine makes the three edits that put a call after `group_by`,
+  swap it and take it away, and offers and refuses what stands in each place.
 - **Text, not boxes.** A step is written as a line of code in a monospaced
   face. A word that can be changed is drawn as nothing but its letters, in
   the colour of what it names: a field, a method, a value, a comparison, a
