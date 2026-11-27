@@ -854,6 +854,66 @@ fn a_having_predicate_of_every_class_is_what_polars_says() {
 }
 
 // ---------------------------------------------------------------------------
+// No key, and no aggregate
+
+#[derive(Default)]
+struct Bare {
+    keys: &'static str,
+    then: &'static str,
+}
+
+fn bare_case(point: &Bare) -> Result<Case, String> {
+    let keys = match point.keys {
+        "no key" => json!({}),
+        "a key" => by(vec![field("k")]),
+        "two keys" => by(vec![field("k"), field("n")]),
+        other => panic!("no keys {other}"),
+    };
+    let finish = match point.then {
+        "len" => len(),
+        "an empty agg" => finishing("LazyGroupBy.agg", json!({})),
+        "an agg of a count" => finishing(
+            "LazyGroupBy.agg",
+            json!({ "aggs": many(vec![field_then("n", vec![call("Expr.len", json!({}))])]) }),
+        ),
+        "head 1" => finishing("LazyGroupBy.head", json!({ "n": json!({ "integer": 1 }) })),
+        other => panic!("no finish {other}"),
+    };
+    Case::of_grouping(
+        keys,
+        vec![finish],
+        WORLD.frame.select(["k", "n"]).map_err(|e| e.to_string())?,
+        Connections::new(),
+    )
+}
+
+#[test]
+fn a_group_by_with_no_key_or_no_aggregate_is_what_polars_says() {
+    let verdicts = Grid::<Bare>::new()
+        .axis(
+            "keys",
+            labelled(&[
+                ("no key", "no key"),
+                ("a key", "a key"),
+                ("two keys", "two keys"),
+            ]),
+            |point, keys| point.keys = keys,
+        )
+        .axis(
+            "finish",
+            labelled(&[
+                ("len", "len"),
+                ("an empty agg", "an empty agg"),
+                ("an agg of a count", "an agg of a count"),
+                ("head 1", "head 1"),
+            ]),
+            |point, then| point.then = then,
+        )
+        .judge(&Question::any_refusal().at(Depth::Rows), bare_case);
+    verdicts.assert_agree(&[], 12);
+}
+
+// ---------------------------------------------------------------------------
 // Chains that are not well formed
 
 #[derive(Default)]
