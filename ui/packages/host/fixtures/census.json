@@ -533,6 +533,10 @@
       "statement": "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
     },
     {
+      "name": "is-in-takes-a-list",
+      "statement": "is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded"
+    },
+    {
       "name": "join-key-names-are-not-repeated",
       "statement": "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
     },

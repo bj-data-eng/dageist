@@ -579,6 +579,38 @@ object, never offered because it is not an operation a step could use (such
 as running a query or printing a plan), or not yet catalogued. When Polars
 moves, refreshing the audit makes that test name every item that changed.
 
+### The Omitted Forms
+
+A list of items left out holds whole items. A form of a parameter that Polars deprecates is a smaller
+omission: the entry stands, and the form of one parameter is refused. The list of omitted forms, in
+`crates/dageist-engine/src/catalog/omitted.rs` beside `left_out.rs`, records each with the entry and the parameter,
+what the form is, the warning Polars gives and the issue that deprecates it, the bug that prompted the omission where
+the form has one, and the name of the rule that refuses it. The catalogue offers the current form, which gives the
+same answers, so the omission loses nothing the editor offered, and a form is omitted only where its replacement is
+catalogued.
+
+The first is the form of `is_in` that is given a collection nested as deeply as the value it follows, such as a column
+of the dtype of the value. Polars 2.2.0 warns that it is ambiguous and deprecated, in
+[pola-rs/polars#22149](https://github.com/pola-rs/polars/issues/22149), and asks for the collection imploded, and
+`pl.lit(5).is_in(pl.lit(1))` panics: it builds a series of a dtype it does not support. A deprecated form is not a bug to report
+to Polars, so the engine refuses it instead, by the rule `is-in-takes-a-list`, whose words say to give a list, or the
+collection imploded with `implode`. The tables never run the form: each line of it records the rule, as it does for a
+receiver that Polars panics on, and the tables of `is_in` measure only the current form, a list or an array given to
+the value, which Polars meets row by row. They measure it on every class, as the methods of lists are, for a value has
+a list of its own element dtype: a float of any width, a duration, a time, a moment of a zone, and a list or an array.
+A struct fits a list of nulls. What a list is looked up in, a list of lists, and a list of structs, are dtypes no class
+of the tables is: the walk cannot tell what Polars says of them, so it leaves the call to the step's run and does not
+refuse it, and offers `is_in` after every class all the same. The grid of `is_in` names what that leaves. A connected list given to `is_in` on its own is built as one list of its
+values, which is the current form; a chain that starts from one gives values of their dtype, which is the form Polars
+deprecates, and is refused until it is imploded.
+
+The fuzz target draws `is_in`, like `implode`, only where a focus names it, and gives it what to look up in as a list
+or an array column or the operand imploded, so that no case it draws holds the omitted form.
+
+A test holds the list to the walk: a step that holds each listed form is refused, by the rule the list names, and the
+words of the refusal give the issue. The test is taught how to build a step that holds a form, so a later omission of a
+deprecated form is listed here, and added to the test, in the same change as the rule that refuses it.
+
 Python's operators are spellings of entries, not entries of their own. `Expr.__add__`
 is `+`, which `Expr.add` is; the same holds for `-`, `*`, `/`, `//`, `%`, `**`, unary
 `-`, `abs()`, `&`, `|`, `^`, `~` and the six comparisons, and for each reflected form,
@@ -836,11 +868,12 @@ What Polars does with each is what the tables say, and some of it is not what a 
   and `unique_counts`, are catalogued with the shape of [a count](#a-count-of-values), and so is `diff` that is told
   to drop the first values, `null_behavior` of `drop`. The steps of a table that share some of their names are
   [below](#the-steps-that-cut-and-number-a-table). `search_sorted` gives a place for each value of `element`, so its
-  count is the argument's, and so is `gather`'s of its `indices`. `is_in` takes a column of the dtype of the values it
-  follows as their set, whole, so it gives the count of the values it follows, and a list column row by row, as the
-  operand of a method is met, so it gives as many as the two meet; a Python list given as `other` waits for a list kind.
-  A join may key on `is_in` of a list or an array, which Polars meets row by row, so the context table measures it as a
-  form of its own, `Expr.is_in[other=list]`. `interpolate` waits, `Expr.item` and the functions that give a list of ranges
+  count is the argument's, and so is `gather`'s of its `indices`. `is_in` looks the values it follows up in a list or an
+  array, which is met row by row, as the operand of a method is, so it gives as many values as the two meet, and one list
+  that holds every value to look in, a collection imploded or a connected list, is one value met by each. A collection nested
+  as deeply as the values it follows, a column of their own dtype, is the form Polars deprecates, so it is
+  [omitted](#the-omitted-forms); a Python list given as `other` waits for a list kind. A join may key on `is_in` of a list or
+  an array, which Polars meets row by row, and the context table measures it so. `interpolate` waits, `Expr.item` and the functions that give a list of ranges
   are left out, and `left_out.rs` gives the reason of each; the functions that start a range or a repeat are
   [below](#ranges-and-repeats).
 
@@ -878,12 +911,11 @@ an operand, a bound, a fill, a power, a part of a moment or of a length of time,
 quantile, the default of a strict replacement, or the value or the predicate of a condition. It is not taken
 again once an aggregate of it is, and the call of a method that takes some of the values is taken whatever it
 is given. A few parameters do not carry it, for the call only looks up in it or by it: the keys of a sort,
-which order the values and are no part of them; what a replacement lists, a table of values it looks up; the
-values `is_in` is given as a column of their own dtype, which is their set, whole; and the share of the exact
-quantile, which Polars reads once, before the groups. What a parameter that must be a scalar refuses is a
+which order the values and are no part of them; what a replacement lists, a table of values it looks up; and the
+share of the exact quantile, which Polars reads once, before the groups. What a parameter that must be a scalar refuses is a
 second state of the same value, carried differently: Polars asks only whether what a call is made of is a
-scalar, so the value stays taken for it through every parameter, the keys of a sort, what a replacement
-lists and the set `is_in` is given included, and only the share of the exact quantile leaves a call that is
+scalar, so the value stays taken for it through every parameter, the keys of a sort and what a replacement
+lists included, and only the share of the exact quantile leaves a call that is
 given one a scalar. A test asks Polars and the walk of every expression parameter of the methods and of the
 functions that start an expression, apart from those of `over`, of the methods that take some of the values,
 whose call is a count and is refused whatever it is given, and of the links of a condition, which tests of
@@ -929,6 +961,13 @@ approximations and the bitwise methods are more of three families that exist. Ag
 `bitwise_xor`; Cumulative gains `cum_min` and `cum_prod`; and Logic the six counts of bits,
 `bitwise_count_ones`, `bitwise_count_zeros`, `bitwise_leading_ones`, `bitwise_leading_zeros`,
 `bitwise_trailing_ones` and `bitwise_trailing_zeros`. Every name is Polars' own.
+
+`implode` is an aggregate of its own kind: it gathers the values into one list of their dtype, and gives that one
+value for every dtype, a list and a struct included, whose own dtype has no class of its own, so the value that
+follows one of lists is read as no class. A join's key may hold it alone and not beside a column, unless it gathers the
+values of a literal, which Polars folds into a literal: the key `a.is_in(lit(1).implode())` is elementwise, and
+`a.is_in(a.implode())` is not. `maintain_order` is true unless it is told, as in Python, and keeps the order of the
+values. It is what `is_in` is given where the values to look up in are a column's own: the column imploded.
 
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
@@ -1874,7 +1913,7 @@ does not read:
 
 - every method the engine allows after a shape of value at some place is held after that
   shape, where the walk allows it; one pair is declared as not held, `is_in` after a
-  count of values, whose one argument that meets a count is the form Polars deprecates;
+  count of values, whose one argument that meets a count is a collection imploded, which the corpus does not give;
 - every function that starts a chain and every link of a condition is held where the
   engine allows it;
 - every context the tables cover holds a chain, and every context in which the engine allows a
@@ -2183,9 +2222,9 @@ A method that takes an option in place of a parameter, as `fill_null` takes a
 well as for the method as it is, under its name with the form after it, such as
 `Expr.fill_null[strategy=forward]`: Polars calls a fill by `zero` or by `one` elementwise, as a
 join's key must be, and a fill by any other word not, so one line would say a wrong thing of
-one of them. `is_in` has a form of its own, `Expr.is_in[other=list]`, measured with a list column as the values it tests
+one of them. `is_in` is measured with a list column as the values it tests
 membership in: Polars meets a list row by row, so a join may key on it, where the same call given a column of its own dtype,
-which is a set met whole, is no key. `drop_nulls` and `drop_nans` are measured on a column that holds no null: how many
+which Polars deprecates, is [omitted](#the-omitted-forms) and was a set met whole, no key. `drop_nulls` and `drop_nans` are measured on a column that holds no null: how many
 values a column has once the nulls are dropped is for the rows to say, and a column that holds
 one has fewer than the table has rows, which Polars refuses to meet them.
 
@@ -2313,7 +2352,7 @@ method that takes an operand. They hold lines for the 26 classes of
 | a list of text | the list of `String` | Polars judges every method that is not named below alike for two element dtypes. |
 | any other list | the list of `Int64` | The same. |
 | any array | the array of `Int64` | The same. |
-| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders, replaces and converts by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `is_in`, `diff`, `replace`, `replace_strict`, `search_sorted`, `cast` and `reverse`, which `SENSITIVE` names. |
+| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders, replaces and converts by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `diff`, `replace`, `replace_strict`, `search_sorted`, `cast` and `reverse`, which `SENSITIVE` names. |
 | any other list or array, of those | none | The call is refused by the rule `element-dtype-is-measured` and a document that holds it is not run: Polars is not asked of what the tables do not measure, and panics on some of it. |
 
 A method that is not named is held to the claim by a test that runs every combination of every
@@ -2964,8 +3003,9 @@ the rows run, a text of a number where Polars casts it to the dtype it meets, a 
 date, text and a number typed without a dtype where the rows run, a Boolean and a number typed without
 a dtype in a bitwise call, a literal that does not cast to its dtype, which the walk could foretell by
 casting the value as the catalogue does, and what Polars panics on in a debug build or never ends on
-(a text padded to a length no memory holds). `is_in` has no grid there: its deprecated form is removed
-with #203, which builds its grid on the helper.
+(a text padded to a length no memory holds). The grid of `is_in` is in `membership_grid.rs`, on the same
+helper: a receiver of every dtype crossed with every form of what it looks up in, in a `select` and as a join's
+key.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a

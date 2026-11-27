@@ -818,6 +818,19 @@ impl Builder<'_> {
             } else {
                 self.argument(argument.value())?
             };
+            // A connected list that `is_in` looks the value up in is one list of its values, as
+            // Polars asks for them: a series of their dtype is a collection nested as the value is,
+            // which Polars deprecates as ambiguous and warns of.
+            let built = match built {
+                Argument::Expression(expression)
+                    if entry == "Expr.is_in"
+                        && argument.parameter() == "other"
+                        && self.inputs.is_a_list_alone(argument.value()) =>
+                {
+                    Argument::Expression(expression.implode(true))
+                }
+                other => other,
+            };
             // What Polars panics on is not run: a value of a dtype the tables do not judge, given to
             // a method that depends on the element dtype, as a list of lists is.
             if !from_another_table {

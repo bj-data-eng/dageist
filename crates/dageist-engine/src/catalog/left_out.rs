@@ -271,7 +271,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.get", Reason::NotYetCatalogued),
     LeftOut::new("Expr.hash", Reason::NotYetCatalogued),
     LeftOut::new("Expr.hist", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.implode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.index_of", Reason::NotYetCatalogued),
     LeftOut::new("Expr.inspect", Reason::NotYetCatalogued),
     LeftOut::new("Expr.interpolate", Reason::NotYetCatalogued),

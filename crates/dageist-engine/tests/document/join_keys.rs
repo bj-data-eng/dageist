@@ -552,6 +552,45 @@ fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
             true,
         ),
         ("a plain column", keyed(is_in("a", field("a"))), false),
+        // Polars folds the values of a literal gathered into a list into a literal, which no
+        // aggregate is; a column gathered is an aggregate, which a key may not hold beside one.
+        (
+            "a literal imploded",
+            keyed(is_in(
+                "a",
+                chain(
+                    call(
+                        "polars.lit",
+                        json!({ "value": { "integer": 1 }, "dtype": { "dtype": "Int64" } }),
+                    ),
+                    vec![call("Expr.implode", json!({}))],
+                ),
+            )),
+            true,
+        ),
+        // What a method made of the literal is not folded: the literal gathered is an aggregate.
+        (
+            "a literal made by a method, imploded",
+            keyed(is_in(
+                "a",
+                chain(
+                    call(
+                        "polars.lit",
+                        json!({ "value": { "integer": 1 }, "dtype": { "dtype": "Int64" } }),
+                    ),
+                    vec![call("Expr.abs", json!({})), call("Expr.implode", json!({}))],
+                ),
+            )),
+            false,
+        ),
+        (
+            "a column imploded",
+            keyed(is_in(
+                "a",
+                field_then("a", vec![call("Expr.implode", json!({}))]),
+            )),
+            false,
+        ),
         ("the first list", keyed(is_in("a", first("l"))), false),
         (
             "a list column of an aggregate",
@@ -603,4 +642,40 @@ fn a_right_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it
         outcome(&report)
     );
     assert_eq!(refused(walk(&report)), None);
+}
+
+#[test]
+fn a_literal_imploded_twice_beside_a_column_is_no_aggregate_of_a_key_as_polars_takes_it() {
+    // Python Polars 2.2.0 folds each gathering of a literal into a literal, so a key that holds one
+    // beside a column is judged elementwise, and refused only for what it gives, a list of lists,
+    // where it is paired with a column of another dtype.
+    let literal = chain(
+        call(
+            "polars.lit",
+            json!({ "value": { "integer": 1 }, "dtype": { "dtype": "Int64" } }),
+        ),
+        vec![
+            call("Expr.implode", json!({})),
+            call("Expr.implode", json!({})),
+        ],
+    );
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field_then(
+                "a",
+                vec![call("Expr.gt", json!({ "other": field("a") }))],
+            )]) }),
+        ),
+        vec![call("When.then", json!({ "statement": literal }))],
+    );
+    let report = join_of(with_lists(), right(), keys(vec![key], vec![field("rf")]));
+    let said = polars_reason(outcome(&report));
+    assert!(!said.contains("elementwise"), "{said}");
+    let source = refused(walk(&report)).map(|found| found.1);
+    assert_ne!(
+        source,
+        Some(RefusalSource::Rule(Rule::KeyIsElementwise)),
+        "the walk takes a literal gathered for an aggregate"
+    );
 }

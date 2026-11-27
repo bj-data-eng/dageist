@@ -13,8 +13,8 @@ use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::fields::{self, Fields, Gives, Input};
 use super::rules::Rule;
 use super::table::{
-    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
-    has_a_subject, is_a_list, is_method, is_of_nested_dtypes, read_as, restored, subject_of,
+    Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables, has_a_subject,
+    is_method, is_of_nested_dtypes, measured_classes, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -378,7 +378,14 @@ impl Refusal {
         }
     }
 
-    fn polars(reason: &Reason) -> Self {
+    pub(super) fn polars(reason: &Reason) -> Self {
+        // A line of the tables that a rule wrote, because the tables never run what it refuses,
+        // is the rule's refusal: its name begins the text, and what follows says what is the matter.
+        if let Some((name, said)) = reason.text.split_once(": ")
+            && let Some(rule) = Rule::from_name(name)
+        {
+            return Self::rule_because(rule, &said);
+        }
         Self {
             source: RefusalSource::Polars(reason.stage),
             reason: reason.text.clone(),
@@ -736,6 +743,7 @@ fn on_receiver(
     entry: &'static Entry,
     receiver: Option<Representative>,
     arguments: &[(&str, Representative)],
+    unclassed: &[&str],
     options: &[(&str, &str)],
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
@@ -758,6 +766,13 @@ fn on_receiver(
         None => Refusal::structure(format!("the tables hold nothing for {id}")),
     };
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| {
+        // What Polars deprecates is refused before it is asked, in the words of its rule.
+        if let (Some(receiver), Some(parameter), Some(argument)) = (receiver, parameter, argument)
+            && let Some((rule, said)) =
+                Rule::forbids_argument(id, parameter, &receiver.dtype(), &argument.dtype())
+        {
+            return Err(Refusal::rule_because(rule, &said));
+        }
         // The line of the class that stands for one the tables hold none for. A method whose
         // answer depends on the element is refused after a class it is not measured on: Polars is
         // not asked of it, and may panic.
@@ -783,12 +798,19 @@ fn on_receiver(
     // that give it say nothing of the call: the option table does.
     let required: Vec<&'static str> = required_expressions(entry)
         .filter(|parameter| !stood_in_for.contains(parameter))
+        // What `is_in` is given and has no class is not judged by the tables, which say nothing of
+        // it: Polars judges it as it builds.
+        .filter(|parameter| !(id == "Expr.is_in" && unclassed.contains(parameter)))
         .collect();
     // What the method is refused for with none of its arguments, which it is measured with where
     // it needs none. Where arguments are given, the lines of the calls that have them say what
     // Polars does of the call, and which of two failures it meets first, as it converts a part it
     // is given before it meets the value it follows, so the refusal of an argument is the one told.
-    let alone = (required.is_empty() && stood_in_for.is_empty()).then(|| line(None, None));
+    // What `is_in` is given and the tables say nothing of is left to Polars, which no line of the
+    // call with none of its arguments says.
+    let left_to_polars = id == "Expr.is_in" && !unclassed.is_empty();
+    let alone = (required.is_empty() && stood_in_for.is_empty() && !left_to_polars)
+        .then(|| line(None, None));
     // What the arguments given decide: each is measured on its own, so what
     // the method gives is what they agree on, and not known where they do not.
     let mut given_fits: Vec<Fit> = Vec::new();
@@ -820,17 +842,37 @@ fn on_receiver(
         if arguments.iter().any(|(name, _)| *name == parameter) {
             continue;
         }
-        let mut refusal = None;
+        let mut refusal: Option<Refusal> = None;
         let mut fitting: Vec<Fit> = Vec::new();
-        for argument in Representative::MEASURED {
+        // `is_in` looks a value up in a list of its own dtype, whose class is one of the core lists
+        // that it is measured on, besides the lists the other methods are given.
+        let tried: &[Representative] = if id == "Expr.is_in" {
+            measured_classes(id)
+        } else {
+            &Representative::MEASURED
+        };
+        for argument in tried.iter().copied() {
             match line(Some(parameter), Some(argument)) {
                 Ok(found) => fitting.push(found),
+                // The first refusal is the one told, but not the rule that asks for a list, which
+                // refuses every argument nested as the value is and says nothing of the others.
                 Err(error) => {
-                    refusal.get_or_insert(error);
+                    let held_is_the_rule = refusal.as_ref().is_some_and(|held| {
+                        held.source() == RefusalSource::Rule(Rule::IsInTakesAList)
+                    });
+                    if refusal.is_none() || held_is_the_rule {
+                        refusal = Some(error);
+                    }
                 }
             }
         }
         let Some(first) = fitting.first() else {
+            // A list or an array is looked up in a list of lists, which no class of the tables is,
+            // so no class fits and the call is still one Polars accepts.
+            if id == "Expr.is_in" && receiver.is_some_and(Representative::is_nested) {
+                fit.get_or_insert(is_in_gives());
+                continue;
+            }
             return Err(refusal.unwrap_or_else(missing));
         };
         // What the argument decides is known when every dtype that fits
@@ -850,7 +892,17 @@ fn on_receiver(
         Some(fit) => Ok(fit),
         // The option table says what the call gives.
         None if !stood_in_for.is_empty() => Ok(Fit::of(None)),
+        // What it is looked up in has no class, which Polars judges as it builds.
+        None if id == "Expr.is_in" && !unclassed.is_empty() => Ok(is_in_gives()),
         None => Err(missing()),
+    }
+}
+
+/// What `is_in` gives where the tables do not judge what it looks up in: a `Boolean` for each value.
+fn is_in_gives() -> Fit {
+    Fit {
+        result: Some(ResultDtype::from_name("Boolean")),
+        shape: Shape::Many,
     }
 }
 
@@ -869,10 +921,10 @@ fn stood_in_for(entry: &Entry, options: &[(&str, &str)]) -> Vec<&'static str> {
         .collect()
 }
 
-/// The options chosen that are given in place of another parameter, and the list that `is_in` is
-/// given, which a method with them stands in a context in the form of.
+/// The options chosen that are given in place of another parameter, which a method with them stands
+/// in a context in the form of.
 fn form_of(entry: &Entry, chosen: &Chosen<'_>) -> Vec<(&'static str, String)> {
-    let mut form: Vec<(&'static str, String)> = entry
+    entry
         .parameters()
         .iter()
         .filter(|parameter| parameter.in_place_of().is_some())
@@ -885,16 +937,7 @@ fn form_of(entry: &Entry, chosen: &Chosen<'_>) -> Vec<(&'static str, String)> {
             (default_word(parameter).as_deref() != Some(word))
                 .then(|| (parameter.name(), word.to_owned()))
         })
-        .collect();
-    if entry.id().as_str() == "Expr.is_in"
-        && chosen
-            .arguments
-            .iter()
-            .any(|(name, class)| *name == LIST_FORM.0 && is_a_list(*class))
-    {
-        form.push((LIST_FORM.0, LIST_FORM.1.to_owned()));
-    }
-    form
+        .collect()
 }
 
 /// What the option table says the options chosen give.
@@ -1258,6 +1301,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     {
         return Err(Refusal::rule_because(rule, &said));
     }
+    // What Polars deprecates in an argument is refused before it is asked, in the words of its rule:
+    // a collection nested as deeply as the value `is_in` follows.
+    // A number typed in without a dtype is a scalar of the dtype it adapts to, so it is nested as a
+    // value that is no list is.
+    if let After::Value { dtype, .. } = place.after {
+        let numbers = chosen
+            .open_numbers
+            .iter()
+            .map(|name| (*name, Representative::Int64));
+        for (name, argument) in chosen.arguments.iter().copied().chain(numbers) {
+            if let Some((rule, said)) =
+                Rule::forbids_argument(id, name, &dtype.dtype(), &argument.dtype())
+            {
+                return Err(Refusal::rule_because(rule, &said));
+            }
+        }
+    }
     // What the call says of a struct: a field that is none, names that do not fit, or fields made.
     let receiver_class = match place.after {
         After::Value { dtype, .. } => Some(dtype),
@@ -1366,7 +1426,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         if let Some(dtype) = receiver
             && !chosen.arguments.is_empty()
         {
-            on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
+            on_receiver(
+                entry,
+                Some(dtype),
+                chosen.arguments,
+                chosen.unclassed,
+                chosen.options,
+            )?;
         }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
@@ -1389,7 +1455,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             .filter(|(name, _)| chosen.options.is_empty() || *name != subject)
             .copied()
             .collect();
-        let fit = on_receiver(entry, None, &lines_of, chosen.options)?;
+        let fit = on_receiver(entry, None, &lines_of, chosen.unclassed, chosen.options)?;
         match subject_class {
             Some(class) => check_options(entry, Some(class), chosen.options)?,
             None => options(entry, chosen.options)?,
@@ -1437,7 +1503,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         place.after,
         is_method(entry) && !struct_arithmetic && !meets_other_fields,
     ) {
-        let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
+        let fit = on_receiver(
+            entry,
+            Some(dtype),
+            chosen.arguments,
+            chosen.unclassed,
+            chosen.options,
+        )?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
@@ -1881,21 +1953,31 @@ pub fn refuse_a_receiver_not_judged(
     Ok(())
 }
 
-/// The refusal of a call after a list or an array, or of a method of lists or arrays, that the
-/// tables refuse of the dtype `receiver` given `arguments`, the dtypes of the expressions it is
-/// given by the names of its parameters: Polars plans such a call nevertheless where it does not
-/// work it out, as where both branches of a condition share it, and panics on the plan. The walk
-/// refuses the same call where it knows the dtypes, whatever it is given; this is asked where it
-/// lost them. An argument of no class is left to [`refuse_an_argument_not_judged`], and the
-/// options the call is given are not asked.
+/// The refusal of a call that a rule or the tables refuse of the dtype `receiver` given `arguments`,
+/// the dtypes of the expressions it is given by the names of its parameters, where the walk lost the
+/// dtypes. A rule refuses an argument for the dtypes it is given, as `is_in` is refused a collection
+/// nested as the value it follows is, whether or not the dtypes have a class. The tables refuse a
+/// call after a list or an array, or a method of lists or arrays: Polars plans such a call
+/// nevertheless where it does not work it out, as where both branches of a condition share it, and
+/// panics on the plan. The walk refuses the same call where it knows the dtypes, whatever it is
+/// given; this is asked where it lost them. An argument of no class is left to
+/// [`refuse_an_argument_not_judged`], and the options the call is given are not asked.
 ///
 /// # Errors
-/// The refusal of the tables, as the walk would have given it.
+/// The refusal of the rule or of the tables, as the walk would have given it.
 pub fn refuse_a_call_the_tables_refuse_after_lists(
     entry: &'static Entry,
     receiver: &DataType,
     arguments: &[(&str, DataType)],
 ) -> Result<(), Refusal> {
+    // What Polars deprecates, whatever the dtypes are: the nesting of a dtype with no class is known.
+    for (name, argument) in arguments {
+        if let Some((rule, said)) =
+            Rule::forbids_argument(entry.id().as_str(), name, receiver, argument)
+        {
+            return Err(Refusal::rule_because(rule, &said));
+        }
+    }
     let Some(class) = Representative::of(receiver) else {
         return Ok(());
     };
@@ -1906,7 +1988,12 @@ pub fn refuse_a_call_the_tables_refuse_after_lists(
         .iter()
         .filter_map(|(name, dtype)| Some((*name, Representative::of(dtype)?)))
         .collect();
-    match on_receiver(entry, Some(class), &classes, &[]) {
+    let unclassed: Vec<&str> = arguments
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| !classes.iter().any(|(classed, _)| classed == name))
+        .collect();
+    match on_receiver(entry, Some(class), &classes, &unclassed, &[]) {
         Err(refusal)
             if matches!(
                 refusal.source(),
@@ -2349,7 +2436,17 @@ fn check_options(
     };
     let check =
         |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key.clone())) {
-            Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
+            Some(Outcome::Refused(reason)) => {
+                let refusal = Refusal::polars(reason);
+                // A line a rule wrote says the call the option was measured with is refused by the
+                // rule, as the call of a list looked up in nothing it fits is, and not the option:
+                // it was not measured.
+                if matches!(refusal.source(), RefusalSource::Rule(_)) {
+                    Ok(())
+                } else {
+                    Err(refusal)
+                }
+            }
             Some(Outcome::Allowed(_)) => Ok(()),
             // A method with several options has no line for one of them alone. It is set to its
             // word beside every other option at its default, so the lines that say that are
@@ -2468,6 +2565,41 @@ mod tests {
             for _ in 0..3 {
                 assert!(options(entry("Expr.str.split"), &[("literal", word)]).is_ok());
             }
+        }
+    }
+
+    #[test]
+    fn a_refusal_read_from_a_line_a_rule_wrote_is_the_rules_and_one_of_polars_is_polars() {
+        // The tables never run what a rule refuses, and write its name and what is the matter.
+        let written = Reason {
+            stage: Stage::Rows,
+            text:
+                "is-in-takes-a-list: Int64 is looked up in Int64, which is nested as the value is"
+                    .to_owned(),
+        };
+        let refusal = Refusal::polars(&written);
+        assert_eq!(refusal.source(), RefusalSource::Rule(Rule::IsInTakesAList));
+        assert!(
+            refusal.reason().contains("Int64 is looked up in Int64"),
+            "{}",
+            refusal.reason()
+        );
+        assert!(refusal.reason().contains("implode"), "{}", refusal.reason());
+        // What Polars said keeps its stage, even where its words hold a colon.
+        for text in [
+            "'is_in' cannot check for Int64 values in Int64 data",
+            "not-a-rule: Int64 is looked up in Int64",
+        ] {
+            let said = Refusal::polars(&Reason {
+                stage: Stage::Schema,
+                text: text.to_owned(),
+            });
+            assert_eq!(
+                said.source(),
+                RefusalSource::Polars(Stage::Schema),
+                "{text}"
+            );
+            assert_eq!(said.reason(), text);
         }
     }
 }

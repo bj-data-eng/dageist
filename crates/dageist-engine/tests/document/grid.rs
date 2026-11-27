@@ -342,6 +342,8 @@ impl Partial {
 #[derive(Default, Clone)]
 pub struct Connections {
     tables: Vec<(String, DataFrame)>,
+    /// The lists connected to the step, by name, which a step looks a value up in.
+    lists: Vec<(String, Series)>,
 }
 
 impl Connections {
@@ -356,8 +358,26 @@ impl Connections {
         self
     }
 
+    /// A list connected as `name`, which `is_in` looks a value up in. Polars is given it as the
+    /// run builds it, gathered into one list, for a series of the dtype of the values is the
+    /// deprecated form.
+    #[must_use]
+    pub fn membership_list(mut self, name: &str, list: Series) -> Self {
+        self.lists.push((name.to_owned(), list));
+        self
+    }
+
     fn inputs(&self) -> Inputs {
         let mut inputs = Inputs::new();
+        for (name, list) in &self.lists {
+            inputs
+                .add_list(
+                    name,
+                    dageist_engine::document::ListOrigin::Parameter,
+                    list.clone(),
+                )
+                .expect("a list that is connected once");
+        }
         for (name, table) in &self.tables {
             inputs
                 .add_table(name, name, table.clone().lazy())
@@ -623,7 +643,13 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
             .find(|(held, _)| held == name)
             .map(|(_, table)| table.clone().lazy())
     };
-    let literals = |_: &str| None;
+    let literals = |name: &str| {
+        case.connections
+            .lists
+            .iter()
+            .find(|(held, _)| held == name)
+            .map(|(_, list)| polars::prelude::lit(list.clone()).implode(true))
+    };
     let connected = Connected::new(&tables, &literals);
     let rows = question.depth == Depth::Rows || walk_said_rows;
     let mode = std::cell::Cell::new(Mode::Plan);

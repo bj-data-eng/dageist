@@ -119,11 +119,21 @@ pub enum Rule {
     /// A window is given a value as long as its input, which a value of one row that a part widens is
     /// not.
     WindowInputIsNotWidened,
+    /// `is_in` looks a value up in a list or an array, one for each value or one for all of them, or
+    /// in a collection imploded, and not in a collection nested as deeply as the value it follows,
+    /// as a column of its own dtype is.
+    ///
+    /// Python Polars 2.2.0 deprecates that form as ambiguous (pola-rs/polars#22149), asking for the
+    /// collection imploded, and panics on one value looked up in another: `pl.lit(5).is_in(pl.lit(1))`
+    /// builds a series of an unknown dtype that it does not support. The catalogue omits the form,
+    /// as the list of its [omitted forms](crate::catalog::omitted_forms) records, and the tables
+    /// never run it.
+    IsInTakesAList,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -134,6 +144,7 @@ impl Rule {
         Self::FieldNamesFitTheStruct,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
+        Self::IsInTakesAList,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
@@ -168,6 +179,7 @@ impl Rule {
             Self::FieldNamesFitTheStruct => "field-names-fit-the-struct",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
+            Self::IsInTakesAList => "is-in-takes-a-list",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
@@ -225,6 +237,9 @@ impl Rule {
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
             Self::FoldedFunctionIsNoJoinKey => {
                 "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
+            }
+            Self::IsInTakesAList => {
+                "is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded"
             }
             Self::JoinKeyNamesAreNotRepeated => {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
@@ -293,6 +308,7 @@ impl Rule {
             | Self::MomentsShareAZone
             | Self::FieldIsOfTheStruct
             | Self::FieldNamesFitTheStruct
+            | Self::IsInTakesAList
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -361,6 +377,34 @@ impl Rule {
             _ => return None,
         };
         Some((Self::ElementDtypeIsImplemented, said))
+    }
+
+    /// The rule that forbids `entry` to be given an argument of the dtype `argument` for `parameter`
+    /// after a value of the dtype `receiver`, with what is the matter, if one does: `is_in` looks the
+    /// value up in a list or an array, and Polars deprecates a collection nested as deeply as the
+    /// value, which a column of its own dtype is, and panics on one value looked up in another.
+    ///
+    /// The tables never run what a rule refuses, and a document is refused before Polars is asked.
+    #[must_use]
+    pub(super) fn forbids_argument(
+        entry: &str,
+        parameter: &str,
+        receiver: &DataType,
+        argument: &DataType,
+    ) -> Option<(Self, String)> {
+        (entry == "Expr.is_in"
+            && parameter == "other"
+            && receiver.nesting_level() == argument.nesting_level())
+        .then(|| {
+            (
+                Self::IsInTakesAList,
+                format!(
+                    "{} is looked up in {}, which is nested as the value is",
+                    dtype_name(receiver),
+                    dtype_name(argument)
+                ),
+            )
+        })
     }
 
     /// The rule that forbids a key that holds an aggregate beside a column, or a
@@ -453,6 +497,7 @@ impl Rule {
             | Self::MomentsShareAZone
             | Self::FieldIsOfTheStruct
             | Self::FieldNamesFitTheStruct
+            | Self::IsInTakesAList
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::StructArithmeticNeedsNumbers

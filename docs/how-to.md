@@ -588,6 +588,19 @@ A step that holds no expression is drawn for itself by the fuzz target, where it
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
+## Omit A Deprecated Form
+
+A form of a parameter that Polars deprecates is [omitted](explanation.md#the-omitted-forms), not catalogued, and
+only where the form that replaces it is catalogued. Name a rule in `Rule` in
+`crates/dageist-engine/src/allowed/rules.rs` whose words say what to give instead, and make the offers refuse the
+form with it, as `Rule::forbids_argument` does for `is_in`: the offers, the tables' generator and a run of a document
+read it before they ask Polars. List the form in `crates/dageist-engine/src/catalog/omitted.rs`, with the entry and the
+parameter, the Polars issue and warning, the bug that prompted the omission where there is one, and the rule, and
+teach `step_holding` in `crates/dageist-engine/tests/document/omitted.rs` to build a step that holds it: the test
+there holds each listed form to the walk. Then refresh [the tables](#refresh-the-tables-of-allowed-combinations), the
+[snapshots the host writes](#refresh-the-offers-snapshots) and the public API audit of the engine, and name the rule
+in the view's `RULE_NAMES` in `ui/packages/host/src/contract.ts`.
+
 ## Refresh The Tables Of Allowed Combinations
 
 The files `counts.txt`, `dtypes.txt`, `contexts.txt` and `options.txt` in
@@ -965,9 +978,13 @@ kind of literal, a place the literal stands or a parameter the grid does not var
 new value of the axis that names it. The grid then holds the finding and every neighbour of it, and the
 campaign need not find the next one.
 
-`is_in` has no grid in `literal_grid.rs`. Its deprecated form is removed with #203, and the grid of what
-it is given (a column, an imploded list, a list column, an array column, a typed literal, a list typed in,
-a null, against each dtype of the receiver) is built on this helper there.
+The grid of `is_in` is in `tests/document/membership_grid.rs`, on this helper. It crosses a receiver of
+every dtype (the lists and arrays of every element dtype, the units of a duration and a moment, a dtype the
+tables have no class of) with every form of what it looks up in (a column of every class, imploded once and
+twice, a typed literal and a typed null of every class, a connected list), with `nulls_equal` both ways, in a
+`select` and as a join's key. It excuses the deprecated form, which the rule `is-in-takes-a-list` refuses where
+what is looked up in is nested as the value is, and names what the walk leaves to Polars: a dtype that no class
+of the tables is, a list of lists, a list of structs, a binary, a categorical, an enum.
 
 ## Check The Build Against The Polars Release
 

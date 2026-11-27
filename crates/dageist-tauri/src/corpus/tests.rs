@@ -82,7 +82,8 @@ fn calls_of(document: &Document) -> Vec<&Call> {
 /// no place the walk allows them, each with why. A method the engine allows after a count of
 /// values only with an argument that meets the count is one the corpus can give no such argument
 /// of: a list of many values is refused by the rule that the values a call meets meet in count,
-/// and the argument that would be allowed is the form of `is_in` that Polars has deprecated. A field
+/// and the argument that `is_in` is allowed is a collection imploded, which the corpus does not
+/// give. A field
 /// read after a count of structs is the other: the values that differ are counted by `value_counts`,
 /// whose fields are the column's own name and the count, so the one name the corpus gives a field
 /// is no field of it. Renaming the fields is the third: a method added to a chain is given no names,

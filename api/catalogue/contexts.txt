@@ -55,6 +55,7 @@
 #   field-names-fit-the-struct: the names given to the fields of a struct must be as many as its fields where it is renamed, or as the places of the array it is made of, and no two fields of a struct may be named alike: Polars refuses names of another number and two fields of one name.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
 #   folded-function-is-no-join-key: a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join.
+#   is-in-takes-a-list: is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded.
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column.
 #   moments-share-a-zone: moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone.
@@ -81,7 +82,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 17220 combinations: 11685 allowed; 3242 refused when Polars resolved the schema, 2293 when it ran the rows, 0 when it ran the empty table.
+# 17220 combinations: 11690 allowed; 3232 refused when Polars resolved the schema, 2298 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -8243,6 +8244,66 @@ Expr.head | sort > over.partition_by | continues | Int64 | - | - | allowed Int64
 Expr.head | sort > over.partition_by | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
 Expr.head | sort | continues | Int64 | - | - | allowed Int64 counted
 Expr.head | sort | ends | Int64 | - | - | refused rows: lengths don't match: zip node received non-equal length inputs
+Expr.implode | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `_POLARS_TMP_PHYS_`
+Expr.implode | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `List(Int64)`
+Expr.implode | filter > over.order_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | filter > over.order_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | filter > over.partition_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | filter > over.partition_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | filter | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `List(Int64)`
+Expr.implode | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `_POLARS_TMP_PHYS_`
+Expr.implode | join_left > condition.value | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | join_left > condition.value | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed List(Int64) one
+Expr.implode | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed List(Int64) one
+Expr.implode | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `_POLARS_TMP_PHYS_`
+Expr.implode | join_right > condition.value | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | join_right > condition.value | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.implode | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed List(Int64) one
+Expr.implode | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed List(Int64) one
+Expr.implode | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `a`
+Expr.implode | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.implode | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.implode | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.implode | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.implode | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed List(Int64) one
+Expr.implode | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed List(Int64) one
+Expr.implode | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[i64]` for series with name `_POLARS_TMP_PHYS_`
+Expr.implode | select > condition.value | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select > condition.value | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select > over.order_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select > over.order_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select > over.partition_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select > over.partition_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | select | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed List(Int64) one
+Expr.implode | sort > condition.value | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > condition.value | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > over.order_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > over.order_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > over.partition_by | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort > over.partition_by | ends | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort | continues | Int64 | - | - | allowed List(Int64) one
+Expr.implode | sort | ends | Int64 | - | - | allowed List(Int64) one
 Expr.is_between | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_between | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_between | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
@@ -8543,126 +8604,66 @@ Expr.is_first_distinct | sort > over.partition_by | continues | Int64 | - | - | 
 Expr.is_first_distinct | sort > over.partition_by | ends | Int64 | - | - | allowed Boolean many
 Expr.is_first_distinct | sort | continues | Int64 | - | - | allowed Boolean many
 Expr.is_first_distinct | sort | ends | Int64 | - | - | allowed Boolean many
-Expr.is_in | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in | filter > condition.value | ends | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in | filter > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | filter > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | filter > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | filter > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | filter | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in | filter | ends | Int64 | Int64 | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in | join_left > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_left | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > condition.value | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > condition.value | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > over.order_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
-Expr.is_in | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | refused schema: all join key expressions must be elementwise.
-Expr.is_in | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Boolean many
-Expr.is_in | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Boolean many
-Expr.is_in | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | select > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | select > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | select | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | sort > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in | sort > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > condition.value | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > over.order_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > over.order_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > over.partition_by | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort > over.partition_by | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in | sort | ends | Int64 | Int64 | - | allowed Boolean many
-Expr.is_in[other=list] | filter > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | filter > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | filter > condition.value | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | filter > condition.value | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | filter > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | filter > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | filter > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | filter > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | filter | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | filter | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | join_left > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | join_left > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | join_left > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | join_left > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | join_left > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_left > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_left > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_left > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_left | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
-Expr.is_in[other=list] | join_left | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
-Expr.is_in[other=list] | join_right > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | join_right > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | join_right > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | join_right > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | join_right > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_right > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_right > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_right > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
-Expr.is_in[other=list] | join_right | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
-Expr.is_in[other=list] | join_right | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate > over.order_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in[other=list] | pivot_aggregate > over.order_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in[other=list] | pivot_aggregate > over.partition_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in[other=list] | pivot_aggregate > over.partition_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.is_in[other=list] | pivot_aggregate | continues | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
-Expr.is_in[other=list] | pivot_aggregate | ends | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
-Expr.is_in[other=list] | select > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | select > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | select > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | select | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | sort > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
-Expr.is_in[other=list] | sort > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort | continues | Int64 | List(Int64) | - | allowed Boolean many
-Expr.is_in[other=list] | sort | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | filter > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.value | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > condition.value | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | filter > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | filter > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | filter > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | filter | continues | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | filter | ends | Int64 | List(Int64) | filter-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_left > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_left > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_left > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | join_left > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | join_left > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_left | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in | join_left | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in | join_right > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_right > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | join_right > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | join_right > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | join_right > over.order_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.order_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.partition_by | continues | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right > over.partition_by | ends | Int64 | List(Int64) | - | refused schema: all join key expressions must be elementwise.
+Expr.is_in | join_right | continues | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in | join_right | ends | Int64 | List(Int64) | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | pivot_aggregate > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | pivot_aggregate > over.order_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.order_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.partition_by | continues | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate > over.partition_by | ends | Int64 | List(Int64) | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.is_in | pivot_aggregate | continues | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in | pivot_aggregate | ends | Int64 | List(Int64) | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.is_in | select > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | select > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | select > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | select | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > condition.predicate | continues | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | sort > condition.predicate | ends | Int64 | List(Int64) | condition-predicate-is-boolean | allowed Boolean many
+Expr.is_in | sort > condition.value | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > condition.value | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > over.order_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > over.order_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > over.partition_by | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort > over.partition_by | ends | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort | continues | Int64 | List(Int64) | - | allowed Boolean many
+Expr.is_in | sort | ends | Int64 | List(Int64) | - | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_infinite | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Boolean many

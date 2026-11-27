@@ -54,7 +54,7 @@ describe('the methods the engine offers after a timestamp', () => {
     // The methods of each family: window one, cumulative, rounding, the fields of a struct and the
     // search of text five, conversion six, maths seven, checks eight, order, pieces of text and nulls nine, logic
     // ten, arithmetic eleven, trigonometry and text fifteen, compare sixteen, rows twenty-six,
-    // temporal forty-three, and aggregate fifty-two.
+    // temporal forty-three, and aggregate fifty-three.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['cumulative', 5],
@@ -74,7 +74,7 @@ describe('the methods the engine offers after a timestamp', () => {
       ['compare', 16],
       ['rows', 26],
       ['temporal', 43],
-      ['aggregate', 52],
+      ['aggregate', 53],
     ]);
     expect(families[0]?.title).toBe('Window');
   });

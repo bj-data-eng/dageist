@@ -1550,6 +1550,15 @@ impl Walker<'_> {
                 slot.is_some().then_some(ends),
                 &mut found,
             );
+            // A connected list given to `is_in` is looked up as one list of its values, which is
+            // how the run builds it, and not as a collection of their dtype.
+            if entry == "Expr.is_in"
+                && given.parameter() == "other"
+                && self.inputs.is_a_list_alone(given.value())
+                && let Some((_, operand)) = found.last_mut()
+            {
+                *operand = imploded(*operand);
+            }
             // `on` is the keys of both tables: Polars evaluates it against the other
             // one as well, so what the tables say of it there is asked too. Its
             // expressions are the left's first, at the same places.
@@ -3675,9 +3684,9 @@ fn taken_after(
 /// what the call gives one that a window refuses. It does wherever the call reads the value, as a part
 /// of a moment, a bound, a fill, a statistic's share or a strict replacement's default, and whether or
 /// not Polars meets it with each of the values the call follows. It does not where the call only
-/// looks up in it or by it: the keys of a sort order the values and are no part of them, what a
-/// replacement lists is a table of values it looks up, and a column of the dtype of the values that
-/// `is_in` is given is their set, whole, which is not read value by value as a list is.
+/// looks up in it or by it: the keys of a sort order the values and are no part of them, and what a
+/// replacement lists is a table of values it looks up. The lists `is_in` looks up in are met row by
+/// row with the values it follows, so they are carried where they are known to be lists.
 fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
     match (entry.id().as_str(), name) {
         ("Expr.sort_by", "by" | "more_by")
@@ -3689,8 +3698,8 @@ fn carries_to_a_window(entry: &Entry, name: &str, operand: &Operand) -> bool {
 
 /// Whether a value that a method took of one value, given to the parameter `name` of `entry`, makes
 /// what the call gives one that Polars cannot tell is one before the rows run. It does for every
-/// parameter, the keys of a sort included, but not for what a replacement lists and the set `is_in`
-/// is given, which Polars looks up in and does not ask whether they are a scalar.
+/// parameter, the keys of a sort included, but not for what a replacement lists and the lists `is_in`
+/// looks up in, which Polars looks up in and does not ask whether they are a scalar.
 fn carries_to_a_scalar(entry: &Entry, name: &str) -> bool {
     !matches!(
         (entry.id().as_str(), name),
@@ -3733,8 +3742,8 @@ fn meets_receiver(entry: &Entry, name: &str, operand: &Operand) -> bool {
 
 /// Whether the operand `name` of `entry` is met with each value of the value the method follows, as
 /// the catalogue says of the parameter, except where the dtype of the operand decides it: `is_in` meets
-/// a list column row by row with the values it follows, and takes a column of their own dtype as their
-/// set, whole, so that it gives as many values as they.
+/// a list or an array row by row with the values it follows, and is given nothing else but what its
+/// rule refuses, so an operand that is not known to be one is not met.
 fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
     if entry.id().as_str() == "Expr.is_in" && name == "other" {
         return operand.dtype.is_some_and(Representative::is_nested);
@@ -4056,7 +4065,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-pub(super) const ONE_VALUE: [&str; 31] = [
+pub(super) const ONE_VALUE: [&str; 32] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -4088,7 +4097,29 @@ pub(super) const ONE_VALUE: [&str; 31] = [
     "Expr.bitwise_and",
     "Expr.bitwise_or",
     "Expr.bitwise_xor",
+    "Expr.implode",
 ];
+
+/// What the values of a connected list are once they are gathered into one list: a list of their
+/// dtype, which is one value. Where the dtype is not one a list of the tables covers, it is not
+/// known.
+fn imploded(values: Operand) -> Operand {
+    let listed = values
+        .dtype
+        .and_then(|class| allowed::Inner::of_class(class).map(Representative::List));
+    Operand {
+        dtype: listed,
+        loose: None,
+        shape: Shape::One,
+        count: Count::NotKnown,
+        known: values.known && listed.is_some(),
+        reliable: values.reliable && listed.is_some(),
+        zone: None,
+        width: None,
+        fields: None,
+        ..values
+    }
+}
 
 fn is_one_value(call: &Call) -> bool {
     ONE_VALUE.contains(&call.entry().id().as_str())
@@ -4273,8 +4304,32 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
 /// alone: what comes before the last that does is not evaluated. A side that is more is
 /// evaluated, and what it holds counts.
 fn holds_what_polars_evaluates(expression: &Expression, is_held: &dyn Fn(&Call) -> bool) -> bool {
+    // Polars folds a literal gathered into a list into a literal, which is no aggregate of the key
+    // where it stands: `a.is_in(lit(1).implode())` is elementwise, as is a literal gathered again
+    // and one that is cast first. It does not fold what another method made of the literal first,
+    // as `lit(1).abs().implode()`, which is one.
+    let folded: Vec<&Call> = match expression.start() {
+        Start::Call(start) if start.entry().id().as_str() == "polars.lit" => {
+            let leading: Vec<&Call> = expression
+                .links()
+                .iter()
+                .take_while(|link| {
+                    matches!(link.entry().id().as_str(), "Expr.cast" | "Expr.implode")
+                })
+                .collect();
+            if leading
+                .iter()
+                .any(|link| link.entry().id().as_str() == "Expr.implode")
+            {
+                leading
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
     let evaluated = |call: &Call| {
-        is_held(call)
+        (is_held(call) && !folded.iter().any(|gathered| std::ptr::eq(*gathered, call)))
             || operands(call)
                 .into_iter()
                 .any(|operand| holds_what_polars_evaluates(operand, is_held))

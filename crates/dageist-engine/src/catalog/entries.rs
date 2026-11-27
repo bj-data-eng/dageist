@@ -789,6 +789,10 @@ fn unique_counts(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError>
     Ok(expr.unique_counts())
 }
 
+fn implode(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.implode(arguments.flag("maintain_order", true)?))
+}
+
 /// Python makes one predicate of the several it is given, which hold all together, and of each
 /// constraint a comparison of the column with the value.
 fn expr_filter(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -3442,6 +3446,14 @@ pub(super) const ENTRIES: &[Entry] = &[
             .not_broadcasting()],
         laziness: Laziness::Lazy,
         build: Build::Expression(head),
+    },
+    Entry {
+        id: EntryId("Expr.implode"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[flag("maintain_order", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(implode),
     },
     Entry {
         id: EntryId("Expr.is_between"),

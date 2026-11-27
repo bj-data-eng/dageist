@@ -20,9 +20,9 @@ use super::probe::measure;
 use super::sample::Frames;
 
 /// Whether the method gives a count of values that the data or its arguments decide, which the walk
-/// states from the arguments and these measurements of one value and many cannot: the count of
-/// `is_in` follows the dtype of the values it is given, a list column's being met row by row and a
-/// column of the values' own dtype being their set.
+/// states from the arguments and these measurements of one value and many cannot: `is_in` is given
+/// a list, which a column of the dtype these measurements give is not, so the lists it is met row
+/// by row with are measured below.
 fn gives_a_count(entry: &Entry) -> bool {
     catalog::Counting::of(entry, &[]).is_some() || entry.id().as_str() == "Expr.is_in"
 }
@@ -342,8 +342,7 @@ fn the_parameters_of_a_method_that_gives_a_count_say_what_polars_does_with_one_v
         ("Expr.filter", "predicates", "t"),
         ("Expr.gather", "indices", "i"),
         ("Expr.search_sorted", "element", "i"),
-        // A list column is met row by row; a column of the value's own dtype is their set, whole,
-        // which is one answer.
+        // A list column is met row by row.
         ("Expr.is_in", "other", "l"),
     ] {
         assert_eq!(rows(id, parameter, given), 3, "{id} {parameter}");
@@ -356,7 +355,6 @@ fn the_parameters_of_a_method_that_gives_a_count_say_what_polars_does_with_one_v
             "{id} {parameter} broadcasts"
         );
     }
-    assert_eq!(rows("Expr.is_in", "other", "i"), 1);
     // The counts and the places a method takes are one value, which Polars does not meet a receiver
     // of one value with each of many for.
     for method_entry in catalog::entries()

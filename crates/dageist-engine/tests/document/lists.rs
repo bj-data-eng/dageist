@@ -1765,8 +1765,12 @@ fn no_argument_of_two_levels_is_run_into_a_panic_of_polars() {
                             .or_default()
                             .push(format!("{receiver} in {place:?}")),
                         Ok(Ok(report))
+                            // `is_in` is looked up in a collection of lists, which Polars accepts or
+                            // refuses and does not panic on, as this test shows: the engine leaves
+                            // such a collection to it.
                             if sensitive
                                 && *has_no_class
+                                && !what.starts_with("Expr.is_in")
                                 && polars_says(&report) == Said::Accepts =>
                         {
                             accepted

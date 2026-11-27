@@ -262,6 +262,19 @@ struct Checked {
 }
 
 fn check(entry: &'static Entry, tested: &Parameter, frame: &DataFrame) -> Checked {
+    // A form the catalogue omits is refused whatever it is given, so a value taken of one value
+    // cannot be asked of it: the call of one value is not one the walk allows. The test of the
+    // omitted forms asks the walk for it.
+    if catalog::omitted_forms()
+        .iter()
+        .any(|form| form.entry() == entry.id().as_str() && form.parameter() == tested.name())
+    {
+        let why = "its form for a value of one dtype is omitted: the walk refuses it".to_owned();
+        return Checked {
+            window: Found::Unbuildable(why.clone()),
+            fill: Found::Unbuildable(why),
+        };
+    }
     if Counting::of(entry, &[]).is_some() {
         return Checked {
             window: Found::ItselfTaken,
@@ -495,9 +508,9 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
     for (name, text) in &fill_unbuildable {
         eprintln!("fill unbuildable {name}: {text}");
     }
-    // Polars reads the fill of a `shift` as a scalar, which only the values a membership test and
-    // a replacement list leave a value that a method took of one value to be, of all the
-    // parameters there are.
+    // Polars reads the fill of a `shift` as a scalar, which only the values a replacement lists
+    // leave a value that a method took of one value to be, of all the parameters there are, and
+    // the values a membership test is given in the form the catalogue omits, which is not asked.
     assert_eq!(fill_accepted, SCALAR_EXCEPTIONS, "{fill_accepted:?}");
     assert_eq!(
         fill_unbuildable
@@ -524,9 +537,13 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
     assert!(asked > 90 && agreed > 50, "asked {asked}, agreed {agreed}");
 }
 
-/// The parameters whose call of one value could not be built or does not run in Polars with any
-/// receiver and filler tried, so a taken value was not asked of them, and why. None.
-const UNBUILDABLE: [(&str, &str); 0] = [];
+/// The parameters whose call of one value could not be built, does not run in Polars with any
+/// receiver and filler tried or is refused by the walk, so a taken value was not asked of them, and
+/// why. The one is the form of the values `is_in` looks up in that the catalogue omits.
+const UNBUILDABLE: [(&str, &str); 1] = [(
+    "Expr.is_in other",
+    "its form for a value of one dtype is omitted: the walk refuses it",
+)];
 
 /// The parameters that Polars and the walk both refuse a taken value for, and not by the window,
 /// with the rule the walk names: Polars reads each as one value that it can tell is one, with "'n'
@@ -641,8 +658,7 @@ fn parameter_name(entry: &Entry, name: &str) -> &'static str {
 }
 
 /// The parameters that leave the call a scalar given a value that a method took of one value.
-const SCALAR_EXCEPTIONS: [&str; 5] = [
-    "Expr.is_in other",
+const SCALAR_EXCEPTIONS: [&str; 4] = [
     "Expr.replace old",
     "Expr.replace new",
     "Expr.replace_strict old",
@@ -651,7 +667,10 @@ const SCALAR_EXCEPTIONS: [&str; 5] = [
 
 /// The calls that cannot be asked as the fill of a `shift` beside themselves, which Polars refuses
 /// for the dtype it gives, with why.
-const UNBUILDABLE_AS_A_FILL: [&str; 4] = [
+const UNBUILDABLE_AS_A_FILL: [&str; 5] = [
+    // The form of the values a membership test is given that the catalogue omits, which Polars
+    // deprecates: the call of one value is refused by the walk, so it is not asked.
+    "Expr.is_in other",
     // A list: Polars fills a list with a list, where the tables measure a fill by the number 1 of
     // the dtype it fills, which a list is not, so they refuse it.
     "Expr.str.split by",

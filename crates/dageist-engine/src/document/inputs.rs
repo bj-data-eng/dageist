@@ -9,6 +9,7 @@ use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
 use crate::allowed::{Representative, Shape, dtype_name};
 
 use super::columns::ColumnDescription;
+use super::model::{Start, Value};
 use super::values::FirstValues;
 use crate::text::text_of;
 
@@ -292,6 +293,16 @@ impl Inputs {
         matches!(
             self.inputs.get(name).map(|connected| &connected.input),
             Some(Input::List(_))
+        )
+    }
+
+    /// Whether `value` is an expression that is a connected list and nothing more.
+    pub(super) fn is_a_list_alone(&self, value: &Value) -> bool {
+        matches!(
+            value,
+            Value::Expression(expression)
+                if expression.links().is_empty()
+                    && matches!(expression.start(), Start::Input(name) if self.is_list(name))
         )
     }
 

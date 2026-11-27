@@ -276,6 +276,8 @@ struct Gen<'a> {
     next_fields: Option<Fields>,
     /// What the function that makes a struct, which a chain was just started from, was made of.
     made_of: Vec<MadeOf>,
+    /// The class of the value the method being drawn follows, where it is known.
+    following: Option<Representative>,
 }
 
 /// One input of a call that makes a struct of expressions: the name it is written under, its class
@@ -397,10 +399,11 @@ fn methods() -> Vec<&'static Entry> {
 /// campaign draws only where a focus names it: the shape of such a count is the first of several
 /// that the catalogue gains, and the campaigns that check them are not a gate of the engine's tests
 /// until every shape exists. [`Counting`](catalog::Counting) says which methods, and `is_in`, whose
-/// count follows the dtype of the values it is given, is one too.
+/// count follows the dtype of the values it is given, is one too, and so is `implode`, which gives
+/// a list of the values that a campaign not focused on lists does not follow.
 fn is_held_back(entry: &Entry) -> bool {
     catalog::Counting::of(entry, &[]).is_some()
-        || entry.id().as_str() == "Expr.is_in"
+        || matches!(entry.id().as_str(), "Expr.is_in" | "Expr.implode")
         || is_of_nested_dtypes(entry)
         || makes_or_reads_structs(entry)
 }
@@ -721,6 +724,7 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         started: None,
         next_fields: None,
         made_of: Vec::new(),
+        following: None,
     };
     let document = generator.document();
     Some(Case {
@@ -1349,6 +1353,34 @@ impl Gen<'_> {
                 single(column)
             }
         }
+    }
+
+    /// The values `is_in` looks up in, nested more deeply than the value it follows: an operand
+    /// that is a list or an array where it follows a value that is none, and otherwise the operand
+    /// imploded as often as it takes to be nested more deeply, which gives one list. What it
+    /// follows is known where the method is drawn, and the operand's class is known or the
+    /// operand is taken for a value that is no list.
+    fn collection(&mut self, slots: &mut Vec<Slot>, depth: usize) -> Built {
+        let level =
+            |class: Option<Representative>| usize::from(class.is_some_and(|c| c.is_nested()));
+        let following = level(self.following);
+        let mut built = self.operand(slots, depth);
+        let mut nesting = level(built.class);
+        while nesting <= following {
+            let mut links = built.expression.links().to_vec();
+            links.push(call("Expr.implode", Vec::new()));
+            let class = match (nesting, built.class) {
+                (0, Some(class)) => Inner::of_class(class).map(Representative::List),
+                _ => None,
+            };
+            built = Built {
+                expression: Expression::new(built.expression.start().clone(), links)
+                    .expect("a chain"),
+                class,
+            };
+            nesting += 1;
+        }
+        built
     }
 
     /// A literal that stands for one value, as the parameters Polars takes
@@ -2098,7 +2130,10 @@ impl Gen<'_> {
             {
                 chosen = self.draw.pick(&focus.methods);
             }
-            let (call, arguments) = self.method_call(chosen, slots, depth, fields)?;
+            self.following = Some(class);
+            let drawn = self.method_call(chosen, slots, depth, fields);
+            self.following = None;
+            let (call, arguments) = drawn?;
             let given: Vec<(&str, Representative)> = arguments
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -2401,6 +2436,10 @@ impl Gen<'_> {
                     };
                     (0..count).map(|_| self.operand(slots, depth)).collect()
                 }
+                // The values `is_in` looks up in: a list or an array, or a collection imploded. A
+                // collection nested as the value it follows is, a column of its own dtype, is the
+                // form Polars deprecates, which the engine refuses and the target does not draw.
+                ("Expr.is_in", "other") => vec![self.collection(slots, depth)],
                 _ => vec![self.operand(slots, depth)],
             };
             if position.is_some() {
@@ -3865,7 +3904,7 @@ mod tests {
     fn the_cases_include_a_shift_back_and_a_shift_forward() {
         // The limit for what a shift leaves null follows the direction of the
         // shift, so the target must reach both for a campaign to check it.
-        let cases: Vec<Case> = (0..6000_u64)
+        let cases: Vec<Case> = (0..12000_u64)
             .filter_map(|offset| generate(&entropy(offset), None))
             .collect();
         let back = cases.iter().filter(|case| shifts_back(case)).count();
@@ -4054,6 +4093,55 @@ mod tests {
         (0..offsets)
             .filter_map(|offset| generate(&entropy(offset), Some(&focus)))
             .collect()
+    }
+
+    #[test]
+    fn a_focus_on_is_in_draws_it_only_looking_up_in_a_collection_nested_more_deeply_than_its_value()
+    {
+        // Polars deprecates a collection nested as the value `is_in` follows is, a column of its
+        // own dtype, which the engine refuses: what is looked up in is a list or an array column or
+        // the operand imploded.
+        let mut asked = 0;
+        for case in focused_cases("is_in", 400) {
+            // The columns of a join's other table are classed as the walk has them, which the
+            // generator may take for another class than Polars gives a call on them, so a join is
+            // asked by the campaigns and not here.
+            if case.document.write().contains("\"LazyFrame.join\"") {
+                continue;
+            }
+            let header = header_of(&case);
+            // The other table's columns have the dtypes of `a` and `b`.
+            let nested = |name: &str| {
+                let name = match name {
+                    "ra" => "a",
+                    "rb" => "b",
+                    other => other,
+                };
+                header[name]
+                    .as_str()
+                    .and_then(Representative::from_name)
+                    .is_some_and(Representative::is_nested)
+            };
+            for arguments in arguments_of(&case, "Expr.is_in") {
+                let then = arguments["other"]["expression"]["then"]
+                    .as_array()
+                    .expect("links");
+                let start = &arguments["other"]["expression"]["start"];
+                let imploded = then
+                    .last()
+                    .is_some_and(|link| link["entry"] == "Expr.implode");
+                let column = start["entry"] == "polars.col" && then.is_empty();
+                let named = start["arguments"]["name"]["columns"][0]
+                    .as_str()
+                    .unwrap_or("");
+                assert!(
+                    imploded || (column && nested(named)),
+                    "is_in looks up in a collection that is neither imploded nor a list or an array: {arguments}"
+                );
+                asked += 1;
+            }
+        }
+        assert!(asked > 50, "only {asked} calls of is_in were drawn");
     }
 
     /// The texts of the list a call is given for `parameter`, whatever the kind of each.

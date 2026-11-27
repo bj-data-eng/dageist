@@ -642,6 +642,7 @@ export const RULE_NAMES = [
   'struct-is-filled-forward-or-backward',
   'struct-arithmetic-needs-numbers',
   'to-struct-names-are-distinct',
+  'is-in-takes-a-list',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */

@@ -14,8 +14,8 @@ use crate::allowed::dtype::{Inner, Representative};
 use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
-    Chain, ContextLine, CountLine, DtypeKey, DtypeLine, LIST_FORM, OptionLine, OptionValue,
-    Outcome, Produces, Reason, Shape, Stage, measured_classes, subject_of,
+    Chain, ContextLine, CountLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces,
+    Reason, Shape, Stage, measured_classes, subject_of,
 };
 use crate::catalog::{
     self, Applies, Argument, BuildError, Counting, Entry, Kind, Parameter, ParameterDefault,
@@ -504,10 +504,21 @@ fn settled(entry: &Entry, options: &[(&str, &str)], outcome: Outcome) -> Outcome
     }
 }
 
-/// What a rule that Polars panics on a receiver says of a call that follows `receiver`: the tables
-/// never run it, and the line says what the rule does.
-fn refused_by_a_rule(entry: &str, receiver: Option<Representative>) -> Option<Outcome> {
-    let (rule, said) = Rule::forbids_receiver(entry, &receiver?.dtype())?;
+/// What a rule says of a call that follows `receiver` and is given `arguments`, the dtypes by the
+/// names of their parameters: Polars panics on some receivers, and deprecates a collection that
+/// `is_in` is given nested as the value it follows is. The tables never run it, and the line says
+/// what the rule does.
+fn refused_by_a_rule(
+    entry: &str,
+    receiver: Option<Representative>,
+    arguments: &[(&str, Representative)],
+) -> Option<Outcome> {
+    let receiver = receiver?;
+    let (rule, said) = Rule::forbids_receiver(entry, &receiver.dtype()).or_else(|| {
+        arguments.iter().find_map(|(parameter, argument)| {
+            Rule::forbids_argument(entry, parameter, &receiver.dtype(), &argument.dtype())
+        })
+    })?;
     Some(Outcome::Refused(Reason {
         stage: Stage::Rows,
         text: format!("{}: {said}", rule.name()),
@@ -515,7 +526,8 @@ fn refused_by_a_rule(entry: &str, receiver: Option<Representative>) -> Option<Ou
 }
 
 pub(super) fn dtype_line(job: &DtypeJob) -> DtypeLine {
-    if let Some(outcome) = refused_by_a_rule(job.entry.id().as_str(), job.receiver) {
+    let given: Vec<(&str, Representative)> = job.parameter.zip(job.argument).into_iter().collect();
+    if let Some(outcome) = refused_by_a_rule(job.entry.id().as_str(), job.receiver, &given) {
         return DtypeLine {
             entry: job.entry.id().as_str(),
             parameter: job.parameter,
@@ -593,9 +605,9 @@ impl DtypeIndex {
         }
     }
 
-    /// The receivers a method that is given a list or an array runs on, the one that fits best
-    /// first, each with the first of them that runs: the form of `is_in` that Polars meets row by
-    /// row.
+    /// The receivers `is_in` runs on, the one that fits best first, each with the first list or
+    /// array it is given that runs: Polars meets it row by row, and deprecates a collection nested
+    /// as the value it follows is, which the rule `is-in-takes-a-list` refuses.
     fn list_candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
         let id = entry.id().as_str();
         let order = std::iter::once(Representative::Int64).chain(
@@ -605,12 +617,19 @@ impl DtypeIndex {
         );
         order
             .filter_map(|receiver| {
-                [
+                // The list or the array of the receiver's own dtype first, where it has one, then
+                // those the tables of the lists read the others as.
+                let own = Inner::of_class(receiver)
+                    .into_iter()
+                    .flat_map(|inner| [Representative::List(inner), Representative::Array(inner)]);
+                own.chain([
                     Representative::List(Inner::Int64),
                     Representative::List(Inner::String),
                     Representative::Array(Inner::Int64),
-                ]
-                .into_iter()
+                    // A list of nulls holds a value of any dtype, as a struct is.
+                    Representative::List(Inner::Null),
+                    Representative::Array(Inner::Null),
+                ])
                 .find_map(|argument| {
                     match self
                         .lines
@@ -633,6 +652,9 @@ impl DtypeIndex {
     /// that must be given, an argument of its own dtype if that runs, and
     /// otherwise the first that does.
     fn candidates(&self, entry: &'static Entry) -> Vec<Candidate> {
+        if entry.id().as_str() == "Expr.is_in" {
+            return self.list_candidates(entry);
+        }
         let order = std::iter::once(Representative::Int64).chain(
             measured_classes(entry.id().as_str())
                 .iter()
@@ -1113,25 +1135,12 @@ fn forms(entry: &'static Entry) -> Vec<Form> {
         };
         forms.extend(words.iter().map(|word| (parameter.name(), *word)));
     }
-    // `is_in` is measured given a list, which Polars meets row by row, as well as given a column of
-    // the dtype it follows.
-    if entry.id().as_str() == "Expr.is_in" {
-        forms.push(LIST_FORM);
-    }
     forms
 }
 
 /// The receivers a form of `entry` is measured on in a context: those the option table allows
 /// the form on, `Int64` before the others, with what it gives on each.
-fn form_candidates_of(
-    entry: &'static Entry,
-    form: Form,
-    options: &OptionIndex,
-    index: &DtypeIndex,
-) -> Vec<Candidate> {
-    if form == LIST_FORM {
-        return index.list_candidates(entry);
-    }
+fn form_candidates_of(entry: &'static Entry, form: Form, options: &OptionIndex) -> Vec<Candidate> {
     let order = std::iter::once(Representative::Int64).chain(
         Representative::MEASURED
             .into_iter()
@@ -1216,7 +1225,7 @@ fn context_lines(
             forms(entry).into_iter().map(|form| {
                 (
                     (entry.id().as_str(), form),
-                    form_candidates_of(entry, form, options, index),
+                    form_candidates_of(entry, form, options),
                 )
             })
         })
@@ -1291,10 +1300,8 @@ fn context_line(
                 };
             };
             let for_subject = chosen.clone();
-            // The form of a list given to `is_in` is no option: the candidate gives it.
             let given: Vec<(&'static str, Argument)> = form
                 .into_iter()
-                .filter(|form| *form != LIST_FORM)
                 .map(|(name, word)| (name, Argument::Choice(word.to_owned())))
                 .collect();
             (
@@ -1740,7 +1747,13 @@ pub(super) fn option_line(
 ) -> OptionLine {
     let id = entry.id().as_str();
     let receiver = candidate.map(|candidate| candidate.receiver);
-    if let Some(outcome) = refused_by_a_rule(id, receiver) {
+    // What the call is given where it stands: the candidate's arguments, or the receiver's own dtype
+    // for each that must be given, which the option table measures a method on without a candidate.
+    let given: Vec<(&str, Representative)> = match candidate {
+        Some(candidate) => candidate.arguments.clone(),
+        None => Vec::new(),
+    };
+    if let Some(outcome) = refused_by_a_rule(id, receiver, &given) {
         return OptionLine {
             entry: id,
             receiver,
