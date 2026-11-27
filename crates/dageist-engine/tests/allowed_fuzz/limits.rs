@@ -49,7 +49,9 @@ use super::literal::{
     LiteralCause, call_with_columns, class_of, expression_with_columns, operand_causes,
     placed_operands, starts_from_a_literal,
 };
-use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
+use super::observe::{
+    Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_checked, observe_probe,
+};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
 use super::structs::Structs;
@@ -5007,9 +5009,115 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
         }
         _ => return Vec::new(),
     };
-    Limit::ALL
+    let own: Vec<Limit> = Limit::ALL
         .into_iter()
         .filter(|limit| applies(*limit, case, &disagreement, prediction, observed))
+        .collect();
+    if own.is_empty() {
+        excuses_as_in_a_select(case, &disagreement)
+    } else {
+        own
+    }
+}
+
+/// The limits that excuse a case of a step that groups, where the expression it disagrees at is
+/// excused by them in a plain `select`. The limits are about what an expression is given, as a
+/// literal of a dtype the step engine casts strictly or a replacement that lists a null, which is
+/// the same in the calls after `group_by` as in a `select`; the case that is asked is the expression
+/// alone in a `select`, which must disagree the same way for a limit to excuse it, so a
+/// disagreement that only the group makes is none of theirs.
+fn excuses_as_in_a_select(case: &Case, disagreement: &Disagreement) -> Vec<Limit> {
+    if case.document.steps()[0].links().is_empty() {
+        return Vec::new();
+    }
+    let place = match disagreement {
+        Disagreement::PolarsRefuses(refusal) => refusal.place.as_ref(),
+        Disagreement::PolarsAllows(refused) => Some(&refused.place),
+        Disagreement::RuleRefuses(_) => return Vec::new(),
+    };
+    let Some(selected) = as_a_select(case, place) else {
+        return Vec::new();
+    };
+    let predicted = predict(&selected);
+    let observed = observe_checked(&selected);
+    let the_same_way = match (&predicted.verdict, &observed.refusal, disagreement) {
+        (Verdict::Allows, Some(_), Disagreement::PolarsRefuses(_)) => true,
+        (Verdict::Refuses(refused), None, Disagreement::PolarsAllows(_)) => {
+            matches!(refused.source, Source::Polars)
+        }
+        _ => false,
+    };
+    if the_same_way {
+        excuses(&selected, &predicted, &observed)
+    } else {
+        Vec::new()
+    }
+}
+
+/// The expression of a step that groups that `place` is in, alone in a `select` of the same frames,
+/// or every expression the step holds where the place does not name one, as a refusal of the rows
+/// does not.
+fn as_a_select(case: &Case, place: Option<&Place>) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let expressions = place
+        .and_then(|place| expression_at(step, place))
+        .map_or_else(|| expressions_of(step), |expression| vec![expression]);
+    if expressions.is_empty() {
+        return None;
+    }
+    let select = Call::new(
+        catalog::entry("LazyFrame.select")?,
+        vec![(
+            "exprs",
+            Value::Many(expressions.into_iter().map(Value::Expression).collect()),
+        )],
+    )
+    .ok()?;
+    let step = Step::new(step.id().clone(), select).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        structs: case.structs.clone(),
+        document: Document::new(vec![step]).ok()?,
+    })
+}
+
+/// The expression of the step's own call or of a call after it that `place` is in.
+fn expression_at(step: &Step, place: &Place) -> Option<Expression> {
+    let mut path = place.path().iter();
+    let call = match place.path().first()? {
+        Segment::Link(at) => {
+            path.next();
+            step.links().get(*at)?
+        }
+        _ => step.call(),
+    };
+    let Some(Segment::Parameter(parameter)) = path.next() else {
+        return None;
+    };
+    match (call.argument(parameter)?, path.next()) {
+        (Value::Many(items), Some(Segment::Item(at))) => match items.get(*at)? {
+            Value::Expression(expression) => Some(expression.clone()),
+            _ => None,
+        },
+        (Value::Expression(expression), _) => Some(expression.clone()),
+        _ => None,
+    }
+}
+
+/// Every expression the arguments of the step's calls hold.
+fn expressions_of(step: &Step) -> Vec<Expression> {
+    std::iter::once(step.call())
+        .chain(step.links())
+        .flat_map(Call::arguments)
+        .flat_map(|argument| match argument.value() {
+            Value::Many(items) => items.iter().collect::<Vec<_>>(),
+            value => vec![value],
+        })
+        .filter_map(|value| match value {
+            Value::Expression(expression) => Some(expression.clone()),
+            _ => None,
+        })
         .collect()
 }
 
