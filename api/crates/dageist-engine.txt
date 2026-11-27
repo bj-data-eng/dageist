@@ -1067,6 +1067,8 @@ pub dageist_engine::document::Value::Table(alloc::string::String)
 pub dageist_engine::document::Value::TimeZone(core::option::Option<alloc::string::String>)
 impl dageist_engine::document::Value
 pub fn dageist_engine::document::Value::from_literal(literal: &dageist_engine::allowed::Literal, kind: dageist_engine::catalog::Kind) -> Self
+impl dageist_engine::document::Value
+pub fn dageist_engine::document::Value::python(&self) -> core::option::Option<alloc::string::String>
 pub enum dageist_engine::document::ValueKind
 pub dageist_engine::document::ValueKind::Choice
 pub dageist_engine::document::ValueKind::Columns
