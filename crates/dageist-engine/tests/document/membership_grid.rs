@@ -1,36 +1,71 @@
-//! `is_in` and `implode` held to Polars over a grid: a receiver of each dtype the tables measure,
-//! and for `other` each form that can be given: a column of every dtype, the same imploded, a
-//! literal of the receiver's dtype, a null, and a column of empty lists. Each key is a step that is
-//! built by the engine's own build functions and asked of Polars, as the step engine would run it,
-//! and the walk's refusals are held to what Polars does.
+//! `is_in` and `implode` held to Polars over a grid, both ways, on the shared helper in `grid.rs`.
 //!
-//! The walk may refuse what Polars accepts only where it is stricter by design: a collection nested
-//! as the receiver is, the form Polars deprecates, and a list that the tables measure no class of.
-//! It may never accept what Polars refuses. `implode` is asked on a column of every dtype, for the
-//! dtype it gives and for where it is refused.
+//! A receiver of every dtype the tables know, and some they do not (the units of a duration and of
+//! a moment, a decimal of another precision, a binary, a categorical and an enum), is looked up in
+//! every form that can be given for `other`: a column of every class, each column imploded once and
+//! twice, a typed literal of every class and each imploded, a null typed as every class and untyped,
+//! a column of empty lists, and a connected list as `document/run.rs` builds it, gathered into one
+//! list. Each is asked with `nulls_equal` true and false, in a `select` and as a join's key, where
+//! the walk folds what it takes for an aggregate. Each step is built by the engine's own functions
+//! and asked of Polars, schema first and then its rows, and the walk is held to what Polars does,
+//! in each cell:
+//!
+//! - the walk accepts what Polars accepts;
+//! - the walk refuses what Polars refuses;
+//! - the only exception is the deprecated form, which Polars accepts with a warning where what is
+//!   looked up in is nested as the value is, and which the rule `is-in-takes-a-list` refuses;
+//! - every other cell that differs is a line of the test, by receiver and form, with its reason.
+//!
+//! The labels of the receiver and of the form begin with the depth of nesting of the dtype, which
+//! the line of the deprecated form names. A cell that cannot be built is named with its reason. A
+//! list typed in has no cell: the editor has no kind for one, as the explanation says of a Python
+//! list given as `other`, which waits for a list kind.
+//!
+//! `implode` is asked on a column of every dtype, imploded once and twice, with `maintain_order`
+//! both ways, for where Polars refuses it, and for the dtype it gives.
+//!
+//! The grid is judged on every core, and takes a minute or less with the engine's tests.
 
-use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
-use dageist_engine::allowed::{After, Inner, RefusalSource, Representative, Rule};
-use dageist_engine::document::{Document, Inputs};
+use dageist_engine::allowed::{After, Inner, Representative};
+use dageist_engine::document::Document;
 use polars::prelude::*;
 use serde_json::{Value, json};
 
 use crate::ask_polars::{self, Connected};
+use crate::grid::{Case, Connections, Depth, Grid, Kind, Known, Pattern, Question};
 use crate::support::{call, chain, document, field, field_then, many, step};
 
-/// The name of the column that holds values of `class`.
-fn column_of(class: Representative) -> String {
+/// A column of the table, as a receiver and as a form of what is looked up in.
+#[derive(Clone)]
+struct Col {
+    /// What the receiver is called in a report.
+    label: String,
+    name: String,
+    dtype: DataType,
+    /// The class of the tables, where the dtype has one.
+    class: Option<Representative>,
+}
+
+impl Col {
+    fn level(&self) -> usize {
+        self.dtype.nesting_level()
+    }
+}
+
+fn name_of(label: &str) -> String {
     format!(
         "c_{}",
-        class.name().replace(['(', ')', ','], "_").replace(' ', "")
+        label
+            .replace(['(', ')', ',', '\'', ' '], "_")
+            .replace("μ", "u")
     )
 }
 
-/// Three values of `class`: one, a null and another, where the dtype can be made of whole numbers.
-fn values_of(class: Representative) -> Option<Series> {
-    let name = column_of(class);
-    let name = name.as_str();
+/// Three values of the dtype of `class`: one, a null and another, where it can be made of whole
+/// numbers.
+fn values_of(class: Representative, name: &str) -> Option<Series> {
     if let Some(inner) = class.element() {
         let is_array = matches!(class, Representative::Array(_));
         let rows: [Option<Vec<i64>>; 3] = [
@@ -68,241 +103,529 @@ fn values_of(class: Representative) -> Option<Series> {
     }
 }
 
-/// The table: a column of every class that can be made, and one of empty lists.
-fn table() -> (DataFrame, Vec<Representative>) {
-    let mut columns: Vec<Column> = Vec::new();
-    let mut classes = Vec::new();
+/// The dtypes the tables have no class of, or have one of for several units and zones, which a
+/// receiver is also asked for: the walk reads them as the class that stands for them, or does not
+/// judge them.
+fn extra_dtypes() -> Vec<(String, DataType)> {
+    let zone = Some(TimeZone::UTC);
+    let mut extra = vec![
+        (
+            "Duration(ns)".to_owned(),
+            DataType::Duration(TimeUnit::Nanoseconds),
+        ),
+        (
+            "Duration(ms)".to_owned(),
+            DataType::Duration(TimeUnit::Milliseconds),
+        ),
+        (
+            "Datetime(ns)".to_owned(),
+            DataType::Datetime(TimeUnit::Nanoseconds, None),
+        ),
+        (
+            "Datetime(ms)".to_owned(),
+            DataType::Datetime(TimeUnit::Milliseconds, None),
+        ),
+        (
+            "Datetime(ns, UTC)".to_owned(),
+            DataType::Datetime(TimeUnit::Nanoseconds, zone.clone()),
+        ),
+        (
+            "Datetime(ms, UTC)".to_owned(),
+            DataType::Datetime(TimeUnit::Milliseconds, zone),
+        ),
+        ("Decimal(38, 10)".to_owned(), DataType::Decimal(38, 10)),
+        ("Binary".to_owned(), DataType::Binary),
+    ];
+    if let Ok(enumeration) = FrozenCategories::new(["1", "3"]) {
+        extra.push((
+            "Enum".to_owned(),
+            DataType::from_frozen_categories(enumeration),
+        ));
+    }
+    extra.push((
+        "Categorical".to_owned(),
+        DataType::from_categories(Categories::global()),
+    ));
+    extra
+}
+
+/// The table, with a column for each dtype that can be made, and the columns.
+fn table() -> (DataFrame, Vec<Col>, Vec<String>) {
+    let mut series: Vec<Series> = Vec::new();
+    let mut columns: Vec<Col> = Vec::new();
+    let mut unmade: Vec<String> = Vec::new();
     for class in Representative::ALL {
-        if let Some(series) = values_of(class)
-            && series.dtype() == &class.dtype()
-        {
-            columns.push(series.into());
-            classes.push(class);
+        let label = class.name().to_owned();
+        let name = name_of(&label);
+        match values_of(class, &name) {
+            Some(values) if values.dtype() == &class.dtype() => {
+                columns.push(Col {
+                    label,
+                    name,
+                    dtype: values.dtype().clone(),
+                    class: Some(class),
+                });
+                series.push(values);
+            }
+            _ => unmade.push(format!(
+                "{class}: no column of it can be made of whole numbers"
+            )),
         }
     }
-    columns.push(
-        ListChunked::from_iter([
-            Some(Series::new("".into(), Vec::<i64>::new())),
-            None,
-            Some(Series::new("".into(), Vec::<i64>::new())),
-        ])
-        .into_series()
-        .with_name("empty_lists".into())
-        .into(),
-    );
-    (
-        DataFrame::new(3, columns).expect("columns of three rows"),
-        classes,
-    )
+    for (label, dtype) in extra_dtypes() {
+        let name = name_of(&label);
+        let base = if dtype == DataType::Binary
+            || matches!(dtype, DataType::Enum(..) | DataType::Categorical(..))
+        {
+            Series::new(name.as_str().into(), [Some("1"), None, Some("3")])
+        } else {
+            Series::new(name.as_str().into(), [Some(1_i64), None, Some(3)])
+        };
+        match base.cast(&dtype) {
+            Ok(values) => {
+                columns.push(Col {
+                    label,
+                    name,
+                    class: Representative::of(values.dtype()),
+                    dtype: values.dtype().clone(),
+                });
+                series.push(values);
+            }
+            Err(error) => unmade.push(format!("{label}: {error}")),
+        }
+    }
+    let empty = ListChunked::from_iter([
+        Some(Series::new("".into(), Vec::<i64>::new())),
+        None,
+        Some(Series::new("".into(), Vec::<i64>::new())),
+    ])
+    .into_series()
+    .with_name("empty_lists".into());
+    columns.push(Col {
+        label: "empty lists".to_owned(),
+        name: "empty_lists".to_owned(),
+        dtype: empty.dtype().clone(),
+        class: Representative::of(empty.dtype()),
+    });
+    series.push(empty);
+    let frame = DataFrame::new(3, series.into_iter().map(Column::from).collect())
+        .expect("columns of three rows");
+    (frame, columns, unmade)
 }
 
 fn implode() -> Value {
     call("Expr.implode", json!({}))
 }
 
-/// A literal of the dtype of `class`, where a document can type one in.
-fn literal_of(class: Representative) -> Option<Value> {
+/// The word a document writes the dtype of `class` with, where it holds one.
+fn document_word(class: Representative) -> Option<String> {
+    dageist_engine::document::Dtype::new(class.dtype())
+        .ok()
+        .map(|dtype| dtype.to_string())
+}
+
+/// A literal that a document types in, of a dtype of `class`.
+fn typed_literal(class: Representative) -> Option<Value> {
+    if class.is_nested() || class == Representative::Struct {
+        return None;
+    }
+    let dtype = json!({ "dtype": document_word(class)? });
     let value = match class {
         Representative::Int8
         | Representative::Int16
         | Representative::Int32
         | Representative::Int64
+        | Representative::Int128
         | Representative::UInt8
         | Representative::UInt16
         | Representative::UInt32
-        | Representative::UInt64 => {
-            json!({ "value": { "integer": 1 }, "dtype": { "dtype": class.name() } })
-        }
-        Representative::Float64 => {
-            json!({ "value": { "float": 1.0 }, "dtype": { "dtype": "Float64" } })
+        | Representative::UInt64
+        | Representative::UInt128
+        | Representative::Date
+        | Representative::Time
+        | Representative::Datetime
+        | Representative::DatetimeZoned
+        | Representative::Duration
+        | Representative::Decimal => json!({ "value": { "integer": 1 }, "dtype": dtype }),
+        Representative::Float16 | Representative::Float32 | Representative::Float64 => {
+            json!({ "value": { "float": 1.0 }, "dtype": dtype })
         }
         Representative::String => json!({ "value": { "string": "1" } }),
         Representative::Boolean => json!({ "value": { "flag": true } }),
+        Representative::Null => json!({ "value": { "flag": null }, "dtype": dtype }),
         _ => return None,
     };
-    Some(chain(call("polars.lit", value), vec![]))
+    Some(call("polars.lit", value))
 }
 
-/// What Polars says of the step: `None` where it accepts it and runs it on the rows, and the first
-/// line of why not otherwise, a panic included.
-fn polars_says(document: &Document, frame: &DataFrame) -> Option<String> {
-    let step = &document.steps()[0];
-    let none = |_: &str| None;
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        ask_polars::refusal_of(step, 0, frame, Connected::tables(&none))
-    }))
-    .unwrap_or_else(|_| Some("Polars panics".to_owned()))
-}
-
-/// The dtype Polars gives the one column the step selects, where it plans the step.
-fn polars_dtype(document: &Document, frame: &DataFrame) -> Option<DataType> {
-    let step = &document.steps()[0];
-    let none = |_: &str| None;
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        ask_polars::plan(step, 0, frame, Connected::tables(&none))
-    }))
-    .ok()
-    .flatten()
-    .and_then(|planned| planned.schema.ok())
-    .and_then(|schema| schema.iter().next().map(|(_, dtype)| dtype.clone()))
-}
-
-fn selecting(expression: Value) -> Document {
-    Document::read(&document(vec![step(
-        "s",
-        "LazyFrame.select",
-        json!({ "exprs": many(vec![expression]) }),
-    )]))
-    .expect("a document")
-}
-
-/// What the walk says of the step: refused by a source, not known, or allowed with the class and
-/// shape of the last call.
-enum Walked {
-    Refused(RefusalSource),
-    NotKnown,
-    Allowed(Option<After>),
-}
-
-fn walked(document: &Document, frame: &DataFrame) -> Walked {
-    let walk = document.steps()[0].walk(0, frame.schema(), &Inputs::new());
-    if let Some(refusal) = walk.refusal() {
-        return Walked::Refused(refusal.refusal().source());
+/// A null typed as `class`, where a document can type one.
+fn typed_null(class: Representative) -> Option<Value> {
+    if class.is_nested() || class == Representative::Struct {
+        return None;
     }
-    if walk.not_known().is_some() {
-        return Walked::NotKnown;
-    }
-    Walked::Allowed(
-        walk.expressions()
-            .iter()
-            .find(|expression| expression.place().path().len() == 2)
-            .and_then(|expression| expression.places().last().copied().flatten())
-            .map(|place| place.after()),
-    )
+    Some(call(
+        "polars.lit",
+        json!({ "value": { "flag": null }, "dtype": { "dtype": document_word(class)? } }),
+    ))
 }
 
-#[test]
-fn is_in_given_each_form_of_other_is_what_polars_says_or_stricter_by_design() {
-    let (frame, classes) = table();
-    assert!(classes.len() > 40, "{} classes were made", classes.len());
-    let mut disagreements: Vec<String> = Vec::new();
-    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
-    let receivers: Vec<Representative> = Representative::MEASURED
-        .into_iter()
-        .filter(|class| classes.contains(class))
+/// A form of what is looked up in.
+#[derive(Clone)]
+struct Form {
+    /// The label, which begins with how deeply what it gives is nested.
+    label: String,
+    /// The expression the step is given, or the name of the connected list.
+    other: Value,
+    /// The connected list, where the form is one.
+    list: Option<(String, Series)>,
+}
+
+/// A receiver, which is a column of the table.
+#[derive(Clone)]
+struct Receiver {
+    label: String,
+    name: String,
+}
+
+struct World {
+    frame: DataFrame,
+    columns: Vec<Col>,
+    forms: Vec<Form>,
+    /// What cannot be given, with why.
+    unbuildable: Vec<String>,
+}
+
+fn labelled(level: usize, what: &str) -> String {
+    format!("{level} {what}")
+}
+
+fn connected_name(class: Representative) -> String {
+    format!("list_of_{}", name_of(class.name()))
+}
+
+static WORLD: LazyLock<World> = LazyLock::new(|| {
+    let (frame, columns, mut unbuildable) = table();
+    let mut forms = Vec::new();
+    for column in &columns {
+        let label = &column.label;
+        let level = column.level();
+        forms.push(Form {
+            label: labelled(level, &format!("a column of {label}")),
+            other: field(&column.name),
+            list: None,
+        });
+        forms.push(Form {
+            label: labelled(level + 1, &format!("a column of {label} imploded")),
+            other: field_then(&column.name, vec![implode()]),
+            list: None,
+        });
+        forms.push(Form {
+            label: labelled(level + 2, &format!("a column of {label} imploded twice")),
+            other: field_then(&column.name, vec![implode(), implode()]),
+            list: None,
+        });
+    }
+    for class in Representative::ALL {
+        if class.is_nested() || class == Representative::Struct {
+            unbuildable.push(format!(
+                "a literal of {class}: the editor types a literal in of a scalar dtype only"
+            ));
+        }
+        if !(class.is_nested() || class == Representative::Struct) && document_word(class).is_none()
+        {
+            unbuildable.push(format!(
+                "a literal and a null typed as {class}: a document holds no dtype word for it"
+            ));
+        }
+        if let Some(literal) = typed_literal(class) {
+            forms.push(Form {
+                label: labelled(0, &format!("a literal of {class}")),
+                other: chain(literal.clone(), vec![]),
+                list: None,
+            });
+            forms.push(Form {
+                label: labelled(1, &format!("a literal of {class} imploded")),
+                other: chain(literal, vec![implode()]),
+                list: None,
+            });
+        }
+        if let Some(null) = typed_null(class) {
+            forms.push(Form {
+                label: labelled(0, &format!("a null typed as {class}")),
+                other: chain(null, vec![]),
+                list: None,
+            });
+        }
+        // A connected list of the values of each class that can be made, as the run builds it.
+        if class != Representative::Struct
+            && let Some(list) = values_of(class, "list")
+            && list.dtype() == &class.dtype()
+        {
+            let name = connected_name(class);
+            forms.push(Form {
+                label: labelled(1, &format!("a connected list of {class}")),
+                other: chain(json!({ "input": name }), vec![]),
+                list: Some((name, list)),
+            });
+        }
+    }
+    forms.push(Form {
+        label: labelled(0, "a null"),
+        other: chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            vec![],
+        ),
+        list: None,
+    });
+    forms.push(Form {
+        label: labelled(1, "empty lists"),
+        other: field("empty_lists"),
+        list: None,
+    });
+    unbuildable.push(
+        "a list typed in, fitting, unfitting or empty: the editor has no kind for one".to_owned(),
+    );
+    World {
+        frame,
+        columns,
+        forms,
+        unbuildable,
+    }
+});
+
+/// What a cell chooses.
+#[derive(Default)]
+struct Point {
+    receiver: Option<Receiver>,
+    form: Option<Form>,
+    nulls_equal: bool,
+    key: bool,
+}
+
+fn right_table() -> DataFrame {
+    df!("rf" => [true, false, true]).expect("the other table")
+}
+
+fn is_in_given(point: &Point) -> Result<Case, String> {
+    let receiver = point.receiver.as_ref().ok_or("no receiver")?;
+    let form = point.form.as_ref().ok_or("no form")?;
+    let looked_up = field_then(
+        &receiver.name,
+        vec![call(
+            "Expr.is_in",
+            json!({ "other": form.other, "nulls_equal": { "flag": point.nulls_equal } }),
+        )],
+    );
+    let (entry, arguments) = if point.key {
+        (
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "other" },
+                "left_on": many(vec![looked_up]),
+                "right_on": many(vec![field("rf")]),
+            }),
+        )
+    } else {
+        (
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![looked_up]) }),
+        )
+    };
+    let mut connections = Connections::new().table("other", right_table());
+    if let Some((name, list)) = &form.list {
+        connections = connections.membership_list(name, list.clone());
+    }
+    Case::of_step(entry, arguments, WORLD.frame.clone(), connections)
+}
+
+fn is_in_grid() -> Grid<Point> {
+    let receivers: Vec<(String, Receiver)> = WORLD
+        .columns
+        .iter()
+        .map(|column| {
+            let label = labelled(column.level(), &column.label);
+            (
+                label.clone(),
+                Receiver {
+                    label,
+                    name: column.name.clone(),
+                },
+            )
+        })
         .collect();
-    for receiver in &receivers {
-        let name = column_of(*receiver);
-        let mut forms: Vec<(String, Value)> = Vec::new();
-        for class in &classes {
-            forms.push((format!("a column of {class}"), field(&column_of(*class))));
-            forms.push((
-                format!("a column of {class} imploded"),
-                field_then(&column_of(*class), vec![implode()]),
-            ));
-        }
-        forms.push((
-            "a null".to_owned(),
-            chain(
-                call("polars.lit", json!({ "value": { "flag": null } })),
-                vec![],
-            ),
-        ));
-        forms.push(("empty lists".to_owned(), field("empty_lists")));
-        if let Some(literal) = literal_of(*receiver) {
-            forms.push(("a literal of its dtype".to_owned(), literal.clone()));
-            let imploded = chain(literal["expression"]["start"].clone(), vec![implode()]);
-            forms.push(("a literal of its dtype imploded".to_owned(), imploded));
-        }
-        for (form, other) in forms {
-            let key = format!("{receiver} looked up in {form}");
-            let document = selecting(field_then(
-                &name,
-                vec![call("Expr.is_in", json!({ "other": other }))],
-            ));
-            let polars = polars_says(&document, &frame);
-            match (walked(&document, &frame), polars) {
-                (Walked::Allowed(_), None) => *counts.entry("both allow").or_default() += 1,
-                (Walked::Refused(_), Some(_)) => *counts.entry("both refuse").or_default() += 1,
-                (Walked::NotKnown, _) => *counts.entry("the walk cannot tell").or_default() += 1,
-                (Walked::Refused(RefusalSource::Rule(Rule::IsInTakesAList)), None) => {
-                    *counts
-                        .entry("refused by the rule that asks for a list, which Polars deprecates")
-                        .or_default() += 1;
-                }
-                (Walked::Refused(RefusalSource::Rule(Rule::ElementDtypeIsMeasured)), None) => {
-                    *counts.entry("refused as not measured").or_default() += 1;
-                }
-                (Walked::Refused(source), None) => {
-                    disagreements.push(format!(
-                        "{key}: the walk refuses by {source:?}, Polars allows it"
-                    ));
-                }
-                (Walked::Allowed(_), Some(said)) => {
-                    disagreements
-                        .push(format!("{key}: the walk allows it, Polars refuses: {said}"));
-                }
-            }
-        }
+    let forms: Vec<(String, Form)> = WORLD
+        .forms
+        .iter()
+        .map(|form| (form.label.clone(), form.clone()))
+        .collect();
+    Grid::<Point>::new()
+        .axis("receiver", receivers, |point, receiver| {
+            point.receiver = Some(receiver.clone());
+        })
+        .axis("form", forms, |point, form| {
+            point.form = Some(form.clone());
+        })
+        .axis(
+            "nulls_equal",
+            vec![("false".to_owned(), false), ("true".to_owned(), true)],
+            |point, equal| point.nulls_equal = *equal,
+        )
+        .axis(
+            "place",
+            vec![("select".to_owned(), false), ("key".to_owned(), true)],
+            |point, key| point.key = *key,
+        )
+}
+
+/// What the grid excuses and names, which is the deprecated form and nothing else unless a line
+/// says so, with the reason.
+fn known() -> Vec<Known> {
+    let mut known = Vec::new();
+    // The deprecated form: what is looked up in is nested as the value is, which Polars accepts with
+    // a warning that it is ambiguous (pola-rs/polars#22149). The rule refuses it.
+    for level in ["0 ", "1 "] {
+        known.push(
+            Known::new(
+                Kind::WalkRefusesOnly,
+                Pattern::new()
+                    .starts("receiver", level)
+                    .starts("form", level),
+                "the deprecated form, nested as the value is, which the rule is-in-takes-a-list refuses and Polars accepts with a warning (pola-rs/polars#22149)",
+            )
+            .saying("rule is-in-takes-a-list"),
+        );
     }
-    eprintln!("is_in grid: {counts:#?}");
-    assert!(
-        disagreements.is_empty(),
-        "{} of the grid's cases disagree:\n{}",
-        disagreements.len(),
-        disagreements.join("\n")
-    );
-    assert!(
-        counts.get("both allow").copied().unwrap_or(0) > 50,
-        "{counts:?}"
-    );
+    known
 }
 
 #[test]
-fn implode_gives_the_dtype_polars_gives_and_is_refused_where_polars_refuses_it() {
-    let (frame, classes) = table();
+fn is_in_given_each_form_of_other_is_what_polars_says_in_a_select_and_as_a_key() {
+    assert!(
+        WORLD.columns.len() > 60,
+        "{} columns were made",
+        WORLD.columns.len()
+    );
+    eprintln!(
+        "not buildable as the grid's cells:\n  {}",
+        WORLD.unbuildable.join("\n  ")
+    );
+    let verdicts = is_in_grid().judge(&Question::any_refusal().at(Depth::Rows), is_in_given);
+    verdicts.assert_agree(&known(), 10_000);
+}
+
+/// The receiver and what `implode` is given.
+#[derive(Default)]
+struct Imploded {
+    receiver: Option<Receiver>,
+    times: usize,
+    order: Option<bool>,
+}
+
+#[test]
+fn implode_is_refused_where_polars_refuses_it_and_gives_the_dtype_polars_gives() {
+    let receivers: Vec<(String, Receiver)> = WORLD
+        .columns
+        .iter()
+        .map(|column| {
+            (
+                column.label.clone(),
+                Receiver {
+                    label: column.label.clone(),
+                    name: column.name.clone(),
+                },
+            )
+        })
+        .collect();
+    let verdicts = Grid::<Imploded>::new()
+        .axis("receiver", receivers, |point, receiver| {
+            point.receiver = Some(receiver.clone());
+        })
+        .axis(
+            "times",
+            vec![("once".to_owned(), 1_usize), ("twice".to_owned(), 2)],
+            |point, times| point.times = *times,
+        )
+        .axis(
+            "maintain_order",
+            vec![
+                ("default".to_owned(), None),
+                ("true".to_owned(), Some(true)),
+                ("false".to_owned(), Some(false)),
+            ],
+            |point, order| point.order = *order,
+        )
+        .judge(&Question::any_refusal().at(Depth::Rows), |point| {
+            let receiver = point.receiver.as_ref().ok_or("no receiver")?;
+            let link = match point.order {
+                None => call("Expr.implode", json!({})),
+                Some(keep) => call(
+                    "Expr.implode",
+                    json!({ "maintain_order": { "flag": keep } }),
+                ),
+            };
+            let expression = field_then(&receiver.name, vec![link; point.times]);
+            Case::of_step(
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![expression]) }),
+                WORLD.frame.clone(),
+                Connections::new(),
+            )
+        });
+    verdicts.assert_agree(&[], 100);
+    // The dtype it gives, asked of Polars and of the walk for each receiver.
     let mut disagreements: Vec<String> = Vec::new();
     let mut checked = 0;
-    for class in &classes {
-        for links in [vec![implode()], vec![implode(), implode()]] {
-            let document = selecting(field_then(&column_of(*class), links.clone()));
-            let key = format!("{class} imploded {} time(s)", links.len());
-            let polars_refusal = polars_says(&document, &frame);
-            let dtype = polars_dtype(&document, &frame);
-            match (walked(&document, &frame), polars_refusal, dtype) {
-                (Walked::Allowed(after), None, Some(dtype)) => {
-                    checked += 1;
-                    let expected = Representative::of(&dtype);
-                    let walked_class = after.and_then(|after| match after {
-                        After::Value { dtype, .. } => Some(dtype),
-                        _ => None,
-                    });
-                    if walked_class != expected {
-                        disagreements.push(format!(
-                            "{key}: Polars gives {dtype:?}, the walk {walked_class:?}"
-                        ));
-                    }
-                }
-                (Walked::Refused(_), Some(_), _) => {}
-                (Walked::NotKnown, _, _) => {}
-                (Walked::Refused(source), None, _) => {
+    for column in &WORLD.columns {
+        for times in [1_usize, 2] {
+            let expression = field_then(&column.name, vec![implode(); times]);
+            let document = Document::read(&document(vec![step(
+                "s",
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![expression]) }),
+            )]))
+            .expect("a document");
+            let step = &document.steps()[0];
+            let none = |_: &str| None;
+            let polars = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                ask_polars::plan(step, 0, &WORLD.frame, Connected::tables(&none))
+            }))
+            .ok()
+            .flatten()
+            .and_then(|planned| planned.schema.ok())
+            .and_then(|schema| schema.iter().next().map(|(_, dtype)| dtype.clone()));
+            let walk = step.walk(
+                0,
+                WORLD.frame.schema(),
+                &dageist_engine::document::Inputs::new(),
+            );
+            let walked = walk
+                .expressions()
+                .iter()
+                .find(|expression| expression.place().path().len() == 2)
+                .and_then(|expression| expression.places().last().copied().flatten())
+                .and_then(|place| match place.after() {
+                    After::Value { dtype, .. } => Some(dtype),
+                    _ => None,
+                });
+            if let Some(dtype) = polars
+                && walk.refusal().is_none()
+                && walk.not_known().is_none()
+            {
+                checked += 1;
+                if walked != Representative::of(&dtype) {
                     disagreements.push(format!(
-                        "{key}: the walk refuses by {source:?}, Polars allows it"
+                        "{} imploded {times} time(s): Polars gives {dtype:?}, the walk {walked:?}",
+                        column.label
                     ));
                 }
-                (Walked::Allowed(_), Some(said), _) => {
-                    disagreements
-                        .push(format!("{key}: the walk allows it, Polars refuses: {said}"));
-                }
-                (Walked::Allowed(_), None, None) => {}
             }
         }
     }
     assert!(
         disagreements.is_empty(),
-        "{} of the grid's cases disagree:\n{}",
+        "{} cells disagree on the dtype:\n{}",
         disagreements.len(),
         disagreements.join("\n")
     );
-    assert!(checked > 40, "{checked} dtypes were compared");
+    assert!(checked > 60, "{checked} dtypes were compared");
 }

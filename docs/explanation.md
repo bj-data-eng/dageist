@@ -3001,8 +3001,9 @@ the rows run, a text of a number where Polars casts it to the dtype it meets, a 
 date, text and a number typed without a dtype where the rows run, a Boolean and a number typed without
 a dtype in a bitwise call, a literal that does not cast to its dtype, which the walk could foretell by
 casting the value as the catalogue does, and what Polars panics on in a debug build or never ends on
-(a text padded to a length no memory holds). `is_in` has no grid there: its deprecated form is removed
-with #203, which builds its grid on the helper.
+(a text padded to a length no memory holds). The grid of `is_in` is in `membership_grid.rs`, on the same
+helper: a receiver of every dtype crossed with every form of what it looks up in, in a `select` and as a join's
+key.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a

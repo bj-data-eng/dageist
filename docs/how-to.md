@@ -978,9 +978,12 @@ kind of literal, a place the literal stands or a parameter the grid does not var
 new value of the axis that names it. The grid then holds the finding and every neighbour of it, and the
 campaign need not find the next one.
 
-`is_in` has no grid in `literal_grid.rs`. Its deprecated form is removed with #203, and the grid of what
-it is given (a column, an imploded list, a list column, an array column, a typed literal, a list typed in,
-a null, against each dtype of the receiver) is built on this helper there.
+The grid of `is_in` is in `tests/document/membership_grid.rs`, on this helper. It crosses a receiver of
+every dtype (the lists and arrays of every element dtype, the units of a duration and a moment, a dtype the
+tables have no class of) with every form of what it looks up in (a column of every class, imploded once and
+twice, a typed literal and a typed null of every class, a connected list), with `nulls_equal` both ways, in a
+`select` and as a join's key. The only cells it excuses without a stated limit are the deprecated form, which
+the rule `is-in-takes-a-list` refuses where what is looked up in is nested as the value is.
 
 ## Check The Build Against The Polars Release
 

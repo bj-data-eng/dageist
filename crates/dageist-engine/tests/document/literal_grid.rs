@@ -27,8 +27,8 @@
 //! ends in a candidate to file is a difference this repository has not settled: the walk allows
 //! or refuses what Polars does not, for a value it does not read.
 //!
-//! `is_in` has no grid here. Its deprecated form is removed with #203, which builds the grid of
-//! what it is given on [`crate::grid`], so a grid written for it now would be written twice.
+//! What `is_in` is given is not a literal that a rule reads, and its grid is in
+//! `membership_grid.rs`, built on the same helper.
 
 use polars::prelude::{DataFrame, DataType, NamedFrom, Series, TimeUnit};
 use serde_json::{Value, json};
