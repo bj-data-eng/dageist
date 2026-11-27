@@ -44,14 +44,6 @@ struct Col {
     label: String,
     name: String,
     dtype: DataType,
-    /// The class of the tables, where the dtype has one.
-    class: Option<Representative>,
-}
-
-impl Col {
-    fn level(&self) -> usize {
-        self.dtype.nesting_level()
-    }
 }
 
 fn name_of(label: &str) -> String {
@@ -163,7 +155,6 @@ fn table() -> (DataFrame, Vec<Col>, Vec<String>) {
                     label,
                     name,
                     dtype: values.dtype().clone(),
-                    class: Some(class),
                 });
                 series.push(values);
             }
@@ -186,7 +177,6 @@ fn table() -> (DataFrame, Vec<Col>, Vec<String>) {
                 columns.push(Col {
                     label,
                     name,
-                    class: Representative::of(values.dtype()),
                     dtype: values.dtype().clone(),
                 });
                 series.push(values);
@@ -205,7 +195,6 @@ fn table() -> (DataFrame, Vec<Col>, Vec<String>) {
         label: "empty lists".to_owned(),
         name: "empty_lists".to_owned(),
         dtype: empty.dtype().clone(),
-        class: Representative::of(empty.dtype()),
     });
     series.push(empty);
     let frame = DataFrame::new(3, series.into_iter().map(Column::from).collect())
@@ -283,7 +272,6 @@ struct Form {
 /// A receiver, which is a column of the table.
 #[derive(Clone)]
 struct Receiver {
-    label: String,
     name: String,
 }
 
@@ -496,7 +484,6 @@ fn is_in_grid() -> Grid<Point> {
             (
                 label.clone(),
                 Receiver {
-                    label,
                     name: column.name.clone(),
                 },
             )
@@ -602,7 +589,6 @@ fn implode_is_refused_where_polars_refuses_it_and_gives_the_dtype_polars_gives()
             (
                 column.label.clone(),
                 Receiver {
-                    label: column.label.clone(),
                     name: column.name.clone(),
                 },
             )
