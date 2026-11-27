@@ -3665,8 +3665,7 @@ impl Walker<'_> {
                             && matches!(
                                 entry.id().as_str(),
                                 "Expr.drop_nulls" | "Expr.drop_nans"
-                            )
-                            && found.0 == Shape::Many =>
+                            ) =>
                     {
                         (Shape::Counted, Count::NotKnown)
                     }
