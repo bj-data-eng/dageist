@@ -4756,6 +4756,8 @@ fn keeps_a_null(link: &Call) -> bool {
             | "Expr.var"
             | "Expr.skew"
             | "Expr.kurtosis"
+            | "Expr.nan_min"
+            | "Expr.nan_max"
             | "Expr.sort"
             | "Expr.reverse"
             | "Expr.diff"
