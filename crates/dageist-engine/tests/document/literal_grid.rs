@@ -225,3 +225,96 @@ fn a_length_or_a_place_that_cannot_cut_values_is_refused_as_polars_refuses_it() 
     known.extend(known_wide_cuts());
     cut_grid(values).assert_agree(&known, 1000);
 }
+
+// ---------------------------------------------------------------------------
+// Whole numbers written as values
+
+/// A whole number written as a value, which the steps that cut a table and `gather_every` take.
+#[derive(Default)]
+struct Counted {
+    step: &'static str,
+    number: Option<Written>,
+}
+
+fn counted_grid() -> Verdicts {
+    let steps: Vec<(String, &'static str)> = [
+        "LazyFrame.head(n)",
+        "LazyFrame.tail(n)",
+        "LazyFrame.slice(offset)",
+        "LazyFrame.slice(length)",
+        "LazyFrame.slice(offset, length 1)",
+        "LazyFrame.gather_every(n)",
+        "LazyFrame.gather_every(offset)",
+        "Expr.gather_every(n)",
+        "Expr.gather_every(offset)",
+    ]
+    .into_iter()
+    .map(|step| (step.to_owned(), step))
+    .collect();
+    let mut numbers = literals::edge_integers();
+    // The places a slice starts at near the last row number Polars counts, 2^63 - 1, and counts
+    // near the greatest of 32 bits.
+    numbers.extend([
+        Written::Integer(i64::MAX - i64::from(u32::MAX)),
+        Written::Integer(i64::MAX - i64::from(u32::MAX) + 1),
+        Written::Integer(i64::from(u32::MAX)),
+        Written::Integer(i64::from(u32::MAX) + 1),
+    ]);
+    numbers.sort_by_key(Written::label);
+    numbers.dedup();
+    // The document reads a whole number there and no other kind, so the floats and the texts the
+    // other grids cross are not cells of this one.
+    let grid = Grid::<Counted>::new()
+        .axis("step", steps, |point, step| point.step = step)
+        .axis(
+            "number",
+            numbers
+                .into_iter()
+                .map(|number| (number.label(), number))
+                .collect(),
+            |point, number| point.number = Some(number.clone()),
+        );
+    grid.judge(&Question::any_refusal().at(Depth::Rows), |point| {
+        let number = point.number.as_ref().expect("a number").json();
+        let (entry, arguments) = match point.step {
+            "LazyFrame.head(n)" => ("LazyFrame.head", json!({ "n": number })),
+            "LazyFrame.tail(n)" => ("LazyFrame.tail", json!({ "n": number })),
+            "LazyFrame.slice(offset)" => ("LazyFrame.slice", json!({ "offset": number })),
+            "LazyFrame.slice(offset, length 1)" => (
+                "LazyFrame.slice",
+                json!({ "offset": number, "length": { "integer": 1 } }),
+            ),
+            "LazyFrame.slice(length)" => (
+                "LazyFrame.slice",
+                json!({ "offset": { "integer": 0 }, "length": number }),
+            ),
+            "LazyFrame.gather_every(n)" => ("LazyFrame.gather_every", json!({ "n": number })),
+            "LazyFrame.gather_every(offset)" => (
+                "LazyFrame.gather_every",
+                json!({ "n": { "integer": 1 }, "offset": number }),
+            ),
+            "Expr.gather_every(n)" => return gather_every_case(json!({ "n": number })),
+            _ => {
+                return gather_every_case(json!({ "n": { "integer": 1 }, "offset": number }));
+            }
+        };
+        Case::of_step(entry, arguments, counts_of_a_column()?, Connections::new())
+    })
+}
+
+fn gather_every_case(arguments: Value) -> Result<Case, String> {
+    Case::of_step(
+        "LazyFrame.select",
+        select(field_then("x", vec![call("Expr.gather_every", arguments)])),
+        counts_of_a_column()?,
+        Connections::new(),
+    )
+}
+
+#[test]
+fn a_step_that_cuts_a_table_by_a_whole_number_polars_cannot_cut_by_is_refused() {
+    // Polars takes every nth row for an n above nothing. A slice that is given no length runs to the
+    // end of the table, whatever its place is, and one that is given a length is refused where its
+    // place and length together run past the last row number Polars counts, 2^63 - 1.
+    counted_grid().assert_agree(&known_casts(), 150);
+}
