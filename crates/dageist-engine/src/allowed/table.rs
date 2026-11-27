@@ -640,12 +640,65 @@ fn cells(lines: Vec<(usize, ContextLine)>) -> Result<HashMap<ContextKey, Context
 /// follows (none for a step), and the options set.
 pub(super) type OptionKey = (&'static str, Option<Representative>, Vec<OptionValue>);
 
+/// The lines of the option table for one entry on one receiver: what each setting of its options
+/// says.
+type OptionGroup = HashMap<Vec<OptionValue>, Outcome>;
+
+/// The lines of the option table, grouped by the entry and the receiver they were measured on.
+///
+/// A lookup of the options of one entry on one receiver, which is what every reader asks, reads
+/// only the lines of that group and not every line of the table. The lines of a group have no
+/// order: no reader depends on one.
+#[derive(Debug, Default)]
+pub(super) struct OptionTable {
+    groups: HashMap<(&'static str, Option<Representative>), OptionGroup>,
+}
+
+impl OptionTable {
+    /// How many lines the table holds.
+    #[cfg(test)]
+    pub(super) fn len(&self) -> usize {
+        self.groups.values().map(HashMap::len).sum()
+    }
+
+    /// The line for the options `key.2` of the entry `key.0` on the receiver `key.1`.
+    pub(super) fn get(&self, key: &OptionKey) -> Option<&Outcome> {
+        self.groups.get(&(key.0, key.1))?.get(key.2.as_slice())
+    }
+
+    /// The lines for `entry` on `receiver`, each as the options it sets and what it says.
+    pub(super) fn of(
+        &self,
+        entry: &'static str,
+        receiver: Option<Representative>,
+    ) -> impl Iterator<Item = (&Vec<OptionValue>, &Outcome)> {
+        self.groups
+            .get(&(entry, receiver))
+            .into_iter()
+            .flat_map(HashMap::iter)
+    }
+}
+
+impl FromIterator<(OptionKey, Outcome)> for OptionTable {
+    fn from_iter<I: IntoIterator<Item = (OptionKey, Outcome)>>(lines: I) -> Self {
+        let mut table = Self::default();
+        for ((entry, receiver, options), outcome) in lines {
+            table
+                .groups
+                .entry((entry, receiver))
+                .or_default()
+                .insert(options, outcome);
+        }
+        table
+    }
+}
+
 /// The committed tables, read.
 #[derive(Debug)]
 pub(super) struct Tables {
     pub dtypes: HashMap<DtypeKey, Outcome>,
     pub contexts: HashMap<ContextKey, ContextCell>,
-    pub options: HashMap<OptionKey, Outcome>,
+    pub options: OptionTable,
     pub counts: HashMap<(Context, Shape), Outcome>,
 }
 

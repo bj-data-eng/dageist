@@ -999,7 +999,7 @@ fn read_options(
         .iter()
         .any(|(name, _)| parameter(name).is_some_and(|found| found.kind() == Kind::Dtype));
     let mut gives: Vec<Produces> = Vec::new();
-    for ((line_id, line_receiver, line), outcome) in &tables.options {
+    for (line, outcome) in tables.options.of(id, read_receiver) {
         let bears = match changed.as_slice() {
             [] => false,
             [_] => {
@@ -1010,9 +1010,7 @@ fn read_options(
             }
             _ => line.len() > 1 && line.iter().all(is_chosen),
         };
-        if *line_id == id
-            && *line_receiver == read_receiver
-            && bears
+        if bears
             && let Outcome::Allowed(Some(produces)) = if by_a_word {
                 outcome.clone()
             } else {
@@ -2365,10 +2363,8 @@ fn alone_in_a_pair(
             .is_some_and(|parameter| default_word(parameter).as_deref() == Some(set.as_str()))
     };
     let mut lines: Vec<(&Vec<OptionValue>, &Outcome)> = Vec::new();
-    for ((line_id, line_receiver, line), outcome) in &tables.options {
-        if *line_id != id
-            || *line_receiver != receiver
-            || line.len() != 2
+    for (line, outcome) in tables.options.of(id, receiver) {
+        if line.len() != 2
             || !line
                 .iter()
                 .any(|(set, value)| *set == name && value == word)
