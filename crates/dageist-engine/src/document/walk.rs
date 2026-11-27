@@ -389,6 +389,9 @@ struct Around<'a> {
     from_a_list: bool,
     /// The name the value the link follows is written under, where the chain knows it.
     output_name: Option<&'a str>,
+    /// The value the link gives is a null: the chain starts from a null literal, and the link and
+    /// each before it keep a null.
+    null_kept: bool,
 }
 
 /// What a chain has so far.
@@ -2634,6 +2637,8 @@ impl Walker<'_> {
                     fields,
                     from_a_list,
                     output_name: name_before.as_deref(),
+                    null_kept: starts_from_a_null(expression)
+                        && expression.links()[..=at].iter().all(keeps_a_null),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2963,6 +2968,7 @@ impl Walker<'_> {
             fields,
             from_a_list,
             output_name,
+            null_kept,
         } = around;
         // What the call says of a struct: the fields it follows, the names and numbers it is given.
         let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
@@ -3320,6 +3326,7 @@ impl Walker<'_> {
                     .with_open_numbers(&open_numbers)
                     .following_an_open_number(receiver_loose.is_some())
                     .among_others(self.siblings_of_the_item())
+                    .of_a_null_literal(null_kept)
                     .with_argument_fields(&argument_fields)
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
@@ -3471,6 +3478,7 @@ impl Walker<'_> {
             .with_open_numbers(&open_numbers)
             .following_an_open_number(receiver_loose.is_some())
             .among_others(self.siblings_of_the_item())
+            .of_a_null_literal(null_kept)
             .with_argument_fields(&argument_fields)
             .with_arguments(&given)
             .with_unclassed(&unclassed)
@@ -4688,6 +4696,22 @@ fn reads_a_column(expression: &Expression) -> bool {
 /// other.
 fn is_a_null(expression: &Expression) -> bool {
     follows_the_start(expression, expression.links().len()) && starts_from_a_null(expression)
+}
+
+/// Whether a call gives a null where it follows one: it takes one of the values, or all of them in
+/// order.
+fn keeps_a_null(link: &Call) -> bool {
+    matches!(
+        link.entry().id().as_str(),
+        "Expr.first"
+            | "Expr.last"
+            | "Expr.max"
+            | "Expr.min"
+            | "Expr.mean"
+            | "Expr.median"
+            | "Expr.sort"
+            | "Expr.reverse"
+    )
 }
 
 /// Whether an expression starts from a null literal.
