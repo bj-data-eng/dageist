@@ -252,6 +252,13 @@ impl Step {
             not_known: None,
         };
         walker.arguments(self.call(), false);
+        // The calls on a group by follow the call that groups, each in the place of its link.
+        for (at, link) in self.links().iter().enumerate() {
+            walker.path = vec![Segment::Link(at)];
+            walker.arguments(link, false);
+            walker.step_options(link);
+            walker.path.clear();
+        }
         walker.selected_items_meet();
         walker.written_names_are_distinct();
         walker.step_options(self.call());

@@ -881,6 +881,8 @@ fn continued_subject(
     // What gives a count of values that the data or the arguments decide goes on to one value, as
     // a count of its values or whether all of them are: no place takes the count itself, and what
     // is measured is whether the method may stand in the place at all.
+    // A predicate of a `having` is one value for each group, whatever the group gives.
+    let aggregated = aggregated || context.outer() == Outer::Having;
     match (aggregated, needs_boolean(context)) {
         (false, _) => Ok(tested),
         (true, true) => method(entry("Expr.all"), tested, Vec::new()),
@@ -896,7 +898,16 @@ fn continued_held(outer: Outer, held: Expr) -> Result<Expr, BuildError> {
     match outer {
         Outer::JoinLeft | Outer::JoinRight => Ok(held.cast(KEY)),
         Outer::PivotAggregate => method(entry("Expr.first"), held, Vec::new()),
-        Outer::Select | Outer::Filter | Outer::Sort => Ok(held),
+        // One value for each group, which a Boolean test of it is, so that what the predicate
+        // is made of is measured and not how it ends.
+        Outer::Having => method(
+            entry("Expr.all"),
+            method(entry("Expr.is_not_null"), held, Vec::new())?,
+            Vec::new(),
+        ),
+        Outer::Select | Outer::Filter | Outer::Sort | Outer::GroupKey | Outer::Aggregate => {
+            Ok(held)
+        }
     }
 }
 
@@ -1001,6 +1012,27 @@ fn host(outer: Outer, held: Expr, frames: &Frames, empty: bool) -> Result<LazyFr
                 ("left_on", expressions(vec![column("key")])),
                 ("right_on", expressions(vec![held])),
             ],
+        ),
+        Outer::GroupKey => grouped(
+            left,
+            vec![("by", expressions(vec![held]))],
+            Vec::new(),
+            ("LazyGroupBy.agg", Vec::new()),
+        ),
+        Outer::Aggregate => grouped(
+            left,
+            vec![("by", expressions(vec![column("k")]))],
+            Vec::new(),
+            ("LazyGroupBy.agg", vec![("aggs", expressions(vec![held]))]),
+        ),
+        Outer::Having => grouped(
+            left,
+            vec![("by", expressions(vec![column("k")]))],
+            vec![(
+                "LazyGroupBy.having",
+                vec![("predicates", expressions(vec![held]))],
+            )],
+            ("LazyGroupBy.agg", Vec::new()),
         ),
         Outer::PivotAggregate => step(
             "LazyFrame.pivot",

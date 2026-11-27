@@ -11,13 +11,14 @@
 use crate::allowed::{self, Place as OfferPlace};
 use crate::catalog::{
     self, BuildError, Entry, Kind, Parameter, ParameterDefault, Setting, Shape, StepFrame,
+    StepStart,
 };
 
 use super::super::dtype::Dtype;
 use super::super::error::{Cause, Refusal, Segment};
 use super::super::model::{Call, Expression, Start, Value, function};
 use super::error::EditProblem;
-use super::path::Fault;
+use super::path::{Fault, with_given};
 
 /// What `kind` takes of an expression, for a setting that stands for one.
 const ANY_EXPRESSION: Kind = Kind::Expression(&[]);
@@ -135,13 +136,68 @@ fn parameter_value(
 
 /// The call a new step of `entry` starts as, on `frame`.
 pub(super) fn step_call(entry: &'static Entry, frame: &StepFrame<'_>) -> Result<Call, Fault> {
-    let start = catalog::start_step(entry, frame).ok_or_else(|| {
+    let start = started(entry, frame)?;
+    call_of(entry, start.arguments())
+}
+
+/// The calls a new step of `entry` starts with after its call, on `frame`: none, except for a step
+/// that groups, which starts with the call that finishes the grouping.
+pub(super) fn step_links(entry: &'static Entry, frame: &StepFrame<'_>) -> Result<Vec<Call>, Fault> {
+    started(entry, frame)?
+        .links()
+        .iter()
+        .map(|link| {
+            let entry = function(link.entry()).map_err(Fault::refused)?;
+            call_of(entry, link.arguments())
+        })
+        .collect()
+}
+
+/// The call a new call of a group by, `entry`, starts as, or the call `from` becomes when it is
+/// swapped for `entry`: what `from` had is kept for the parameters `entry` has of the same name,
+/// kind and shape, and every other parameter starts as the catalogue says.
+pub(super) fn group_call(entry: &'static Entry, from: Option<&Call>) -> Result<Call, Fault> {
+    let start = catalog::start_link(entry).ok_or_else(|| {
         Fault::here(EditProblem::NoStart {
             entry: entry.id().as_str(),
         })
     })?;
+    let mut call = call_of(entry, start.arguments())?;
+    if let Some(old) = from {
+        for held in old.arguments() {
+            let same = |parameter: &Parameter| {
+                old.entry()
+                    .parameters()
+                    .iter()
+                    .find(|old| old.name() == parameter.name())
+                    .is_some_and(|old| {
+                        old.kind() == parameter.kind() && old.shape() == parameter.shape()
+                    })
+            };
+            if entry
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.name() == held.parameter() && same(parameter))
+            {
+                call = with_given(&call, held.parameter(), Some(held.value().clone()))?;
+            }
+        }
+    }
+    Ok(call)
+}
+
+fn started(entry: &'static Entry, frame: &StepFrame<'_>) -> Result<StepStart, Fault> {
+    catalog::start_step(entry, frame).ok_or_else(|| {
+        Fault::here(EditProblem::NoStart {
+            entry: entry.id().as_str(),
+        })
+    })
+}
+
+/// The call of `entry` that starts with `settings`.
+fn call_of(entry: &'static Entry, settings: &[(&'static str, Setting)]) -> Result<Call, Fault> {
     let mut given = Vec::new();
-    for (name, setting) in start.arguments() {
+    for (name, setting) in settings {
         let Some(parameter) = entry
             .parameters()
             .iter()

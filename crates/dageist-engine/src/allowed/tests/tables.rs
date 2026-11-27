@@ -58,9 +58,9 @@ fn the_representative_dtypes_are_named_and_classed_consistently() {
 }
 
 #[test]
-fn the_contexts_are_six_positions_and_each_with_four_inside_it() {
+fn the_contexts_are_nine_positions_and_each_with_four_inside_it() {
     let contexts = Context::all();
-    assert_eq!(contexts.len(), 6 + 6 * 4);
+    assert_eq!(contexts.len(), 9 + 9 * 4);
     for context in &contexts {
         assert_eq!(Context::from_name(&context.name()).as_ref(), Some(context));
     }
@@ -449,6 +449,54 @@ fn an_end_rule_about_a_dtype_does_not_refuse_what_it_does_not_know() {
         Some(Rule::PivotAggregateGivesOneValue)
     );
     assert_eq!(Rule::forbids_end(aggregate, None, Shape::One), None);
+}
+
+#[test]
+fn a_having_predicate_gives_one_value_for_each_group_that_polars_casts_to_a_boolean() {
+    let having = Context::step(Outer::Having);
+    let value = |name: &str| ResultDtype::from_name(name);
+    // Polars keeps a group by a number as it does by a Boolean, and by null none.
+    for kept in ["Boolean", "Int64", "UInt8", "Float64", "Null"] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value(kept)), Shape::One),
+            None,
+            "{kept}"
+        );
+    }
+    // And refuses to cast the rest when it runs the rows.
+    for refused in [
+        "String",
+        "Date",
+        "List(Int64)",
+        "Struct(x: Int64, y: String)",
+    ] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value(refused)), Shape::One),
+            Some(Rule::HavingCastsToBoolean),
+            "{refused}"
+        );
+    }
+    // What is not known is not refused, but the values of a group are a list whatever dtype they
+    // have.
+    assert_eq!(Rule::forbids_end(having, None, Shape::One), None);
+    for shape in [Shape::Many, Shape::Counted] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value("Boolean")), shape),
+            Some(Rule::HavingGivesOneValue)
+        );
+        assert_eq!(
+            Rule::forbids_end(having, None, shape),
+            Some(Rule::HavingGivesOneValue)
+        );
+    }
+    // An aggregate and a key stand in no such place: they end as a select's item does.
+    for outer in [Outer::Aggregate, Outer::GroupKey] {
+        let context = Context::step(outer);
+        assert_eq!(
+            Rule::forbids_end(context, Some(&value("String")), Shape::Many),
+            None
+        );
+    }
 }
 
 #[test]

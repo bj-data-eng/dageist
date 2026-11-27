@@ -485,7 +485,7 @@ fn edit_of_kind(dice: &mut Dice, document: &Document, kind: usize) -> Option<Att
         .collect();
     let methods: Vec<&'static str> = catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame && entry.applies() != Applies::Function)
+        .filter(|entry| !entry.applies().is_of_a_step() && entry.applies() != Applies::Function)
         .map(|entry| entry.id().as_str())
         .collect();
     let steps = document.steps().len();

@@ -4,15 +4,16 @@
 mod arguments;
 mod chains;
 mod error;
+mod groups;
 mod path;
 mod starting;
 mod steps;
 
 pub use error::{EditError, EditProblem, Thing, ValueKind, Wanted};
 
-use super::error::Place;
+use super::error::{Place, Segment};
 use super::model::{Document, Step};
-use path::{Leaf, rebuild_call};
+use path::{Fault, Leaf, rebuild_call};
 
 impl Document {
     /// The step `place` names, and where it is. The place names a step by its
@@ -52,11 +53,32 @@ impl Document {
     /// The document with the step `place` names made again with `leaf`
     /// applied where the first `walk` segments of its way end. An error is for
     /// `place`.
+    ///
+    /// A way that starts with a link goes into that link of a step that groups, and any other
+    /// way into the step's own call.
     fn edited_at(&self, place: &Place, walk: usize, leaf: &Leaf<'_>) -> Result<Self, EditError> {
         let (index, step) = self.step_named(place)?;
         let way = place.path().get(..walk).unwrap_or_default();
-        let call = rebuild_call(step.call(), way, 0, leaf).map_err(|fault| fault.at(place))?;
-        let made = Step::new(step.id().clone(), call).map_err(|refusal| {
+        let made = match way.split_first() {
+            Some((Segment::Link(at), rest)) => {
+                let link = step
+                    .links()
+                    .get(*at)
+                    .ok_or_else(|| Fault::beyond(1, EditProblem::Nothing).at(place))?;
+                let link = rebuild_call(link, rest, 1, leaf).map_err(|fault| fault.at(place))?;
+                let mut links = step.links().to_vec();
+                if let Some(slot) = links.get_mut(*at) {
+                    *slot = link;
+                }
+                Step::chain(step.id().clone(), step.call().clone(), links)
+            }
+            _ => {
+                let call =
+                    rebuild_call(step.call(), way, 0, leaf).map_err(|fault| fault.at(place))?;
+                Step::chain(step.id().clone(), call, step.links().to_vec())
+            }
+        }
+        .map_err(|refusal| {
             EditError::of_refusal(refusal.in_step(index, Some(step.id().clone())))
         })?;
         self.with_step(index, made)

@@ -279,7 +279,7 @@ pub enum Thing {
     EntryValue,
     /// The start of an expression.
     Start,
-    /// A link of an expression.
+    /// A link of an expression, or a call after `group_by` in a step that groups.
     Link,
     /// An expression that starts with no call: a hole, or a connected input.
     ExpressionWithoutCall,
@@ -340,6 +340,8 @@ pub enum Wanted {
     EntryPart,
     /// A link of an expression.
     Link,
+    /// A call after `group_by` in a step that groups.
+    GroupCall,
     /// An expression.
     Expression,
     /// A list.
@@ -359,6 +361,7 @@ impl fmt::Display for Wanted {
             Self::Item => "an item of a list",
             Self::EntryPart => "the key or value of an entry",
             Self::Link => "a link of an expression",
+            Self::GroupCall => "a call after group_by in a step that groups",
             Self::Expression => "an expression",
             Self::List => "a list",
             Self::Pairs => "pairs",

@@ -117,9 +117,23 @@ fn read_step(index: usize, json: &Json) -> Result<Step, Refusal> {
     let id = string("id", field(entries, "id").map_err(early)?).map_err(early)?;
     let id = StepId::new(id).map_err(|_| early(Refusal::new(Cause::EmptyStepId)))?;
     let at = |refusal: Refusal| refusal.in_step(index, Some(id.clone()));
-    object("a step", json, &["id", "call"]).map_err(at)?;
+    object("a step", json, &["id", "call", "then"]).map_err(at)?;
     let call = read_call(field(entries, "call").map_err(at)?, Position::Step).map_err(at)?;
-    Step::new(id.clone(), call).map_err(at)
+    // The calls on a group by that follow `group_by`, which no other step has.
+    let links = match find(entries, "then") {
+        None => Vec::new(),
+        Some(links) => array("then", links)
+            .map_err(at)?
+            .iter()
+            .enumerate()
+            .map(|(link, json)| {
+                read_call(json, Position::Grouped)
+                    .map_err(|refusal| refusal.under(Segment::Link(link)))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(at)?,
+    };
+    Step::chain(id.clone(), call, links).map_err(at)
 }
 
 fn read_call(json: &Json, position: Position) -> Result<Call, Refusal> {

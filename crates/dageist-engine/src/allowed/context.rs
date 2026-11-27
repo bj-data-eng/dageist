@@ -29,6 +29,15 @@ pub enum Outer {
     /// A pivot's aggregate, a chain that starts from `element()`, which
     /// stands for the values of one group.
     PivotAggregate,
+    /// A key of `group_by`, a column or an expression, which names the group each row is in.
+    GroupKey,
+    /// An aggregate of `agg`, evaluated on the rows of each group: a chain that aggregates gives one
+    /// value for each group, and one that does not, such as `col("a") + 1`, gives a list of its
+    /// values for each group.
+    Aggregate,
+    /// A predicate of `having`, evaluated on the rows of each group as an aggregate is, and
+    /// giving one value for each group, which Polars casts to a `Boolean` to keep the group or not.
+    Having,
 }
 
 /// A position inside an expression that holds another expression.
@@ -46,13 +55,16 @@ pub enum Nested {
 
 impl Outer {
     /// Every position of a step.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 9] = [
         Self::Select,
         Self::Filter,
         Self::Sort,
         Self::JoinLeft,
         Self::JoinRight,
         Self::PivotAggregate,
+        Self::GroupKey,
+        Self::Aggregate,
+        Self::Having,
     ];
 
     /// The name the tables give the position.
@@ -65,6 +77,9 @@ impl Outer {
             Self::JoinLeft => "join_left",
             Self::JoinRight => "join_right",
             Self::PivotAggregate => "pivot_aggregate",
+            Self::GroupKey => "group_key",
+            Self::Aggregate => "aggregate",
+            Self::Having => "having",
         }
     }
 
@@ -78,6 +93,9 @@ impl Outer {
             Self::JoinLeft => ("LazyFrame.join", "left_on"),
             Self::JoinRight => ("LazyFrame.join", "right_on"),
             Self::PivotAggregate => ("LazyFrame.pivot", "aggregate_function"),
+            Self::GroupKey => ("LazyFrame.group_by", "by"),
+            Self::Aggregate => ("LazyGroupBy.agg", "aggs"),
+            Self::Having => ("LazyGroupBy.having", "predicates"),
         }
     }
 
@@ -148,6 +166,9 @@ impl Position {
             ("LazyFrame.join", "on" | "left_on") => Self::Outer(Outer::JoinLeft),
             ("LazyFrame.join", "right_on") => Self::Outer(Outer::JoinRight),
             ("LazyFrame.pivot", "aggregate_function") => Self::Outer(Outer::PivotAggregate),
+            ("LazyFrame.group_by", "by" | "named_by") => Self::Outer(Outer::GroupKey),
+            ("LazyGroupBy.agg", "aggs" | "named_aggs") => Self::Outer(Outer::Aggregate),
+            ("LazyGroupBy.having", "predicates") => Self::Outer(Outer::Having),
             ("Expr.over", "partition_by" | "more_exprs") => Self::Nested(Nested::PartitionBy),
             ("Expr.over", "order_by") => Self::Nested(Nested::OrderBy),
             ("polars.when" | "Then.when" | "ChainedThen.when", "predicates") => {
@@ -171,7 +192,7 @@ pub struct Context {
 }
 
 impl Context {
-    /// Every context the tables cover: the six positions of a step, and each
+    /// Every context the tables cover: the nine positions of a step, and each
     /// of them with each of the four positions inside an expression.
     #[must_use]
     pub fn all() -> Vec<Self> {

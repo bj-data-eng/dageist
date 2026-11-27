@@ -23,6 +23,14 @@ use super::table::Shape;
 pub enum Rule {
     /// A pivot's aggregate gives one value for each group.
     PivotAggregateGivesOneValue,
+    /// A `having`'s predicate gives one value for each group, as an aggregate does that is no list:
+    /// what gives the values of the group is a list that Polars cannot cast to a `Boolean` when it
+    /// runs the rows.
+    HavingGivesOneValue,
+    /// A `having`'s predicate is a value Polars casts to a `Boolean` to keep a group or not: a
+    /// `Boolean`, a number, or null. Text, a date, a list, a struct and the rest it refuses when it
+    /// runs the rows.
+    HavingCastsToBoolean,
     /// A filter's only predicate is one column: an expression that gives several, as the unnest of a
     /// struct of several fields does, or none, as the unnest of a struct of no field does, is
     /// refused there, and taken beside another predicate.
@@ -133,7 +141,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 30] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -144,6 +152,8 @@ impl Rule {
         Self::FieldNamesFitTheStruct,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
+        Self::HavingCastsToBoolean,
+        Self::HavingGivesOneValue,
         Self::IsInTakesAList,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
@@ -179,6 +189,8 @@ impl Rule {
             Self::FieldNamesFitTheStruct => "field-names-fit-the-struct",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
+            Self::HavingCastsToBoolean => "having-casts-to-boolean",
+            Self::HavingGivesOneValue => "having-gives-one-value",
             Self::IsInTakesAList => "is-in-takes-a-list",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
@@ -238,6 +250,12 @@ impl Rule {
             Self::FoldedFunctionIsNoJoinKey => {
                 "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
             }
+            Self::HavingGivesOneValue => {
+                "a having's predicate must give one value for each group: the values of the group, as a column or a method that keeps some of them gives, are a list that Polars cannot cast to a Boolean when it runs the rows, so give an aggregate such as the sum, the first value, whether all are true, or a count compared with a number"
+            }
+            Self::HavingCastsToBoolean => {
+                "a having's predicate must be a value Polars casts to a Boolean to keep a group or not: a Boolean, a number, or null, and not text, a date, a list or a struct, which it refuses when it runs the rows"
+            }
             Self::IsInTakesAList => {
                 "is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded"
             }
@@ -295,6 +313,7 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
+            Self::HavingGivesOneValue => context == Context::step(Outer::Having),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             Self::FoldedFunctionIsNoJoinKey => {
                 matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
@@ -322,9 +341,9 @@ impl Rule {
             | Self::WindowInputIsNotCounted
             | Self::WindowInputIsNotWidened
             | Self::WrittenNamesAreDistinct => false,
-            Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
-                self.needs_boolean_end(context)
-            }
+            Self::ConditionPredicateIsBoolean
+            | Self::FilterPredicateIsBoolean
+            | Self::HavingCastsToBoolean => self.needs_boolean_end(context),
         }
     }
 
@@ -455,6 +474,16 @@ impl Rule {
         if context == Context::step(Outer::PivotAggregate) && shape != Shape::One {
             return Some(Self::PivotAggregateGivesOneValue);
         }
+        // A predicate of a `having` is one value for each group, which Polars casts to a `Boolean`
+        // as it can, so a number is kept and a dtype it cannot cast is not.
+        if context == Context::step(Outer::Having) {
+            if shape != Shape::One {
+                return Some(Self::HavingGivesOneValue);
+            }
+            return result
+                .is_some_and(|result| !casts_to_boolean(result))
+                .then_some(Self::HavingCastsToBoolean);
+        }
         if known_not_boolean {
             Self::ALL
                 .into_iter()
@@ -482,7 +511,12 @@ impl Rule {
                 context.outer() == Outer::Filter
                     && matches!(context.nested(), None | Some(Nested::ConditionValue))
             }
+            Self::HavingCastsToBoolean => {
+                context.outer() == Outer::Having
+                    && matches!(context.nested(), None | Some(Nested::ConditionValue))
+            }
             Self::PivotAggregateGivesOneValue
+            | Self::HavingGivesOneValue
             | Self::ElementOnlyInPivotAggregate
             | Self::FoldedFunctionIsNoJoinKey
             | Self::JoinKeyNamesAreNotRepeated
@@ -510,6 +544,32 @@ impl Rule {
             | Self::WrittenNamesAreDistinct => false,
         }
     }
+}
+
+/// Whether Polars casts a value of the dtype `result` to a `Boolean`, as a `having` does to keep a
+/// group or not: a `Boolean`, a number, or null. A dtype with no class is not one of them.
+fn casts_to_boolean(result: &ResultDtype) -> bool {
+    use Representative as R;
+    matches!(
+        result.class(),
+        Some(
+            R::Boolean
+                | R::Null
+                | R::Int8
+                | R::Int16
+                | R::Int32
+                | R::Int64
+                | R::Int128
+                | R::UInt8
+                | R::UInt16
+                | R::UInt32
+                | R::UInt64
+                | R::UInt128
+                | R::Float16
+                | R::Float32
+                | R::Float64
+        )
+    )
 }
 
 impl fmt::Display for Rule {

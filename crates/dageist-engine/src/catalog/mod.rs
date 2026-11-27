@@ -36,11 +36,11 @@ pub use condition::Conditional;
 pub use counting::Counting;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use duration::{DurationError, DurationUse, any_moment, check_duration};
-pub(crate) use entries::{time_of_day, typed_literal};
+pub(crate) use entries::{group_keys, time_of_day, typed_literal};
 pub use left_out::{LeftOut, Reason, left_out};
 pub use omitted::{OmittedForm, omitted_forms};
 pub use pattern::{PatternError, check_pattern, groups_dtype};
-pub use starting::{Setting, StepFrame, StepStart, start_step};
+pub use starting::{LinkStart, Setting, StepFrame, StepStart, start_link, start_step};
 pub use timezone::{TimeZoneError, check_time_zone};
 pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 

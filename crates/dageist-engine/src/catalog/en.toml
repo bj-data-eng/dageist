@@ -1499,7 +1499,7 @@ label = "start counting at"
 
 [entries."LazyGroupBy.agg"]
 name = "agg"
-hint = "a value, or a list of values, for each group, from chains"
+hint = "one value for each group from a chain that aggregates, and a list of its values for each group from one that does not"
 
 [entries."LazyGroupBy.agg".parameters.aggs]
 name = "aggs"

@@ -2155,12 +2155,17 @@ fn pivot(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildErro
 /// Python's `group_by`: the keys given by position, then those given by name, each named for its
 /// name, grouped by in a stable order where `maintain_order` is true.
 fn group_by(frame: LazyFrame, arguments: &Arguments) -> Result<LazyGroupBy, BuildError> {
-    let keys = positional_and_named_by(arguments, "by", "named_by")?;
+    let keys = group_keys(arguments)?;
     Ok(if arguments.flag("maintain_order", false)? {
         frame.group_by_stable(keys)
     } else {
         frame.group_by(keys)
     })
+}
+
+/// The keys a call of `group_by` groups by: those given by position, then those given by name.
+pub(crate) fn group_keys(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    positional_and_named_by(arguments, "by", "named_by")
 }
 
 /// The expressions of the starred parameter `positional` followed by those of the double-starred

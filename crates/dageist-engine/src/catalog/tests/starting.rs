@@ -358,6 +358,68 @@ fn what_is_not_a_step_starts_with_nothing() {
 }
 
 #[test]
+fn a_new_group_by_starts_with_the_call_that_finishes_it_and_every_call_of_a_group_by_starts() {
+    let columns = names(&["a", "b"]);
+    let frame = StepFrame {
+        columns: &columns,
+        tables: &[],
+    };
+    let entry = catalog::entry("LazyFrame.group_by").expect("an entry");
+    let start = start_step(entry, &frame).expect("a step that starts");
+    // One key still to be given, and an aggregation of one new column still to be given.
+    assert_eq!(
+        start.arguments(),
+        [("by", Setting::List(vec![Setting::ToGive]))]
+    );
+    let [finishing] = start.links() else {
+        panic!("one call that finishes the grouping")
+    };
+    assert_eq!(finishing.entry(), "LazyGroupBy.agg");
+    assert_eq!(
+        finishing.arguments(),
+        [(
+            "named_aggs",
+            Setting::Pairs(vec![(
+                Setting::Text("new_column".to_owned()),
+                Setting::ToGive
+            )])
+        )]
+    );
+    // Any other step starts with no call after its own.
+    for other in catalog::entries() {
+        if other.id().as_str() != "LazyFrame.group_by"
+            && let Some(start) = start_step(other, &frame)
+        {
+            assert!(start.links().is_empty(), "{}", other.id().as_str());
+        }
+    }
+    // Every call of a group by starts with parameters it has, and nothing else starts a call.
+    for entry in catalog::entries() {
+        let started = catalog::start_link(entry);
+        assert_eq!(
+            started.is_some(),
+            entry.applies() == catalog::Applies::Grouped,
+            "{}",
+            entry.id().as_str()
+        );
+        for (name, _) in started.iter().flat_map(|started| started.arguments()) {
+            assert!(
+                entry
+                    .parameters()
+                    .iter()
+                    .any(|parameter| parameter.name() == *name),
+                "{} has no parameter {name}",
+                entry.id().as_str()
+            );
+        }
+    }
+    // A quantile starts with the median, which it cannot be built without a share to take.
+    let quantile = catalog::start_link(catalog::entry("LazyGroupBy.quantile").expect("an entry"))
+        .expect("a call that starts");
+    assert_eq!(quantile.arguments(), [("quantile", Setting::Float(0.5))]);
+}
+
+#[test]
 fn every_argument_a_new_step_starts_with_is_a_parameter_of_its_entry() {
     let columns = names(&["a", "b"]);
     let tables = names(&["t"]);
@@ -369,8 +431,8 @@ fn every_argument_a_new_step_starts_with_is_a_parameter_of_its_entry() {
         .iter()
         .filter_map(|entry| start_step(entry, &frame).map(|start| (entry, start)))
         .collect();
-    // The twenty steps of the catalogue.
-    assert_eq!(steps.len(), 20);
+    // The twenty-one steps of the catalogue.
+    assert_eq!(steps.len(), 21);
     for (entry, start) in steps {
         for (name, _) in start.arguments() {
             assert!(

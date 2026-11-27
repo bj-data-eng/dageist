@@ -14,7 +14,7 @@ use polars::prelude::{
     col,
 };
 
-use crate::allowed::{self, Context, Position, Refusal};
+use crate::allowed::{self, Context, Outer, Position, Refusal};
 use crate::catalog::{
     Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, any_moment,
     check_duration, check_pattern, english,
@@ -578,6 +578,7 @@ fn run_step(
         positions: Vec::new(),
         traces: Vec::new(),
         written: Vec::new(),
+        grouping: None,
     };
     // A step with a hole is not built: it is walked, and says where it is incomplete.
     if let Some(path) = step.first_hole() {
@@ -603,7 +604,7 @@ fn run_step(
             written: Vec::new(),
         };
     }
-    let frame = match builder.step(step.call(), input) {
+    let frame = match builder.step(step, input) {
         Ok(frame) => frame,
         Err(stop) => {
             let place = stop.place(&base);
@@ -692,6 +693,9 @@ struct Builder<'a> {
     traces: Vec<ExpressionDtypes>,
     /// The expressions the step writes as columns, named as they are written.
     written: Vec<Expr>,
+    /// The keys of the group by the step makes, once its call is built: the aggregates and the
+    /// predicates after it are evaluated on the rows of each group.
+    grouping: Option<Vec<Expr>>,
 }
 
 impl Builder<'_> {
@@ -754,7 +758,8 @@ impl Builder<'_> {
         }))
     }
 
-    fn step(&mut self, call: &Call, input: LazyFrame) -> Result<LazyFrame, Stop> {
+    fn step(&mut self, step: &Step, input: LazyFrame) -> Result<LazyFrame, Stop> {
+        let call = step.call();
         self.elements = self.values_of_a_pivot(call);
         let arguments = self.arguments(call)?;
         match call.entry().build() {
@@ -763,6 +768,25 @@ impl Builder<'_> {
                     self.written = self.built(call.entry().writes(&arguments))?;
                 }
                 self.built(build(input, &arguments))
+            }
+            Build::Grouping(build) => {
+                self.grouping = Some(self.built(crate::catalog::group_keys(&arguments))?);
+                let mut group = self.built(build(input, &arguments))?;
+                for (at, link) in step.links().iter().enumerate() {
+                    self.path.push(Segment::Link(at));
+                    let arguments = self.arguments(link)?;
+                    match link.entry().build() {
+                        Build::GroupedStep(build) => {
+                            group = self.built(build(group, &arguments))?
+                        }
+                        Build::GroupedEnd(build) => return self.built(build(group, &arguments)),
+                        _ => return self.misplaced(link),
+                    }
+                    self.path.pop();
+                }
+                // A step that groups is finished by its last call, which it cannot be made
+                // without.
+                self.misplaced(call)
             }
             _ => self.misplaced(call),
         }
@@ -948,7 +972,7 @@ impl Builder<'_> {
             }
         };
         self.path.pop();
-        let start = self.resolve(&state, from_element);
+        let start = self.traced(&state, from_element);
         let mut links = Vec::with_capacity(expression.links().len());
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -1029,7 +1053,7 @@ impl Builder<'_> {
                 _ => return self.misplaced(link),
             };
             self.path.pop();
-            links.push(self.resolve(&state, from_element));
+            links.push(self.traced(&state, from_element));
         }
         if let (Some(start), true) = (start, self.probe.is_some()) {
             self.traces.push(ExpressionDtypes {
@@ -1134,6 +1158,51 @@ impl Builder<'_> {
             })
             .map(|(_, dtype)| dtype.clone())
             .collect()
+    }
+
+    /// The dtype `state` has where the report says it, when the dtypes are wanted: what it gives
+    /// where it stands. In an aggregate or a predicate of a group by that is what it gives for
+    /// each group, which is a value for a chain that aggregates and a list of the values of the
+    /// group for one that does not; anywhere else it is [`resolve`](Self::resolve)'s.
+    fn traced(&self, state: &Built, from_element: bool) -> Option<Resolution> {
+        let in_a_group = matches!(
+            Context::from_positions(&self.positions).map(|context| context.outer()),
+            Some(Outer::Aggregate | Outer::Having)
+        );
+        let (Some(keys), Some(probe), true, false) =
+            (&self.grouping, &self.probe, in_a_group, from_element)
+        else {
+            return self.resolve(state, from_element);
+        };
+        let expr = match state {
+            Built::Expr(expr) => expr.clone(),
+            Built::Condition(condition) => match condition.clone().into_expr() {
+                Ok(expr) => expr,
+                Err(_) => return Some(Resolution::Unfinished),
+            },
+        };
+        // The keys come first in what a group by gives, and then the aggregates.
+        let mut keyed = probe.clone().group_by(keys.clone()).agg(Vec::<Expr>::new());
+        let kept = match keyed.collect_schema() {
+            Ok(schema) => schema.len(),
+            Err(error) => return Some(Resolution::Refused(error)),
+        };
+        let mut frame = probe.clone().group_by(keys.clone()).agg([expr]);
+        Some(match frame.collect_schema() {
+            Ok(schema) => {
+                let mut dtypes: Vec<DataType> = schema
+                    .iter()
+                    .skip(kept)
+                    .map(|(_, dtype)| dtype.clone())
+                    .collect();
+                if dtypes.len() == 1 {
+                    Resolution::Dtype(dtypes.remove(0))
+                } else {
+                    Resolution::Several(dtypes)
+                }
+            }
+            Err(error) => Resolution::Refused(error),
+        })
     }
 
     /// The dtype `state` has, when the dtypes are wanted.

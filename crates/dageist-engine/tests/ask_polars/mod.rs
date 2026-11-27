@@ -135,7 +135,7 @@ pub fn first_line(text: &str) -> String {
 /// expressions; `None` for a step that cannot be asked.
 pub fn plan(step: &Step, index: usize, source: &DataFrame, tables: Tables) -> Option<Planned> {
     let mut asking = Asking::new(step, index, source, tables, true);
-    let built = match asking.step(step.call(), source.clone().lazy()) {
+    let built = match asking.step(step, source.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::CannotAsk) => return None,
         Err(Stop::Refused(refused)) => {
@@ -165,7 +165,7 @@ pub fn schema_of(
     tables: Tables,
 ) -> Option<Result<SchemaRef, Refused>> {
     let mut asking = Asking::new(step, index, source, tables, false);
-    let built = match asking.step(step.call(), source.clone().lazy()) {
+    let built = match asking.step(step, source.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::CannotAsk) => return None,
         Err(Stop::Refused(refused)) => return Some(Err(refused)),
@@ -200,7 +200,7 @@ pub fn collect_on(
     limit: usize,
 ) -> Result<DataFrame, String> {
     let mut asking = Asking::new(step, index, working, tables, true);
-    let frame = match asking.step(step.call(), working.clone().lazy()) {
+    let frame = match asking.step(step, working.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::Refused(refused)) => return Err(refused.reason),
         Err(Stop::CannotAsk) => return Err("the step cannot be asked".to_owned()),
@@ -359,10 +359,28 @@ impl<'a> Asking<'a> {
         }
     }
 
-    fn step(&mut self, call: &Call, input: LazyFrame) -> Result<LazyFrame, Stop> {
+    fn step(&mut self, step: &Step, input: LazyFrame) -> Result<LazyFrame, Stop> {
+        let call = step.call();
         let arguments = self.arguments(call)?;
         match call.entry().build() {
             Build::Frame(build) => self.built(build(input, &arguments)),
+            // The calls of a group by follow it, the last of which gives the table.
+            Build::Grouping(build) => {
+                let mut group = self.built(build(input, &arguments))?;
+                for (at, link) in step.links().iter().enumerate() {
+                    self.path.push(Segment::Link(at));
+                    let arguments = self.arguments(link)?;
+                    match link.entry().build() {
+                        Build::GroupedStep(build) => {
+                            group = self.built(build(group, &arguments))?
+                        }
+                        Build::GroupedEnd(build) => return self.built(build(group, &arguments)),
+                        _ => return self.refused("a call of a group by follows group_by"),
+                    }
+                    self.path.pop();
+                }
+                self.refused("a step that groups is finished by its last call")
+            }
             _ => self.refused("a step is built from a frame"),
         }
     }

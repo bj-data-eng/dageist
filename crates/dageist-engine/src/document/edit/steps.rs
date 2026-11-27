@@ -6,7 +6,7 @@ use crate::catalog::{Entry, StepFrame};
 use super::super::error::{Cause, Place};
 use super::super::model::{Document, Step, StepId};
 use super::error::{EditError, EditProblem};
-use super::starting::step_call;
+use super::starting::{step_call, step_links};
 
 impl Document {
     /// The document with a new step of the entry `entry` at the position `at`,
@@ -41,8 +41,9 @@ impl Document {
             ));
         }
         let call = step_call(entry, frame).map_err(|fault| fault.at(&place))?;
+        let links = step_links(entry, frame).map_err(|fault| fault.at(&place))?;
         let id = self.fresh_id(entry)?;
-        let step = Step::new(id.clone(), call)
+        let step = Step::chain(id.clone(), call, links)
             .map_err(|refusal| EditError::of_refusal(refusal.in_step(at, Some(id))))?;
         let mut steps = self.steps().to_vec();
         steps.insert(at, step);
@@ -68,7 +69,8 @@ impl Document {
         let (index, found) = self.step_named(step)?;
         let entry = entry_named(entry, step)?;
         let call = step_call(entry, frame).map_err(|fault| fault.at(step))?;
-        let made = Step::new(found.id().clone(), call).map_err(|refusal| {
+        let links = step_links(entry, frame).map_err(|fault| fault.at(step))?;
+        let made = Step::chain(found.id().clone(), call, links).map_err(|refusal| {
             EditError::of_refusal(refusal.in_step(index, Some(found.id().clone())))
         })?;
         self.with_step(index, made)

@@ -7,7 +7,7 @@ use dageist_engine::document::{
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, document, field, grouping, many, named, step};
+use crate::support::{call, document, field, field_then, grouping, many, named, step};
 
 fn parameter(name: &str) -> Segment {
     Segment::Parameter(name.to_owned())
@@ -26,10 +26,11 @@ fn len() -> Value {
     finish("LazyGroupBy.len", json!({}))
 }
 
+/// A `having` that keeps the groups in which every flag `b` is true.
 fn having() -> Value {
     finish(
         "LazyGroupBy.having",
-        json!({ "predicates": many(vec![field("b")]) }),
+        json!({ "predicates": many(vec![field_then("b", vec![call("Expr.all", json!({}))])]) }),
     )
 }
 
@@ -79,7 +80,8 @@ fn a_step_that_groups_is_written_back_exactly() {
     assert_eq!(document.steps().len(), 2);
     assert_eq!(document.write(), text);
     // A step that does not group holds no `then`.
-    assert!(!document.write_indented().contains("\"then\": []"));
+    let written: Value = serde_json::from_str(&document.write()).expect("JSON");
+    assert!(written["steps"][1].get("then").is_none());
 }
 
 #[test]

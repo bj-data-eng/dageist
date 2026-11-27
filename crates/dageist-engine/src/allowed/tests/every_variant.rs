@@ -34,7 +34,10 @@ const fn next_outer(outer: Outer) -> Option<Outer> {
         Outer::Sort => Some(Outer::JoinLeft),
         Outer::JoinLeft => Some(Outer::JoinRight),
         Outer::JoinRight => Some(Outer::PivotAggregate),
-        Outer::PivotAggregate => None,
+        Outer::PivotAggregate => Some(Outer::GroupKey),
+        Outer::GroupKey => Some(Outer::Aggregate),
+        Outer::Aggregate => Some(Outer::Having),
+        Outer::Having => None,
     }
 }
 
@@ -58,7 +61,9 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::FieldIsOfTheStruct => Some(Rule::FieldNamesFitTheStruct),
         Rule::FieldNamesFitTheStruct => Some(Rule::FilterPredicateIsBoolean),
         Rule::FilterPredicateIsBoolean => Some(Rule::FoldedFunctionIsNoJoinKey),
-        Rule::FoldedFunctionIsNoJoinKey => Some(Rule::IsInTakesAList),
+        Rule::FoldedFunctionIsNoJoinKey => Some(Rule::HavingCastsToBoolean),
+        Rule::HavingCastsToBoolean => Some(Rule::HavingGivesOneValue),
+        Rule::HavingGivesOneValue => Some(Rule::IsInTakesAList),
         Rule::IsInTakesAList => Some(Rule::JoinKeyNamesAreNotRepeated),
         Rule::JoinKeyNamesAreNotRepeated => Some(Rule::KeyIsElementwise),
         Rule::KeyIsElementwise => Some(Rule::MomentsShareAZone),

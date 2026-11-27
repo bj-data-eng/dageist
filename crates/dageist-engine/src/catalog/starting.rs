@@ -128,10 +128,35 @@ pub struct StepFrame<'a> {
     pub tables: &'a [String],
 }
 
-/// What a new step of an entry is given: the arguments it starts with.
+/// What a new call of a group by is given, as a link after `group_by` or as the call that
+/// finishes it: the entry and the arguments it starts with.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkStart {
+    entry: &'static str,
+    arguments: Vec<(&'static str, Setting)>,
+}
+
+impl LinkStart {
+    /// The entry the call is of, such as `LazyGroupBy.agg`.
+    #[must_use]
+    pub const fn entry(&self) -> &'static str {
+        self.entry
+    }
+
+    /// The parameters the call starts with, by Python's name, each with what it is set to. A
+    /// parameter that is not among them is not given: it holds its default.
+    #[must_use]
+    pub fn arguments(&self) -> &[(&'static str, Setting)] {
+        &self.arguments
+    }
+}
+
+/// What a new step of an entry is given: the arguments it starts with, and, for a step that groups,
+/// the calls after `group_by` that it cannot be built without.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepStart {
     arguments: Vec<(&'static str, Setting)>,
+    links: Vec<LinkStart>,
 }
 
 impl StepStart {
@@ -141,6 +166,13 @@ impl StepStart {
     #[must_use]
     pub fn arguments(&self) -> &[(&'static str, Setting)] {
         &self.arguments
+    }
+
+    /// The calls after the call of the step that it starts with: for `group_by`, the call that
+    /// finishes the grouping. None for any other step.
+    #[must_use]
+    pub fn links(&self) -> &[LinkStart] {
+        &self.links
     }
 
     /// What the parameter `name` is set to, if the step starts with it.
@@ -236,6 +268,12 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
             ("values", Setting::ToGive),
             ("aggregate_function", Setting::Element(PIVOT_AGGREGATE)),
         ],
+        "LazyFrame.group_by" => {
+            return Some(StepStart {
+                arguments: vec![start_of("by")?],
+                links: vec![start_link(catalog_entry(GROUP_FINISH)?)?],
+            });
+        }
         "LazyFrame.drop" => vec![start_of("columns")?],
         "LazyFrame.fill_nan" => vec![start_of("value")?],
         "LazyFrame.slice" => vec![start_of("offset")?],
@@ -253,5 +291,47 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
         | "LazyFrame.with_row_index" => Vec::new(),
         _ => return None,
     };
-    Some(StepStart { arguments })
+    Some(StepStart {
+        arguments,
+        links: Vec::new(),
+    })
+}
+
+/// The call that finishes a new step that groups: `agg` of one new column, whose aggregate is
+/// still to be given, as a new column of `with_columns` is.
+const GROUP_FINISH: &str = "LazyGroupBy.agg";
+
+fn catalog_entry(id: &str) -> Option<&'static Entry> {
+    super::entry(id)
+}
+
+/// What a new call of a group by, the entry `entry`, starts with, or `None` where the entry is no
+/// call of a group by.
+///
+/// `having` starts with a test, an equality of a field and a value still to be given, as a new
+/// filter does; `agg` with one new column whose aggregate is still to be given, as `with_columns`
+/// does; and `quantile` with the median, the share it must be given and the editor can pick. The
+/// shortcuts need nothing but what Polars does without it: `head` and `tail` five rows, `first` and
+/// `last` the first and last value even where it is empty.
+#[must_use]
+pub fn start_link(entry: &Entry) -> Option<LinkStart> {
+    if entry.applies() != Applies::Grouped {
+        return None;
+    }
+    let arguments = match entry.id().as_str() {
+        "LazyGroupBy.having" => vec![("predicates", Setting::List(vec![Setting::started_test()]))],
+        "LazyGroupBy.agg" => vec![(
+            "named_aggs",
+            Setting::Pairs(vec![(
+                Setting::Text("new_column".to_owned()),
+                Setting::ToGive,
+            )]),
+        )],
+        "LazyGroupBy.quantile" => vec![("quantile", Setting::Float(0.5))],
+        _ => Vec::new(),
+    };
+    Some(LinkStart {
+        entry: entry.id().as_str(),
+        arguments,
+    })
 }
