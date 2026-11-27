@@ -730,10 +730,10 @@ fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) ->
             part.links().is_empty()
                 && matches!(part.start(), Start::Call(call)
                 if call.entry().id().as_str() == "polars.lit"
-                    && matches!(
+                    && (matches!(
                         call.argument("value"),
                         Some(Value::Integer(_) | Value::Float(_) | Value::Flag(Some(_)))
-                    ))
+                    ) || is_a_number_of_a_dtype(call)))
         }
         Some(_) => false,
     };
@@ -744,6 +744,42 @@ fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) ->
         Some(Value::Expression(part)) => key_name(part),
         _ => Some("literal".to_owned()),
     }
+}
+
+/// Whether the literal is a text of a number given no dtype, which Polars reads as the number it
+/// is where a part of a moment is given one.
+fn is_a_text_of_a_number(call: &Call) -> bool {
+    call.argument("dtype").is_none()
+        && matches!(call.argument("value"), Some(Value::String(text))
+            if text.trim().parse::<f64>().is_ok_and(f64::is_finite))
+}
+
+/// Whether the literal is a number given a dtype of numbers, as the step engine makes it: the value
+/// cast strictly to the dtype, so a float or a text of a number given a dtype of whole numbers is
+/// the whole number it casts to, which Polars folds as it does a number typed in.
+fn is_a_number_of_a_dtype(call: &Call) -> bool {
+    use polars::prelude::DataType as D;
+    let (Some(value), Some(Value::Dtype(dtype))) = (call.argument("value"), call.argument("dtype"))
+    else {
+        return false;
+    };
+    matches!(
+        dtype.as_polars(),
+        D::Int8
+            | D::Int16
+            | D::Int32
+            | D::Int64
+            | D::Int128
+            | D::UInt8
+            | D::UInt16
+            | D::UInt32
+            | D::UInt64
+            | D::UInt128
+            | D::Float16
+            | D::Float32
+            | D::Float64
+    ) && catalog::typed_literal(&value.placeholder(), dtype.as_polars())
+        .is_ok_and(|scalar| !scalar.is_null())
 }
 
 /// Whether Polars folds the call into a literal, which it names by an alias: a moment, with no
@@ -765,7 +801,9 @@ fn is_folded_into_a_literal(start: &Call) -> bool {
             part.links().is_empty()
                 && matches!(part.start(), Start::Call(call)
                     if call.entry().id().as_str() == "polars.lit"
-                        && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+                        && (matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_)))
+                            || is_a_text_of_a_number(call)
+                            || is_a_number_of_a_dtype(call)))
         }
         Some(_) => false,
     };

@@ -245,15 +245,6 @@ fn a_moment_or_a_length_of_time_made_of_numbers_typed_in_is_no_join_key_however_
         )
         .saying("rule folded-function-is-no-join-key"),
     );
-    known.push(
-        Known::new(
-            Kind::PolarsRefusesOnly,
-            Pattern::new().is("function", "polars.duration(weeks)"),
-            "Polars cannot make the weeks of a length of time of a number of 128 bits that does not \
-             fit 64, which the walk does not read (candidate to file)",
-        )
-        .saying("failed in column 'scalar'"),
-    );
     parts_of_a_moment_grid(values).assert_agree(&known, 500);
 }
 
