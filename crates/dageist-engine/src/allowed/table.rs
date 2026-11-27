@@ -722,7 +722,7 @@ pub(super) fn has_a_subject(entry: &catalog::Entry) -> bool {
 /// elements with the value they are given. A test that runs Polars on every class holds this list
 /// to the methods that need it: a method that is not here judges a list or an array as the class
 /// that stands for it does, and one that is here is measured on [`CORE_NESTED`] as well.
-pub(super) const SENSITIVE: [&str; 24] = [
+pub(super) const SENSITIVE: [&str; 23] = [
     "Expr.add",
     "Expr.and_",
     "Expr.approx_quantile",
@@ -734,7 +734,6 @@ pub(super) const SENSITIVE: [&str; 24] = [
     "Expr.fill_null",
     "Expr.floordiv",
     "Expr.is_close",
-    "Expr.is_in",
     "Expr.mod",
     "Expr.mul",
     "Expr.ne",
@@ -784,7 +783,9 @@ const MEASURED_AND_CORE: [Representative; 35] = {
 
 /// The classes the tables hold lines for `entry` on, as the receiver and as an argument.
 pub(super) fn measured_classes(entry: &str) -> &'static [Representative] {
-    if is_of_nested_dtypes(entry) {
+    // `is_in` looks a value up in a list or an array of an element dtype that fits it, which each
+    // class has its own of, so it is measured on every class beside the methods of lists.
+    if is_of_nested_dtypes(entry) || entry == "Expr.is_in" {
         &Representative::ALL
     } else if SENSITIVE.contains(&entry) {
         &MEASURED_AND_CORE

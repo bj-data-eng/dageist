@@ -626,6 +626,9 @@ impl DtypeIndex {
                     Representative::List(Inner::Int64),
                     Representative::List(Inner::String),
                     Representative::Array(Inner::Int64),
+                    // A list of nulls holds a value of any dtype, as a struct is.
+                    Representative::List(Inner::Null),
+                    Representative::Array(Inner::Null),
                 ])
                 .find_map(|argument| {
                     match self

@@ -4103,6 +4103,12 @@ mod tests {
         // the operand imploded.
         let mut asked = 0;
         for case in focused_cases("is_in", 400) {
+            // The columns of a join's other table are classed as the walk has them, which the
+            // generator may take for another class than Polars gives a call on them, so a join is
+            // asked by the campaigns and not here.
+            if case.document.write().contains("\"LazyFrame.join\"") {
+                continue;
+            }
             let header = header_of(&case);
             // The other table's columns have the dtypes of `a` and `b`.
             let nested = |name: &str| {

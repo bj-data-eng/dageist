@@ -295,8 +295,19 @@ struct World {
     unbuildable: Vec<String>,
 }
 
-fn labelled(level: usize, what: &str) -> String {
-    format!("{level} {what}")
+/// The label of a receiver or a form that gives `dtype`: how deeply it is nested, and a question
+/// mark before that where no class of the tables is the dtype, which the walk cannot judge.
+fn labelled(dtype: &DataType, what: &str) -> String {
+    let level = dtype.nesting_level();
+    if Representative::of(dtype).is_some() {
+        format!("{level} {what}")
+    } else {
+        format!("?{level} {what}")
+    }
+}
+
+fn gathered(dtype: &DataType) -> DataType {
+    DataType::List(Box::new(dtype.clone()))
 }
 
 fn connected_name(class: Representative) -> String {
@@ -308,19 +319,24 @@ static WORLD: LazyLock<World> = LazyLock::new(|| {
     let mut forms = Vec::new();
     for column in &columns {
         let label = &column.label;
-        let level = column.level();
         forms.push(Form {
-            label: labelled(level, &format!("a column of {label}")),
+            label: labelled(&column.dtype, &format!("a column of {label}")),
             other: field(&column.name),
             list: None,
         });
         forms.push(Form {
-            label: labelled(level + 1, &format!("a column of {label} imploded")),
+            label: labelled(
+                &gathered(&column.dtype),
+                &format!("a column of {label} imploded"),
+            ),
             other: field_then(&column.name, vec![implode()]),
             list: None,
         });
         forms.push(Form {
-            label: labelled(level + 2, &format!("a column of {label} imploded twice")),
+            label: labelled(
+                &gathered(&gathered(&column.dtype)),
+                &format!("a column of {label} imploded twice"),
+            ),
             other: field_then(&column.name, vec![implode(), implode()]),
             list: None,
         });
@@ -339,19 +355,22 @@ static WORLD: LazyLock<World> = LazyLock::new(|| {
         }
         if let Some(literal) = typed_literal(class) {
             forms.push(Form {
-                label: labelled(0, &format!("a literal of {class}")),
+                label: labelled(&class.dtype(), &format!("a literal of {class}")),
                 other: chain(literal.clone(), vec![]),
                 list: None,
             });
             forms.push(Form {
-                label: labelled(1, &format!("a literal of {class} imploded")),
+                label: labelled(
+                    &gathered(&class.dtype()),
+                    &format!("a literal of {class} imploded"),
+                ),
                 other: chain(literal, vec![implode()]),
                 list: None,
             });
         }
         if let Some(null) = typed_null(class) {
             forms.push(Form {
-                label: labelled(0, &format!("a null typed as {class}")),
+                label: labelled(&class.dtype(), &format!("a null typed as {class}")),
                 other: chain(null, vec![]),
                 list: None,
             });
@@ -363,14 +382,17 @@ static WORLD: LazyLock<World> = LazyLock::new(|| {
         {
             let name = connected_name(class);
             forms.push(Form {
-                label: labelled(1, &format!("a connected list of {class}")),
+                label: labelled(
+                    &gathered(&class.dtype()),
+                    &format!("a connected list of {class}"),
+                ),
                 other: chain(json!({ "input": name }), vec![]),
                 list: Some((name, list)),
             });
         }
     }
     forms.push(Form {
-        label: labelled(0, "a null"),
+        label: labelled(&DataType::Null, "a null"),
         other: chain(
             call("polars.lit", json!({ "value": { "flag": null } })),
             vec![],
@@ -378,7 +400,7 @@ static WORLD: LazyLock<World> = LazyLock::new(|| {
         list: None,
     });
     forms.push(Form {
-        label: labelled(1, "empty lists"),
+        label: labelled(&gathered(&DataType::Int64), "empty lists"),
         other: field("empty_lists"),
         list: None,
     });
@@ -443,7 +465,7 @@ fn is_in_grid() -> Grid<Point> {
         .columns
         .iter()
         .map(|column| {
-            let label = labelled(column.level(), &column.label);
+            let label = labelled(&column.dtype, &column.label);
             (
                 label.clone(),
                 Receiver {
@@ -494,6 +516,29 @@ fn known() -> Vec<Known> {
             )
             .saying("rule is-in-takes-a-list"),
         );
+    }
+    // A dtype that no class of the tables is: a list of lists, of structs, and a binary, a
+    // categorical and an enum. The walk cannot tell what a collection of it is looked up in, or what
+    // is looked up in it, and leaves the call to Polars, which refuses it when the step runs where it
+    // does. Stated here to be filed: the walk would need the depth and the element of a dtype that
+    // has no class.
+    for (axis, what) in [
+        ("form", "what is looked up in has no class of the tables"),
+        (
+            "receiver",
+            "the value that is looked up has no class of the tables",
+        ),
+    ] {
+        known.push(Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().starts(axis, "?"),
+            if axis == "form" {
+                "what is looked up in is of a dtype with no class of the tables (a list of lists, of structs, a binary, a categorical, an enum), so the walk cannot tell that Polars refuses it and leaves it to the step's run"
+            } else {
+                "the value is of a dtype with no class of the tables (a binary, a categorical, an enum), so the walk cannot tell what it may be looked up in and leaves it to the step's run"
+            },
+        ));
+        let _ = what;
     }
     known
 }

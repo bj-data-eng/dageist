@@ -378,7 +378,7 @@ impl Refusal {
         }
     }
 
-    fn polars(reason: &Reason) -> Self {
+    pub(super) fn polars(reason: &Reason) -> Self {
         // A line of the tables that a rule wrote, because the tables never run what it refuses,
         // is the rule's refusal: its name begins the text, and what follows says what is the matter.
         if let Some((name, said)) = reason.text.split_once(": ")
@@ -743,21 +743,11 @@ fn on_receiver(
     entry: &'static Entry,
     receiver: Option<Representative>,
     arguments: &[(&str, Representative)],
+    unclassed: &[&str],
     options: &[(&str, &str)],
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
-    // `is_in` follows a list or an array only looking up in a collection of lists, which no class of
-    // the tables is: no argument of a class fits, and one that has none is not judged.
-    if id == "Expr.is_in"
-        && receiver.is_some_and(Representative::is_nested)
-        && !arguments.iter().any(|(name, _)| *name == "other")
-    {
-        return Err(Refusal::rule_because(
-            Rule::ElementDtypeIsMeasured,
-            &"Expr.is_in follows a list or an array only given a collection of lists, which the tables do not measure",
-        ));
-    }
     // A method that depends on the element is refused after a class it is not measured on, whether
     // it is given an expression or an option in place of one, which no line of the dtype table says.
     if let Some(class) = receiver
@@ -808,12 +798,19 @@ fn on_receiver(
     // that give it say nothing of the call: the option table does.
     let required: Vec<&'static str> = required_expressions(entry)
         .filter(|parameter| !stood_in_for.contains(parameter))
+        // What `is_in` is given and has no class is not judged by the tables, which say nothing of
+        // it: Polars judges it as it builds.
+        .filter(|parameter| !(id == "Expr.is_in" && unclassed.contains(parameter)))
         .collect();
     // What the method is refused for with none of its arguments, which it is measured with where
     // it needs none. Where arguments are given, the lines of the calls that have them say what
     // Polars does of the call, and which of two failures it meets first, as it converts a part it
     // is given before it meets the value it follows, so the refusal of an argument is the one told.
-    let alone = (required.is_empty() && stood_in_for.is_empty()).then(|| line(None, None));
+    // What `is_in` is given and the tables say nothing of is left to Polars, which no line of the
+    // call with none of its arguments says.
+    let left_to_polars = id == "Expr.is_in" && !unclassed.is_empty();
+    let alone = (required.is_empty() && stood_in_for.is_empty() && !left_to_polars)
+        .then(|| line(None, None));
     // What the arguments given decide: each is measured on its own, so what
     // the method gives is what they agree on, and not known where they do not.
     let mut given_fits: Vec<Fit> = Vec::new();
@@ -870,6 +867,12 @@ fn on_receiver(
             }
         }
         let Some(first) = fitting.first() else {
+            // A list or an array is looked up in a list of lists, which no class of the tables is,
+            // so no class fits and the call is still one Polars accepts.
+            if id == "Expr.is_in" && receiver.is_some_and(Representative::is_nested) {
+                fit.get_or_insert(is_in_gives());
+                continue;
+            }
             return Err(refusal.unwrap_or_else(missing));
         };
         // What the argument decides is known when every dtype that fits
@@ -889,7 +892,17 @@ fn on_receiver(
         Some(fit) => Ok(fit),
         // The option table says what the call gives.
         None if !stood_in_for.is_empty() => Ok(Fit::of(None)),
+        // What it is looked up in has no class, which Polars judges as it builds.
+        None if id == "Expr.is_in" && !unclassed.is_empty() => Ok(is_in_gives()),
         None => Err(missing()),
+    }
+}
+
+/// What `is_in` gives where the tables do not judge what it looks up in: a `Boolean` for each value.
+fn is_in_gives() -> Fit {
+    Fit {
+        result: Some(ResultDtype::from_name("Boolean")),
+        shape: Shape::Many,
     }
 }
 
@@ -1305,15 +1318,6 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             }
         }
     }
-    // `is_in` given a collection that no class of the tables is, as a list of structs or of lists
-    // is, is not judged: the tables hold no line of it, and a call of no class that fits is not
-    // refused for that, which Polars may accept.
-    if id == "Expr.is_in" && chosen.unclassed.contains(&"other") {
-        return Err(Refusal::rule_because(
-            Rule::ElementDtypeIsMeasured,
-            &"Expr.is_in is given a collection that no class of the tables is, which they do not measure",
-        ));
-    }
     // What the call says of a struct: a field that is none, names that do not fit, or fields made.
     let receiver_class = match place.after {
         After::Value { dtype, .. } => Some(dtype),
@@ -1422,7 +1426,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         if let Some(dtype) = receiver
             && !chosen.arguments.is_empty()
         {
-            on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
+            on_receiver(
+                entry,
+                Some(dtype),
+                chosen.arguments,
+                chosen.unclassed,
+                chosen.options,
+            )?;
         }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
@@ -1445,7 +1455,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             .filter(|(name, _)| chosen.options.is_empty() || *name != subject)
             .copied()
             .collect();
-        let fit = on_receiver(entry, None, &lines_of, chosen.options)?;
+        let fit = on_receiver(entry, None, &lines_of, chosen.unclassed, chosen.options)?;
         match subject_class {
             Some(class) => check_options(entry, Some(class), chosen.options)?,
             None => options(entry, chosen.options)?,
@@ -1493,7 +1503,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         place.after,
         is_method(entry) && !struct_arithmetic && !meets_other_fields,
     ) {
-        let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
+        let fit = on_receiver(
+            entry,
+            Some(dtype),
+            chosen.arguments,
+            chosen.unclassed,
+            chosen.options,
+        )?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
@@ -1972,7 +1988,12 @@ pub fn refuse_a_call_the_tables_refuse_after_lists(
         .iter()
         .filter_map(|(name, dtype)| Some((*name, Representative::of(dtype)?)))
         .collect();
-    match on_receiver(entry, Some(class), &classes, &[]) {
+    let unclassed: Vec<&str> = arguments
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| !classes.iter().any(|(classed, _)| classed == name))
+        .collect();
+    match on_receiver(entry, Some(class), &classes, &unclassed, &[]) {
         Err(refusal)
             if matches!(
                 refusal.source(),
@@ -2415,7 +2436,17 @@ fn check_options(
     };
     let check =
         |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key.clone())) {
-            Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
+            Some(Outcome::Refused(reason)) => {
+                let refusal = Refusal::polars(reason);
+                // A line a rule wrote says the call the option was measured with is refused by the
+                // rule, as the call of a list looked up in nothing it fits is, and not the option:
+                // it was not measured.
+                if matches!(refusal.source(), RefusalSource::Rule(_)) {
+                    Ok(())
+                } else {
+                    Err(refusal)
+                }
+            }
             Some(Outcome::Allowed(_)) => Ok(()),
             // A method with several options has no line for one of them alone. It is set to its
             // word beside every other option at its default, so the lines that say that are

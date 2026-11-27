@@ -295,39 +295,25 @@ fn a_connected_list_given_to_is_in_makes_no_warning_of_polars() {
 }
 
 #[test]
-fn a_list_column_looked_up_in_a_collection_of_lists_is_not_judged_by_the_tables() {
-    // Python Polars 2.2.0 takes `l.is_in(l.implode().implode())`: a list is looked up in a list of
-    // lists. No class of the tables is a list of lists, so the engine does not offer it, and says
-    // that the tables do not measure it, and not that Polars refuses a collection that is no list.
-    let looked_up = field_then(
-        "l",
-        vec![is_in(field_then("l", vec![implode(), implode()]))],
-    );
-    let (rule, said) = refused_by_a_rule(looked_up);
-    assert_eq!(rule, "element-dtype-is-measured");
-    assert!(said.contains("Expr.is_in"), "{said}");
+fn a_list_column_looked_up_in_a_collection_of_lists_is_left_to_polars_and_not_refused() {
+    // Python Polars 2.2.0 takes `l.is_in(l.implode())`: a list is looked up in a list of lists. No class of the tables is a list of lists, so the walk cannot tell, and leaves the call
+    // to the step's run: it is not refused, and the method is offered after the list.
+    let looked_up = field_then("l", vec![is_in(field_then("l", vec![implode()]))]);
+    assert_eq!(walk_of(looked_up.clone()).refusal(), None);
+    assert_eq!(cells(looked_up), cell_texts(&["true", "true", "true"]));
 }
 
 #[test]
-fn a_list_column_looked_up_in_lists_of_lists_with_an_option_is_refused_by_a_rule_too() {
-    // The option table records what a rule refuses, for it never runs it, so a refusal read from
-    // it is the rule's, and not Polars'.
+fn a_list_column_looked_up_in_lists_of_lists_is_not_refused_for_an_option_either() {
     let looked_up = field_then(
         "l",
         vec![call(
             "Expr.is_in",
             json!({
-                "other": field_then("l", vec![implode(), implode()]),
+                "other": field_then("l", vec![implode()]),
                 "nulls_equal": { "flag": false },
             }),
         )],
     );
-    let walk = walk_of(looked_up);
-    let refusal = walk.refusal().expect("a refusal").refusal();
-    assert!(
-        matches!(refusal.source(), RefusalSource::Rule(_)),
-        "refused by {:?}: {}",
-        refusal.source(),
-        refusal.reason()
-    );
+    assert_eq!(walk_of(looked_up).refusal(), None);
 }

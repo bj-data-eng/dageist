@@ -982,8 +982,9 @@ The grid of `is_in` is in `tests/document/membership_grid.rs`, on this helper. I
 every dtype (the lists and arrays of every element dtype, the units of a duration and a moment, a dtype the
 tables have no class of) with every form of what it looks up in (a column of every class, imploded once and
 twice, a typed literal and a typed null of every class, a connected list), with `nulls_equal` both ways, in a
-`select` and as a join's key. The only cells it excuses without a stated limit are the deprecated form, which
-the rule `is-in-takes-a-list` refuses where what is looked up in is nested as the value is.
+`select` and as a join's key. It excuses the deprecated form, which the rule `is-in-takes-a-list` refuses where
+what is looked up in is nested as the value is, and names what the walk leaves to Polars: a dtype that no class
+of the tables is, a list of lists, a list of structs, a binary, a categorical, an enum.
 
 ## Check The Build Against The Polars Release
 

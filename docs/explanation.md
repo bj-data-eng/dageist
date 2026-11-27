@@ -596,7 +596,11 @@ of the dtype of the value. Polars 2.2.0 warns that it is ambiguous and deprecate
 to Polars, so the engine refuses it instead, by the rule `is-in-takes-a-list`, whose words say to give a list, or the
 collection imploded with `implode`. The tables never run the form: each line of it records the rule, as it does for a
 receiver that Polars panics on, and the tables of `is_in` measure only the current form, a list or an array given to
-the value, which Polars meets row by row. A connected list given to `is_in` on its own is built as one list of its
+the value, which Polars meets row by row. They measure it on every class, as the methods of lists are, for a value has
+a list of its own element dtype: a float of any width, a duration, a time, a moment of a zone, and a list or an array.
+A struct fits a list of nulls. What a list is looked up in, a list of lists, and a list of structs, are dtypes no class
+of the tables is: the walk cannot tell what Polars says of them, so it leaves the call to the step's run and does not
+refuse it, and offers `is_in` after every class all the same. The grid of `is_in` names what that leaves. A connected list given to `is_in` on its own is built as one list of its
 values, which is the current form; a chain that starts from one gives values of their dtype, which is the form Polars
 deprecates, and is refused until it is imploded.
 
@@ -963,9 +967,7 @@ value for every dtype, a list and a struct included, whose own dtype has no clas
 follows one of lists is read as no class. A join's key may hold it alone and not beside a column, unless it gathers the
 values of a literal, which Polars folds into a literal: the key `a.is_in(lit(1).implode())` is elementwise, and
 `a.is_in(a.implode())` is not. `maintain_order` is true unless it is told, as in Python, and keeps the order of the
-values. It is what `is_in` is given where the values to look up in are a column's own: the column imploded. `is_in`
-follows a list or an array only given a collection of lists, which no class of the tables is, so the tables do not
-measure it and the engine does not offer it.
+values. It is what `is_in` is given where the values to look up in are a column's own: the column imploded.
 
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
@@ -2350,7 +2352,7 @@ method that takes an operand. They hold lines for the 26 classes of
 | a list of text | the list of `String` | Polars judges every method that is not named below alike for two element dtypes. |
 | any other list | the list of `Int64` | The same. |
 | any array | the array of `Int64` | The same. |
-| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders, replaces and converts by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `is_in`, `diff`, `replace`, `replace_strict`, `search_sorted`, `cast` and `reverse`, which `SENSITIVE` names. |
+| a list or an array, of a method that depends on the element dtype | the line of its own, for the classes it is measured on | Polars finds the supertype of the elements and the operand, compares elements that may have none, or fills, searches, orders, replaces and converts by them: `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `eq`, `ne`, `eq_missing`, `ne_missing`, `and_`, `or_`, `xor`, `fill_null`, `fill_nan`, `is_close`, `diff`, `replace`, `replace_strict`, `search_sorted`, `cast` and `reverse`, which `SENSITIVE` names. |
 | any other list or array, of those | none | The call is refused by the rule `element-dtype-is-measured` and a document that holds it is not run: Polars is not asked of what the tables do not measure, and panics on some of it. |
 
 A method that is not named is held to the claim by a test that runs every combination of every
