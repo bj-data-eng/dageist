@@ -4428,6 +4428,13 @@ fn applies(
                 && refusal.reason.contains("not yet implemented")
                 && refusal.reason.contains("replacement pattern per row")
                 && grouped;
+            // A window partitioned by a column, which the tables measured as a partition of the
+            // rows, is partitioned by the values of a group where a group evaluates it.
+            let a_window_by_the_values = refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .contains("window expression with non-elementwise")
+                && grouped;
             // A replacement of text given the values of a group as its value, a list for each
             // group, is refused for the values it is given as many as it is, where a select gives
             // it the column.
@@ -4455,7 +4462,11 @@ fn applies(
                     .any(|held| any_call(held, &|call| is(call, "Expr.replace_strict")));
             pivot && (of_nothing || a_text_share)
                 || grouped
-                    && (of_nothing || a_pattern_per_row || an_incomplete_mapping || a_value_per_row)
+                    && (of_nothing
+                        || a_pattern_per_row
+                        || an_incomplete_mapping
+                        || a_value_per_row
+                        || a_window_by_the_values)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
@@ -5660,6 +5671,7 @@ mod tests {
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
             "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+            "uncovered-a-group-aggregate--a-window-over-the-values-of-a-group-that-polars-refuses.case",
             "uncovered-a-group-aggregate--a-replacement-of-text-given-the-values-of-a-group.case",
             "uncovered-a-group-aggregate--a-replacement-value-of-the-length-of-a-group.case",
             "uncovered-a-group-aggregate--a-window-over-a-column-in-a-having.case",
