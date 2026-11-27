@@ -114,6 +114,9 @@ export function OfferList({
     search.current?.focus();
   }, []);
 
+  // A list with nothing to choose from, whose word only names what can be done to its piece, is
+  // those actions alone: it has no search box and nothing to say is not found.
+  const choices = groups('').some((group) => group.offers.length > 0);
   const shown = groups(typed)
     .filter((group) => group.offers.length > 0)
     .map((group) => {
@@ -154,76 +157,80 @@ export function OfferList({
           ))}
         </div>
       )}
-      <label className="dg-search">
-        <input
-          ref={search}
-          type="text"
-          aria-label={placeholder}
-          placeholder={placeholder}
-          spellCheck={false}
-          value={typed}
-          onChange={(event) => {
-            setTyped(event.currentTarget.value);
-            onType?.(event.currentTarget.value);
-            setMarked(null);
-            setPlaces(placesOf(groups(event.currentTarget.value)));
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              event.preventDefault();
-              step(event.key === 'ArrowDown' ? 1 : -1);
-            } else if (event.key === 'Enter' && chosen !== undefined) {
-              event.preventDefault();
-              pick(chosen);
-            }
-          }}
-        />
-      </label>
-      <div ref={list} className="dg-offer-list">
-        {shown.map((group, at) => (
-          <section
-            // Groups keep their order while the list is open, so a group's place identifies it.
-            key={group.title ?? String(at)}
-            aria-label={group.title ?? undefined}
-            className="dg-group"
-          >
-            {group.title !== null && (
-              <div className="dg-group-head">
-                {group.title}
-                {group.counted && <span>{group.offers.length}</span>}
-              </div>
-            )}
-            {group.offers.map((offer) => (
-              <div key={offer.id} className={cx('dg-offer', offer === chosen && 'dg-chosen')}>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  disabled={offer.reason !== null}
-                  title={offer.reason ?? undefined}
-                  aria-pressed={offer.ticked ?? undefined}
-                  className="dg-offer-pick"
-                  onPointerDown={(event) => {
-                    // A press on a row must not take the search box's focus.
-                    event.preventDefault();
-                  }}
-                  onClick={() => {
-                    pick(offer);
-                  }}
-                >
-                  {offer.ticked !== null && <span aria-hidden="true" className="dg-tick" />}
-                  <span data-tone={offer.tone} data-look={offer.look} className="dg-block">
-                    {offer.label}
-                  </span>
-                  {/* The note stays beside a control at the end of the row, so a row always says what it is. */}
-                  <span className="dg-offer-note">{offer.reason ?? offer.note}</span>
-                </button>
-                {offer.extra}
-              </div>
-            ))}
-          </section>
-        ))}
-        {shown.length === 0 && <div className="dg-nothing">Nothing by that name.</div>}
-      </div>
+      {choices && (
+        <label className="dg-search">
+          <input
+            ref={search}
+            type="text"
+            aria-label={placeholder}
+            placeholder={placeholder}
+            spellCheck={false}
+            value={typed}
+            onChange={(event) => {
+              setTyped(event.currentTarget.value);
+              onType?.(event.currentTarget.value);
+              setMarked(null);
+              setPlaces(placesOf(groups(event.currentTarget.value)));
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                step(event.key === 'ArrowDown' ? 1 : -1);
+              } else if (event.key === 'Enter' && chosen !== undefined) {
+                event.preventDefault();
+                pick(chosen);
+              }
+            }}
+          />
+        </label>
+      )}
+      {choices && (
+        <div ref={list} className="dg-offer-list">
+          {shown.map((group, at) => (
+            <section
+              // Groups keep their order while the list is open, so a group's place identifies it.
+              key={group.title ?? String(at)}
+              aria-label={group.title ?? undefined}
+              className="dg-group"
+            >
+              {group.title !== null && (
+                <div className="dg-group-head">
+                  {group.title}
+                  {group.counted && <span>{group.offers.length}</span>}
+                </div>
+              )}
+              {group.offers.map((offer) => (
+                <div key={offer.id} className={cx('dg-offer', offer === chosen && 'dg-chosen')}>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    disabled={offer.reason !== null}
+                    title={offer.reason ?? undefined}
+                    aria-pressed={offer.ticked ?? undefined}
+                    className="dg-offer-pick"
+                    onPointerDown={(event) => {
+                      // A press on a row must not take the search box's focus.
+                      event.preventDefault();
+                    }}
+                    onClick={() => {
+                      pick(offer);
+                    }}
+                  >
+                    {offer.ticked !== null && <span aria-hidden="true" className="dg-tick" />}
+                    <span data-tone={offer.tone} data-look={offer.look} className="dg-block">
+                      {offer.label}
+                    </span>
+                    {/* The note stays beside a control at the end of the row, so a row always says what it is. */}
+                    <span className="dg-offer-note">{offer.reason ?? offer.note}</span>
+                  </button>
+                  {offer.extra}
+                </div>
+              ))}
+            </section>
+          ))}
+          {shown.length === 0 && <div className="dg-nothing">Nothing by that name.</div>}
+        </div>
+      )}
       {actions.length > 0 && (
         <div className="dg-acts">
           {actions.map((action) => (

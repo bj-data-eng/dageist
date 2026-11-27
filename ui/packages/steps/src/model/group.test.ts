@@ -8,6 +8,7 @@ import { decodeCorpusPart } from '../../../host/test-support/corpus';
 import { finishingEntries, groupedRoleOf, havingEntry, indexCatalogue, verbOf } from './catalogue';
 import { callInStep, linkSegment, parameterSegment } from './doc';
 import { groupLayoutOf } from './group';
+import { outputDtypeOf, prepareRun, rowEndOf } from './report';
 
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 const documents = decodeCorpusPart(JSON.parse(stepsFile)).documents;
@@ -69,5 +70,40 @@ describe('the call a way through a step reaches', () => {
     expect(callInStep(step, [])?.entry).toBe('LazyFrame.group_by');
     // An argument is no call.
     expect(callInStep(step, [linkSegment(0), parameterSegment('predicates')])).toBeNull();
+  });
+});
+
+/** The corpus step that sums a column of a group by, run, with its report. */
+function summed() {
+  const found = documents.find(
+    (held) => held.name === 'LazyGroupBy.sum as it is put into a group by',
+  );
+  if (found === undefined) throw new Error('no such document');
+  const [step] = found.document.steps;
+  const [result] = prepareRun(found.document.steps, found.run).steps;
+  if (step === undefined || result === undefined) throw new Error('no step');
+  return { step, result };
+}
+
+describe('what the engine reports of a step that groups', () => {
+  it('is how many groups the step gave of the rows it was given, which the engine counted', () => {
+    const { step, result } = summed();
+    expect(rowEndOf(step.call, result)).toEqual({ kind: 'grouped', groups: 1, received: 3 });
+  });
+
+  it('is the dtype of each column it gives, found by the name the column has', () => {
+    const { result } = summed();
+    expect(outputDtypeOf(result, 'int64')).toBe('Int64');
+    expect(outputDtypeOf(result, 'no such column')).toBeNull();
+  });
+
+  it('is nothing at the end of a row that was not counted, or of a step that was not accepted', () => {
+    const found = documents.find((held) => held.name === 'LazyFrame.group_by as it is added');
+    if (found === undefined) throw new Error('no such document');
+    const [step] = found.document.steps;
+    const [result] = prepareRun(found.document.steps, found.run).steps;
+    if (step === undefined || result === undefined) throw new Error('no step');
+    expect(rowEndOf(step.call, result)).toBeNull();
+    expect(outputDtypeOf(result, 'int64')).toBeNull();
   });
 });

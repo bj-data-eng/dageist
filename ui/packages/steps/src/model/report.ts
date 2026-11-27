@@ -374,7 +374,9 @@ export type RowEnd =
   /** A join: the columns it adds. */
   | { readonly kind: 'join'; readonly added: readonly AddedColumn[] }
   /** A filter: how many rows it kept of those it was given. */
-  | { readonly kind: 'kept'; readonly kept: number; readonly received: number };
+  | { readonly kind: 'kept'; readonly kept: number; readonly received: number }
+  /** A step that groups: how many groups it gave from the rows it was given. */
+  | { readonly kind: 'grouped'; readonly groups: number; readonly received: number };
 
 /** Returns the name of the column an `Add column` step adds. */
 function addedAlias(call: CallView): string | null {
@@ -414,9 +416,21 @@ export function rowEndOf(call: CallView, result: PreparedStep): RowEnd | null {
       return result.rows === null
         ? null
         : { kind: 'kept', kept: result.rows.kept, received: result.rows.received };
+    case 'LazyFrame.group_by':
+      return result.rows === null
+        ? null
+        : { kind: 'grouped', groups: result.rows.kept, received: result.rows.received };
     default:
       return null;
   }
+}
+
+/**
+ * Returns the dtype of the column `name` that the accepted step `result` gives, as the engine
+ * reports it, or `null` where the step was not accepted or gives no such column.
+ */
+export function outputDtypeOf(result: PreparedStep, name: string): string | null {
+  return result.status === 'valid' ? (findColumn(result.after, name)?.dtype ?? null) : null;
 }
 
 /** What the rows of a step show: the rows, or why there are none. */

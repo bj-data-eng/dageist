@@ -79,11 +79,11 @@ import type { Frame } from './model/frame';
 import { findTable, tablesOf } from './model/inputs';
 import { chosenOptions } from './model/offers';
 import type { PreparedStep } from './model/report';
-import { rowEndOf, sayingOf } from './model/report';
+import { outputDtypeOf, rowEndOf, sayingOf } from './model/report';
 import { NO_POSITIONS, within } from './model/place';
 import { fieldArgument, listArgument } from './model/requests';
 import { actionsOf } from './model/words';
-import { PreparedStepProvider } from './engine';
+import { PreparedStepProvider, usePreparedStep } from './engine';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
@@ -200,6 +200,8 @@ interface NamedWords {
   readonly named: string;
   /** What the chain holds, said of `name`, which is empty where it is not typed yet. */
   readonly holds: (name: string) => string;
+  /** Whether the dtype the step gives the chain's column stands at the end of its line. */
+  readonly dtype: boolean;
 }
 
 /**
@@ -234,6 +236,11 @@ function NamedChain({
   const holds = positionOfParameter(catalogue.entries.get(call.entry) ?? null, parameter);
   const namedPath = under(callPath, parameterSegment(parameter));
   const valuePath = under(namedPath, valueSegment(at));
+  // What the step gives the column, as the engine reports it: of an aggregate that does not
+  // aggregate it is a list of each group's values, which the hint of the call says.
+  const prepared = usePreparedStep();
+  const entry = catalogue.entries.get(call.entry);
+  const dtype = prepared === null || name === '' ? null : outputDtypeOf(prepared, name);
   return (
     <>
       <TypedBlock
@@ -262,6 +269,11 @@ function NamedChain({
           void edits.setArgument(valuePath, request);
         }}
       />
+      {words.dtype && dtype !== null && (
+        <Hint lines={entry?.hint === undefined ? [] : [entry.hint]} code={false}>
+          <span className="dg-dtype">{dtype}</span>
+        </Hint>
+      )}
     </>
   );
 }
@@ -270,6 +282,7 @@ function NamedChain({
 const NEW_COLUMN: NamedWords = {
   named: 'new column',
   holds: (name) => `What ${name === '' ? 'the column' : name} holds`,
+  dtype: false,
 };
 
 function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
@@ -405,6 +418,7 @@ function PivotHead({ call, frame }: HeadProps): React.JSX.Element {
 const NAMED_KEY: NamedWords = {
   named: 'key',
   holds: (name) => `What the key ${name === '' ? '' : `${name} `}holds`,
+  dtype: false,
 };
 
 /** The parameters of an `agg` that hold its aggregates, and those that are named. */
@@ -415,6 +429,7 @@ const NAMED_AGGS = 'named_aggs';
 const NAMED_AGGREGATE: NamedWords = {
   named: 'column',
   holds: (name) => `What ${name === '' ? 'the column' : name} aggregates`,
+  dtype: true,
 };
 
 /** Draws the named chains of the parameter `parameter` of the call at `callPath`, or what adds the first. */
@@ -453,13 +468,17 @@ function NamedChains({
         </span>
       ))}
       {entries.length === 0 && found !== undefined && (
-        // None is in the document: the list of them is drawn with what adds one.
-        <ParameterDrawing
-          parameter={found}
-          argument={named}
-          path={under(callPath, parameterSegment(parameter))}
-          around={{ frame, items: () => [] }}
-        />
+        // None is in the document: the list of them is drawn with what adds one, after its name,
+        // so that it is told from the one that adds a key.
+        <>
+          <Word>{found.shown}</Word>
+          <ParameterDrawing
+            parameter={found}
+            argument={named}
+            path={under(callPath, parameterSegment(parameter))}
+            around={{ frame, items: () => [] }}
+          />
+        </>
       )}
     </>
   );
@@ -496,7 +515,7 @@ function HavingLine({ call, at, frame }: HeadProps & { readonly at: number }): R
           look="verb"
           names
           describedAs="The predicates that keep groups. Take the having away"
-          placeholder="Nothing to change here"
+          placeholder="The having"
           offers={() => []}
         />
       </Piece>
@@ -772,6 +791,15 @@ function Outcome({ call, result }: OutcomeProps): React.JSX.Element | null {
         <span className="text-xs text-muted">
           keeps{' '}
           <span className="dg-dtype">{`${String(end.kept)} of ${String(end.received)} rows`}</span>
+        </span>
+      );
+    case 'grouped':
+      return (
+        <span className="text-xs text-muted">
+          gives{' '}
+          <span className="dg-dtype">
+            {`${String(end.groups)} ${end.groups === 1 ? 'group' : 'groups'} of ${String(end.received)} rows`}
+          </span>
         </span>
       );
     default:
