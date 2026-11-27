@@ -1082,6 +1082,7 @@ dependencies = [
  "dageist",
  "dageist-engine",
  "dageist-graph",
+ "dageist-text",
  "polars",
  "rfd",
  "serde",
@@ -1089,6 +1090,15 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+]
+
+[[package]]
+name = "dageist-text"
+version = "0.1.0"
+dependencies = [
+ "dageist-engine",
+ "dageist-syntax",
+ "polars",
 ]
 
 [[package]]

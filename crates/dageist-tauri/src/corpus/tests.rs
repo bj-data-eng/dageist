@@ -601,6 +601,45 @@ fn what_the_walk_allows_where_the_corpus_puts_a_call_is_what_the_tables_allow_th
 }
 
 #[test]
+fn every_document_writes_as_text_that_reads_back_as_the_same_document() {
+    let held = documents();
+    let mut failures = Vec::new();
+    for reported in &held {
+        let text = match dageist_text::write(&reported.model) {
+            Ok(text) => text,
+            Err(error) => {
+                failures.push(format!("{} is not written: {error}", reported.name));
+                continue;
+            }
+        };
+        match dageist_text::read(&text) {
+            Ok(read) if read == reported.model => {}
+            Ok(read) => failures.push(format!(
+                "{} reads back as another document:\n{text}\n{}\n{}",
+                reported.name,
+                read.write(),
+                reported.model.write()
+            )),
+            Err(error) => {
+                failures.push(format!("{} does not read: {error}\n{text}", reported.name))
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} of {} documents:\n{}",
+        failures.len(),
+        held.len(),
+        failures
+            .iter()
+            .take(5)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    );
+}
+
+#[test]
 fn the_snapshot_is_what_the_host_reports() {
     // What the node is connected to, which the starts that are inputs name.
     let inputs = serde_json::to_value(
