@@ -3637,18 +3637,60 @@ fn is_met_by_its_dtype(entry: &Entry, name: &str, operand: &Operand) -> bool {
 }
 
 /// Why a method that cuts the values it follows may not cut them by what it is given, where it is a
-/// number typed in below nothing: how many values the first, the last and `limit` keep, and the length
-/// of a slice.
+/// number typed in that Polars cannot cut by: below nothing for how many values the first, the last
+/// and `limit` keep and for the length of a slice, and for every place and count one with a
+/// fraction, which Polars refuses as no whole number, whatever its value is. The number is read as
+/// the step engine makes it, so a float or a text given the dtype of whole numbers is the whole
+/// number it casts to.
 fn cut_below_nothing(link: &Call) -> Option<String> {
-    let parameter = match link.entry().id().as_str() {
-        "Expr.head" | "Expr.limit" | "Expr.tail" => "n",
-        "Expr.slice" => "length",
+    let parameters: &[&str] = match link.entry().id().as_str() {
+        "Expr.head" | "Expr.limit" | "Expr.tail" => &["n"],
+        "Expr.slice" => &["offset", "length"],
         _ => return None,
     };
-    let number = whole_number(link, parameter).filter(|number| *number < 0)?;
-    Some(format!(
-        "values cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from them"
-    ))
+    parameters.iter().find_map(|parameter| {
+        match cut_number(link, parameter)? {
+            CutNumber::Whole(number) if number < 0 && *parameter != "offset" => Some(format!(
+                "values cannot be cut by {parameter} {number}: Polars cannot extract a length below nothing from them"
+            )),
+            CutNumber::Fraction => Some(format!(
+                "values cannot be cut by {parameter} given as a number with a fraction: Polars needs it to be integral"
+            )),
+            CutNumber::Whole(_) => None,
+        }
+    })
+}
+
+/// A number typed in that a cut reads.
+enum CutNumber {
+    /// A whole number, as written or as a dtype of whole numbers makes it.
+    Whole(i128),
+    /// A number with a fraction typed without a dtype, which Polars does not read as a whole number.
+    Fraction,
+}
+
+/// The number the call is given for `parameter` where it is a literal alone, and what it is.
+fn cut_number(link: &Call, parameter: &str) -> Option<CutNumber> {
+    let literal = match link.argument(parameter)? {
+        Value::Integer(number) => return Some(CutNumber::Whole(i128::from(*number))),
+        Value::Expression(expression) if expression.links().is_empty() => {
+            match expression.start() {
+                Start::Call(start) if start.entry().id().as_str() == "polars.lit" => start,
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    let value = literal.argument("value")?;
+    match (literal.argument("dtype"), value) {
+        (None, Value::Integer(number)) => Some(CutNumber::Whole(i128::from(*number))),
+        (None, Value::Float(_)) => Some(CutNumber::Fraction),
+        (Some(Value::Dtype(dtype)), value) => {
+            let scalar = catalog::typed_literal(&value.placeholder(), dtype.as_polars()).ok()?;
+            whole_value(scalar.value()).map(CutNumber::Whole)
+        }
+        _ => None,
+    }
 }
 
 /// A whole number the call is given for `parameter`, typed in, where it is one.
