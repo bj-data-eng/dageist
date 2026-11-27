@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 31] = [
+const PREDICATES: [&str; 34] = [
     "the values",
     "all null",
     "first",
@@ -689,6 +689,9 @@ const PREDICATES: [&str; 31] = [
     "a null of lists, reverse",
     "a null of dates, head 1",
     "a null of dates, drop_nulls",
+    "a null of lists, approx_quantile",
+    "a null of dates, quantile",
+    "a null of dates, std",
 ];
 
 fn typed_null_then(dtype: &str, entry: &str) -> Value {
@@ -803,6 +806,27 @@ fn predicate_of(column: &Col, form: &str) -> Value {
             vec![call("Expr.head", json!({ "n": whole(1) }))],
         ),
         "a null of dates, drop_nulls" => typed_null_then("Date", "Expr.drop_nulls"),
+        "a null of lists, approx_quantile" => crate::support::chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "flag": null }, "dtype": { "dtype": "List(Int64)" } }),
+            ),
+            vec![call(
+                "Expr.approx_quantile",
+                json!({ "quantile": lit(json!({ "float": 0.5 })) }),
+            )],
+        ),
+        "a null of dates, quantile" => crate::support::chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "flag": null }, "dtype": { "dtype": "Date" } }),
+            ),
+            vec![call(
+                "Expr.quantile",
+                json!({ "quantile": lit(json!({ "float": 0.5 })) }),
+            )],
+        ),
+        "a null of dates, std" => typed_null_then("Date", "Expr.std"),
         "a null of text" => typed_null("String"),
         "a null of dates" => typed_null("Date"),
         "a null of lists" => typed_null("List(Int64)"),
