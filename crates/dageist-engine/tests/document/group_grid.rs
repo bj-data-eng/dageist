@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 23] = [
+const PREDICATES: [&str; 31] = [
     "the values",
     "all null",
     "first",
@@ -681,7 +681,25 @@ const PREDICATES: [&str; 23] = [
     "a null of text",
     "a null of dates",
     "a null of lists",
+    "a null of dates, first",
+    "a null of lists, last",
+    "a null of text, max",
+    "a null of datetimes, mean",
+    "a null of dates, sort",
+    "a null of lists, reverse",
+    "a null of dates, head 1",
+    "a null of dates, drop_nulls",
 ];
+
+fn typed_null_then(dtype: &str, entry: &str) -> Value {
+    crate::support::chain(
+        call(
+            "polars.lit",
+            json!({ "value": { "flag": null }, "dtype": { "dtype": dtype } }),
+        ),
+        vec![call(entry, json!({}))],
+    )
+}
 
 fn typed_null(dtype: &str) -> Value {
     crate::support::chain(
@@ -766,6 +784,25 @@ fn predicate_of(column: &Col, form: &str) -> Value {
                 json!({ "statement": typed_null("Date") }),
             )],
         ),
+        // A null stays null through what keeps one value of it or all of them in order, which a
+        // having casts whatever its dtype, and through what takes some of the values it does not:
+        // that gives a list.
+        "a null of dates, first" => typed_null_then("Date", "Expr.first"),
+        "a null of lists, last" => typed_null_then("List(Int64)", "Expr.last"),
+        "a null of text, max" => typed_null_then("String", "Expr.max"),
+        "a null of datetimes, mean" => {
+            typed_null_then("Datetime(time_unit='us', time_zone=None)", "Expr.mean")
+        }
+        "a null of dates, sort" => typed_null_then("Date", "Expr.sort"),
+        "a null of lists, reverse" => typed_null_then("List(Int64)", "Expr.reverse"),
+        "a null of dates, head 1" => crate::support::chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "flag": null }, "dtype": { "dtype": "Date" } }),
+            ),
+            vec![call("Expr.head", json!({ "n": whole(1) }))],
+        ),
+        "a null of dates, drop_nulls" => typed_null_then("Date", "Expr.drop_nulls"),
         "a null of text" => typed_null("String"),
         "a null of dates" => typed_null("Date"),
         "a null of lists" => typed_null("List(Int64)"),
