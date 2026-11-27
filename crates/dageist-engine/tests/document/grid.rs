@@ -1097,6 +1097,22 @@ impl Chosen {
     }
 }
 
+impl Chosen {
+    /// Whether the value is a number, or a text of one, that is at least `limit`.
+    #[must_use]
+    pub fn is_at_least(&self, limit: f64) -> bool {
+        match self.value.as_ref() {
+            Some(literals::Written::Integer(number)) => (*number as f64) >= limit,
+            Some(literals::Written::Float(number)) => *number >= limit,
+            Some(literals::Written::Text(text)) => text
+                .trim()
+                .parse::<f64>()
+                .is_ok_and(|number| number >= limit),
+            _ => false,
+        }
+    }
+}
+
 /// A point that holds the literal a grid varies.
 pub trait HoldsLiteral {
     fn literal_mut(&mut self) -> &mut Chosen;
