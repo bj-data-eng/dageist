@@ -16,7 +16,7 @@ use super::counts;
 use super::generate::{Focus, generate};
 use super::limits::{
     Limit, a_key_drops_values, as_a_select, excuses, excuses_a_refused_prefix,
-    holds_a_condition_in_an_operand, is_the_same_objection, keys_as_a_select, strict,
+    is_the_same_objection, keys_as_a_select, strict,
 };
 use super::observe::{
     Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
@@ -511,41 +511,6 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     None
 }
 
-/// Whether every prefix of a step that groups where the tables and Polars differ in dtype is one the
-/// tables give as a list of what Polars gives, and a condition stands in an operand: the walk gave
-/// the list of the values of the group for one value. `false` where nothing differs.
-fn is_a_list_for_one_value(case: &Case, prediction: &Prediction, observed: &Observed) -> bool {
-    use dageist_engine::allowed::{Inner, Representative};
-    if !holds_a_condition_in_an_operand(case) {
-        return false;
-    }
-    let mut differs = false;
-    for expected in &prediction.expressions {
-        let Some(seen) = observed
-            .expressions
-            .iter()
-            .find(|seen| seen.place == expected.place)
-        else {
-            continue;
-        };
-        let pairs = std::iter::once((expected.start, &seen.start))
-            .chain(expected.links.iter().copied().zip(&seen.links));
-        for (predicted, found) in pairs {
-            let (Some(predicted), Seen::Dtype(_, _, Some(class))) = (predicted, found) else {
-                continue;
-            };
-            if predicted == *class {
-                continue;
-            }
-            if Inner::of_class(*class).map(Representative::List) != Some(predicted) {
-                return false;
-            }
-            differs = true;
-        }
-    }
-    differs
-}
-
 /// How Polars words its refusal of a join whose keys have dtypes that do not match.
 const KEYS_DO_NOT_MATCH: &str = "datatypes of join keys don't match";
 
@@ -764,13 +729,6 @@ impl CaseTarget for AllowedTarget {
                 )
             {
                 return outcome;
-            }
-            if is_a_list_for_one_value(case, &prediction, &observed) && !strict() {
-                tally("not covered (dtype): a-list-for-one-value-in-a-condition");
-                return CaseOutcome::expected_rejection(
-                    Vec::new(),
-                    Limit::AListForOneValueInACondition.statement(),
-                );
             }
             let text = match &prediction.verdict {
                 Verdict::Allows => "allows".to_owned(),
@@ -1051,34 +1009,6 @@ mod tests {
 
     use super::super::observe::refused_in_memory;
     use super::{is_a_refusal_of_the_lengths_of_a_replacement, one_line};
-
-    fn kept(name: &str) -> super::Case {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/allowed_fuzz/regressions")
-            .join(name);
-        super::Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
-    }
-
-    #[test]
-    fn a_list_for_one_value_is_the_difference_of_a_group_with_a_condition_in_an_operand_alone() {
-        use super::super::observe::observe;
-        use super::super::predict::predict;
-        // The walk gives a list for one value where a condition stands beside a comparison.
-        let beside =
-            kept("uncovered-a-list-for-one-value-in-a-condition--beside-a-comparison.case");
-        assert!(super::is_a_list_for_one_value(
-            &beside,
-            &predict(&beside),
-            &observe(&beside)
-        ));
-        // A group with no condition in an operand, or where nothing differs, is not it.
-        let other = kept("uncovered-a-group-aggregate--a-comparison-of-a-literal.case");
-        assert!(!super::is_a_list_for_one_value(
-            &other,
-            &predict(&other),
-            &observe(&other)
-        ));
-    }
 
     #[test]
     fn a_detail_cut_short_is_a_line_that_is_trimmed() {

@@ -2455,9 +2455,9 @@ impl Walker<'_> {
                                 zones: Vec::new(),
                                 widths: Vec::new(),
                                 structs: Vec::new(),
-                                single: start_arguments
-                                    .iter()
-                                    .all(|(_, operand)| operand.shape == Shape::One),
+                                single: start_arguments.iter().all(|(_, operand)| {
+                                    !operand.known || operand.shape == Shape::One
+                                }),
                                 values_single: true,
                                 known: start_arguments.iter().all(|(_, operand)| operand.known),
                             }
@@ -3466,14 +3466,16 @@ impl Walker<'_> {
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
             .all(|(_, operand)| operand.known);
+        // What the walk has no dtype for has no shape it can count on either, and is not taken for
+        // many: the condition it stands in is then not told, and not refused.
         let given_values_single = arguments
             .iter()
             .filter(|(name, _)| name == "statement")
-            .all(|(_, operand)| operand.shape == Shape::One);
+            .all(|(_, operand)| !operand.known || operand.shape == Shape::One);
         let given_single = arguments
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
-            .all(|(_, operand)| operand.shape == Shape::One);
+            .all(|(_, operand)| !operand.known || operand.shape == Shape::One);
         // A condition that ends gives the dtype its values have, when they
         // have one.
         let gives = match (&cur, entry.id().as_str()) {

@@ -2308,9 +2308,8 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
   the typing of a null literal that #228 tracks.
 - A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
 - A method of the tables' measure of many values, applied to one value inside a condition that stands in the
-  predicate of another or beside a comparison, in an aggregate or a `having`, is one value where the walk gives
-  a list: `a-list-for-one-value-in-a-condition`, which the dtype of each prefix shows, and which #244 tracks the
-  fix of.
+  predicate of another or beside a comparison, was one value that the walk gave a list (#244): what the walk has
+  no dtype for is no longer taken for many in a condition, which settles the cases a campaign found.
 - A key that holds two refusals of the rows, which Polars names in either order and with the values of either row
   it meets first, is said to give the smallest in words that the engine and the asker name when each is run
   again, and a case that a limit excuses of a refusal it names when observed again is excused (#234).
@@ -2320,8 +2319,8 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
   is. The walk itself follows the nulls it can see: a null literal, a moment made with a null part, the difference of
   one value and a condition whose values are nulls, through the calls that keep a null.
 
-Focused campaigns of 8000 cases end with no disagreement at the seeds 7, 11, 13, 99991, 271828, 1140027, 2718281,
-3141592 and 5772156.
+Focused campaigns of 8000 cases end with no disagreement at the seeds 7, 11, 13, 99991, 271828, 555555, 1140027,
+2718281, 3141592 and 5772156.
 
 A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
 the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the

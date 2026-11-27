@@ -401,13 +401,6 @@ pub enum Limit {
     /// tracks the values a table does not hold). Polars refusing the schema for a quantile that
     /// should be between 0 and 1, in a step that has a quantile.
     AShareOutsideZeroToOne,
-    /// A method of the tables' measure of many values, as the split of text and the days in a
-    /// month are, applied to one value inside a condition that stands in the predicate of another
-    /// condition or beside a comparison, in an aggregate or a `having`, is one value, which Polars
-    /// gives as it is, where the walk gives the list of the values of the group (the issue 244
-    /// tracks the fix). The tables say a list of a dtype and Polars says that dtype, for each
-    /// prefix that differs, in a step that groups, and a condition stands in an operand.
-    AListForOneValueInACondition,
     /// A `having` casts the value it is given to a `Boolean` as it can, and a null is cast whatever
     /// its dtype, as every value of it is null. The walk follows a null that a null literal, a
     /// moment made with a null part or one value's difference makes through the calls that keep it,
@@ -537,7 +530,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 44] = [
+    pub const ALL: [Self; 43] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -567,7 +560,6 @@ impl Limit {
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
         Self::AShareOutsideZeroToOne,
-        Self::AListForOneValueInACondition,
         Self::AHavingPredicateOfNulls,
         Self::ALiteralTextBesideManyReplacementValues,
         Self::AReplacementOfAnAggregateInAWindowKey,
@@ -620,7 +612,6 @@ impl Limit {
                 "a-replacement-of-more-than-the-first-match"
             }
             Self::AShareOutsideZeroToOne => "a-share-outside-zero-to-one",
-            Self::AListForOneValueInACondition => "a-list-for-one-value-in-a-condition",
             Self::AHavingPredicateOfNulls => "a-having-predicate-of-nulls",
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a-literal-text-beside-many-replacement-values"
@@ -763,9 +754,6 @@ impl Limit {
             }
             Self::AHavingPredicateOfNulls => {
                 "a having casts a predicate that is null in every group whatever its dtype, and the walk follows only the nulls that a null literal, a moment's null part or the difference of one value make"
-            }
-            Self::AListForOneValueInACondition => {
-                "a method that the tables measured as many values, applied to one value inside a condition that stands in an operand, is one value in a group by, where the walk gives the list of the values of the group (tracked by #244)"
             }
             Self::AShareOutsideZeroToOne => {
                 "Polars refuses a share outside 0 to 1 as it builds the step, which no table holds, as the tables measure a share inside it (tracked by #224)"
@@ -5253,26 +5241,6 @@ fn is_null_in_every_group(case: &Case, place: &Place) -> bool {
                 })
                 .unwrap_or(false)
     })
-}
-
-/// Whether a step that groups holds a condition inside an operand of a call of an expression it is
-/// given: in the predicate of another condition, or beside a comparison.
-pub fn holds_a_condition_in_an_operand(case: &Case) -> bool {
-    let step = &case.document.steps()[0];
-    !step.links().is_empty()
-        && expressions_of(step).iter().any(|expression| {
-            std::iter::once(expression.start())
-                .filter_map(|start| match start {
-                    Start::Call(call) => Some(call),
-                    Start::Input(_) | Start::Hole => None,
-                })
-                .chain(expression.links())
-                .any(|call| {
-                    operands(call)
-                        .into_iter()
-                        .any(|(_, operand)| any_call(operand, &|call| is(call, "polars.when")))
-                })
-        })
 }
 
 /// Whether two refusals of Polars are one objection: the same stage and the same reason, as the
