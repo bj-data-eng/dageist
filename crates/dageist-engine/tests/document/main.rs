@@ -14,6 +14,7 @@ mod floats;
 mod frames;
 mod grid;
 mod group_grid;
+mod group_kernels_grid;
 mod groupings;
 mod holes;
 mod inputs;
