@@ -181,7 +181,7 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
 fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_context() {
     let entries: Vec<_> = catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .collect();
     let tables = Tables::committed();
     // A method that takes an option in place of a parameter has a cell for each word of it, in

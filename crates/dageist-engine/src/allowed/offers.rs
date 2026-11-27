@@ -1254,6 +1254,11 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 "a step stands in the list of steps, not in an expression",
             ));
         }
+        (Applies::Grouped, _) => {
+            return Err(Refusal::structure(
+                "a call of a group by follows the call that groups, not an expression",
+            ));
+        }
         (Applies::Expression, After::Value { .. }) => {}
         (Applies::Expression, After::Start) => {
             return Err(Refusal::structure(
@@ -2224,7 +2229,7 @@ pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
 pub fn offers(place: &Place) -> Vec<Offer> {
     catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .map(|entry| Offer {
             entry,
             verdict: offer(entry, place, &Chosen::default()),

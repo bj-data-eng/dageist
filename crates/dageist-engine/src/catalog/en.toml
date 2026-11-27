@@ -50,6 +50,9 @@ title = "str · find, count, extract"
 [families.window]
 title = "Window"
 
+[families.grouped]
+title = "Grouped · filter the groups, finish the grouping"
+
 [families.compare]
 title = "Comparison · true or false"
 
@@ -1219,6 +1222,23 @@ label = "every"
 name = "offset"
 label = "start at"
 
+[entries."LazyFrame.group_by"]
+name = "group_by"
+hint = "the rows gathered into groups by some keys, and a value for each group"
+head = "Group table"
+
+[entries."LazyFrame.group_by".parameters.by]
+name = "by"
+label = "group by"
+
+[entries."LazyFrame.group_by".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order of the groups"
+
+[entries."LazyFrame.group_by".parameters.named_by]
+name = "named_by"
+label = "named keys"
+
 [entries."LazyFrame.head"]
 name = "head"
 hint = "the first rows"
@@ -1476,6 +1496,114 @@ label = "name of the count"
 [entries."LazyFrame.with_row_index".parameters.offset]
 name = "offset"
 label = "start counting at"
+
+[entries."LazyGroupBy.agg"]
+name = "agg"
+hint = "a value, or a list of values, for each group, from chains"
+
+[entries."LazyGroupBy.agg".parameters.aggs]
+name = "aggs"
+label = "values for each group"
+
+[entries."LazyGroupBy.agg".parameters.named_aggs]
+name = "named_aggs"
+label = "named values for each group"
+
+[entries."LazyGroupBy.all"]
+name = "all"
+hint = "the values of each group in a list, for every column that is not a key"
+
+[entries."LazyGroupBy.first"]
+name = "first"
+hint = "the first value of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.first".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."LazyGroupBy.having"]
+name = "having"
+hint = "only the groups for which every condition holds"
+
+[entries."LazyGroupBy.having".parameters.predicates]
+name = "predicates"
+label = "conditions on the group"
+
+[entries."LazyGroupBy.head"]
+name = "head"
+hint = "the first rows of each group"
+
+[entries."LazyGroupBy.head".parameters.n]
+name = "n"
+label = "rows of each group"
+
+[entries."LazyGroupBy.last"]
+name = "last"
+hint = "the last value of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.last".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."LazyGroupBy.len"]
+name = "len"
+hint = "the number of rows of each group"
+
+[entries."LazyGroupBy.len".parameters.name]
+name = "name"
+label = "name of the count"
+
+[entries."LazyGroupBy.max"]
+name = "max"
+hint = "the largest value of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.mean"]
+name = "mean"
+hint = "the mean of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.median"]
+name = "median"
+hint = "the median of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.min"]
+name = "min"
+hint = "the smallest value of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.n_unique"]
+name = "n_unique"
+hint = "how many different values each group has, for every column that is not a key"
+
+[entries."LazyGroupBy.quantile"]
+name = "quantile"
+hint = "the value a share of each group falls below, for every column that is not a key"
+
+[entries."LazyGroupBy.quantile".parameters.quantile]
+name = "quantile"
+label = "share from 0 to 1"
+
+[entries."LazyGroupBy.quantile".parameters.interpolation]
+name = "interpolation"
+label = "between two values"
+
+[entries."LazyGroupBy.quantile".parameters.interpolation.choices]
+nearest = "nearest"
+higher = "higher"
+lower = "lower"
+midpoint = "midpoint"
+linear = "linear"
+equiprobable = "equiprobable"
+
+[entries."LazyGroupBy.sum"]
+name = "sum"
+hint = "the sum of each group, for every column that is not a key"
+
+[entries."LazyGroupBy.tail"]
+name = "tail"
+hint = "the last rows of each group"
+
+[entries."LazyGroupBy.tail".parameters.n]
+name = "n"
+label = "rows of each group"
 
 [entries."Then.otherwise"]
 name = "otherwise"
@@ -2119,6 +2247,7 @@ label = "result dtype"
 no_fields = "no fields"
 fields = "{count} fields"
 sorted_by = "by {fields}"
+grouped_by = "by {fields}"
 joined_on = "{table} on {fields}"
 pivoted_on = "on {field}"
 renamed = "{from} → {to}"

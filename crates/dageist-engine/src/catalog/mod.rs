@@ -44,6 +44,7 @@ pub use starting::{Setting, StepFrame, StepStart, start_step};
 pub use timezone::{TimeZoneError, check_time_zone};
 pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 
+use polars::lazy::frame::LazyGroupBy;
 use polars::prelude::{Expr, LazyFrame};
 
 /// The identifier of an entry: the Python owner and name, such as
@@ -66,8 +67,14 @@ pub enum Applies {
     /// A method of an expression, such as `shift`, including the methods of
     /// its namespaces, such as `dt.offset_by`.
     Expression,
-    /// A method of a lazy frame that gives a lazy frame: a step of the list.
+    /// A method of a lazy frame: a step of the list. It gives a lazy frame, or, as `group_by`
+    /// does, starts a chain of calls on a lazy group by that a [`Grouped`](Self::Grouped) call
+    /// finishes.
     Frame,
+    /// A method of a lazy group by, which `group_by` gives: `having`, which filters its groups, and
+    /// the calls that finish the chain, `agg`, its shortcuts, `head` and `tail`. A step holds it as
+    /// a link after the call that starts the chain.
+    Grouped,
     /// A function that makes an expression from its arguments, such as `col`.
     Function,
     /// A link of a `when-then-otherwise` expression: `when`, `then` or
@@ -77,10 +84,19 @@ pub enum Applies {
 }
 
 impl Applies {
+    /// Whether the entry is a call of a step of the list, as against what stands in an
+    /// expression: a method of a lazy frame, which starts a step, or of a lazy group by, which a
+    /// step that groups continues and finishes with.
+    #[must_use]
+    pub const fn is_of_a_step(self) -> bool {
+        matches!(self, Self::Frame | Self::Grouped)
+    }
+
     /// Every kind of thing an entry applies to.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Expression,
         Self::Frame,
+        Self::Grouped,
         Self::Function,
         Self::Condition,
     ];
@@ -129,6 +145,9 @@ pub enum Family {
     Search,
     /// Working within groups: `over`.
     Window,
+    /// What follows `group_by`: filtering the groups with `having`, and finishing with `agg`, its
+    /// shortcuts, `head` and `tail`.
+    Grouped,
     /// Comparisons and tests that give a Boolean: `eq`, `gt`, `eq_missing`, `is_between`,
     /// `is_close`, `is_null`, `str.starts_with`, `str.contains`, and the like.
     Compare,
@@ -150,7 +169,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::Steps,
         Self::Rows,
         Self::Order,
@@ -166,6 +185,7 @@ impl Family {
         Self::Pieces,
         Self::Search,
         Self::Window,
+        Self::Grouped,
         Self::Compare,
         Self::Checks,
         Self::Logic,
@@ -194,6 +214,7 @@ impl Family {
             Self::Pieces => "pieces",
             Self::Search => "search",
             Self::Window => "window",
+            Self::Grouped => "grouped",
             Self::Compare => "compare",
             Self::Checks => "checks",
             Self::Logic => "logic",
@@ -885,6 +906,13 @@ pub enum Build {
     Expression(fn(Expr, &Arguments) -> Result<Expr, BuildError>),
     /// Applies a step to the frame it follows.
     Frame(fn(LazyFrame, &Arguments) -> Result<LazyFrame, BuildError>),
+    /// Starts a chain of calls on a group by from the frame it follows: `group_by`. The chain is
+    /// finished by one call of [`Build::GroupedEnd`], which gives a lazy frame.
+    Grouping(fn(LazyFrame, &Arguments) -> Result<LazyGroupBy, BuildError>),
+    /// Continues the group by it follows: `having`.
+    GroupedStep(fn(LazyGroupBy, &Arguments) -> Result<LazyGroupBy, BuildError>),
+    /// Finishes the group by it follows, in a lazy frame: `agg`, its shortcuts, `head` and `tail`.
+    GroupedEnd(fn(LazyGroupBy, &Arguments) -> Result<LazyFrame, BuildError>),
     /// Makes an expression from its arguments alone.
     Function(fn(&Arguments) -> Result<Expr, BuildError>),
     /// Starts a condition from its arguments alone: `when`.
@@ -902,6 +930,9 @@ impl std::fmt::Debug for Build {
         formatter.write_str(match self {
             Self::Expression(_) => "Build::Expression",
             Self::Frame(_) => "Build::Frame",
+            Self::Grouping(_) => "Build::Grouping",
+            Self::GroupedStep(_) => "Build::GroupedStep",
+            Self::GroupedEnd(_) => "Build::GroupedEnd",
             Self::Function(_) => "Build::Function",
             Self::Condition(_) => "Build::Condition",
             Self::ConditionStep(_) => "Build::ConditionStep",
@@ -933,7 +964,8 @@ impl Entry {
     pub const fn applies(&self) -> Applies {
         match self.build {
             Build::Expression(_) => Applies::Expression,
-            Build::Frame(_) => Applies::Frame,
+            Build::Frame(_) | Build::Grouping(_) => Applies::Frame,
+            Build::GroupedStep(_) | Build::GroupedEnd(_) => Applies::Grouped,
             Build::Function(_) => Applies::Function,
             Build::Condition(_) | Build::ConditionStep(_) | Build::ConditionEnd(_) => {
                 Applies::Condition

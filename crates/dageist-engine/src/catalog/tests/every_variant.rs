@@ -29,7 +29,8 @@ fn chain<T: Copy>(first: T, next: impl Fn(T) -> Option<T>) -> Vec<T> {
 const fn next_applies(applies: Applies) -> Option<Applies> {
     match applies {
         Applies::Expression => Some(Applies::Frame),
-        Applies::Frame => Some(Applies::Function),
+        Applies::Frame => Some(Applies::Grouped),
+        Applies::Grouped => Some(Applies::Function),
         Applies::Function => Some(Applies::Condition),
         Applies::Condition => None,
     }

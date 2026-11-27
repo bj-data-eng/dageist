@@ -23,8 +23,8 @@ use crate::catalog::{
 };
 
 use super::build::{
-    column, condition_with, element, entry, expression, expressions, flag, function, integer,
-    method, null_of, one_of, patterns, required_choices, required_values, step,
+    column, condition_with, element, entry, expression, expressions, flag, function, grouped,
+    integer, method, null_of, one_of, patterns, required_choices, required_values, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -387,7 +387,7 @@ fn has_dtype_lines(entry: &'static Entry) -> bool {
     match entry.applies() {
         Applies::Expression => true,
         Applies::Function => !expression_parameters(entry).is_empty(),
-        Applies::Frame | Applies::Condition => false,
+        Applies::Frame | Applies::Grouped | Applies::Condition => false,
     }
 }
 
@@ -1197,7 +1197,7 @@ fn context_lines(
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
     {
         let forms = if entry.applies() == Applies::Expression {
             forms(entry)
@@ -1402,7 +1402,7 @@ fn context_line(
             }),
         ),
         Applies::Condition => (None, Box::new(move |_| condition_with(id))),
-        Applies::Frame => unreachable!("steps do not stand in a context"),
+        Applies::Frame | Applies::Grouped => unreachable!("steps do not stand in a context"),
     };
     let receiver = candidate.as_ref().map(|candidate| candidate.receiver);
     let argument = candidate
@@ -1688,6 +1688,18 @@ fn option_step(
     empty: bool,
     options: Vec<(&'static str, Argument)>,
 ) -> Result<LazyFrame, BuildError> {
+    // A group by is given the key it needs and finished by an aggregation of nothing, which gives
+    // the keys.
+    if id == "LazyFrame.group_by" {
+        let mut given = vec![("by", expressions(vec![column("a")]))];
+        given.extend(options);
+        return grouped(
+            frames.left(empty),
+            given,
+            Vec::new(),
+            ("LazyGroupBy.agg", Vec::new()),
+        );
+    }
     let mut given = match id {
         "LazyFrame.join" => vec![
             ("other", Argument::Table(frames.other(empty))),
