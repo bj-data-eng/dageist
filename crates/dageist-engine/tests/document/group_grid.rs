@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 40] = [
+const PREDICATES: [&str; 45] = [
     "the values",
     "all null",
     "first",
@@ -698,6 +698,11 @@ const PREDICATES: [&str; 40] = [
     "a date made with a null day, max",
     "a null of datetimes, nan_min",
     "a null of lists, nan_max",
+    "a null of floats, min",
+    "a null of floats, median",
+    "a null of floats, var",
+    "a null of floats, skew",
+    "a null of floats, kurtosis",
 ];
 
 fn typed_null_then(dtype: &str, entry: &str) -> Value {
@@ -867,6 +872,12 @@ fn predicate_of(column: &Col, form: &str) -> Value {
         }
         "a null of lists, nan_max" => typed_null_then("List(Int64)", "Expr.nan_max"),
         "a null of dates, std" => typed_null_then("Date", "Expr.std"),
+        // What a call that keeps a null gives of one, which a having casts whatever its dtype.
+        "a null of floats, min" => typed_null_then("Float64", "Expr.min"),
+        "a null of floats, median" => typed_null_then("Float64", "Expr.median"),
+        "a null of floats, var" => typed_null_then("Float64", "Expr.var"),
+        "a null of floats, skew" => typed_null_then("Float64", "Expr.skew"),
+        "a null of floats, kurtosis" => typed_null_then("Float64", "Expr.kurtosis"),
         "a null of text" => typed_null("String"),
         "a null of dates" => typed_null("Date"),
         "a null of lists" => typed_null("List(Int64)"),
