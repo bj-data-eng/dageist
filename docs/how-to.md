@@ -949,8 +949,9 @@ To write the grid of a new rule:
    ask `Depth::Rows`. A cell that the walk
    refuses on rows is asked them whatever the depth is.
 4. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of
-   its axes and a reason written for a reader: the walk refuses only, Polars refuses only, and every
-   unbuildable cell and every cell set aside. A line that matches no cell fails as stale, so a limit
+   its axes, the words of what was said (`saying`, or `saying_one_of`) and a reason written for a
+   reader: the walk refuses only, Polars refuses only, the catalogue refuses only, and every
+   unbuildable cell and every cell set aside. A line that several grids hold is `shared`. A line that matches no cell fails as stale, so a limit
    that has gone is found. A disagreement is fixed, with a failing grid test committed first, or it is
    listed with its reason and filed.
 

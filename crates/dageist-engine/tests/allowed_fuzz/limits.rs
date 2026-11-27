@@ -196,14 +196,15 @@ pub enum Limit {
     /// take the values of a column below zero; the sample's rows are 1, a null and 3, which a
     /// sum or a product of them does not.
     ANegativeExponent,
-    /// A literal is given a dtype that its value does not cast to: a whole number past the dtype's
-    /// edges, a float with a fraction or a text that is no number of it given to whole numbers, a
-    /// text given `Boolean`. The step engine builds the literal by casting the value to the dtype
-    /// strictly, as Python's `lit` does, so Polars refuses the step when it is built, before any
-    /// table is asked, and the tables measured literals of a dtype that holds the number 1.
-    /// Polars refusing the schema with a failed conversion or a cast it does not support, in a
-    /// case that holds such a literal: the case run again with each such literal made the number 1
-    /// of its dtype is not refused for a failed conversion.
+    /// A literal is given a dtype that its value does not cast to: a whole number past the
+    /// dtype's edges, a float that overflows it, a text that is no number of it, a text given
+    /// `Boolean`. A float with a fraction given to whole numbers is cut by the cast and is no such
+    /// literal. The step engine builds the literal by casting the value to the dtype strictly, as
+    /// Python's `lit` does, so the step is refused when it is built, before any table is asked,
+    /// and the tables measured literals of a dtype that holds the number 1. The limit excuses
+    /// Polars refusing the schema, in a case that holds such a literal, with a failed conversion
+    /// or a cast it does not support, where the case run again with each such literal made the
+    /// number 1 of its dtype is not refused for either.
     ALiteralThatDoesNotCast,
     /// A value of the dtype Null, a column or a literal, typed as it or not, or what a call
     /// gives that dtype, is an operand of `and`, `or` and `xor` that the tables allow,

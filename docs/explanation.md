@@ -2891,7 +2891,7 @@ value, zero and minus one, the numbers 2^24 and 2^53 and one past them for the f
 whole float or as a text of the number, and now and then as a value that the cast to the dtype refuses,
 which a limit holds; a number typed without a dtype is drawn from 1, 0, 300, -1, 128, 255, 70000, 2^24,
 2^53, their successors and the greatest whole number, or from 1.5, 1e40, 0.0, minus zero, whole floats, 2^24
-and 2^53 as floats; a text is `"1d"` mostly and otherwise empty, a number, a fraction or a word; the
+and 2^53 as floats; a text is `"1d"` in three draws of nine and otherwise empty, a number, a fraction or a word; a literal given `Boolean` is the number 1, 0 or 2, a fraction, a flag, or a text of a number, an empty text or a word, and the 128 bit and half float dtypes are drawn at their edges too, the 128 bit ones as a text above 64 bits; the
 count a cut is given reaches 2^32 and the greatest whole number. Elsewhere it keeps to what the
 tables measured: a `shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
 tables measured the dtype, which the sign does not change), a number of significant figures
@@ -2932,32 +2932,39 @@ debug build, the walk being most of the time. A panic of Polars is the cell's ou
 does not end names itself and ends the run.
 
 Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk
-panicked, unbuildable (the case cannot be made, such as a text of a length no memory holds), or set
-aside (the catalogue cannot build the literal, so the step engine refuses the step before the walk is
-asked: a value that does not cast to the dtype it is given). The walk must take what Polars takes and
-refuse what Polars refuses. A cell where it does not is fixed, with the failing grid committed
-first, or named in the test by the pattern of its axes with a reason; a line that matches no cell
-fails as stale, so a limit that has gone does not stay.
+panicked, unbuildable (the case cannot be made, such as a text of a length no memory holds, or a step
+Polars cannot be asked of), the catalogue refuses only (the catalogue cannot build the step, so the
+step engine refuses it before the walk is asked, and the walk allows it: a value that does not cast to
+the dtype it is given, a count below nothing), or set aside (Polars refuses it for another reason than
+the grid asks about). The walk must take what Polars takes and refuse what Polars refuses. A cell where
+it does not is fixed, with the failing grid committed first, or named in the test by the pattern of its
+axes with a reason; a cell that two lines name is counted by the more specific, and a line that
+matches no cell fails as stale, so a limit that has gone does not stay.
 
 `tests/document/literal_grid.rs` holds the grids of every rule that reads a literal, which is each
-role the catalogue gives a parameter: what a number is added to, divided by, raised to, a logarithm is
-taken to, a bound it is cut to, a share, a count, a length, a value that fills (`fill_null`, `shift`);
-the values `replace` and `replace_strict` list; the counts and places that `head`, `tail`, `slice` and
-`gather_every` cut by, as methods and as steps; and the comparisons with a number in a filter and in a
-condition. The grid of #207's missing comparisons in `nulls.rs` is judged by it too. The grids found
-four differences that are fixed: a number typed without a dtype beside a date, a moment, a length of time
-or a time of day, which `fill_null` and the arithmetic refuse and the walk allowed; a count or a place
-with a fraction, and a length below nothing written as a float or a text given a dtype of whole
-numbers; every 0th row and a slice that runs past row 2^63 - 1; and a part of a moment or of a length of
-time that a float or a text of a number given a dtype of numbers makes, which Polars folds into a literal
-that a join's key may not hold. What they leave is named in the
-tests, each with its reason, and is not settled here: the value of a share outside 0 to 1, a
-length of padding or an exponent below nothing or beyond 32 bits, a bound or a listed value that its dtype
-cannot hold when the rows run, a text of a number where Polars casts it to the dtype it meets, a typed null
-that meets a date, text and a number typed without a dtype where the rows run, and what Polars panics on
-(a whole number raised to a power that overflows, a date shifted and filled with a number typed without
-a dtype) or never ends on (a text padded to a length no memory holds). `is_in` has no grid there: its
-deprecated form is removed with #203, which builds its grid on the helper.
+role the catalogue gives a parameter: what a number is added to, subtracted from, multiplied, divided
+by, raised to, a logarithm is taken to, a bound it is cut to, a share, a count, a length, a value that
+fills (`fill_null`, `fill_nan`, `shift`), the operands of `and_` and `or_`; the values `replace` and
+`replace_strict` list; the counts and places that `head`, `tail`, `slice`, `top_k`, `diff`,
+`pct_change` and `gather_every` cut or look back by, as methods and as steps; and the comparisons with a
+number in a filter and in a condition. The operands are crossed in both orders, the column first and the
+literal first. The grid of #207's missing comparisons in `nulls.rs` is judged by it too. The grids found
+differences that are fixed: a number typed without a dtype beside a date, a moment, a length of time
+or a time of day, which `fill_null` and the arithmetic refuse, on either side, and the walk allowed; a
+count or a place with a fraction, and a length below nothing written as a float or a text given a
+dtype of whole numbers; every 0th row, and a slice that is given a length and runs past row 2^63 - 1,
+where one given none runs to the end of the table, as Python builds it, and the count `head` and
+`limit` take, a whole number of the platform where the catalogue took 32 bits; and a part of a moment
+or of a length of time that a float or a text of a number given a dtype of numbers makes, which Polars
+folds into a literal that a join's key may not hold. What they leave is named in the tests, each with
+its reason, and is not settled here: the value of a share outside 0 to 1, a length of padding or an
+exponent below nothing or beyond 32 bits, a bound or a listed value that its dtype cannot hold when
+the rows run, a text of a number where Polars casts it to the dtype it meets, a typed null that meets a
+date, text and a number typed without a dtype where the rows run, a Boolean and a number typed without
+a dtype in a bitwise call, a literal that does not cast to its dtype, which the walk could foretell by
+casting the value as the catalogue does, and what Polars panics on in a debug build or never ends on
+(a text padded to a length no memory holds). `is_in` has no grid there: its deprecated form is removed
+with #203, which builds its grid on the helper.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a
