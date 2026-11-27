@@ -113,8 +113,7 @@ describe('the corpus, rebuilt through the functions the components call', () => 
   });
 
   it('finds a step no list adds and a parameter of a step that is not offered, as the catalogue says', () => {
-    // The step list holds the seven steps with heads; twelve more are drawn by their parameters, and
-    // a step that groups is not drawn yet.
+    // The step list holds the eight steps with heads; thirteen more are drawn by their parameters.
     const steps = [...found.gaps.values()].flatMap((gap) =>
       gap.cover.kind === 'step' ? [gap.cover.entry] : [],
     );
@@ -125,7 +124,6 @@ describe('the corpus, rebuilt through the functions the components call', () => 
       'LazyFrame.fill_nan',
       'LazyFrame.first',
       'LazyFrame.gather_every',
-      'LazyFrame.group_by',
       'LazyFrame.head',
       'LazyFrame.last',
       'LazyFrame.limit',

@@ -7,10 +7,24 @@
  * package's front door.
  */
 
-import type { ContextView, EntryView, OfferPlaceView, PositionView } from '@dageist/host';
+import type {
+  ContextView,
+  EntryView,
+  OfferPlaceView,
+  ParameterView,
+  PositionView,
+} from '@dageist/host';
 
 import type { Catalogue } from '../src/model/catalogue';
-import { HEAD, START_FUNCTIONS, VERBS, conditionId, verbId, verbOf } from '../src/model/catalogue';
+import {
+  HEAD,
+  START_FUNCTIONS,
+  VERBS,
+  conditionId,
+  groupedHeadOf,
+  verbId,
+  verbOf,
+} from '../src/model/catalogue';
 import type { ParameterControl } from '../src/model/controls';
 import { settingOf } from '../src/model/controls';
 import { FIELD_ID, LITERAL_ID, OTHERWISE, THEN } from '../src/model/doc';
@@ -36,15 +50,28 @@ export function isDrawn(control: ParameterControl): boolean {
   }
 }
 
-/** Returns whether the editor draws the outer position of `context`: the head of some step draws a parameter that stands there. */
+/**
+ * Returns whether the editor draws the outer position of `context`: the head of some step draws a
+ * parameter that stands there, or the head of a step that groups draws one of a call after `group_by`.
+ */
 function outerIsDrawn(catalogue: Catalogue, context: ContextView): boolean {
-  return VERBS.some((verb) =>
-    (catalogue.entries.get(verbId(verb))?.parameters ?? []).some(
-      (parameter) =>
-        Object.values<string>(HEAD[verb]).includes(parameter.name) &&
-        parameter.position?.kind === 'outer' &&
-        parameter.position.name === context.outer,
-    ),
+  const stands = (parameter: ParameterView): boolean =>
+    parameter.position?.kind === 'outer' && parameter.position.name === context.outer;
+  return (
+    VERBS.some((verb) =>
+      (catalogue.entries.get(verbId(verb))?.parameters ?? []).some(
+        (parameter) =>
+          Object.values<string>(HEAD[verb]).includes(parameter.name) && stands(parameter),
+      ),
+    ) ||
+    [...catalogue.entries.values()].some((entry) =>
+      entry.parameters.some(
+        (parameter) =>
+          entry.grouped !== null &&
+          groupedHeadOf(entry.id).includes(parameter.name) &&
+          stands(parameter),
+      ),
+    )
   );
 }
 

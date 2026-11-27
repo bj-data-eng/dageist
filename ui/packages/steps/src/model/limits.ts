@@ -137,18 +137,7 @@ const FIELDS_LOST =
 
 /** Why a step the editor draws by its parameters alone is not added from the list of steps. */
 const NOT_A_STEP_OF_THE_LIST =
-  'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
-
-/** Why a step that groups, and the calls after `group_by`, are not drawn. */
-const GROUPING_NOT_DRAWN =
-  'the engine holds a step that groups as `group_by` and the calls on the group by that follow it, and the editor does not draw it yet (#114)';
-
-/** Declares the place `outer` that holds an expression of a step that groups, alone and inside each of the four nested positions, which no word of the editor stands at. */
-function groupingPlaces(outer: string): Gap[] {
-  return [null, 'over.partition_by', 'over.order_by', 'condition.predicate', 'condition.value'].map(
-    (nested) => ({ cover: { kind: 'place', outer, nested }, reason: GROUPING_NOT_DRAWN }),
-  );
-}
+  'the list of steps holds the eight steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
 
 /** Declares the step `entry`, which no list adds. */
 function stepGap(entry: string): Gap {
@@ -188,13 +177,7 @@ export const GAPS: readonly Gap[] = [
   // The names of a struct's fields, which are offered where the walk reports them.
   parameterGap('Expr.struct.drop', 'names', FIELDS_LOST),
   parameterGap('Expr.struct.field', 'name', FIELDS_LOST),
-  // What a step that groups holds, which the editor does not draw: where its keys, its aggregates
-  // and its having stand, and the step itself.
-  ...groupingPlaces('group_key'),
-  ...groupingPlaces('aggregate'),
-  ...groupingPlaces('having'),
-  { cover: { kind: 'step', entry: 'LazyFrame.group_by' }, reason: GROUPING_NOT_DRAWN },
-  // The steps no list adds: the editor adds the seven it has heads for.
+  // The steps no list adds: the editor adds the eight it has heads for.
   stepGap('LazyFrame.drop'),
   stepGap('LazyFrame.drop_nans'),
   stepGap('LazyFrame.drop_nulls'),

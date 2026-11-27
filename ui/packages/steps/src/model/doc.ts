@@ -163,6 +163,21 @@ export function callAt(from: CallView, path: Path): CallView | null {
   return reached?.kind === 'call' ? reached.call : null;
 }
 
+/** The calls of a step: the call that starts it, and the calls on a group by that follow it. */
+export type StepCalls = Pick<DocumentStepView, 'call' | 'links'>;
+
+/**
+ * Returns the call that the way `path` from the step `step` reaches: where the way begins with a
+ * link, the call of a group by that follows the step's own, and otherwise one inside the step's
+ * own call. `null` where the document has nothing there or what is there is not a call.
+ */
+export function callInStep(step: StepCalls, path: Path): CallView | null {
+  const [first, ...rest] = path;
+  if (first?.kind !== 'link') return callAt(step.call, path);
+  const link = step.links[first.index];
+  return link === undefined ? null : callAt(link, rest);
+}
+
 /** An expression, as the document holds it. */
 export type ExpressionView = Extract<ArgumentView, { readonly kind: 'expression' }>;
 

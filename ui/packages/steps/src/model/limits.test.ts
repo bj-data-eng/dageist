@@ -40,16 +40,6 @@ describe('the declared gaps', () => {
         'shown literal flag',
         'shown resolution several',
         'noContext LazyFrame.filter constraints',
-        ...['group_key', 'aggregate', 'having'].flatMap((outer) =>
-          [
-            'alone',
-            'over.partition_by',
-            'over.order_by',
-            'condition.predicate',
-            'condition.value',
-          ].map((nested) => `place ${outer} ${nested}`),
-        ),
-        'step LazyFrame.group_by',
         'step LazyFrame.drop',
         'step LazyFrame.drop_nans',
         'step LazyFrame.drop_nulls',
@@ -83,21 +73,9 @@ describe('the declared gaps', () => {
       if (gap.cover.kind === 'stepParameter') {
         expect(gap.reason, coverKey(gap.cover)).toContain('#137');
       }
-      if (gap.cover.kind === 'step' && gap.cover.entry !== 'LazyFrame.group_by') {
+      if (gap.cover.kind === 'step') {
         expect(gap.reason, coverKey(gap.cover)).toContain('#137');
       }
-    }
-  });
-
-  it('name the issue that is to draw a step that groups: the step and where its keys, aggregates and having stand', () => {
-    const keys = GAPS.map((gap) => coverKey(gap.cover)).filter(
-      (key) =>
-        key === 'step LazyFrame.group_by' ||
-        ['group_key', 'aggregate', 'having'].some((outer) => key.startsWith(`place ${outer} `)),
-    );
-    expect(keys).toHaveLength(16);
-    for (const gap of GAPS.filter((held) => keys.includes(coverKey(held.cover)))) {
-      expect(gap.reason, coverKey(gap.cover)).toContain('#114');
     }
   });
 
