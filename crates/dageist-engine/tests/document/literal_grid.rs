@@ -79,6 +79,8 @@ struct Given {
     literal: Chosen,
     method: &'static str,
     parameter: &'static str,
+    /// Whether the literal is what the method follows, and the column what it is given.
+    first: bool,
 }
 
 impl HoldsLiteral for Given {
@@ -249,6 +251,54 @@ fn a_moment_or_a_length_of_time_made_of_numbers_typed_in_is_no_join_key_however_
         .saying("rule folded-function-is-no-join-key"),
     );
     parts_of_a_moment_grid(values).assert_agree(&known, 500);
+}
+
+// ---------------------------------------------------------------------------
+// Arithmetic with a number typed without a dtype, on either side
+
+fn arithmetic_grid(values: Vec<Written>) -> Verdicts {
+    let methods: Vec<(String, (&'static str, &'static str))> = [
+        "Expr.add",
+        "Expr.sub",
+        "Expr.mul",
+        "Expr.truediv",
+        "Expr.floordiv",
+        "Expr.mod",
+    ]
+    .into_iter()
+    .map(|method| (method.to_owned(), (method, "other")))
+    .collect();
+    let grid = Grid::<Given>::new()
+        .column_axis(moments())
+        .axis("method", methods, |point, (method, parameter)| {
+            point.method = method;
+            point.parameter = parameter;
+        })
+        .axis("order", orders(), |point, first| point.first = *first)
+        .literal_axes(values, &[None]);
+    grid.judge(&Question::any_refusal().at(Depth::Rows), |point| {
+        if point.first {
+            literal_first(point)
+        } else {
+            method_given_the_literal(point)
+        }
+    })
+}
+
+#[test]
+fn a_number_typed_without_a_dtype_beside_a_date_is_refused_in_arithmetic_on_either_side() {
+    // Polars gives the number no dtype beside a date, a moment, a length of time or a time of day,
+    // and refuses to do arithmetic of them, whichever of the two is given to the other, except
+    // where a length of time is multiplied or divided by a number, which it allows.
+    let numbers = [
+        Written::Integer(-1),
+        Written::Integer(1),
+        Written::Integer(300),
+        Written::Float(1.0),
+        Written::Float(1.5),
+        Written::Float(2e38),
+    ];
+    arithmetic_grid(numbers.to_vec()).assert_agree(&[], 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -600,6 +650,37 @@ fn shift_grid(scale: Scale) -> Verdicts {
 /// Rules that read a literal by the role of the parameter it is given as, one method of each:
 /// what a number is added to, divided by, raised to, a logarithm is taken to, a share a quantile
 /// reads, a length a text is padded to.
+/// The two orders of the operands of a method that meets the column: the column first, or the
+/// literal first.
+fn orders() -> Vec<(String, bool)> {
+    vec![
+        ("the column first".to_owned(), false),
+        ("the literal first".to_owned(), true),
+    ]
+}
+
+/// The case where the literal is what the method follows and the column is what it is given, as
+/// `1 + x` is. A method with no operand of the kind to turn round has no such case.
+fn literal_first(point: &Given) -> Result<Case, String> {
+    let column = point.column.as_ref().expect("a column");
+    if !matches!(point.parameter, "other" | "exponent" | "base") {
+        return Err(format!(
+            "{} takes no operand that the column can be, beside a literal it follows",
+            point.method
+        ));
+    }
+    let item = chain(
+        point.literal.call(),
+        vec![call(point.method, json!({ point.parameter: field("x") }))],
+    );
+    Case::of_step(
+        "LazyFrame.select",
+        select(item),
+        one_column_table(column)?,
+        Connections::new(),
+    )
+}
+
 fn role_grid(scale: Scale) -> Verdicts {
     let methods: Vec<(String, (&'static str, &'static str))> = [
         ("Expr.add", "other"),
@@ -620,8 +701,12 @@ fn role_grid(scale: Scale) -> Verdicts {
             point.method = method;
             point.parameter = parameter;
         })
+        .axis("order", orders(), |point, first| point.first = *first)
         .literal_axes(values(scale), &words());
     grid.judge(&Question::any_refusal().at(scale.depth()), |point| {
+        if point.first {
+            return literal_first(point);
+        }
         if point.method == "Expr.str.pad_start" && point.literal.is_at_least(f64::from(1_u32 << 31))
         {
             return Err(
@@ -760,6 +845,13 @@ fn known_numbers_written_as_text() -> Known {
 /// every cell show, of the large grid, are named only there.
 fn known_role_limits(scale: Scale) -> Vec<Known> {
     let mut known = vec![
+        Known::new(
+            Kind::Unbuildable,
+            Pattern::new().is("order", "the literal first"),
+            "a method with no operand that the column can be, beside a literal it follows, has no \
+             cell with the literal first",
+        )
+        .saying("takes no operand that the column can be"),
         known_numbers_written_as_text(),
         Known::new(
             Kind::PolarsRefusesOnly,
