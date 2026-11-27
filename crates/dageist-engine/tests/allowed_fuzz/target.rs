@@ -821,6 +821,25 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = excused("refused by a rule, Polars allows") {
                             return outcome;
                         }
+                        // A rule that is no group's, as the predicate of a condition is, refuses
+                        // the expression alone in a select as it does here, where it is excused.
+                        if let Some(selected) = as_a_select(case, Some(&refused.place))
+                            && case.document.steps()[0].call().entry().id().as_str()
+                                == "LazyFrame.group_by"
+                            && matches!(
+                                &predict(&selected).verdict,
+                                Verdict::Refuses(alone)
+                                    if matches!(&alone.source, Source::Rule(same) if *same == rule)
+                            )
+                            && observe_checked(&selected).refusal.is_none()
+                            && let Ok(outcome) = self.evaluate(&selected)
+                            && outcome.kind() == dageist_fuzz::OutcomeKind::ExpectedRejection
+                        {
+                            tally(format!(
+                                "refused by a rule in a group, excused in a select: {rule}"
+                            ));
+                            return Ok(outcome);
+                        }
                         // A predicate the rule refuses may hold a call Polars refuses first,
                         // or may not be evaluated, so it is asked on a column of its dtype.
                         if is_a_predicate_rule(rule)

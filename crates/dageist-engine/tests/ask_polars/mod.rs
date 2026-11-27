@@ -600,7 +600,11 @@ impl<'a> Asking<'a> {
             Ok(schema) => schema.len(),
             Err(error) => return Some(Said::Refused(first_line(&error.to_string()))),
         };
-        let mut frame = probe.clone().group_by(keys.clone()).agg([expr]);
+        // Named apart from the keys, as a key that it reads would be named as the key is.
+        let mut frame = probe
+            .clone()
+            .group_by(keys.clone())
+            .agg([expr.name().prefix("traced ")]);
         Some(match frame.collect_schema() {
             Ok(schema) => {
                 let dtypes: Vec<&DataType> =
