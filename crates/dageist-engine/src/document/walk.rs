@@ -2960,6 +2960,29 @@ impl Walker<'_> {
                     .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
+            // A number typed without a dtype that adapts to what the call follows has none beside
+            // what is no number, so where no dtype it could take lets the call stand, Polars
+            // refuses it whatever the number is.
+            let refused_for_a_number = match (&verdict, missing.as_slice()) {
+                (Verdict::Allowed(_), [name]) if operand_adapts(entry, name) => resolved
+                    .iter()
+                    .find(|(given, _, _)| given == name)
+                    .and_then(|(_, _, number)| *number)
+                    .and_then(|number| {
+                        allowed::refused_for_every_number(
+                            entry,
+                            &place,
+                            &Chosen::default()
+                                .with_arguments(&given)
+                                .with_options(&words),
+                            name,
+                            number,
+                        )
+                        .or_else(|| allowed::refused_as_ambiguous(entry, &place, name))
+                    }),
+                _ => None,
+            };
+            let verdict = refused_for_a_number.map_or(verdict, Verdict::Refused);
             let standing = Standing {
                 follows: Some(after),
                 verdict: Some(verdict.clone()),
