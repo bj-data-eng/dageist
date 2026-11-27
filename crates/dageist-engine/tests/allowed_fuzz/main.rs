@@ -271,15 +271,15 @@ fn the_threads_polars_runs_on_are_the_ones_it_is_told_to() {
     assert!(polars_threads() >= 1);
 }
 
-/// A step that groups that the tables refuse and Polars refuses, with a condition inside it that
-/// the walk gives a dtype that Polars does not, is no difference of dtypes: the prefixes after the
-/// refusal were not asked of the tables.
+/// A step that groups that Polars refuses, and that the tables refuse or cannot say, is no
+/// difference of dtypes: the prefixes after the refusal were not asked of the tables.
 #[test]
 fn a_group_that_both_refuse_is_no_difference_of_dtypes() {
     let target = AllowedTarget::new();
     for bytes in [
         &include_bytes!("probes/a-group-both-refuse-with-a-condition-of-no-dtype.case")[..],
         &include_bytes!("probes/a-group-both-refuse-with-a-date-in-a-condition.case")[..],
+        &include_bytes!("probes/a-group-refused-with-a-default-of-the-values-of-a-group.case")[..],
     ] {
         let evaluation = replay(&target, bytes, &mut |_| Ok(())).expect("a case is replayed");
         assert_ne!(

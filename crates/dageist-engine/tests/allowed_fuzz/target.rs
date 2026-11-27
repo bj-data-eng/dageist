@@ -710,11 +710,12 @@ impl CaseTarget for AllowedTarget {
             .expressions
             .iter()
             .any(|expected| expected.start.is_some() || expected.links.iter().any(Option::is_some));
-        // A step that groups that the tables refuse and Polars refuses is no expression whose
-        // prefixes either gives the dtype of: the walk stops at the refusal, and what stands after
-        // it was not asked, as a condition's value that the walk gives as many is.
+        // A step that groups that Polars refuses, and that the tables refuse or cannot say, is no
+        // expression whose prefixes either gives the dtype of: the walk stops at the refusal and
+        // what stands after it was not asked, and a default of the values of a group that Polars
+        // refuses when it runs the rows is a list in its schema, which the walk does not widen.
         let both_refuse = !case.document.steps()[0].links().is_empty()
-            && matches!(prediction.verdict, Verdict::Refuses(_))
+            && !matches!(prediction.verdict, Verdict::Allows)
             && observed.refusal.is_some();
         if !both_refuse && let Some(difference) = dtype_difference(case, &prediction, &observed) {
             // A prefix that Polars refuses where the tables allow it is the refusal of the case a
