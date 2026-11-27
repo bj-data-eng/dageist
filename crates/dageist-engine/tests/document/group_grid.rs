@@ -601,7 +601,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 18] = [
+const PREDICATES: [&str; 23] = [
     "the values",
     "all null",
     "first",
@@ -620,7 +620,22 @@ const PREDICATES: [&str; 18] = [
     "first then sort",
     "literal null then drop_nulls",
     "a condition of one value twice",
+    "a condition that gives the first",
+    "a condition that gives a null of dates",
+    "a null of text",
+    "a null of dates",
+    "a null of lists",
 ];
+
+fn typed_null(dtype: &str) -> Value {
+    crate::support::chain(
+        call(
+            "polars.lit",
+            json!({ "value": { "flag": null }, "dtype": { "dtype": dtype } }),
+        ),
+        vec![],
+    )
+}
 
 fn predicate_of(column: &Col, form: &str) -> Value {
     let one = |entry: &str| call(entry, json!({}));
@@ -673,6 +688,31 @@ fn predicate_of(column: &Col, form: &str) -> Value {
                 ),
             ],
         ),
+        // Where a condition stands alone as the predicate, the value it gives is cast as a
+        // predicate that is that value is, and a null is cast whatever its dtype.
+        "a condition that gives the first" => crate::support::chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![of(column, vec![one("Expr.first"), one("Expr.is_not_null")])]) }),
+            ),
+            vec![call(
+                "When.then",
+                json!({ "statement": of(column, vec![one("Expr.first")]) }),
+            )],
+        ),
+        "a condition that gives a null of dates" => crate::support::chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![of(column, vec![one("Expr.first"), one("Expr.is_null")])]) }),
+            ),
+            vec![call(
+                "When.then",
+                json!({ "statement": typed_null("Date") }),
+            )],
+        ),
+        "a null of text" => typed_null("String"),
+        "a null of dates" => typed_null("Date"),
+        "a null of lists" => typed_null("List(Int64)"),
         "literal null then drop_nulls" => crate::support::chain(
             call("polars.lit", json!({ "value": { "flag": null } })),
             vec![one("Expr.drop_nulls")],
