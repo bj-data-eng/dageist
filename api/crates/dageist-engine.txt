@@ -90,14 +90,17 @@ pub dageist_engine::allowed::Outcome::Refused(dageist_engine::allowed::Reason)
 impl core::fmt::Display for dageist_engine::allowed::Outcome
 pub fn dageist_engine::allowed::Outcome::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Outer
+pub dageist_engine::allowed::Outer::Aggregate
 pub dageist_engine::allowed::Outer::Filter
+pub dageist_engine::allowed::Outer::GroupKey
+pub dageist_engine::allowed::Outer::Having
 pub dageist_engine::allowed::Outer::JoinLeft
 pub dageist_engine::allowed::Outer::JoinRight
 pub dageist_engine::allowed::Outer::PivotAggregate
 pub dageist_engine::allowed::Outer::Select
 pub dageist_engine::allowed::Outer::Sort
 impl dageist_engine::allowed::Outer
-pub const dageist_engine::allowed::Outer::ALL: [Self; 6]
+pub const dageist_engine::allowed::Outer::ALL: [Self; 9]
 pub const fn dageist_engine::allowed::Outer::evaluated_against(self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::allowed::Outer::host(self) -> (&'static str, &'static str)
 pub const fn dageist_engine::allowed::Outer::name(self) -> &'static str
@@ -160,6 +163,9 @@ pub dageist_engine::allowed::Rule::FieldIsOfTheStruct
 pub dageist_engine::allowed::Rule::FieldNamesFitTheStruct
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
+pub dageist_engine::allowed::Rule::GroupedNamesAreDistinct
+pub dageist_engine::allowed::Rule::HavingCastsToBoolean
+pub dageist_engine::allowed::Rule::HavingGivesOneValue
 pub dageist_engine::allowed::Rule::IsInTakesAList
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
@@ -179,7 +185,7 @@ pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 28]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 31]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -397,6 +403,7 @@ pub fn dageist_engine::allowed::refuse_a_receiver_not_judged(entry: &'static dag
 pub fn dageist_engine::allowed::refuse_an_argument_not_judged(entry: &'static dageist_engine::catalog::Entry, argument: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_grouped_name_given_twice(name: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_name_written_twice(name: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -415,8 +422,10 @@ pub dageist_engine::catalog::Applies::Condition
 pub dageist_engine::catalog::Applies::Expression
 pub dageist_engine::catalog::Applies::Frame
 pub dageist_engine::catalog::Applies::Function
+pub dageist_engine::catalog::Applies::Grouped
 impl dageist_engine::catalog::Applies
-pub const dageist_engine::catalog::Applies::ALL: [Self; 4]
+pub const dageist_engine::catalog::Applies::ALL: [Self; 5]
+pub const fn dageist_engine::catalog::Applies::is_of_a_step(self) -> bool
 pub enum dageist_engine::catalog::Argument
 pub dageist_engine::catalog::Argument::Choice(alloc::string::String)
 pub dageist_engine::catalog::Argument::Columns(alloc::vec::Vec<alloc::string::String>)
@@ -444,6 +453,9 @@ pub dageist_engine::catalog::Build::ConditionStep(fn(dageist_engine::catalog::Co
 pub dageist_engine::catalog::Build::Expression(fn(polars_plan::dsl::expr::Expr, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>)
 pub dageist_engine::catalog::Build::Frame(fn(polars_lazy::frame::LazyFrame, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>)
 pub dageist_engine::catalog::Build::Function(fn(&dageist_engine::catalog::Arguments) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>)
+pub dageist_engine::catalog::Build::GroupedEnd(fn(polars_lazy::frame::LazyGroupBy, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>)
+pub dageist_engine::catalog::Build::GroupedStep(fn(polars_lazy::frame::LazyGroupBy, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_lazy::frame::LazyGroupBy, dageist_engine::catalog::BuildError>)
+pub dageist_engine::catalog::Build::Grouping(fn(polars_lazy::frame::LazyFrame, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_lazy::frame::LazyGroupBy, dageist_engine::catalog::BuildError>)
 impl core::fmt::Debug for dageist_engine::catalog::Build
 pub fn dageist_engine::catalog::Build::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::catalog::BuildError
@@ -554,6 +566,7 @@ pub dageist_engine::catalog::Family::Compare
 pub dageist_engine::catalog::Family::Condition
 pub dageist_engine::catalog::Family::Conversion
 pub dageist_engine::catalog::Family::Cumulative
+pub dageist_engine::catalog::Family::Grouped
 pub dageist_engine::catalog::Family::Logic
 pub dageist_engine::catalog::Family::Maths
 pub dageist_engine::catalog::Family::Nulls
@@ -570,7 +583,7 @@ pub dageist_engine::catalog::Family::Text
 pub dageist_engine::catalog::Family::Trigonometry
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 22]
+pub const dageist_engine::catalog::Family::ALL: [Self; 23]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -653,6 +666,8 @@ pub dageist_engine::catalog::SummaryPhrase::Field
 pub dageist_engine::catalog::SummaryPhrase::Fields
 pub dageist_engine::catalog::SummaryPhrase::Fields::count: usize
 pub dageist_engine::catalog::SummaryPhrase::Greater
+pub dageist_engine::catalog::SummaryPhrase::GroupedBy
+pub dageist_engine::catalog::SummaryPhrase::GroupedBy::fields: &'a str
 pub dageist_engine::catalog::SummaryPhrase::JoinedOn
 pub dageist_engine::catalog::SummaryPhrase::JoinedOn::fields: &'a str
 pub dageist_engine::catalog::SummaryPhrase::JoinedOn::table: &'a str
@@ -682,6 +697,7 @@ pub dageist_engine::catalog::SummaryWord::Equal
 pub dageist_engine::catalog::SummaryWord::Field
 pub dageist_engine::catalog::SummaryWord::Fields
 pub dageist_engine::catalog::SummaryWord::Greater
+pub dageist_engine::catalog::SummaryWord::GroupedBy
 pub dageist_engine::catalog::SummaryWord::JoinedOn
 pub dageist_engine::catalog::SummaryWord::Less
 pub dageist_engine::catalog::SummaryWord::Name
@@ -694,7 +710,7 @@ pub dageist_engine::catalog::SummaryWord::SortedBy
 pub dageist_engine::catalog::SummaryWord::Value
 pub dageist_engine::catalog::SummaryWord::Worked
 impl dageist_engine::catalog::SummaryWord
-pub const dageist_engine::catalog::SummaryWord::ALL: [Self; 20]
+pub const dageist_engine::catalog::SummaryWord::ALL: [Self; 21]
 pub const fn dageist_engine::catalog::SummaryWord::key(self) -> &'static str
 pub const fn dageist_engine::catalog::SummaryWord::places(self) -> &'static [&'static str]
 pub enum dageist_engine::catalog::ValueType
@@ -768,6 +784,10 @@ pub struct dageist_engine::catalog::LeftOut
 impl dageist_engine::catalog::LeftOut
 pub const fn dageist_engine::catalog::LeftOut::id(&self) -> &'static str
 pub const fn dageist_engine::catalog::LeftOut::reason(&self) -> dageist_engine::catalog::Reason
+pub struct dageist_engine::catalog::LinkStart
+impl dageist_engine::catalog::LinkStart
+pub fn dageist_engine::catalog::LinkStart::arguments(&self) -> &[(&'static str, dageist_engine::catalog::Setting)]
+pub const fn dageist_engine::catalog::LinkStart::entry(&self) -> &'static str
 pub struct dageist_engine::catalog::OmittedForm
 impl dageist_engine::catalog::OmittedForm
 pub const fn dageist_engine::catalog::OmittedForm::bug(&self) -> core::option::Option<&'static str>
@@ -819,6 +839,7 @@ pub struct dageist_engine::catalog::StepStart
 impl dageist_engine::catalog::StepStart
 pub fn dageist_engine::catalog::StepStart::argument(&self, name: &str) -> core::option::Option<&dageist_engine::catalog::Setting>
 pub fn dageist_engine::catalog::StepStart::arguments(&self) -> &[(&'static str, dageist_engine::catalog::Setting)]
+pub fn dageist_engine::catalog::StepStart::links(&self) -> &[dageist_engine::catalog::LinkStart]
 pub struct dageist_engine::catalog::TimeZoneError
 impl dageist_engine::catalog::TimeZoneError
 pub fn dageist_engine::catalog::TimeZoneError::reason(&self) -> &str
@@ -851,6 +872,7 @@ pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static
 pub fn dageist_engine::catalog::groups_dtype(text: &str) -> core::result::Result<polars_core::datatypes::dtype::DataType, dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
 pub fn dageist_engine::catalog::omitted_forms() -> &'static [dageist_engine::catalog::OmittedForm]
+pub fn dageist_engine::catalog::start_link(entry: &dageist_engine::catalog::Entry) -> core::option::Option<dageist_engine::catalog::LinkStart>
 pub fn dageist_engine::catalog::start_step(entry: &dageist_engine::catalog::Entry, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::option::Option<dageist_engine::catalog::StepStart>
 pub mod dageist_engine::document
 pub enum dageist_engine::document::Cause
@@ -873,6 +895,8 @@ pub dageist_engine::document::Cause::Shape::what: &'static str
 pub dageist_engine::document::Cause::TooDeep
 pub dageist_engine::document::Cause::UnfinishedCondition
 pub dageist_engine::document::Cause::UnfinishedCondition::needs: &'static str
+pub dageist_engine::document::Cause::UnfinishedGrouping
+pub dageist_engine::document::Cause::UnfinishedGrouping::found: &'static str
 pub dageist_engine::document::Cause::UnknownArgument(alloc::string::String)
 pub dageist_engine::document::Cause::UnknownEntry(alloc::string::String)
 pub dageist_engine::document::Cause::UnknownField(alloc::string::String)
@@ -963,6 +987,7 @@ pub dageist_engine::document::Outcome::Valid
 pub dageist_engine::document::Outcome::Valid::changes: alloc::vec::Vec<dageist_engine::document::ColumnChange>
 pub dageist_engine::document::Outcome::Valid::schema: polars_core::schema::SchemaRef
 pub enum dageist_engine::document::Position
+pub dageist_engine::document::Position::Grouped
 pub dageist_engine::document::Position::Link
 pub dageist_engine::document::Position::Start
 pub dageist_engine::document::Position::Step
@@ -1093,6 +1118,7 @@ pub dageist_engine::document::Wanted::Argument
 pub dageist_engine::document::Wanted::Call
 pub dageist_engine::document::Wanted::EntryPart
 pub dageist_engine::document::Wanted::Expression
+pub dageist_engine::document::Wanted::GroupCall
 pub dageist_engine::document::Wanted::Item
 pub dageist_engine::document::Wanted::Link
 pub dageist_engine::document::Wanted::List
@@ -1145,6 +1171,10 @@ pub fn dageist_engine::document::Document::add_step(&self, at: usize, entry: &st
 pub fn dageist_engine::document::Document::move_step(&self, step: &dageist_engine::document::Place, to: usize) -> core::result::Result<Self, dageist_engine::document::EditError>
 pub fn dageist_engine::document::Document::remove_step(&self, step: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
 pub fn dageist_engine::document::Document::swap_step(&self, step: &dageist_engine::document::Place, entry: &str, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::result::Result<Self, dageist_engine::document::EditError>
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::insert_group_call(&self, step: &dageist_engine::document::Place, at: usize, entry: &str) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::remove_group_call(&self, call: &dageist_engine::document::Place) -> core::result::Result<Self, dageist_engine::document::EditError>
+pub fn dageist_engine::document::Document::swap_group_call(&self, call: &dageist_engine::document::Place, entry: &str) -> core::result::Result<Self, dageist_engine::document::EditError>
 impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::insert_link(&self, expression: &dageist_engine::document::Place, at: usize, entry: &str, standing: core::option::Option<&dageist_engine::allowed::Place>) -> core::result::Result<Self, dageist_engine::document::EditError>
 pub fn dageist_engine::document::Document::move_link(&self, link: &dageist_engine::document::Place, to: usize) -> core::result::Result<Self, dageist_engine::document::EditError>
@@ -1276,7 +1306,10 @@ impl dageist_engine::document::Step
 pub fn dageist_engine::document::Step::at_default(&self, index: usize) -> alloc::vec::Vec<dageist_engine::document::Place>
 impl dageist_engine::document::Step
 pub const fn dageist_engine::document::Step::call(&self) -> &dageist_engine::document::Call
+pub fn dageist_engine::document::Step::calls(&self) -> impl core::iter::traits::iterator::Iterator<Item = &dageist_engine::document::Call>
+pub fn dageist_engine::document::Step::chain(id: dageist_engine::document::StepId, call: dageist_engine::document::Call, links: alloc::vec::Vec<dageist_engine::document::Call>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub const fn dageist_engine::document::Step::id(&self) -> &dageist_engine::document::StepId
+pub fn dageist_engine::document::Step::links(&self) -> &[dageist_engine::document::Call]
 pub fn dageist_engine::document::Step::new(id: dageist_engine::document::StepId, call: dageist_engine::document::Call) -> core::result::Result<Self, dageist_engine::document::Refusal>
 impl dageist_engine::document::Step
 pub fn dageist_engine::document::Step::first_hole(&self) -> core::option::Option<alloc::vec::Vec<dageist_engine::document::Segment>>
