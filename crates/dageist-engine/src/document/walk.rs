@@ -4709,6 +4709,12 @@ fn keeps_a_null(link: &Call) -> bool {
             | "Expr.min"
             | "Expr.mean"
             | "Expr.median"
+            | "Expr.quantile"
+            | "Expr.approx_quantile"
+            | "Expr.std"
+            | "Expr.var"
+            | "Expr.skew"
+            | "Expr.kurtosis"
             | "Expr.sort"
             | "Expr.reverse"
     )
