@@ -1187,7 +1187,12 @@ impl Builder<'_> {
             Ok(schema) => schema.len(),
             Err(error) => return Some(Resolution::Refused(error)),
         };
-        let mut frame = probe.clone().group_by(keys.clone()).agg([expr]);
+        // What it is named is of no matter to its dtype, and a key read by it is named as the key
+        // is, which Polars refuses as a column named twice.
+        let mut frame = probe
+            .clone()
+            .group_by(keys.clone())
+            .agg([expr.name().prefix("traced ")]);
         Some(match frame.collect_schema() {
             Ok(schema) => {
                 let mut dtypes: Vec<DataType> = schema
