@@ -4305,15 +4305,27 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
 /// evaluated, and what it holds counts.
 fn holds_what_polars_evaluates(expression: &Expression, is_held: &dyn Fn(&Call) -> bool) -> bool {
     // Polars folds a literal gathered into a list into a literal, which is no aggregate of the key
-    // where it stands: `a.is_in(lit(1).implode())` is elementwise, as is a literal gathered again.
-    // It does not fold what a method made of the literal first, as `lit(1).abs().implode()`, which
-    // is one.
+    // where it stands: `a.is_in(lit(1).implode())` is elementwise, as is a literal gathered again
+    // and one that is cast first. It does not fold what another method made of the literal first,
+    // as `lit(1).abs().implode()`, which is one.
     let folded: Vec<&Call> = match expression.start() {
-        Start::Call(start) if start.entry().id().as_str() == "polars.lit" => expression
-            .links()
-            .iter()
-            .take_while(|link| link.entry().id().as_str() == "Expr.implode")
-            .collect(),
+        Start::Call(start) if start.entry().id().as_str() == "polars.lit" => {
+            let leading: Vec<&Call> = expression
+                .links()
+                .iter()
+                .take_while(|link| {
+                    matches!(link.entry().id().as_str(), "Expr.cast" | "Expr.implode")
+                })
+                .collect();
+            if leading
+                .iter()
+                .any(|link| link.entry().id().as_str() == "Expr.implode")
+            {
+                leading
+            } else {
+                Vec::new()
+            }
+        }
         _ => Vec::new(),
     };
     let evaluated = |call: &Call| {
