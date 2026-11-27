@@ -4409,6 +4409,13 @@ fn applies(
                 && refusal.reason.contains("not yet implemented")
                 && refusal.reason.contains("replacement pattern per row")
                 && grouped;
+            // A replacement of text given the values of a group as its value, a list for each
+            // group, is refused for the values it is given as many as it is, where a select gives
+            // it the column.
+            let a_value_per_row = refusal.stage == Stage::Rows
+                && (refusal.reason.contains("multivalue replacement")
+                    || refusal.reason.contains("replacement value length"))
+                && grouped;
             // A strict replacement lists the values of a group, a list for each group, where a
             // select lists the values of the column, which Polars finds incomplete as it runs them.
             let an_incomplete_mapping = refusal.stage == Stage::Rows
@@ -4428,7 +4435,8 @@ fn applies(
                     )
                     .any(|held| any_call(held, &|call| is(call, "Expr.replace_strict")));
             pivot && (of_nothing || a_text_share)
-                || grouped && (of_nothing || a_pattern_per_row || an_incomplete_mapping)
+                || grouped
+                    && (of_nothing || a_pattern_per_row || an_incomplete_mapping || a_value_per_row)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
@@ -5584,6 +5592,8 @@ mod tests {
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
             "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+            "uncovered-a-group-aggregate--a-replacement-of-text-given-the-values-of-a-group.case",
+            "uncovered-a-group-aggregate--a-replacement-value-of-the-length-of-a-group.case",
             "uncovered-a-group-aggregate--a-window-over-a-column-in-a-having.case",
             "uncovered-a-group-aggregate--a-strict-replacement-of-the-values-of-a-group.case",
         ] {
