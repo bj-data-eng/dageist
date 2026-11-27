@@ -32,4 +32,6 @@ tauri-build = "=2.7.4"
 # The corpus of step documents builds the tables it runs them on, which the engine's public API
 # does not hand out. The engine builds Polars with its features; this adds none.
 polars = { path = "../../vendor/polars/crates/polars", default-features = false }
+# Writes each document of the corpus of step documents as text and reads it back.
+dageist-text = { path = "../dageist-text" }
 tauri = { version = "=2.12.5", features = ["test"] }

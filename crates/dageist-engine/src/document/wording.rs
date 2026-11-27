@@ -3,14 +3,30 @@
 //! quoted and escaped; a flag as `True`, `False` or `None`; a dtype as the
 //! attribute of `pl` that Python Polars names it by.
 //!
-//! These are the words of [`Step::summary`](super::Step::summary) and, for a
-//! number, of [`Literal::shown`](crate::allowed::Literal::shown).
+//! These are the words of [`Step::summary`](super::Step::summary), of
+//! [`Value::python`] and, for a number, of
+//! [`Literal::shown`](crate::allowed::Literal::shown).
 
 use std::fmt::Write as _;
 
 use polars::prelude::{DataType, TimeUnit};
 
 use super::model::{Expression, Start, Value};
+
+impl Value {
+    /// The value as Python writes it, where it is not made of other values
+    /// or an expression, or `None` where it is: a number as Python's `repr`
+    /// writes it, so that a whole float keeps its fraction; text, a choice, a
+    /// duration, a pattern, a path and a time zone as a string in double
+    /// quotes; a flag and no time zone as `True`, `False` or `None`; a dtype as
+    /// the attribute of `pl` Python Polars names it by, such as `pl.Int64` or
+    /// `pl.List(pl.String)`; column names as one string, or a list of them
+    /// where there is not one; and a table as its own name.
+    #[must_use]
+    pub fn python(&self) -> Option<String> {
+        scalar(self)
+    }
+}
 
 /// `value` as Python writes it where it is not made of other values or an
 /// expression, or `None` where it is. A table is its own name.

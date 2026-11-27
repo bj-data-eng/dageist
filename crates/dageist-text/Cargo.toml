@@ -1,0 +1,21 @@
+[package]
+name = "dageist-text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A dageist step document as Polars-style text: written from the document, and read back strictly against the catalogue."
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+dageist-engine = { path = "../dageist-engine", version = "=0.1.0" }
+dageist-syntax = { path = "../dageist-syntax", version = "=0.1.0" }
+
+[dev-dependencies]
+# Builds the table a document is run on in the tests. The features are those the engine's build
+# of `polars` already turns on.
+polars = { path = "../../vendor/polars/crates/polars", default-features = false }

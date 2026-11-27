@@ -2128,11 +2128,10 @@ A summary is what the step works on, such as `by document_id, timestamp` or
 `step_sla on step_to`; its words are in the language file's `summary` table, and
 what is worked out is `…`. A name is written as the document holds it, and a typed
 value as Python writes it, as above. The report of each step carries its summary,
-and the step list and the editor's step menu show it. The engine does not write a
-step as Python Polars source: Dageist adds functions of its own beside Polars', and
-a Python rendering of every step would either not run as written or give slightly
-different results, so the blocks, the summaries and the previews are what say what
-a step does.
+and the step list and the editor's step menu show it. The blocks, the summaries and
+the previews are what the editor shows of a step; the [text form](#the-text-form) is a
+second form of the whole document, for people and agents that read and write steps
+as text.
 
 The document-timing steps, the seven document rows they run on and the tables
 connected to them are test data, not code: the engine's tests read them from
@@ -2141,6 +2140,84 @@ tests from the same graph as a workspace's files in
 `crates/dageist-tauri/tests/corpus/timing`, from which the host's snapshots for
 the view are written. The application opens on
 [the sample workspace](#the-sample-workspace).
+
+### The Text Form
+
+A step document also has a form as text, shaped like a chain of Python Polars
+calls on `lf`, the table the steps run on:
+
+```python
+(
+    lf
+    .with_columns(
+        previous_order=pl.col("ordered_at").shift(1).over(pl.col("customer_id")),
+    )
+    # step: latest
+    .sort(pl.col("ordered_at"), descending=True)
+)
+```
+
+People and agents can read and write steps in a notation they already know, and a
+Polars pipeline can be pasted in to become a document. No Python runs: two crates
+read and write the notation in Rust.
+
+- **`dageist-syntax`** reads the notation into a tree whose every node knows its
+  line and column, and prints a tree back, a step to a line and a long call an
+  argument to a line. It knows nothing of what the names mean and does not depend
+  on Polars, so it builds and tests in seconds and is fuzzed on its own: every
+  refusal lies within the text, and printing what printed text reads gives the same
+  text. The notation is a subset of Python's expressions: names, decimal numbers,
+  strings, `True`, `False`, `None`, `...`, lists, dicts, attributes and calls with
+  arguments by position, by name, `*` and `**`, and comments. Everything else is
+  refused by what it is: an assignment, a loop, an import, a lambda, a
+  comprehension, an operator, a subscript.
+- **`dageist-text`** reads the tree as a document against the catalogue, and
+  writes a document as a tree. It depends on the engine, and the engine knows
+  nothing of it.
+
+Reading resolves each name to an entry by Python Polars' qualified name, which is
+the entry's identifier: a step is a method of `LazyFrame`, `pl.col` is
+`polars.col`, `.str.contains` after an expression is `Expr.str.contains`, and
+`.then` after `pl.when(…)` is `When.then`, the class the chain has come to
+deciding which entry a method is. dageist's own functions are written as a Polars
+plugin writes its own: `dg.<name>(…)` for `dageist.<name>`, and `.dg.<name>(…)` for
+a method in their namespace. Arguments bind to parameters as Python binds them,
+and each value is read as its parameter's kind takes it, so `"a"` is a column's
+name for `pl.col` and a choice for `rank`'s `method`. A number, `True` or
+`False` alone where an expression goes is `pl.lit` of it; text alone is refused
+there, because Python Polars reads it as a column in some methods and as a literal
+in others, so the text says which with `pl.col` or `pl.lit`, and `None` alone is
+refused, because Python Polars reads it as the argument left out where its
+parameter defaults to `None`. A bare name is a connected input or
+table, and `...` is a hole the editor has not filled, so an incomplete document has
+a text too. The calls, expressions, steps and the document are then made with the
+constructors the step editor's edits use, so the text is refused for what an edit
+is refused for: an unknown name, a call that cannot stand where it is, an argument
+the catalogue does not take, a link of a condition out of order. A name the
+catalogue leaves out is refused with the reason it records, such as
+`Expr.map_elements`, which takes a Python function. Every refusal carries the line
+and columns of the part of the text it refuses.
+
+A step read without a name is named as the step editor names a step it adds: the
+entry's name, then `_2`, `_3` and on. Writing leaves a step's name out where reading
+gives it back, and writes `# step: <name>` on the line before the step's dot where it
+does not, so that a step keeps its name, and with it its history and the places
+edits name, when the text is read back. Arguments keep the order the document holds
+them in, which the editor's edits do not always make the parameters' order; the one exception is a starred
+parameter's items held after pairs that must be written as a dict after `**`, which
+Python reads no `*` after, so they are written, and read back, before the pairs. The
+host's tests write every document of the [corpus](#the-corpus-of-step-documents) as
+text and read it back as the same document.
+
+The text is a notation of dageist's steps, not a promise that Python runs it the
+same. Dageist adds functions of its own beside Polars', and the writer leaves
+nothing out that a step holds, so pasted into Python a text may not run as written,
+or give slightly different results.
+
+An input named `lf`, `pl`, `dg`, by a word of Python's own or by what is no Python
+name cannot be written bare, and writing a document that holds one is refused with
+its place. The graph's input names are Python names already, but it does not yet
+refuse `lf`, `pl`, `dg` or Python's own words as one.
 
 ## Which Combinations Polars Allows
 

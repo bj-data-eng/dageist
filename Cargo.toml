@@ -36,6 +36,8 @@ members = [
     "crates/dageist-fuzz",
     "crates/dageist-graph",
     "crates/dageist-pack",
+    "crates/dageist-syntax",
+    "crates/dageist-text",
     "crates/dageist-workspace",
     "crates/dageist-tauri",
 ]

@@ -27,8 +27,9 @@ independent integration review.
 ## Repository Identity And Ownership
 
 This repository owns the host-independent `dageist` core in `src/`, the
-graph model, the dataframe engine, the delta packs, the workspace on disk, the
-fuzz framework and the host adapters under `crates/`,
+graph model, the dataframe engine, the step document's text form and its
+notation, the delta packs, the workspace on disk, the fuzz framework and the
+host adapters under `crates/`,
 the React view in `ui/`, their contracts, manifests, tests, documentation and
 shared tooling. Root owns workspace wiring and the core. The Tauri host owns
 its window, webview configuration, IPC commands, the bridge that serves the
@@ -68,6 +69,8 @@ and current source establishes behavior.
 | Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
+| The notation of a step document's text form, its tree with line and column spans and its printing, without Polars | [crates/dageist-syntax/src/](crates/dageist-syntax/src/lib.rs); its fuzz target [tests/notation_fuzz/](crates/dageist-syntax/tests/notation_fuzz/main.rs) |
+| A step document written as Polars-style text and read back against the catalogue | [crates/dageist-text/src/](crates/dageist-text/src/lib.rs), [read.rs](crates/dageist-text/src/read.rs), [write.rs](crates/dageist-text/src/write.rs) |
 | The graph's nodes, references, layout, edits and structural checks, without Polars | [crates/dageist-graph/src/](crates/dageist-graph/src/lib.rs) |
 | Git packs whose objects are stored as deltas against bases the caller names, written through gix-pack | [crates/dageist-pack/src/](crates/dageist-pack/src/lib.rs), [delta.rs](crates/dageist-pack/src/delta.rs) |
 | A workspace's files, their format and their reading through edits; its commits, a node's history and its packing | [crates/dageist-workspace/src/](crates/dageist-workspace/src/lib.rs), [files.rs](crates/dageist-workspace/src/files.rs), [store.rs](crates/dageist-workspace/src/store.rs) |
@@ -206,6 +209,23 @@ tests run `git` to verify the packs it writes:
 ```sh
 cargo test --offline --locked -p dageist-pack
 cargo clippy --offline --locked -p dageist-pack --all-targets --no-deps -- -F unsafe-code -D warnings
+```
+
+Syntax checks from the repository root. The crate does not depend on Polars;
+its tests include the notation fuzz target, which runs through `dageist-fuzz`:
+
+```sh
+cargo test --offline --locked -p dageist-syntax
+cargo clippy --offline --locked -p dageist-syntax --all-targets --no-deps -- -F unsafe-code -D warnings
+```
+
+Text checks from the repository root. The crate depends on the engine, so they
+build Polars. The host's corpus tests also write each document of the corpus as
+text and read it back:
+
+```sh
+cargo test --offline --locked -p dageist-text
+cargo clippy --offline --locked -p dageist-text --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 Workspace checks from the repository root. The crate does not depend on Polars;
