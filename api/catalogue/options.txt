@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 14336 combinations: 7148 allowed; 4621 refused when Polars resolved the schema, 2567 when it ran the rows, 0 when it ran the empty table.
+# 14388 combinations: 7200 allowed; 4621 refused when Polars resolved the schema, 2567 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
 Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
@@ -5448,6 +5448,58 @@ Expr.first | UInt64 | ignore_nulls=false | allowed UInt64 one
 Expr.first | UInt64 | ignore_nulls=true | allowed UInt64 one
 Expr.first | UInt8 | ignore_nulls=false | allowed UInt8 one
 Expr.first | UInt8 | ignore_nulls=true | allowed UInt8 one
+Expr.implode | Array(Int64, 2) | maintain_order=false | allowed List(Array(Int64, 2)) one
+Expr.implode | Array(Int64, 2) | maintain_order=true | allowed List(Array(Int64, 2)) one
+Expr.implode | Boolean | maintain_order=false | allowed List(Boolean) one
+Expr.implode | Boolean | maintain_order=true | allowed List(Boolean) one
+Expr.implode | Date | maintain_order=false | allowed List(Date) one
+Expr.implode | Date | maintain_order=true | allowed List(Date) one
+Expr.implode | Datetime(us) | maintain_order=false | allowed List(Datetime(us)) one
+Expr.implode | Datetime(us) | maintain_order=true | allowed List(Datetime(us)) one
+Expr.implode | Datetime(us, UTC) | maintain_order=false | allowed List(Datetime(us, UTC)) one
+Expr.implode | Datetime(us, UTC) | maintain_order=true | allowed List(Datetime(us, UTC)) one
+Expr.implode | Decimal(10, 2) | maintain_order=false | allowed List(Decimal(10, 2)) one
+Expr.implode | Decimal(10, 2) | maintain_order=true | allowed List(Decimal(10, 2)) one
+Expr.implode | Duration(us) | maintain_order=false | allowed List(Duration(us)) one
+Expr.implode | Duration(us) | maintain_order=true | allowed List(Duration(us)) one
+Expr.implode | Float16 | maintain_order=false | allowed List(Float16) one
+Expr.implode | Float16 | maintain_order=true | allowed List(Float16) one
+Expr.implode | Float32 | maintain_order=false | allowed List(Float32) one
+Expr.implode | Float32 | maintain_order=true | allowed List(Float32) one
+Expr.implode | Float64 | maintain_order=false | allowed List(Float64) one
+Expr.implode | Float64 | maintain_order=true | allowed List(Float64) one
+Expr.implode | Int128 | maintain_order=false | allowed List(Int128) one
+Expr.implode | Int128 | maintain_order=true | allowed List(Int128) one
+Expr.implode | Int16 | maintain_order=false | allowed List(Int16) one
+Expr.implode | Int16 | maintain_order=true | allowed List(Int16) one
+Expr.implode | Int32 | maintain_order=false | allowed List(Int32) one
+Expr.implode | Int32 | maintain_order=true | allowed List(Int32) one
+Expr.implode | Int64 | maintain_order=false | allowed List(Int64) one
+Expr.implode | Int64 | maintain_order=true | allowed List(Int64) one
+Expr.implode | Int8 | maintain_order=false | allowed List(Int8) one
+Expr.implode | Int8 | maintain_order=true | allowed List(Int8) one
+Expr.implode | List(Int64) | maintain_order=false | allowed List(List(Int64)) one
+Expr.implode | List(Int64) | maintain_order=true | allowed List(List(Int64)) one
+Expr.implode | List(String) | maintain_order=false | allowed List(List(String)) one
+Expr.implode | List(String) | maintain_order=true | allowed List(List(String)) one
+Expr.implode | Null | maintain_order=false | allowed List(Null) one
+Expr.implode | Null | maintain_order=true | allowed List(Null) one
+Expr.implode | String | maintain_order=false | allowed List(String) one
+Expr.implode | String | maintain_order=true | allowed List(String) one
+Expr.implode | Struct(x: Int64, y: String) | maintain_order=false | allowed List(Struct(x: Int64, y: String)) one
+Expr.implode | Struct(x: Int64, y: String) | maintain_order=true | allowed List(Struct(x: Int64, y: String)) one
+Expr.implode | Time | maintain_order=false | allowed List(Time) one
+Expr.implode | Time | maintain_order=true | allowed List(Time) one
+Expr.implode | UInt128 | maintain_order=false | allowed List(UInt128) one
+Expr.implode | UInt128 | maintain_order=true | allowed List(UInt128) one
+Expr.implode | UInt16 | maintain_order=false | allowed List(UInt16) one
+Expr.implode | UInt16 | maintain_order=true | allowed List(UInt16) one
+Expr.implode | UInt32 | maintain_order=false | allowed List(UInt32) one
+Expr.implode | UInt32 | maintain_order=true | allowed List(UInt32) one
+Expr.implode | UInt64 | maintain_order=false | allowed List(UInt64) one
+Expr.implode | UInt64 | maintain_order=true | allowed List(UInt64) one
+Expr.implode | UInt8 | maintain_order=false | allowed List(UInt8) one
+Expr.implode | UInt8 | maintain_order=true | allowed List(UInt8) one
 Expr.is_between | Array(Int64, 2) | closed=both | refused rows: cannot perform '>=' comparison between series 'a' of dtype: array[i64, 2] and series 'b' of dtype: array[i64, 2]
 Expr.is_between | Array(Int64, 2) | closed=left | refused rows: cannot perform '>=' comparison between series 'a' of dtype: array[i64, 2] and series 'b' of dtype: array[i64, 2]
 Expr.is_between | Array(Int64, 2) | closed=none | refused rows: cannot perform '>' comparison between series 'a' of dtype: array[i64, 2] and series 'b' of dtype: array[i64, 2]

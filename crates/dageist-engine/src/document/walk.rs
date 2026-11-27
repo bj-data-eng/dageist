@@ -4056,7 +4056,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-pub(super) const ONE_VALUE: [&str; 31] = [
+pub(super) const ONE_VALUE: [&str; 32] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -4088,6 +4088,7 @@ pub(super) const ONE_VALUE: [&str; 31] = [
     "Expr.bitwise_and",
     "Expr.bitwise_or",
     "Expr.bitwise_xor",
+    "Expr.implode",
 ];
 
 fn is_one_value(call: &Call) -> bool {

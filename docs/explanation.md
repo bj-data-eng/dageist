@@ -930,6 +930,12 @@ approximations and the bitwise methods are more of three families that exist. Ag
 `bitwise_count_ones`, `bitwise_count_zeros`, `bitwise_leading_ones`, `bitwise_leading_zeros`,
 `bitwise_trailing_ones` and `bitwise_trailing_zeros`. Every name is Polars' own.
 
+`implode` is an aggregate of its own kind: it gathers the values into one list of their dtype, and gives that one
+value for every dtype, a list and a struct included, whose own dtype has no class of its own, so the value that
+follows one of lists is read as no class. A join's key may hold it alone and not beside a column. `maintain_order` is
+true unless it is told, as in Python, and keeps the order of the values. It is what `is_in` is given where the values
+to look up in are a column's own: the column imploded.
+
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
 - Each aggregate gives one value, so a join's key may hold one alone and not beside a column, which

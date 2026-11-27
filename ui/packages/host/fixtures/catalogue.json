@@ -3353,6 +3353,38 @@
       ]
     },
     {
+      "id": "Expr.implode",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "implode",
+      "hint": "the values gathered into one list",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.is_between",
       "applies": "expression",
       "family": "compare",

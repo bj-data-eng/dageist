@@ -1966,6 +1966,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.implode",
+      "verdict": {
+        "kind": "allowed",
+        "result": "List(Datetime(us))",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.is_between",
       "verdict": {
         "kind": "allowed",

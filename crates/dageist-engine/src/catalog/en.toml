@@ -1897,6 +1897,14 @@ hint = "highest value"
 name = "min"
 hint = "lowest value"
 
+[entries."Expr.implode"]
+name = "implode"
+hint = "the values gathered into one list"
+
+[entries."Expr.implode".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
 [entries."Expr.sum"]
 name = "sum"
 hint = "total"

@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 77755 combinations: 26263 allowed; 20311 refused when Polars resolved the schema, 31181 when it ran the rows, 0 when it ran the empty table.
+# 77781 combinations: 26289 allowed; 20311 refused when Polars resolved the schema, 31181 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -27534,6 +27534,32 @@ Expr.head | n | UInt8 | UInt16 | allowed UInt8 counted
 Expr.head | n | UInt8 | UInt32 | allowed UInt8 counted
 Expr.head | n | UInt8 | UInt64 | allowed UInt8 counted
 Expr.head | n | UInt8 | UInt8 | allowed UInt8 counted
+Expr.implode | - | Array(Int64, 2) | - | allowed List(Array(Int64, 2)) one
+Expr.implode | - | Boolean | - | allowed List(Boolean) one
+Expr.implode | - | Date | - | allowed List(Date) one
+Expr.implode | - | Datetime(us) | - | allowed List(Datetime(us)) one
+Expr.implode | - | Datetime(us, UTC) | - | allowed List(Datetime(us, UTC)) one
+Expr.implode | - | Decimal(10, 2) | - | allowed List(Decimal(10, 2)) one
+Expr.implode | - | Duration(us) | - | allowed List(Duration(us)) one
+Expr.implode | - | Float16 | - | allowed List(Float16) one
+Expr.implode | - | Float32 | - | allowed List(Float32) one
+Expr.implode | - | Float64 | - | allowed List(Float64) one
+Expr.implode | - | Int128 | - | allowed List(Int128) one
+Expr.implode | - | Int16 | - | allowed List(Int16) one
+Expr.implode | - | Int32 | - | allowed List(Int32) one
+Expr.implode | - | Int64 | - | allowed List(Int64) one
+Expr.implode | - | Int8 | - | allowed List(Int8) one
+Expr.implode | - | List(Int64) | - | allowed List(List(Int64)) one
+Expr.implode | - | List(String) | - | allowed List(List(String)) one
+Expr.implode | - | Null | - | allowed List(Null) one
+Expr.implode | - | String | - | allowed List(String) one
+Expr.implode | - | Struct(x: Int64, y: String) | - | allowed List(Struct(x: Int64, y: String)) one
+Expr.implode | - | Time | - | allowed List(Time) one
+Expr.implode | - | UInt128 | - | allowed List(UInt128) one
+Expr.implode | - | UInt16 | - | allowed List(UInt16) one
+Expr.implode | - | UInt32 | - | allowed List(UInt32) one
+Expr.implode | - | UInt64 | - | allowed List(UInt64) one
+Expr.implode | - | UInt8 | - | allowed List(UInt8) one
 Expr.is_between | lower_bound | Array(Int64, 2) | Array(Int64, 2) | refused rows: cannot perform '>=' comparison between series 'a' of dtype: array[i64, 2] and series 'b' of dtype: array[i64, 2]
 Expr.is_between | lower_bound | Array(Int64, 2) | Boolean | refused rows: could not evaluate '>=' comparison between series 'a' of dtype: Array(Int64, 2) and series 'b' of dtype: Boolean
 Expr.is_between | lower_bound | Array(Int64, 2) | Date | refused rows: could not evaluate '>=' comparison between series 'a' of dtype: Array(Int64, 2) and series 'b' of dtype: Date

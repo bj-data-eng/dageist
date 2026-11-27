@@ -397,10 +397,11 @@ fn methods() -> Vec<&'static Entry> {
 /// campaign draws only where a focus names it: the shape of such a count is the first of several
 /// that the catalogue gains, and the campaigns that check them are not a gate of the engine's tests
 /// until every shape exists. [`Counting`](catalog::Counting) says which methods, and `is_in`, whose
-/// count follows the dtype of the values it is given, is one too.
+/// count follows the dtype of the values it is given, is one too, and so is `implode`, which gives
+/// a list of the values that a campaign not focused on lists does not follow.
 fn is_held_back(entry: &Entry) -> bool {
     catalog::Counting::of(entry, &[]).is_some()
-        || entry.id().as_str() == "Expr.is_in"
+        || matches!(entry.id().as_str(), "Expr.is_in" | "Expr.implode")
         || is_of_nested_dtypes(entry)
         || makes_or_reads_structs(entry)
 }
@@ -3865,7 +3866,7 @@ mod tests {
     fn the_cases_include_a_shift_back_and_a_shift_forward() {
         // The limit for what a shift leaves null follows the direction of the
         // shift, so the target must reach both for a campaign to check it.
-        let cases: Vec<Case> = (0..6000_u64)
+        let cases: Vec<Case> = (0..12000_u64)
             .filter_map(|offset| generate(&entropy(offset), None))
             .collect();
         let back = cases.iter().filter(|case| shifts_back(case)).count();
