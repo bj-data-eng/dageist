@@ -59,6 +59,11 @@ export interface SlotProps extends Listing {
    * does. Its list then ends with what can be done to that piece.
    */
   readonly names?: boolean;
+  /**
+   * Whether the list is what can be done to the piece the word names and nothing to choose from,
+   * so that it has no search box and no rows.
+   */
+  readonly actionsOnly?: boolean;
   /** Receives the slot's word, for a caller that drags by it or places a list against it. */
   readonly buttonRef?: (element: HTMLButtonElement | null) => void;
 }
@@ -72,6 +77,7 @@ export function Slot({
   placeholder,
   offers,
   wide = false,
+  actionsOnly = false,
   wrong = false,
   waits = false,
   names = false,
@@ -135,6 +141,7 @@ export function Slot({
             actions={actions}
             placeholder={placeholder}
             groups={offers}
+            actionsOnly={actionsOnly}
             keepOpen={false}
             wide={wide}
             onDone={close}

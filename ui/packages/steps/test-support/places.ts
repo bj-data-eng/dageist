@@ -68,7 +68,7 @@ function outerIsDrawn(catalogue: Catalogue, context: ContextView): boolean {
       entry.parameters.some(
         (parameter) =>
           entry.grouped !== null &&
-          groupedHeadOf(entry.id).includes(parameter.name) &&
+          groupedHeadOf(entry).some((held) => held.name === parameter.name) &&
           stands(parameter),
       ),
     )

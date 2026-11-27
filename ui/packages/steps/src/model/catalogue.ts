@@ -264,18 +264,13 @@ export function stepOptionParameters(
 }
 
 /**
- * The parameters of the calls on a group by that the step's head draws itself, by the entry that
- * holds them: the predicates of a `having`, and the aggregates of an `agg`. The other parameters of
- * such a call are drawn as the options of its name.
+ * Returns the parameters of the call `entry` on a group by that the step's head draws itself: the
+ * ones that hold the expressions the engine evaluates on the values of each group, which the
+ * catalogue says by their position, as the predicates of a `having` and the aggregates of an
+ * `agg` are. The other parameters of such a call are drawn as the options of its name.
  */
-export const GROUPED_HEAD: Readonly<Record<string, readonly string[]>> = {
-  'LazyGroupBy.having': ['predicates'],
-  'LazyGroupBy.agg': ['aggs', 'named_aggs'],
-};
-
-/** Returns the parameters of the call on a group by `entry` that the step's head draws itself. */
-export function groupedHeadOf(entry: string): readonly string[] {
-  return Object.hasOwn(GROUPED_HEAD, entry) ? (GROUPED_HEAD[entry] ?? []) : [];
+export function groupedHeadOf(entry: EntryView): readonly ParameterView[] {
+  return entry.parameters.filter((parameter) => parameter.position !== null);
 }
 
 /** What a call on a group by is there, as the catalogue says: the predicate of the groups it keeps, or the call that finishes the grouping. */

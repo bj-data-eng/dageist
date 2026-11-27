@@ -61,6 +61,11 @@ export interface OfferListProps {
   readonly placeholder: string;
   /** Returns what is on offer for the text typed so far. */
   readonly groups: (typed: string) => readonly OfferGroup[];
+  /**
+   * Whether the list is its actions alone: a word that names a piece and has nothing to choose
+   * from. It then has no search box and no rows, and says nothing is found where nothing is.
+   */
+  readonly actionsOnly?: boolean;
   /** Whether the list stays open when a row is picked, as one that takes several does. */
   readonly keepOpen: boolean;
   /** Whether the list is wide enough for a control at the end of its rows. */
@@ -95,6 +100,7 @@ export function OfferList({
   actions = [],
   placeholder,
   groups,
+  actionsOnly = false,
   keepOpen,
   wide,
   onDone,
@@ -114,9 +120,7 @@ export function OfferList({
     search.current?.focus();
   }, []);
 
-  // A list with nothing to choose from, whose word only names what can be done to its piece, is
-  // those actions alone: it has no search box and nothing to say is not found.
-  const choices = groups('').some((group) => group.offers.length > 0);
+  const choices = !actionsOnly;
   const shown = groups(typed)
     .filter((group) => group.offers.length > 0)
     .map((group) => {

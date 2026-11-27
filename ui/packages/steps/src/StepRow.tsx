@@ -421,10 +421,6 @@ const NAMED_KEY: NamedWords = {
   dtype: false,
 };
 
-/** The parameters of an `agg` that hold its aggregates, and those that are named. */
-const AGGS = 'aggs';
-const NAMED_AGGS = 'named_aggs';
-
 /** The words of the named aggregates of an `agg`. */
 const NAMED_AGGREGATE: NamedWords = {
   named: 'column',
@@ -484,15 +480,18 @@ function NamedChains({
   );
 }
 
-/** The parameter of a `having` that holds its predicates. */
-const PREDICATES = 'predicates';
-
 /** Draws the predicate of a `having` that keeps the groups it holds, and what takes it away. */
 function HavingLine({ call, at, frame }: HeadProps & { readonly at: number }): React.JSX.Element {
   const catalogue = useCatalogue();
   const edits = useStepEdits();
   const actions = actionsOf('step');
   const callPath = [linkSegment(at)];
+  const entry = catalogue.entries.get(call.entry) ?? null;
+  // The parameter that holds the predicates, which the catalogue says by its position.
+  const predicates =
+    entry === null
+      ? null
+      : (groupedHeadOf(entry).find((parameter) => parameter.kind.kind === 'expression') ?? null);
   return (
     <span className="dg-line">
       <Piece
@@ -510,25 +509,25 @@ function HavingLine({ call, at, frame }: HeadProps & { readonly at: number }): R
       >
         {/* The word opens a list that has nothing to offer but what takes it away. */}
         <Slot
-          label="having"
+          label={entry?.name ?? call.entry}
           tone="verb"
           look="verb"
           names
           describedAs="The predicates that keep groups. Take the having away"
           placeholder="The having"
           offers={() => []}
+          actionsOnly
         />
       </Piece>
-      <ConditionBlocks
-        path={under(callPath, parameterSegment(PREDICATES))}
-        argument={givenOf(call, PREDICATES)}
-        frame={frame}
-        positions={within(
-          NO_POSITIONS,
-          positionOfParameter(catalogue.entries.get(call.entry) ?? null, PREDICATES),
-        )}
-        tone="verb"
-      />
+      {predicates !== null && (
+        <ConditionBlocks
+          path={under(callPath, parameterSegment(predicates.name))}
+          argument={givenOf(call, predicates.name)}
+          frame={frame}
+          positions={within(NO_POSITIONS, positionOfParameter(entry, predicates.name))}
+          tone="verb"
+        />
+      )}
     </span>
   );
 }
@@ -551,9 +550,19 @@ function FinishingLine({
       : null,
   );
   // The parameters of the call that a list can add, which the call itself draws once they are set.
-  const parameters = entry === null ? [] : optionParameters(entry, groupedHeadOf(entry.id));
+  const head = entry === null ? [] : groupedHeadOf(entry);
+  const parameters =
+    entry === null
+      ? []
+      : optionParameters(
+          entry,
+          head.map((parameter) => parameter.name),
+        );
   const given = new Set(call.arguments.map((held) => held.parameter));
   const around = { frame, items: () => [] };
+  // The aggregates the call is given as a list, and as named ones, where it takes any.
+  const listed = head.find((parameter) => parameter.kind.kind === 'expression') ?? null;
+  const named = head.find((parameter) => parameter.kind.kind === 'pairs') ?? null;
   return (
     <span className="dg-line">
       <Hint lines={entry === null ? [] : [entry.hint]} code={false}>
@@ -589,21 +598,17 @@ function FinishingLine({
           onOpenChange={list.onOpenChange}
         />
       </Hint>
-      {entry !== null && (
-        <>
-          {groupedHeadOf(entry.id).includes(AGGS) && (
-            <>
-              <ParameterOf entry={entry} call={call} name={AGGS} path={callPath} around={around} />
-              <NamedChains
-                call={call}
-                callPath={callPath}
-                parameter={NAMED_AGGS}
-                words={NAMED_AGGREGATE}
-                frame={frame}
-              />
-            </>
-          )}
-        </>
+      {entry !== null && listed !== null && (
+        <ParameterOf entry={entry} call={call} name={listed.name} path={callPath} around={around} />
+      )}
+      {named !== null && (
+        <NamedChains
+          call={call}
+          callPath={callPath}
+          parameter={named.name}
+          words={NAMED_AGGREGATE}
+          frame={frame}
+        />
       )}
       <OptionRows
         entry={entry}
