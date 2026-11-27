@@ -1316,6 +1316,34 @@ impl Walker<'_> {
                 .then(Segment::Parameter("name".to_owned()));
             given.push((place, Some(name)));
         }
+        // Where the order of the groups is kept a key is one value or as many as the rows, and a key
+        // that takes some of the values is not either, but by chance of the data.
+        if matches!(
+            step.call().argument("maintain_order"),
+            Some(Value::Flag(Some(true)))
+        ) {
+            let some = self
+                .selected
+                .iter()
+                .find(|(_, shape, count)| {
+                    *shape == Shape::Counted
+                        && !matches!(
+                            count,
+                            allowed::Count::Exactly(1) | allowed::Count::AtMost(1)
+                        )
+                })
+                .map(|(place, _, _)| place.clone());
+            if let Some(place) = some
+                && let Err(refusal) = allowed::rule_forbids_a_key_that_takes_some_values_in_order()
+            {
+                self.refusal.get_or_insert(WalkRefusal {
+                    place,
+                    refusal,
+                    at_end: true,
+                    argument_unknown: false,
+                });
+            }
+        }
         let mut seen: Vec<&String> = Vec::new();
         for (place, name) in &given {
             let Some(name) = name else { continue };
@@ -2753,7 +2781,10 @@ impl Walker<'_> {
             _ => None,
         };
         let held_here = held.is_some() && context == Context::step(Outer::Select);
-        let held_place = held_here.then(|| place.clone());
+        // The keys of a group by are as many as one another as the items of a select are.
+        let held_place = (held_here
+            || (held.is_some() && context == Context::step(Outer::GroupKey)))
+        .then(|| place.clone());
         if held_here {
             let names = self.names_written(expression, &calls, name.as_ref());
             let by_a_field = expression.links().iter().any(|link| {
@@ -3584,6 +3615,18 @@ impl Walker<'_> {
             (Applies::Expression, _) => {
                 let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
                 {
+                    // What a key drops of the values it reads is how many the data decide, as what
+                    // a filter keeps is, where a group by meets it with the other keys and the rows.
+                    Ok(found)
+                        if place.context() == Context::step(Outer::GroupKey)
+                            && matches!(
+                                entry.id().as_str(),
+                                "Expr.drop_nulls" | "Expr.drop_nans"
+                            )
+                            && found.0 == Shape::Many =>
+                    {
+                        (Shape::Counted, Count::NotKnown)
+                    }
                     Ok(found) => found,
                     Err(refusal) => {
                         let refusal = if involves_a_list {

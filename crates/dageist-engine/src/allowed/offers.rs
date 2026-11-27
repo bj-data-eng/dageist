@@ -2178,6 +2178,16 @@ pub fn rule_forbids_a_window_over_a_count() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::WindowInputIsNotCounted))
 }
 
+/// Whether a key of a group by that gives some of the values of a column may stand where the order
+/// of the groups is kept.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_key_that_takes_some_values_in_order() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::KeptOrderNeedsKeysOfTheRows))
+}
+
 /// The refusal of a call that meets values of other counts than it takes, which the caller has
 /// found: one value meets each of the others, and others are as many as one another.
 ///

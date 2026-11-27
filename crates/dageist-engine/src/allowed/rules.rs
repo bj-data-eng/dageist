@@ -87,6 +87,10 @@ pub enum Rule {
     /// Arrays that meet and give an array are of one width, which is known: Polars refuses to add
     /// arrays of two widths and gives a list where it fills one with the other.
     ArraysMeetAtOneWidth,
+    /// Where `maintain_order` keeps the order of the groups, a key of a group by gives one value or
+    /// as many as the table has rows: Polars refuses a key that takes some of the values, as the
+    /// first of them or those that are not null, for lengths that differ.
+    KeptOrderNeedsKeysOfTheRows,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, no comparison of missing values of a column of whole numbers
     /// with a literal that is a number with a fraction or a whole number that its dtype cannot hold,
@@ -145,7 +149,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -161,6 +165,7 @@ impl Rule {
         Self::HavingGivesOneValue,
         Self::IsInTakesAList,
         Self::JoinKeyNamesAreNotRepeated,
+        Self::KeptOrderNeedsKeysOfTheRows,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
         Self::OneColumnIsNeeded,
@@ -199,6 +204,7 @@ impl Rule {
             Self::HavingGivesOneValue => "having-gives-one-value",
             Self::IsInTakesAList => "is-in-takes-a-list",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
+            Self::KeptOrderNeedsKeysOfTheRows => "kept-order-needs-keys-of-the-rows",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
             Self::OneColumnIsNeeded => "one-column-is-needed",
@@ -271,6 +277,9 @@ impl Rule {
             Self::JoinKeyNamesAreNotRepeated => {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
+            Self::KeptOrderNeedsKeysOfTheRows => {
+                "where `maintain_order` keeps the order of the groups, a key must give one value or as many as the table has rows: Polars refuses a key that takes some of the values, as head, filter and drop_nulls do, for lengths that differ where the arguments or the data make it fewer, so give the key as a column, or leave the order unset"
+            }
             Self::KeyIsElementwise => {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
             }
@@ -338,6 +347,7 @@ impl Rule {
             | Self::FieldNamesFitTheStruct
             | Self::GroupedNamesAreDistinct
             | Self::IsInTakesAList
+            | Self::KeptOrderNeedsKeysOfTheRows
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -549,6 +559,7 @@ impl Rule {
             | Self::FoldedFunctionIsNoJoinKey
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
+            | Self::KeptOrderNeedsKeysOfTheRows
             | Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
             | Self::ElementDtypeIsMeasured

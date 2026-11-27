@@ -235,7 +235,29 @@ fn labelled<T: Clone>(items: &[(&str, T)]) -> Vec<(String, T)> {
 }
 
 fn keys_known() -> Vec<Known> {
-    Vec::new()
+    vec![
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .one_of("form", &["unique", "filter, some of the values"])
+                .is("maintain_order", "true"),
+            "the walk cannot know how many values a key that takes some of them gives, which the data decide, so where the order is kept it refuses it by design, and Polars allows it by chance of this table: its filter keeps one row, which it broadcasts, and its values that differ are as many as the rows",
+        )
+        .saying("kept-order-needs-keys-of-the-rows"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .is("class", "Struct(x: Int64, y: String)")
+                .one_of(
+                    "form",
+                    &[
+                        "drop_nulls, some of the values",
+                        "drop_nulls and n, two lengths",
+                    ],
+                ),
+            "a struct whose fields hold nulls is no null, so the table's rows are all kept by drop_nulls, which the walk cannot know of the data, and refuses as it refuses any key that takes some of the values",
+        ),
+    ]
 }
 
 #[test]
