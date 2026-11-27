@@ -91,11 +91,18 @@ pub enum Rule {
     /// as many as the table has rows: Polars refuses a key that takes some of the values, as the
     /// first of them or those that are not null, for lengths that differ.
     KeptOrderNeedsKeysOfTheRows,
-    /// A join's own key is elementwise: it holds no aggregate beside a column,
+    /// A join's own key, and the key of a window in what a group by evaluates in `agg` or `having`
+    /// (what the window groups by, and what it orders by), is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, no comparison of missing values of a column of whole numbers
     /// with a literal that is a number with a fraction or a whole number that its dtype cannot hold,
     /// as Polars reads the literal, and no replacement of values that are not literals.
     KeyIsElementwise,
+    /// In what a group by evaluates in `agg` or `having`, a literal that a method maps or whose
+    /// values it replaces is given no values beside it: neither the values of the group nor, for
+    /// the methods that replace, and in a `having` for the others, one value that an aggregate
+    /// gave. Polars cannot replace a literal by values for each row, and refuses a map of one value
+    /// beside many as of another length.
+    LiteralBesideValuesInAGroup,
     /// A parameter that Polars reads as one value is given one: not the rows, not a count of values
     /// that the data or the arguments decide, and, for the places a shift and a difference look back
     /// by and the value a shift fills with, not one value that a method took of one value.
@@ -149,7 +156,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 33] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -167,6 +174,7 @@ impl Rule {
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeptOrderNeedsKeysOfTheRows,
         Self::KeyIsElementwise,
+        Self::LiteralBesideValuesInAGroup,
         Self::MomentsShareAZone,
         Self::OneColumnIsNeeded,
         Self::ParameterTakesOneValue,
@@ -206,6 +214,7 @@ impl Rule {
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeptOrderNeedsKeysOfTheRows => "kept-order-needs-keys-of-the-rows",
             Self::KeyIsElementwise => "key-is-elementwise",
+            Self::LiteralBesideValuesInAGroup => "literal-beside-values-in-a-group",
             Self::MomentsShareAZone => "moments-share-a-zone",
             Self::OneColumnIsNeeded => "one-column-is-needed",
             Self::ParameterTakesOneValue => "parameter-takes-one-value",
@@ -281,7 +290,10 @@ impl Rule {
                 "where `maintain_order` keeps the order of the groups, a key must give one value or as many as the table has rows: Polars refuses a key that takes some of the values, as head, filter and drop_nulls do, for lengths that differ where the arguments or the data make it fewer, so give the key as a column, or leave the order unset"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+                "a join's key, and the key of a window in what a group by evaluates in `agg` or `having`, must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+            }
+            Self::LiteralBesideValuesInAGroup => {
+                "in `agg` and `having`, a literal that dt.replace, str.splitn or str.split_exact maps may not be given the values of the group beside it, nor one value that an aggregate gave in a `having`, and a literal that replace, replace_strict, str.replace or str.replace_all replaces may not be given either: Polars cannot replace a literal by values for each row, and refuses the map of one value beside many as of another length"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::ElementDtypeIsImplemented => {
@@ -332,7 +344,8 @@ impl Rule {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::HavingGivesOneValue => context == Context::step(Outer::Having),
-            Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
+            Self::JoinKeyNamesAreNotRepeated => context.is_join_key(),
+            Self::KeyIsElementwise => context.is_join_key() || context.is_a_group_window_key(),
             Self::FoldedFunctionIsNoJoinKey => {
                 matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
                     && matches!(entry, "polars.datetime" | "polars.duration")
@@ -348,6 +361,7 @@ impl Rule {
             | Self::GroupedNamesAreDistinct
             | Self::IsInTakesAList
             | Self::KeptOrderNeedsKeysOfTheRows
+            | Self::LiteralBesideValuesInAGroup
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
             | Self::PatternIsValid
@@ -447,12 +461,12 @@ impl Rule {
     }
 
     /// The rule that forbids a key that holds an aggregate beside a column, or a
-    /// column compared with a null, where `context` is a join's own key, if it
-    /// does. Whether the key holds one is a
+    /// column compared with a null, where `context` is a join's own key or the key of a window in
+    /// what a group by evaluates, if it does. Whether the key holds one is a
     /// matter of the whole expression, which the caller found.
     #[must_use]
     pub(super) fn forbids_non_elementwise_key(context: Context) -> Option<Self> {
-        context.is_join_key().then_some(Self::KeyIsElementwise)
+        (context.is_join_key() || context.is_a_group_window_key()).then_some(Self::KeyIsElementwise)
     }
 
     /// The rule that forbids a moment or a length of time made of numbers typed in, where
@@ -560,6 +574,7 @@ impl Rule {
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
             | Self::KeptOrderNeedsKeysOfTheRows
+            | Self::LiteralBesideValuesInAGroup
             | Self::DurationIsValid
             | Self::ElementDtypeIsImplemented
             | Self::ElementDtypeIsMeasured

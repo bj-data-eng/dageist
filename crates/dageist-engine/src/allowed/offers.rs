@@ -2095,8 +2095,9 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
 
 /// The refusal of a key that the caller has already found is not elementwise, as
 /// it holds an aggregate beside a column, or a column compared with a null,
-/// where `context` holds one of a join's own keys, if the rule refuses it there.
-/// Polars accepts such a key in a window, so the rule is silent there. What a
+/// where `context` holds one of a join's own keys, or the key of a window in what a group by
+/// evaluates in `agg` or `having`, if the rule refuses it there. Polars accepts such a key in a
+/// window of a select, a filter or a sort key, so the rule is silent there. What a
 /// key holds is a matter of the whole expression, not of one entry, so the
 /// caller finds it, and this does not.
 ///
@@ -2117,6 +2118,23 @@ pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), 
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
+}
+
+/// The refusal of a literal that a method of a group maps or replaces the values of, given values
+/// beside it, which the caller has found: `given` says what the parameter was given, as `the values
+/// of the group` or `one value that an aggregate gave`.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words and what the parameter was given.
+pub fn rule_forbids_a_literal_beside_values_in_a_group(
+    parameter: &str,
+    given: &str,
+) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::LiteralBesideValuesInAGroup,
+        &format!("{parameter} was given {given}"),
+    ))
 }
 
 /// The refusal of a moment or a length of time made of numbers typed in, which the caller has found,

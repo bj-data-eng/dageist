@@ -320,6 +320,9 @@ struct Operand {
     /// the operand it is used with.
     loose: Option<Loose>,
     shape: Shape,
+    /// Whether it is made of literals alone: a value that no column and no aggregate of the table
+    /// is part of.
+    literal: bool,
     /// How many values it gives where its shape is [`Shape::Counted`], as far as the arguments
     /// fix it.
     count: Count,
@@ -392,6 +395,8 @@ struct Around<'a> {
     /// The value the link gives is a null: the chain starts from a null literal, and the link and
     /// each before it keep a null.
     null_kept: bool,
+    /// Whether the value the link follows is made of literals alone.
+    literal: bool,
 }
 
 /// What a chain has so far.
@@ -2239,6 +2244,7 @@ impl Walker<'_> {
             dtype: None,
             loose: None,
             shape: Shape::Many,
+            literal: false,
             count: Count::NotKnown,
             taken: Taken::default(),
             known: false,
@@ -2654,6 +2660,7 @@ impl Walker<'_> {
                     from_a_list,
                     output_name: name_before.as_deref(),
                     null_kept,
+                    literal: is_made_of_literals(expression, at),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2853,6 +2860,7 @@ impl Walker<'_> {
                     _ => None,
                 },
                 shape,
+                literal: is_made_of_literals(expression, expression.links().len()),
                 count,
                 taken,
                 // What was not asked has no shape that can be counted on.
@@ -2887,6 +2895,7 @@ impl Walker<'_> {
                 } else {
                     Shape::Many
                 },
+                literal: false,
                 count: meeting.1,
                 taken,
                 known: true,
@@ -2985,6 +2994,7 @@ impl Walker<'_> {
             from_a_list,
             output_name,
             null_kept,
+            literal: receiver_is_literal,
         } = around;
         // What the call says of a struct: the fields it follows, the names and numbers it is given.
         let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
@@ -3048,6 +3058,25 @@ impl Walker<'_> {
                 Some(Value::Choice(word)) if word == "join" || word == "explode"
             )
             && let Err(refusal) = allowed::rule_forbids_a_window_over_a_count()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // A group evaluates what maps a literal, and what replaces the values of one, with kernels
+        // that take no values beside it.
+        if matches!(cur, Cur::Value { .. })
+            && receiver_is_literal
+            && matches!(context.outer(), Outer::Aggregate | Outer::Having)
+            && let Some((parameter, given)) =
+                given_values_beside_a_literal(entry, arguments, context.outer())
+            && let Err(refusal) =
+                allowed::rule_forbids_a_literal_beside_values_in_a_group(parameter, given)
         {
             self.refuse(&refusal, false);
             return (
@@ -4460,6 +4489,109 @@ fn imploded(values: Operand) -> Operand {
         fields: None,
         ..values
     }
+}
+
+/// Whether the start of `expression` and its first `upto` links are made of literals alone: a
+/// literal, or a function of literals, that no aggregate, no count of values and no column is
+/// part of.
+fn is_made_of_literals(expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    let Start::Call(start) = expression.start() else {
+        return false;
+    };
+    let of_literals = |call: &Call| {
+        operands(call)
+            .into_iter()
+            .all(|inside| is_made_of_literals(inside, inside.links().len()))
+    };
+    (start.entry().id().as_str() == "polars.lit"
+        || (takes_expressions(start) && of_literals(start)))
+        && links
+            .iter()
+            .all(|link| !is_one_value(link) && !is_counting(link) && of_literals(link))
+}
+
+/// Where Polars refuses values beside a literal in what a group by evaluates, as a method maps the
+/// literal or replaces the values of it: the values of the group, and one value that an aggregate
+/// gave, in `agg` and in `having`.
+#[allow(clippy::struct_excessive_bools)]
+struct Beside {
+    rows_in_agg: bool,
+    one_in_agg: bool,
+    rows_in_having: bool,
+    one_in_having: bool,
+}
+
+/// What Polars refuses of what a literal receiver of `entry` is given for `parameter`, as the grid
+/// of the methods that are given values beside what they follow shows.
+fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
+    match (entry, parameter) {
+        // The methods that map a literal take the values of a group beside it in `agg` as a map of
+        // one value beside many, and one value that an aggregate gave in a `having` only.
+        ("Expr.dt.replace", _) | ("Expr.str.splitn" | "Expr.str.split_exact", "by") => {
+            Some(Beside {
+                rows_in_agg: true,
+                one_in_agg: false,
+                rows_in_having: false,
+                one_in_having: true,
+            })
+        }
+        // What sorts a literal by the values of the group is as long as they are, not as it is.
+        ("Expr.sort_by", "by") => Some(Beside {
+            rows_in_agg: true,
+            one_in_agg: false,
+            rows_in_having: false,
+            one_in_having: false,
+        }),
+        // A replacement of a literal by values for each row is not yet implemented.
+        ("Expr.replace" | "Expr.replace_strict", "old" | "new") => Some(Beside {
+            rows_in_agg: true,
+            one_in_agg: true,
+            rows_in_having: true,
+            one_in_having: true,
+        }),
+        // What fills a literal replaced takes one value of an aggregate in `having` as the others
+        // take it, and in `agg` takes the values of the group too.
+        ("Expr.replace_strict", "default")
+        | ("Expr.str.replace" | "Expr.str.replace_all", "value") => Some(Beside {
+            rows_in_agg: true,
+            one_in_agg: true,
+            rows_in_having: false,
+            one_in_having: true,
+        }),
+        _ => None,
+    }
+}
+
+/// The first parameter of `entry` that a literal receiver is given values beside, in what a group by
+/// evaluates in `outer`, which Polars refuses, with what it was given: the values of the group, or
+/// one value that an aggregate gave.
+fn given_values_beside_a_literal<'a>(
+    entry: &Entry,
+    arguments: &'a [(String, Operand)],
+    outer: Outer,
+) -> Option<(&'a str, &'static str)> {
+    arguments.iter().find_map(|(name, operand)| {
+        let refused = beside_a_literal(entry.id().as_str(), name)?;
+        if !operand.known {
+            return None;
+        }
+        let having = outer == Outer::Having;
+        match operand.shape {
+            Shape::Many
+                if (refused.rows_in_having && having) || (refused.rows_in_agg && !having) =>
+            {
+                Some((name.as_str(), "the values of the group"))
+            }
+            Shape::One
+                if !operand.literal
+                    && ((refused.one_in_having && having) || (refused.one_in_agg && !having)) =>
+            {
+                Some((name.as_str(), "one value that an aggregate gave"))
+            }
+            _ => None,
+        }
+    })
 }
 
 fn is_one_value(call: &Call) -> bool {

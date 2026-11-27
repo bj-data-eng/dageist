@@ -882,7 +882,14 @@ fn continued_subject(
     // a count of its values or whether all of them are: no place takes the count itself, and what
     // is measured is whether the method may stand in the place at all.
     // A predicate of a `having` is one value for each group, whatever the group gives.
-    let aggregated = aggregated || context.outer() == Outer::Having;
+    // The key of a window is not a predicate, and is no aggregate: a window groups by the rows of
+    // its group, which an aggregate is not.
+    let aggregated = aggregated
+        || (context.outer() == Outer::Having
+            && !matches!(
+                context.nested(),
+                Some(Nested::PartitionBy | Nested::OrderBy)
+            ));
     match (aggregated, needs_boolean(context)) {
         (false, _) => Ok(tested),
         (true, true) => method(entry("Expr.all"), tested, Vec::new()),

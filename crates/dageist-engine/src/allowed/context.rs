@@ -258,6 +258,16 @@ impl Context {
         self.nested.is_none() && matches!(self.outer, Outer::JoinLeft | Outer::JoinRight)
     }
 
+    /// Whether an expression that stands here is the key of a window inside what a group by
+    /// evaluates on the values of each group, in `agg` or in `having`, where Polars needs it to be
+    /// elementwise as it does a join's key. A window in a select, a filter or a sort key accepts
+    /// one that is not.
+    #[must_use]
+    pub const fn is_a_group_window_key(&self) -> bool {
+        matches!(self.outer, Outer::Aggregate | Outer::Having)
+            && matches!(self.nested, Some(Nested::PartitionBy | Nested::OrderBy))
+    }
+
     /// The position of the step.
     #[must_use]
     pub const fn outer(&self) -> Outer {
