@@ -80,15 +80,19 @@ pub enum Limit {
     /// for another cause, which a probe or another limit settles. A pivot's
     /// aggregate reads no column to stand in, so it is not this.
     ALiteral,
-    /// A pivot's aggregate is run on the values of each group, not on a
-    /// column in `select`, and Polars uses other kernels for them: it takes the
+    /// A pivot's aggregate, and what a group by gives its aggregates and its `having`, is run on
+    /// the values of each group, not on a column in `select`, and Polars uses other kernels for
+    /// them: it takes the
     /// `max` of a `Struct` there, which `select` refuses, and compares, casts
     /// and windows what `select` does not. A table with no rows has no groups,
     /// and the values of an aggregate over none have no dtype. The empty table's
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
     ///
-    /// The reasons the gate accepts, each at a call of the aggregate of a pivot:
+    /// A group by adds a replacement that is given a pattern for each row, which Polars does not yet
+    /// implement in the kernels of a group.
+    ///
+    /// The reasons the gate accepts, each at a call of the aggregate of a pivot or of a group by:
     /// - the tables refusing, which Polars allows, with a reason that says a dtype an operation
     ///   does not support or a function that makes a length of time expects numbers, a comparison,
     ///   an operation, an evaluation, a cast, a struct field, the
@@ -389,6 +393,11 @@ pub enum Limit {
     /// place, in a case with a `str.replace` that is given a count above one: the case run again
     /// with each count left out is not refused for it.
     AReplacementOfMoreThanTheFirstMatch,
+    /// A share outside 0 to 1, which a quantile of a group by is given, is refused by Polars as it
+    /// builds the step, and no table holds it: the tables measure a share inside (the issue 224
+    /// tracks the values a table does not hold). Polars refusing the schema for a quantile that
+    /// should be between 0 and 1, in a step that has a quantile.
+    AShareOutsideZeroToOne,
     /// A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table
     /// only where each piece it runs them in is no longer than that one value, and never over a table
     /// with no rows, so a replacement of it given many values is refused where the column of text the
@@ -510,7 +519,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 41] = [
+    pub const ALL: [Self; 42] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -539,6 +548,7 @@ impl Limit {
         Self::AStrictReplacementGivenNoDefault,
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
+        Self::AShareOutsideZeroToOne,
         Self::ALiteralTextBesideManyReplacementValues,
         Self::AReplacementOfAnAggregateInAWindowKey,
         Self::AFormatTheDtypeCannotWrite,
@@ -589,6 +599,7 @@ impl Limit {
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "a-replacement-of-more-than-the-first-match"
             }
+            Self::AShareOutsideZeroToOne => "a-share-outside-zero-to-one",
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a-literal-text-beside-many-replacement-values"
             }
@@ -645,7 +656,7 @@ impl Limit {
                 "a panic of Polars depends on the plan it makes, which another place may not make"
             }
             Self::AGroupAggregate => {
-                "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
+                "a pivot's aggregate, and an aggregate or a having of a group by, is run on groups, with kernels of its own, not on a column in select"
             }
             Self::AShiftThatLeavesNulls => {
                 "a shift leaves nulls, which Polars does not meet with the dtype the tables refuse"
@@ -727,6 +738,9 @@ impl Limit {
             }
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a literal text, or a struct of literals written as text, is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
+            }
+            Self::AShareOutsideZeroToOne => {
+                "Polars refuses a share outside 0 to 1 as it builds the step, which no table holds, as the tables measure a share inside it (tracked by #224)"
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
@@ -1383,6 +1397,16 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         let value = match (&node, segment) {
             (Node::Call(call), Segment::Parameter(name)) => call.argument(name),
             (Node::Value(Value::Many(items)), Segment::Item(at)) => items.get(*at),
+            // A call that follows the step's own, as the calls after `group_by` do.
+            (Node::Call(_), Segment::Link(at))
+                if locus.places.is_empty() && locus.top.is_none() =>
+            {
+                node = match case.document.steps()[0].links().get(*at) {
+                    Some(call) => Node::Call(call),
+                    None => return locus,
+                };
+                continue;
+            }
             (Node::Value(Value::Pairs(pairs)), Segment::Key(at)) => {
                 pairs.get(*at).map(|(key, _)| key)
             }
@@ -4119,6 +4143,8 @@ fn applies(
 ) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
+    // What a group by evaluates on the values of each group, as a pivot's aggregate is.
+    let grouped = !case.document.steps()[0].links().is_empty();
     let held = operands(step);
     let explodes_in = |expression: &Expression| any_call(expression, &has_explode);
     match (limit, disagreement) {
@@ -4247,6 +4273,17 @@ fn applies(
                     .any(|(_, held)| holds_a_replacement_of_a_literal(held))
                 && refused_for_a_value_of_another_length_with_columns(case) == Some(false)
         }
+        (Limit::AShareOutsideZeroToOne, Disagreement::PolarsRefuses(refusal)) => {
+            // The share is the cause where Polars names it: nothing else says a quantile should be
+            // between 0 and 1.
+            refusal.stage == Stage::Schema
+                && refusal
+                    .reason
+                    .contains("quantile` should be between 0.0 and 1.0")
+                && std::iter::once(case.document.steps()[0].call())
+                    .chain(case.document.steps()[0].links())
+                    .any(|call| matches!(call.entry().id().as_str(), "LazyGroupBy.quantile"))
+        }
         (Limit::AReplacementOfMoreThanTheFirstMatch, Disagreement::PolarsRefuses(refusal)) => {
             // The count is the cause where Polars stops refusing it once each replacement is
             // given none, which is the first match.
@@ -4366,14 +4403,20 @@ fn applies(
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "Expr.quantile")));
-            pivot && (of_nothing || a_text_share)
+            // Polars does not yet implement a replacement that is given a pattern for each row in
+            // the kernels of a group, though it does in a select.
+            let a_pattern_per_row = refusal.stage != Stage::Schema
+                && refusal.reason.contains("not yet implemented")
+                && refusal.reason.contains("replacement pattern per row")
+                && grouped;
+            pivot && (of_nothing || a_text_share) || grouped && (of_nothing || a_pattern_per_row)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
-            pivot
+            (pivot || grouped)
                 && [
                     "not supported for dtype",
                     "cannot compare",
@@ -5040,10 +5083,23 @@ fn excuses_as_in_a_select(case: &Case, disagreement: &Disagreement) -> Vec<Limit
     };
     let predicted = predict(&selected);
     let observed = observe_checked(&selected);
+    // The same way is the same stage and the same objection: a refusal that only the group makes
+    // is not hidden by another that the expression makes alone.
     let the_same_way = match (&predicted.verdict, &observed.refusal, disagreement) {
-        (Verdict::Allows, Some(_), Disagreement::PolarsRefuses(_)) => true,
-        (Verdict::Refuses(refused), None, Disagreement::PolarsAllows(_)) => {
-            matches!(refused.source, Source::Polars)
+        (Verdict::Allows, Some(alone), Disagreement::PolarsRefuses(here)) => is_the_same_objection(
+            Some(&alone.stage),
+            &alone.reason,
+            Some(&here.stage),
+            &here.reason,
+        ),
+        (Verdict::Refuses(alone), None, Disagreement::PolarsAllows(here)) => {
+            matches!(alone.source, Source::Polars)
+                && is_the_same_objection(
+                    alone.stage.as_ref(),
+                    &alone.reason,
+                    here.stage.as_ref(),
+                    &here.reason,
+                )
         }
         _ => false,
     };
@@ -5052,6 +5108,63 @@ fn excuses_as_in_a_select(case: &Case, disagreement: &Disagreement) -> Vec<Limit
     } else {
         Vec::new()
     }
+}
+
+/// Whether a key of a step that groups drops the nulls or the NaNs it reads, at any depth.
+pub fn a_key_drops_values(case: &Case) -> bool {
+    let step = &case.document.steps()[0];
+    step.call()
+        .arguments()
+        .iter()
+        .filter(|given| matches!(given.parameter(), "by" | "named_by"))
+        .flat_map(|given| match given.value() {
+            Value::Many(items) => items.iter().collect::<Vec<_>>(),
+            Value::Pairs(pairs) => pairs.iter().map(|(_, entry)| entry).collect(),
+            other => vec![other],
+        })
+        .any(|key| matches!(key, Value::Expression(key) if any_call(key, &is_a_drop)))
+}
+
+/// Whether two refusals of Polars are one objection: the same stage and the same reason, as the
+/// probes read a reason.
+pub fn is_the_same_objection<S: PartialEq>(
+    stage: Option<&S>,
+    reason: &str,
+    other_stage: Option<&S>,
+    other_reason: &str,
+) -> bool {
+    stage == other_stage && same_reason(&Source::Polars, reason, other_reason)
+}
+
+/// The keys of a step that groups, as the items of a `select` of the same frames.
+pub fn keys_as_a_select(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let keys: Vec<Value> = step
+        .call()
+        .arguments()
+        .iter()
+        .filter(|given| matches!(given.parameter(), "by" | "named_by"))
+        .flat_map(|given| match given.value() {
+            Value::Many(items) => items.clone(),
+            Value::Pairs(pairs) => pairs.iter().map(|(_, entry)| entry.clone()).collect(),
+            other => vec![other.clone()],
+        })
+        .filter(|key| matches!(key, Value::Expression(_)))
+        .collect();
+    if keys.is_empty() {
+        return None;
+    }
+    let select = Call::new(
+        catalog::entry("LazyFrame.select")?,
+        vec![("exprs", Value::Many(keys))],
+    )
+    .ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        structs: case.structs.clone(),
+        document: Document::new(vec![Step::new(step.id().clone(), select).ok()?]).ok()?,
+    })
 }
 
 /// The expression of a step that groups that `place` is in, alone in a `select` of the same frames,
@@ -5411,11 +5524,59 @@ mod tests {
 
     #[test]
     fn what_a_select_excuses_of_an_expression_is_excused_of_it_in_a_step_that_groups() {
-        // A text literal compared with a null literal of a number: the tables refuse it, as they
-        // do in a select, and Polars allows it as it does there.
+        // A strict replacement that lists one value, given no default: Polars refuses a value it
+        // does not list as it does alone in a select, where the limit excuses it.
         assert_eq!(
-            excused_by_kept("uncovered-a-literal--given-to-a-comparison-in-a-group.case"),
-            vec![Limit::ALiteral]
+            excused_by_kept("uncovered-a-strict-replacement-given-no-default--in-a-group.case"),
+            vec![Limit::AStrictReplacementGivenNoDefault]
+        );
+    }
+
+    #[test]
+    fn two_refusals_are_one_objection_only_at_one_stage_for_one_reason() {
+        assert!(is_the_same_objection(
+            Some(&Stage::Rows),
+            "incomplete mapping specified for `replace_strict`",
+            Some(&Stage::Rows),
+            "incomplete mapping specified for `replace_strict`",
+        ));
+        assert!(!is_the_same_objection(
+            Some(&Stage::Rows),
+            "incomplete mapping specified for `replace_strict`",
+            Some(&Stage::Schema),
+            "incomplete mapping specified for `replace_strict`",
+        ));
+        assert!(!is_the_same_objection(
+            Some(&Stage::Rows),
+            "incomplete mapping specified for `replace_strict`",
+            Some(&Stage::Rows),
+            "not yet implemented: `replace` with a replacement pattern per row",
+        ));
+    }
+
+    #[test]
+    fn what_is_excused_of_a_group_by_is_what_polars_does_with_the_values_of_a_group() {
+        for name in [
+            "uncovered-a-group-aggregate--a-replacement-pattern-per-row.case",
+            "uncovered-a-group-aggregate--is_close-of-a-column-of-nulls.case",
+            "uncovered-a-group-aggregate--the-schema-says-null-of-a-null-literal.case",
+            "uncovered-a-group-aggregate--degrees-in-the-order-of-a-window.case",
+            "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
+            "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AGroupAggregate],
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_share_outside_zero_to_one_is_excused_for_a_quantile_and_for_no_other_reason() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-share-outside-zero-to-one.case"),
+            vec![Limit::AShareOutsideZeroToOne]
         );
     }
 

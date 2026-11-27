@@ -14,7 +14,10 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
-use super::limits::{Limit, as_a_select, excuses, excuses_a_refused_prefix, strict};
+use super::limits::{
+    Limit, a_key_drops_values, as_a_select, excuses, excuses_a_refused_prefix,
+    is_the_same_objection, keys_as_a_select, strict,
+};
 use super::observe::{
     Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
@@ -26,7 +29,7 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const STRICTER_BY_DESIGN: [(&str, &str); 7] = [
+const STRICTER_BY_DESIGN: [(&str, &str); 8] = [
     (
         "pivot-aggregate-gives-one-value",
         "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
@@ -50,6 +53,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 7] = [
     (
         "struct-is-filled-forward-or-backward",
         "a struct is filled only forward or backward, though Polars fills it by any strategy where it holds no null",
+    ),
+    (
+        "kept-order-needs-keys-of-the-rows",
+        "a key that takes some of the values gives as many as the arguments or the data decide, which Polars refuses where the order is kept unless by chance of the sample's rows they are the rows' or one value, as a filter that keeps one row, a drop that finds no null and the first rows that are all of them are",
     ),
     (
         "element-dtype-is-implemented",
@@ -786,7 +793,14 @@ impl CaseTarget for AllowedTarget {
                             == "LazyFrame.group_by"
                         && matches!(
                             &predict(&selected).verdict,
-                            Verdict::Refuses(alone) if matches!(alone.source, Source::Polars)
+                            Verdict::Refuses(alone)
+                                if matches!(alone.source, Source::Polars)
+                                    && is_the_same_objection(
+                                        alone.stage.as_ref(),
+                                        &alone.reason,
+                                        refused.stage.as_ref(),
+                                        &refused.reason,
+                                    )
                         )
                         && observe_checked(&selected).refusal.is_none()
                         && let Ok(outcome) = self.evaluate(&selected)
@@ -839,6 +853,39 @@ impl CaseTarget for AllowedTarget {
                                 "refused by a rule in a group, excused in a select: {rule}"
                             ));
                             return Ok(outcome);
+                        }
+                        // A count that a key of a group by is made, which its keys meet: asked as
+                        // the keys of a select are, with the control that makes the count another.
+                        if !case.document.steps()[0].links().is_empty()
+                            && let Some(selected) = keys_as_a_select(case)
+                            && let Verdict::Refuses(alone) = predict(&selected).verdict
+                            && matches!(&alone.source, Source::Rule(same) if *same == rule)
+                            && observe_checked(&selected).refusal.is_none()
+                            && let Some(outcome) = by_design(&selected, &alone, rule)
+                        {
+                            return outcome;
+                        }
+                        // A key that drops the nulls or the NaNs it reads gives as many values as the
+                        // data leave, which the sample's rows, that hold none to drop, make the rows'
+                        // by chance: the count is the data's, as a filter's is.
+                        if !case.document.steps()[0].links().is_empty()
+                            && ["values-meet-in-count", "window-input-is-not-counted"]
+                                .contains(&rule)
+                            && a_key_drops_values(case)
+                            && !strict()
+                        {
+                            tally(format!(
+                                "{}: {rule} of a key that drops",
+                                counts::STRICTER_BY_DESIGN
+                            ));
+                            return CaseOutcome::expected_rejection(
+                                Vec::new(),
+                                one_line(&format!(
+                                    "{}: a key that drops the nulls or the NaNs it reads gives as many values as the data leave, which a sample with none to drop makes the rows' by chance: {}",
+                                    counts::STRICTER_BY_DESIGN,
+                                    refused.reason
+                                )),
+                            );
                         }
                         // A predicate the rule refuses may hold a call Polars refuses first,
                         // or may not be evaluated, so it is asked on a column of its dtype.
