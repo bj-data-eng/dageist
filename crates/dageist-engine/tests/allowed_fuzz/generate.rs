@@ -4057,6 +4057,49 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn a_focus_on_is_in_draws_it_only_looking_up_in_a_collection_nested_more_deeply_than_its_value()
+    {
+        // Polars deprecates a collection nested as the value `is_in` follows is, a column of its
+        // own dtype, which the engine refuses: what is looked up in is a list or an array column or
+        // the operand imploded.
+        let mut asked = 0;
+        for case in focused_cases("is_in", 400) {
+            let header = header_of(&case);
+            // The other table's columns have the dtypes of `a` and `b`.
+            let nested = |name: &str| {
+                let name = match name {
+                    "ra" => "a",
+                    "rb" => "b",
+                    other => other,
+                };
+                header[name]
+                    .as_str()
+                    .and_then(Representative::from_name)
+                    .is_some_and(Representative::is_nested)
+            };
+            for arguments in arguments_of(&case, "Expr.is_in") {
+                let then = arguments["other"]["expression"]["then"]
+                    .as_array()
+                    .expect("links");
+                let start = &arguments["other"]["expression"]["start"];
+                let imploded = then
+                    .last()
+                    .is_some_and(|link| link["entry"] == "Expr.implode");
+                let column = start["entry"] == "polars.col" && then.is_empty();
+                let named = start["arguments"]["name"]["columns"][0]
+                    .as_str()
+                    .unwrap_or("");
+                assert!(
+                    imploded || (column && nested(named)),
+                    "is_in looks up in a collection that is neither imploded nor a list or an array: {arguments}"
+                );
+                asked += 1;
+            }
+        }
+        assert!(asked > 50, "only {asked} calls of is_in were drawn");
+    }
+
     /// The texts of the list a call is given for `parameter`, whatever the kind of each.
     fn listed(arguments: &serde_json::Value, parameter: &str) -> Option<Vec<String>> {
         let items = arguments.get(parameter)?["many"].as_array()?;
