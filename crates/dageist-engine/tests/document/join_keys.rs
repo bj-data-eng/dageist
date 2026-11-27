@@ -552,6 +552,30 @@ fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
             true,
         ),
         ("a plain column", keyed(is_in("a", field("a"))), false),
+        // Polars folds the values of a literal gathered into a list into a literal, which no
+        // aggregate is; a column gathered is an aggregate, which a key may not hold beside one.
+        (
+            "a literal imploded",
+            keyed(is_in(
+                "a",
+                chain(
+                    call(
+                        "polars.lit",
+                        json!({ "value": { "integer": 1 }, "dtype": { "dtype": "Int64" } }),
+                    ),
+                    vec![call("Expr.implode", json!({}))],
+                ),
+            )),
+            true,
+        ),
+        (
+            "a column imploded",
+            keyed(is_in(
+                "a",
+                field_then("a", vec![call("Expr.implode", json!({}))]),
+            )),
+            false,
+        ),
         ("the first list", keyed(is_in("a", first("l"))), false),
         (
             "a list column of an aggregate",

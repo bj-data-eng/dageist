@@ -293,3 +293,17 @@ fn a_connected_list_given_to_is_in_makes_no_warning_of_polars() {
     );
     assert!(!printed.contains("deprecated"), "Polars warned\n{printed}");
 }
+
+#[test]
+fn a_list_column_looked_up_in_a_collection_of_lists_is_not_judged_by_the_tables() {
+    // Python Polars 2.2.0 takes `l.is_in(l.implode().implode())`: a list is looked up in a list of
+    // lists. No class of the tables is a list of lists, so the engine does not offer it, and says
+    // that the tables do not measure it, and not that Polars refuses a collection that is no list.
+    let looked_up = field_then(
+        "l",
+        vec![is_in(field_then("l", vec![implode(), implode()]))],
+    );
+    let (rule, said) = refused_by_a_rule(looked_up);
+    assert_eq!(rule, "element-dtype-is-measured");
+    assert!(said.contains("Expr.is_in"), "{said}");
+}
