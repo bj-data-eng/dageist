@@ -320,6 +320,9 @@ fn edge_numbers(class: Representative) -> Vec<i64> {
         Representative::UInt16 => vec![0, i64::from(u16::MAX)],
         Representative::UInt32 => vec![0, i64::from(u32::MAX)],
         Representative::UInt64 => vec![0, i64::MAX],
+        Representative::Int128 => vec![i64::MIN, i64::MAX, 0, -1],
+        Representative::UInt128 => vec![0, i64::MAX],
+        Representative::Float16 => vec![2048, 2049, 65_504, 0, -1],
         Representative::Float32 => vec![1 << 24, (1 << 24) + 1, 1 << 53, 0, -1],
         Representative::Float64 => vec![1 << 53, (1 << 53) + 1, (1 << 24) + 1, 0, -1],
         _ => vec![0, 1],
@@ -337,7 +340,8 @@ fn past_the_edges(class: Representative) -> Vec<i64> {
         Representative::UInt8 => vec![-1, i64::from(u8::MAX) + 1],
         Representative::UInt16 => vec![-1, i64::from(u16::MAX) + 1],
         Representative::UInt32 => vec![-1, i64::from(u32::MAX) + 1],
-        Representative::UInt64 => vec![-1],
+        Representative::UInt64 | Representative::UInt128 => vec![-1],
+        Representative::Float16 => vec![65_520, 70_000],
         _ => vec![300],
     }
 }
@@ -355,10 +359,10 @@ fn literal_classes() -> Vec<Representative> {
 const EDGE_PERCENT: usize = 25;
 
 /// How many of the first of the [`NUMBERED`] classes are numbers.
-const NUMERIC_CLASSES: usize = 10;
+const NUMERIC_CLASSES: usize = 13;
 
 /// The classes the whole number 1 is cast to as a literal, the numbers first.
-const NUMBERED: [Representative; 17] = [
+const NUMBERED: [Representative; 20] = [
     Representative::Int8,
     Representative::Int16,
     Representative::Int32,
@@ -369,6 +373,9 @@ const NUMBERED: [Representative; 17] = [
     Representative::UInt64,
     Representative::Float32,
     Representative::Float64,
+    Representative::Float16,
+    Representative::Int128,
+    Representative::UInt128,
     Representative::Boolean,
     Representative::String,
     Representative::Date,
@@ -1171,9 +1178,43 @@ impl Gen<'_> {
     /// measured with the number 1, so these are what the rules that read a literal's value must
     /// settle.
     fn written_as_a_number_of(&mut self, class: Representative) -> Value {
-        let numeric = NUMBERED[..NUMERIC_CLASSES].contains(&class);
-        if !numeric || !self.draw.chance(EDGE_PERCENT) {
+        if !self.draw.chance(EDGE_PERCENT) {
             return Value::Integer(1);
+        }
+        if class == Representative::Boolean {
+            // A flag is the number 0 or 1, a text of one or of a word, and a number that is neither.
+            return match self.draw.below(9) {
+                0 => Value::Integer(0),
+                1 => Value::Integer(2),
+                2 => Value::Float(0.5),
+                3 => Value::Float(1.0),
+                4 => Value::String("true".to_owned()),
+                5 => Value::String("1".to_owned()),
+                6 => Value::String(String::new()),
+                7 => Value::String("abc".to_owned()),
+                _ => Value::Flag(Some(true)),
+            };
+        }
+        if !NUMBERED[..NUMERIC_CLASSES].contains(&class) {
+            return Value::Integer(1);
+        }
+        // A number of 128 bits above 64 bits can only be written as a text or a float.
+        if matches!(class, Representative::Int128 | Representative::UInt128) && self.draw.chance(40)
+        {
+            let wide: &[&str] = if class == Representative::Int128 {
+                &[
+                    "170141183460469231731687303715884105727",
+                    "-170141183460469231731687303715884105728",
+                    "170141183460469231731687303715884105728",
+                ]
+            } else {
+                &[
+                    "340282366920938463463374607431768211455",
+                    "170141183460469231731687303715884105728",
+                    "340282366920938463463374607431768211456",
+                ]
+            };
+            return Value::String(self.draw.pick(wide).to_owned());
         }
         let number = if self.draw.chance(8) {
             self.draw.pick(&past_the_edges(class))
@@ -3765,9 +3806,9 @@ mod tests {
     /// Whether every share a quantile is given in the JSON `value` is a literal alone of a numeric
     /// dtype, or of none, which is a number typed in.
     fn shares_are_numbers(value: &serde_json::Value, found: &mut usize) -> bool {
-        const NUMERIC: [&str; 10] = [
-            "Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float32",
-            "Float64",
+        const NUMERIC: [&str; 13] = [
+            "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64",
+            "UInt128", "Float16", "Float32", "Float64",
         ];
         match value {
             serde_json::Value::Object(map) => {
