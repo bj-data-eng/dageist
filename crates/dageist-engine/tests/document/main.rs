@@ -24,6 +24,7 @@ mod moments_walked;
 mod nesting;
 mod not_run;
 mod nulls;
+mod omitted;
 mod order;
 mod patterns;
 mod pivot_groups;

@@ -12,6 +12,7 @@
     "field-names-fit-the-struct",
     "filter-predicate-is-boolean",
     "folded-function-is-no-join-key",
+    "is-in-takes-a-list",
     "join-key-names-are-not-repeated",
     "key-is-elementwise",
     "moments-share-a-zone",

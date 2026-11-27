@@ -863,7 +863,7 @@ fn a_search_gives_a_place_for_each_value_it_looks_for() {
 }
 
 #[test]
-fn is_in_gives_the_values_it_follows_unless_it_is_given_a_list_of_each() {
+fn is_in_gives_a_value_for_each_value_it_follows_given_a_list_of_each_or_one_imploded() {
     let is_in = |receiver: Vec<Value>, other: Value| {
         select_of(vec![on(
             "a",
@@ -875,16 +875,17 @@ fn is_in_gives_the_values_it_follows_unless_it_is_given_a_list_of_each() {
         )])
     };
     let sum = || vec![call("Expr.sum", json!({}))];
-    // A column of the values' own dtype is their set, whole: one value is asked of it, and each of
-    // the rows is.
+    // A collection imploded is one list that holds every value to look in, which each value is
+    // met by: one value is asked of it, and each of the rows is.
+    let imploded = on("k", vec![call("Expr.implode", json!({}))]);
     for (name, receiver, shape) in [
         ("one value", sum(), Shape::One),
         ("the rows", Vec::new(), Shape::Many),
     ] {
         assert_eq!(
-            last_after(item(&is_in(receiver, field("k")), 0)),
+            last_after(item(&is_in(receiver, imploded.clone()), 0)),
             after(Representative::Boolean, shape),
-            "{name} given a column"
+            "{name} given a collection imploded"
         );
     }
     // A list of each group's values is met row by row, so one value is asked of each.

@@ -715,17 +715,6 @@ pub(super) fn has_a_subject(entry: &catalog::Entry) -> bool {
     is_method(entry) || subject_of(entry).is_some()
 }
 
-/// The form of `is_in` that is given a list or an array as the values it tests membership in:
-/// Polars meets them row by row, so the test is elementwise where the same call given a column of
-/// its own dtype, which is a set that is met whole, is not. The context table measures it apart, as
-/// it does a method given an option in place of a parameter.
-pub(super) const LIST_FORM: (&str, &str) = ("other", "list");
-
-/// Whether a dtype is a list or an array, which `is_in` meets row by row.
-pub(super) const fn is_a_list(class: Representative) -> bool {
-    class.is_nested()
-}
-
 /// The methods whose answer depends on the element dtype of a list or an array, where Polars
 /// meets it with another operand or fills, orders or compares by it: arithmetic finds the
 /// supertype of the elements and the other operand, a comparison of lists compares elements that

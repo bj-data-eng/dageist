@@ -323,7 +323,7 @@ fn typed(literal: &Literal) -> Value {
 /// The documents refused by a rule that the walk applies to what a call is given or to the keys of a
 /// join, which the offers at a place do not give a call: a pattern, a duration and a time zone that
 /// are not valid, a range that cannot be made, a key that is no elementwise, two pairs of keys
-/// named alike, and a window given a count of values.
+/// named alike, a window given a count of values, and a value looked up in a column of its own dtype.
 pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
     let whole = column_of(Representative::Int64);
     let text = |words: &str| typed(&Literal::String(words.to_owned()));
@@ -372,6 +372,19 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
             ),
         },
     ];
+
+    // A column looked up in a column of its own dtype, which Polars deprecates: the values that
+    // `is_in` looks up in are a list, or a collection imploded.
+    cases.push(Case {
+        name: "a value looked up in a column of its own dtype".to_owned(),
+        document: method_given(
+            planner,
+            Representative::Int64,
+            Shape::Many,
+            "Expr.is_in",
+            vec![("other", field(&whole))],
+        ),
+    });
 
     // A replacement of one old value by many new ones, which the rule asks to be as many as the old.
     cases.push(Case {

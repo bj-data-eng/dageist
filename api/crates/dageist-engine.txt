@@ -160,6 +160,7 @@ pub dageist_engine::allowed::Rule::FieldIsOfTheStruct
 pub dageist_engine::allowed::Rule::FieldNamesFitTheStruct
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
+pub dageist_engine::allowed::Rule::IsInTakesAList
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::MomentsShareAZone
@@ -178,7 +179,7 @@ pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 27]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 28]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -767,6 +768,15 @@ pub struct dageist_engine::catalog::LeftOut
 impl dageist_engine::catalog::LeftOut
 pub const fn dageist_engine::catalog::LeftOut::id(&self) -> &'static str
 pub const fn dageist_engine::catalog::LeftOut::reason(&self) -> dageist_engine::catalog::Reason
+pub struct dageist_engine::catalog::OmittedForm
+impl dageist_engine::catalog::OmittedForm
+pub const fn dageist_engine::catalog::OmittedForm::bug(&self) -> core::option::Option<&'static str>
+pub const fn dageist_engine::catalog::OmittedForm::deprecation(&self) -> &'static str
+pub const fn dageist_engine::catalog::OmittedForm::entry(&self) -> &'static str
+pub const fn dageist_engine::catalog::OmittedForm::form(&self) -> &'static str
+pub const fn dageist_engine::catalog::OmittedForm::issue(&self) -> &'static str
+pub const fn dageist_engine::catalog::OmittedForm::parameter(&self) -> &'static str
+pub const fn dageist_engine::catalog::OmittedForm::rule(&self) -> &'static str
 pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::adapts_numbers_only(&self) -> bool
@@ -840,6 +850,7 @@ pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
 pub fn dageist_engine::catalog::groups_dtype(text: &str) -> core::result::Result<polars_core::datatypes::dtype::DataType, dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
+pub fn dageist_engine::catalog::omitted_forms() -> &'static [dageist_engine::catalog::OmittedForm]
 pub fn dageist_engine::catalog::start_step(entry: &dageist_engine::catalog::Entry, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::option::Option<dageist_engine::catalog::StepStart>
 pub mod dageist_engine::document
 pub enum dageist_engine::document::Cause

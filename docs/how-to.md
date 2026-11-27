@@ -588,6 +588,19 @@ A step that holds no expression is drawn for itself by the fuzz target, where it
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
+## Omit A Deprecated Form
+
+A form of a parameter that Polars deprecates is [omitted](explanation.md#the-omitted-forms), not catalogued, and
+only where the form that replaces it is catalogued. Name a rule in `Rule` in
+`crates/dageist-engine/src/allowed/rules.rs` whose words say what to give instead, and make the offers refuse the
+form with it, as `Rule::forbids_argument` does for `is_in`: the offers, the tables' generator and a run of a document
+read it before they ask Polars. List the form in `crates/dageist-engine/src/catalog/omitted.rs`, with the entry and the
+parameter, the Polars issue and warning, the bug that prompted the omission where there is one, and the rule, and
+teach `step_holding` in `crates/dageist-engine/tests/document/omitted.rs` to build a step that holds it: the test
+there holds each listed form to the walk. Then refresh [the tables](#refresh-the-tables-of-allowed-combinations), the
+[snapshots the host writes](#refresh-the-offers-snapshots) and the public API audit of the engine, and name the rule
+in the view's `RULE_NAMES` in `ui/packages/host/src/contract.ts`.
+
 ## Refresh The Tables Of Allowed Combinations
 
 The files `counts.txt`, `dtypes.txt`, `contexts.txt` and `options.txt` in

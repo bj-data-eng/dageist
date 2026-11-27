@@ -13,8 +13,8 @@ use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::fields::{self, Fields, Gives, Input};
 use super::rules::Rule;
 use super::table::{
-    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
-    has_a_subject, is_a_list, is_method, is_of_nested_dtypes, read_as, restored, subject_of,
+    Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables, has_a_subject,
+    is_method, is_of_nested_dtypes, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -758,6 +758,13 @@ fn on_receiver(
         None => Refusal::structure(format!("the tables hold nothing for {id}")),
     };
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| {
+        // What Polars deprecates is refused before it is asked, in the words of its rule.
+        if let (Some(receiver), Some(parameter), Some(argument)) = (receiver, parameter, argument)
+            && let Some((rule, said)) =
+                Rule::forbids_argument(id, parameter, &receiver.dtype(), &argument.dtype())
+        {
+            return Err(Refusal::rule_because(rule, &said));
+        }
         // The line of the class that stands for one the tables hold none for. A method whose
         // answer depends on the element is refused after a class it is not measured on: Polars is
         // not asked of it, and may panic.
@@ -820,13 +827,20 @@ fn on_receiver(
         if arguments.iter().any(|(name, _)| *name == parameter) {
             continue;
         }
-        let mut refusal = None;
+        let mut refusal: Option<Refusal> = None;
         let mut fitting: Vec<Fit> = Vec::new();
         for argument in Representative::MEASURED {
             match line(Some(parameter), Some(argument)) {
                 Ok(found) => fitting.push(found),
+                // The first refusal is the one told, but not the rule that asks for a list, which
+                // refuses every argument nested as the value is and says nothing of the others.
                 Err(error) => {
-                    refusal.get_or_insert(error);
+                    let held_is_the_rule = refusal.as_ref().is_some_and(|held| {
+                        held.source() == RefusalSource::Rule(Rule::IsInTakesAList)
+                    });
+                    if refusal.is_none() || held_is_the_rule {
+                        refusal = Some(error);
+                    }
                 }
             }
         }
@@ -869,10 +883,10 @@ fn stood_in_for(entry: &Entry, options: &[(&str, &str)]) -> Vec<&'static str> {
         .collect()
 }
 
-/// The options chosen that are given in place of another parameter, and the list that `is_in` is
-/// given, which a method with them stands in a context in the form of.
+/// The options chosen that are given in place of another parameter, which a method with them stands
+/// in a context in the form of.
 fn form_of(entry: &Entry, chosen: &Chosen<'_>) -> Vec<(&'static str, String)> {
-    let mut form: Vec<(&'static str, String)> = entry
+    entry
         .parameters()
         .iter()
         .filter(|parameter| parameter.in_place_of().is_some())
@@ -885,16 +899,7 @@ fn form_of(entry: &Entry, chosen: &Chosen<'_>) -> Vec<(&'static str, String)> {
             (default_word(parameter).as_deref() != Some(word))
                 .then(|| (parameter.name(), word.to_owned()))
         })
-        .collect();
-    if entry.id().as_str() == "Expr.is_in"
-        && chosen
-            .arguments
-            .iter()
-            .any(|(name, class)| *name == LIST_FORM.0 && is_a_list(*class))
-    {
-        form.push((LIST_FORM.0, LIST_FORM.1.to_owned()));
-    }
-    form
+        .collect()
 }
 
 /// What the option table says the options chosen give.
@@ -1257,6 +1262,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         && let Some((rule, said)) = Rule::forbids_receiver(id, &dtype.dtype())
     {
         return Err(Refusal::rule_because(rule, &said));
+    }
+    // What Polars deprecates in an argument is refused before it is asked, in the words of its rule:
+    // a collection nested as deeply as the value `is_in` follows.
+    // A number typed in without a dtype is a scalar of the dtype it adapts to, so it is nested as a
+    // value that is no list is.
+    if let After::Value { dtype, .. } = place.after {
+        let numbers = chosen
+            .open_numbers
+            .iter()
+            .map(|name| (*name, Representative::Int64));
+        for (name, argument) in chosen.arguments.iter().copied().chain(numbers) {
+            if let Some((rule, said)) =
+                Rule::forbids_argument(id, name, &dtype.dtype(), &argument.dtype())
+            {
+                return Err(Refusal::rule_because(rule, &said));
+            }
+        }
     }
     // What the call says of a struct: a field that is none, names that do not fit, or fields made.
     let receiver_class = match place.after {
@@ -1881,21 +1903,31 @@ pub fn refuse_a_receiver_not_judged(
     Ok(())
 }
 
-/// The refusal of a call after a list or an array, or of a method of lists or arrays, that the
-/// tables refuse of the dtype `receiver` given `arguments`, the dtypes of the expressions it is
-/// given by the names of its parameters: Polars plans such a call nevertheless where it does not
-/// work it out, as where both branches of a condition share it, and panics on the plan. The walk
-/// refuses the same call where it knows the dtypes, whatever it is given; this is asked where it
-/// lost them. An argument of no class is left to [`refuse_an_argument_not_judged`], and the
-/// options the call is given are not asked.
+/// The refusal of a call that a rule or the tables refuse of the dtype `receiver` given `arguments`,
+/// the dtypes of the expressions it is given by the names of its parameters, where the walk lost the
+/// dtypes. A rule refuses an argument for the dtypes it is given, as `is_in` is refused a collection
+/// nested as the value it follows is, whether or not the dtypes have a class. The tables refuse a
+/// call after a list or an array, or a method of lists or arrays: Polars plans such a call
+/// nevertheless where it does not work it out, as where both branches of a condition share it, and
+/// panics on the plan. The walk refuses the same call where it knows the dtypes, whatever it is
+/// given; this is asked where it lost them. An argument of no class is left to
+/// [`refuse_an_argument_not_judged`], and the options the call is given are not asked.
 ///
 /// # Errors
-/// The refusal of the tables, as the walk would have given it.
+/// The refusal of the rule or of the tables, as the walk would have given it.
 pub fn refuse_a_call_the_tables_refuse_after_lists(
     entry: &'static Entry,
     receiver: &DataType,
     arguments: &[(&str, DataType)],
 ) -> Result<(), Refusal> {
+    // What Polars deprecates, whatever the dtypes are: the nesting of a dtype with no class is known.
+    for (name, argument) in arguments {
+        if let Some((rule, said)) =
+            Rule::forbids_argument(entry.id().as_str(), name, receiver, argument)
+        {
+            return Err(Refusal::rule_because(rule, &said));
+        }
+    }
     let Some(class) = Representative::of(receiver) else {
         return Ok(());
     };
