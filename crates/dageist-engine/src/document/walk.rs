@@ -3399,7 +3399,12 @@ impl Walker<'_> {
             };
             // One value is met by each of the values of an operand of many, whatever dtype the
             // operand that is not known has.
-            let shape = broadcast(link, arguments, shape);
+            let shape = broadcast(
+                link,
+                arguments,
+                shape,
+                matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+            );
             // What a method that takes some of the values gives of how many is the arguments' to
             // say, whether or not the dtype of one of them is known.
             let (option_words, _) = option_words(link);
@@ -3413,8 +3418,14 @@ impl Walker<'_> {
                         Cur::Value { shape, count, .. } => (*shape, *count),
                         _ => (Shape::Many, Count::NotKnown),
                     };
-                    self.counted_after(link, receiver, arguments, allowance)
-                        .unwrap_or((shape, Count::NotKnown))
+                    self.counted_after(
+                        link,
+                        receiver,
+                        arguments,
+                        allowance,
+                        matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+                    )
+                    .unwrap_or((shape, Count::NotKnown))
                 }
                 _ => (shape, Count::NotKnown),
             };
@@ -3632,8 +3643,13 @@ impl Walker<'_> {
         };
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
-                let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
-                {
+                let (shape, count) = match self.counted_after(
+                    link,
+                    receiver,
+                    arguments,
+                    allowance,
+                    matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+                ) {
                     // What a key drops of the values it reads is how many the data decide, as what
                     // a filter keeps is, where a group by meets it with the other keys and the rows.
                     Ok(found)
@@ -3859,6 +3875,7 @@ impl Walker<'_> {
         receiver: (Shape, Count),
         arguments: &[(String, Operand)],
         offered: &allowed::Allowance,
+        in_group: bool,
     ) -> Result<(Shape, Count), Refusal> {
         let entry = link.entry();
         let (words, _) = option_words(link);
@@ -3941,7 +3958,7 @@ impl Walker<'_> {
             (Shape::Counted, _) => return Ok((Shape::Counted, Count::NotKnown)),
             (shape, _) => shape,
         };
-        let widened = broadcast(link, arguments, table);
+        let widened = broadcast(link, arguments, table, in_group);
         // An aggregate reduces what it follows, wherever the tables measured it, and a method that
         // gives a value for each of the values it follows keeps them, which one value met by many
         // widens, and one value met by a count is.
@@ -4226,7 +4243,7 @@ fn counted_by(link: &Call, counting: Counting, held: Option<Count>) -> Count {
 /// The number of values a method gives, which is many where it gives one value of the value it
 /// follows and is given an operand of many: the one value is met by each of them, as the count of
 /// nulls is by the base of a logarithm that is a column.
-fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape, in_group: bool) -> Shape {
     let entry = link.entry();
     // A window gives each row of its group the value it gives the group, so one value over a
     // window is as many values as the table has rows, unless the window explodes, which gives
@@ -4242,7 +4259,13 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
             matches!(link.argument(name), Some(Value::Many(items)) if !items.is_empty())
                 || matches!(link.argument(name), Some(Value::Expression(_)))
         });
-        return if explodes && !partitions {
+        // Where a group evaluates it, what is ordered is the rows of the group, which it explodes
+        // to a list of them for each group.
+        let ordered = in_group
+            && arguments
+                .iter()
+                .any(|(name, operand)| name == "order_by" && operand.shape == Shape::Many);
+        return if explodes && !partitions && !ordered {
             shape
         } else {
             Shape::Many
