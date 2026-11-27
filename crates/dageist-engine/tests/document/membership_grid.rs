@@ -536,23 +536,37 @@ fn known() -> Vec<Known> {
     // is looked up in it, and leaves the call to Polars, which refuses it when the step runs where it
     // does. Stated here to be filed: the walk would need the depth and the element of a dtype that
     // has no class.
-    for (axis, what) in [
-        ("form", "what is looked up in has no class of the tables"),
-        (
-            "receiver",
-            "the value that is looked up has no class of the tables",
-        ),
-    ] {
-        known.push(Known::new(
+    known.push(
+        Known::new(
             Kind::PolarsRefusesOnly,
-            Pattern::new().starts(axis, "?"),
-            if axis == "form" {
-                "what is looked up in is of a dtype with no class of the tables (a list of lists, of structs, a binary, a categorical, an enum), so the walk cannot tell that Polars refuses it and leaves it to the step's run"
-            } else {
-                "the value is of a dtype with no class of the tables (a binary, a categorical, an enum), so the walk cannot tell what it may be looked up in and leaves it to the step's run"
-            },
-        ));
-        let _ = what;
+            Pattern::new().starts("form", "?"),
+            "what is looked up in is of a dtype with no class of the tables (a list of lists, of structs, a binary, a categorical, an enum), so the walk cannot tell that Polars refuses it and leaves it to the step's run",
+        )
+        .saying("cannot check for"),
+    );
+    known.push(
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().starts("receiver", "?"),
+            "the value is of a dtype with no class of the tables (a binary, a categorical, an enum), so the walk cannot tell what it may be looked up in and leaves it to the step's run",
+        )
+        .saying("cannot check for"),
+    );
+    // The deprecated form where one side is of such a dtype: the walk does not know the dtype, so it
+    // cannot tell that the nesting is equal, and only the step's run refuses it by the rule. Polars
+    // injects an implode for the deprecated form, which leaves a join's key not elementwise.
+    for (receiver, form) in [("?0", "?0"), ("?0", "0 "), ("0 ", "?0")] {
+        known.push(
+            Known::new(
+                Kind::PolarsRefusesOnly,
+                Pattern::new()
+                    .is("place", "key")
+                    .starts("receiver", receiver)
+                    .starts("form", form),
+                "the deprecated form with a dtype of no class on one side: Polars gathers what is looked up in into a list for it, which leaves a join's key not elementwise, and the walk, which does not know the dtype, cannot tell that it is the deprecated form",
+            )
+            .saying("elementwise"),
+        );
     }
     known
 }
