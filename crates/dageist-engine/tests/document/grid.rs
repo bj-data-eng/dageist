@@ -860,6 +860,9 @@ pub struct Known {
     /// Words of which what was said of each cell holds one, so that a cell that is set aside or
     /// unbuildable for another reason than the one given is not passed over.
     pub saying: Vec<&'static str>,
+    /// Whether the line is one that several grids share, so that a grid it names no cell of is
+    /// not why it is stale.
+    pub shared: bool,
 }
 
 impl Known {
@@ -870,7 +873,15 @@ impl Known {
             pattern,
             reason,
             saying: Vec::new(),
+            shared: false,
         }
+    }
+
+    /// The same line, held by a grid that may have no cell for it.
+    #[must_use]
+    pub const fn shared(mut self) -> Self {
+        self.shared = true;
+        self
     }
 
     /// The same line, which names only the cells whose words hold `words`.
@@ -1019,7 +1030,11 @@ impl Verdicts {
             let _ = write!(failures, "\n{} cells that no line names:", unnamed.len());
             failures.push_str(&describe(&unnamed));
         }
-        for (line, _) in known.iter().zip(&used).filter(|(_, count)| **count == 0) {
+        for (line, _) in known
+            .iter()
+            .zip(&used)
+            .filter(|(line, count)| **count == 0 && !line.shared)
+        {
             let _ = write!(
                 failures,
                 "\na line that names {} matches no such cell, so it is stale: {}",

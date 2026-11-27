@@ -575,8 +575,17 @@ fn method_case(method: &str, names: &[&str], point: &Given) -> Result<Case, Stri
     for name in names {
         let value = if *name == point.parameter {
             point.literal.expression()
+        } else if *name == "offset" {
+            // The place a text is cut from is a whole number whatever the column is.
+            literals::expression(&Written::Integer(0), None)
         } else {
             companion(column)
+        };
+        // What a method takes any number of is a list.
+        let value = if *name == "others" {
+            many(vec![value])
+        } else {
+            value
         };
         arguments.insert((*name).to_owned(), value);
     }
@@ -663,15 +672,20 @@ fn orders() -> Vec<(String, bool)> {
 /// `1 + x` is. A method with no operand of the kind to turn round has no such case.
 fn literal_first(point: &Given) -> Result<Case, String> {
     let column = point.column.as_ref().expect("a column");
-    if !matches!(point.parameter, "other" | "exponent" | "base") {
+    if !matches!(point.parameter, "other" | "exponent" | "base" | "others") {
         return Err(format!(
             "{} takes no operand that the column can be, beside a literal it follows",
             point.method
         ));
     }
+    let operand = if point.parameter == "others" {
+        many(vec![field("x")])
+    } else {
+        field("x")
+    };
     let item = chain(
         point.literal.call(),
-        vec![call(point.method, json!({ point.parameter: field("x") }))],
+        vec![call(point.method, json!({ point.parameter: operand }))],
     );
     Case::of_step(
         "LazyFrame.select",
@@ -715,6 +729,46 @@ fn role_grid(scale: Scale) -> Verdicts {
         }
         let names: &[&str] = match point.method {
             "Expr.is_between" => &["lower_bound", "upper_bound"],
+            _ => &[point.parameter],
+        };
+        method_case(point.method, names, point)
+    })
+}
+
+/// The methods whose parameter the walk reads by its role and that the grid of the roles does not
+/// cross: the value `fill_nan` fills with, the share an approximate quantile reads, how many values
+/// `top_k` and `bottom_k` keep, how far `diff`, `pct_change` and `shift` look back, the length
+/// `str.slice` cuts, and the operands of `and_` and `or_`.
+fn more_roles_grid(scale: Scale) -> Verdicts {
+    let methods: Vec<(String, (&'static str, &'static str))> = [
+        ("Expr.fill_nan", "value"),
+        ("Expr.approx_quantile", "quantile"),
+        ("Expr.top_k", "k"),
+        ("Expr.bottom_k", "k"),
+        ("Expr.diff", "n"),
+        ("Expr.pct_change", "n"),
+        ("Expr.shift", "n"),
+        ("Expr.str.slice", "length"),
+        ("Expr.and_", "others"),
+        ("Expr.or_", "others"),
+    ]
+    .into_iter()
+    .map(|(method, parameter)| (format!("{method}({parameter})"), (method, parameter)))
+    .collect();
+    let grid = Grid::<Given>::new()
+        .column_axis(column_dtypes())
+        .axis("method", methods, |point, (method, parameter)| {
+            point.method = method;
+            point.parameter = parameter;
+        })
+        .axis("order", orders(), |point, first| point.first = *first)
+        .literal_axes(values(scale), &words());
+    grid.judge(&Question::any_refusal().at(scale.depth()), |point| {
+        if point.first {
+            return literal_first(point);
+        }
+        let names: &[&str] = match point.method {
+            "Expr.str.slice" => &["offset", "length"],
             _ => &[point.parameter],
         };
         method_case(point.method, names, point)
@@ -838,7 +892,10 @@ fn known_numbers_written_as_text() -> Known {
         "the tables were measured with the text 1d, which is no number, so they refuse on rows a \
          text of a number that Polars casts to the dtype it meets (candidate to file)",
     )
-    .saying("tables of Polars at Rows: conversion from `str`")
+    .saying_one_of(&[
+        "tables of Polars at Rows: conversion from `str`",
+        "tables of Polars at Rows: cannot unpack series of type `str`",
+    ])
 }
 
 /// The limits of the rules that read a literal by the role of its parameter. The ones the rows of
@@ -855,7 +912,10 @@ fn known_role_limits(scale: Scale) -> Vec<Known> {
         known_numbers_written_as_text(),
         Known::new(
             Kind::PolarsRefusesOnly,
-            Pattern::new().starts("method", "Expr.quantile"),
+            Pattern::new().one_of(
+                "method",
+                &["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
+            ),
             "a share outside 0 to 1 is refused by Polars, and the walk does not read the value of \
              a share (candidate to file)",
         )
@@ -872,6 +932,32 @@ fn known_role_limits(scale: Scale) -> Vec<Known> {
             "arithmetic on dtypes dyn",
             "division with 'String' datatypes",
         ]),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().one_of("method", &["Expr.and_(others)", "Expr.or_(others)"]).is("column", "Boolean"),
+            "Polars refuses to meet a Boolean with a number typed without a dtype in a bitwise call, \
+             on either side, which the walk leaves not known as it does the arithmetic of text \
+             (candidate to file)",
+        )
+        .saying_one_of(&["on Boolean and Unknown(", "and Boolean is not supported"]),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().starts("method", "Expr.fill_nan"),
+            "the walk refuses fill_nan of a date, a moment, a length of time or a time of day filled \
+             with a number typed without a dtype at the schema, as no supertype of the two, where \
+             Polars gets to the rows and refuses them there, as it refuses any value, for the test of \
+             NaN is not supported for them: the verdict is right and its stage is not (the refusal \
+             comes from the tables' offer of the call for an argument of no known dtype, and was \
+             there before the grids) (candidate to file)",
+        )
+        .saying("failed to determine supertype of"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new().starts("method", "Expr.fill_nan"),
+            "Polars casts the value fill_nan fills with to the dtype of the column and refuses one \
+             that dtype cannot hold, which the walk does not read (candidate to file)",
+        )
+        .saying("failed in column 'scalar'"),
         Known::new(
             Kind::PolarsRefusesOnly,
             Pattern::new().starts("method", "Expr.str.pad_start"),
@@ -1036,6 +1122,17 @@ fn the_walk_takes_a_comparison_with_a_literal_in_a_filter_and_a_condition_as_pol
         .assert_agree(&known_casts(), 40_000);
 }
 
+#[test]
+fn the_walk_takes_the_other_literal_roles_as_polars_does() {
+    let mut known = known_casts();
+    known.extend(
+        known_role_limits(Scale::Normal)
+            .into_iter()
+            .map(Known::shared),
+    );
+    more_roles_grid(Scale::Normal).assert_agree(&known, 5_000);
+}
+
 // ---------------------------------------------------------------------------
 // The large grids
 
@@ -1141,4 +1238,17 @@ fn the_large_grid_of_a_comparison_with_a_literal_is_taken_as_polars_does() {
         ],
     )
     .assert_agree(&known, 200_000);
+}
+
+#[test]
+#[ignore = "the large grid, run on request"]
+fn the_large_grid_of_the_other_literal_roles_is_taken_as_polars_does() {
+    let mut known = known_casts();
+    known.extend(
+        known_role_limits(Scale::Large)
+            .into_iter()
+            .map(Known::shared),
+    );
+    known.extend(known_large_role_limits().into_iter().map(Known::shared));
+    more_roles_grid(Scale::Large).assert_agree(&known, 100_000);
 }
