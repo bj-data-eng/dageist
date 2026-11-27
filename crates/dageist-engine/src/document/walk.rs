@@ -2486,7 +2486,11 @@ impl Walker<'_> {
         // Where both values are the same one value Polars may drop the predicate, which is then
         // met by it. Where they are the same rows or the same count it does not, and a predicate
         // that is not as many refuses the condition as it would two values that differ.
-        let mut branches_are_one = statements.len() > 1
+        // Where a group evaluates the chain it keeps the predicate, and what it gives is the rows
+        // of the group, a list for each group.
+        let by_group = matches!(context.outer(), Outer::Aggregate | Outer::Having);
+        let mut branches_are_one = !by_group
+            && statements.len() > 1
             && statements.windows(2).all(|pair| pair[0] == pair[1])
             && statements
                 .iter()
