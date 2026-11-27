@@ -276,6 +276,8 @@ struct Gen<'a> {
     next_fields: Option<Fields>,
     /// What the function that makes a struct, which a chain was just started from, was made of.
     made_of: Vec<MadeOf>,
+    /// The class of the value the method being drawn follows, where it is known.
+    following: Option<Representative>,
 }
 
 /// One input of a call that makes a struct of expressions: the name it is written under, its class
@@ -722,6 +724,7 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         started: None,
         next_fields: None,
         made_of: Vec::new(),
+        following: None,
     };
     let document = generator.document();
     Some(Case {
@@ -1350,6 +1353,34 @@ impl Gen<'_> {
                 single(column)
             }
         }
+    }
+
+    /// The values `is_in` looks up in, nested more deeply than the value it follows: an operand
+    /// that is a list or an array where it follows a value that is none, and otherwise the operand
+    /// imploded as often as it takes to be nested more deeply, which gives one list. What it
+    /// follows is known where the method is drawn, and the operand's class is known or the
+    /// operand is taken for a value that is no list.
+    fn collection(&mut self, slots: &mut Vec<Slot>, depth: usize) -> Built {
+        let level =
+            |class: Option<Representative>| usize::from(class.is_some_and(|c| c.is_nested()));
+        let following = level(self.following);
+        let mut built = self.operand(slots, depth);
+        let mut nesting = level(built.class);
+        while nesting <= following {
+            let mut links = built.expression.links().to_vec();
+            links.push(call("Expr.implode", Vec::new()));
+            let class = match (nesting, built.class) {
+                (0, Some(class)) => Inner::of_class(class).map(Representative::List),
+                _ => None,
+            };
+            built = Built {
+                expression: Expression::new(built.expression.start().clone(), links)
+                    .expect("a chain"),
+                class,
+            };
+            nesting += 1;
+        }
+        built
     }
 
     /// A literal that stands for one value, as the parameters Polars takes
@@ -2099,7 +2130,10 @@ impl Gen<'_> {
             {
                 chosen = self.draw.pick(&focus.methods);
             }
-            let (call, arguments) = self.method_call(chosen, slots, depth, fields)?;
+            self.following = Some(class);
+            let drawn = self.method_call(chosen, slots, depth, fields);
+            self.following = None;
+            let (call, arguments) = drawn?;
             let given: Vec<(&str, Representative)> = arguments
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
@@ -2402,6 +2436,10 @@ impl Gen<'_> {
                     };
                     (0..count).map(|_| self.operand(slots, depth)).collect()
                 }
+                // The values `is_in` looks up in: a list or an array, or a collection imploded. A
+                // collection nested as the value it follows is, a column of its own dtype, is the
+                // form Polars deprecates, which the engine refuses and the target does not draw.
+                ("Expr.is_in", "other") => vec![self.collection(slots, depth)],
                 _ => vec![self.operand(slots, depth)],
             };
             if position.is_some() {
