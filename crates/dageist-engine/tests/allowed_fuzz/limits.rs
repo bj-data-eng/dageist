@@ -4443,6 +4443,12 @@ fn applies(
                 && refusal.reason.contains("not yet implemented")
                 && refusal.reason.contains("replacement pattern per row")
                 && grouped;
+            // A count or a place that a call takes of the values of a group, converted for each
+            // group, as the NaN a group's kurtosis is cannot be, where a select takes the one value.
+            let a_conversion_per_group = refusal.stage == Stage::Rows
+                && unplaced(refusal)
+                && is_a_failed_conversion(&refusal.reason)
+                && grouped;
             // A window partitioned by a column, which the tables measured as a partition of the
             // rows, is partitioned by the values of a group where a group evaluates it.
             let a_window_by_the_values = refusal.stage == Stage::Rows
@@ -4481,7 +4487,8 @@ fn applies(
                         || a_pattern_per_row
                         || an_incomplete_mapping
                         || a_value_per_row
-                        || a_window_by_the_values)
+                        || a_window_by_the_values
+                        || a_conversion_per_group)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
@@ -5706,6 +5713,7 @@ mod tests {
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
             "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+            "uncovered-a-group-aggregate--a-count-that-is-a-value-of-each-group.case",
             "uncovered-a-group-aggregate--a-window-over-the-values-of-a-group-that-polars-refuses.case",
             "uncovered-a-group-aggregate--a-replacement-of-text-given-the-values-of-a-group.case",
             "uncovered-a-group-aggregate--a-replacement-value-of-the-length-of-a-group.case",
