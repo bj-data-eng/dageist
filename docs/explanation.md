@@ -2318,9 +2318,10 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
   one value and a condition whose values are nulls, through the calls that keep a null.
 
 Campaigns of 8000 cases focused so, at the seeds 7, 13, 1140027, 2718281 and 5772156, end with no disagreement.
-Two are known and open. The seed 3141592 finds a condition in the predicate of a condition, in an aggregate, whose
-one value the walk gives a list where Polars gives one value: the walk takes a method that makes a list of one value
-as many values. The seed 11 finds two refusals in one key, an out of range date and the format of a time zone, which
+Two kinds are known and open. The seeds 3141592 and 99991 find a condition that stands in the predicate of a
+condition, or as the other side of a comparison, in an aggregate or a having, whose one value the walk gives a list
+where Polars gives one value: the walk takes a method that the tables measured as many values, as the split of text
+and the days in a month are, applied to one value as many values. The seed 11 finds two refusals in one key, an out of range date and the format of a time zone, which
 Polars names in either order from run to run, so the asker and the engine differ in which it names, which is a
 property of Polars' threads and not of the step.
 
