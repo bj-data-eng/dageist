@@ -1365,3 +1365,21 @@ fn is_in_may_follow_a_value_whose_own_list_the_tables_measure_before_it_is_given
         );
     }
 }
+
+#[test]
+fn is_in_is_offered_after_a_value_of_every_class_where_a_collection_fits_it() {
+    // Polars accepts a value looked up in a list or an array of an element dtype that fits it, in
+    // every class: a float of any width, a duration, a time, a moment of a zone, a struct, and a list
+    // or an array, which is looked up in a list of lists. None may lose the method for it.
+    for class in Representative::ALL {
+        let allowed = offer(
+            entry("Expr.is_in"),
+            &select_after(class),
+            &Chosen::default(),
+        );
+        assert!(
+            matches!(allowed, Verdict::Allowed(_)),
+            "{class}: {allowed:?}"
+        );
+    }
+}

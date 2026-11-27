@@ -2536,4 +2536,39 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn a_refusal_read_from_a_line_a_rule_wrote_is_the_rules_and_one_of_polars_is_polars() {
+        // The tables never run what a rule refuses, and write its name and what is the matter.
+        let written = Reason {
+            stage: Stage::Rows,
+            text:
+                "is-in-takes-a-list: Int64 is looked up in Int64, which is nested as the value is"
+                    .to_owned(),
+        };
+        let refusal = Refusal::polars(&written);
+        assert_eq!(refusal.source(), RefusalSource::Rule(Rule::IsInTakesAList));
+        assert!(
+            refusal.reason().contains("Int64 is looked up in Int64"),
+            "{}",
+            refusal.reason()
+        );
+        assert!(refusal.reason().contains("implode"), "{}", refusal.reason());
+        // What Polars said keeps its stage, even where its words hold a colon.
+        for text in [
+            "'is_in' cannot check for Int64 values in Int64 data",
+            "not-a-rule: Int64 is looked up in Int64",
+        ] {
+            let said = Refusal::polars(&Reason {
+                stage: Stage::Schema,
+                text: text.to_owned(),
+            });
+            assert_eq!(
+                said.source(),
+                RefusalSource::Polars(Stage::Schema),
+                "{text}"
+            );
+            assert_eq!(said.reason(), text);
+        }
+    }
 }
