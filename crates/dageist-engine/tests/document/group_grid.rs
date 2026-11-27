@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 38] = [
+const PREDICATES: [&str; 40] = [
     "the values",
     "all null",
     "first",
@@ -696,6 +696,8 @@ const PREDICATES: [&str; 38] = [
     "the first, diff",
     "a null of times, diff",
     "a date made with a null day, max",
+    "a null of datetimes, nan_min",
+    "a null of lists, nan_max",
 ];
 
 fn typed_null_then(dtype: &str, entry: &str) -> Value {
@@ -860,6 +862,10 @@ fn predicate_of(column: &Col, form: &str) -> Value {
             ),
             vec![one("Expr.max")],
         ),
+        "a null of datetimes, nan_min" => {
+            typed_null_then("Datetime(time_unit='us', time_zone='UTC')", "Expr.nan_min")
+        }
+        "a null of lists, nan_max" => typed_null_then("List(Int64)", "Expr.nan_max"),
         "a null of dates, std" => typed_null_then("Date", "Expr.std"),
         "a null of text" => typed_null("String"),
         "a null of dates" => typed_null("Date"),
