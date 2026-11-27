@@ -224,12 +224,20 @@ export const APPLIES = ['expression', 'frame', 'grouped', 'function', 'condition
 /** What an entry is applied to. */
 export type AppliesView = (typeof APPLIES)[number];
 
+/** What a call on a group by is: the predicate of the groups it keeps, or the call that finishes the grouping. */
+export const GROUPED_ROLES = ['having', 'finishes'] as const;
+
+/** What a call on a group by is there. */
+export type GroupedRoleView = (typeof GROUPED_ROLES)[number];
+
 /** Mirrors `EntryView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface EntryView {
   /** The stable identifier saved steps keep, such as `Expr.shift`. */
   readonly id: string;
   /** `condition` is one link of `when`, `then` and `otherwise`. */
   readonly applies: AppliesView;
+  /** What the entry is on a group by; `null` for an entry that is not a call on one. */
+  readonly grouped: GroupedRoleView | null;
   /** The key of the family it is swapped within. */
   readonly family: string;
   /** The name shown for it; in English, Polars' own name. */

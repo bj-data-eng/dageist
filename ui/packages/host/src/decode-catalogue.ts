@@ -18,7 +18,7 @@ import type {
   ShapeView,
   WordsView,
 } from './contract';
-import { APPLIES, NESTED_POSITIONS, OUTER_POSITIONS, VALUE_TYPES } from './contract';
+import { APPLIES, GROUPED_ROLES, NESTED_POSITIONS, OUTER_POSITIONS, VALUE_TYPES } from './contract';
 import type { Decode } from './decode';
 import {
   ROOT,
@@ -266,10 +266,11 @@ const readParameter: Decode<ParameterView> = readRecord(
 );
 
 const readEntry: Decode<EntryView> = readRecord(
-  ['id', 'applies', 'family', 'name', 'hint', 'head', 'lazy', 'parameters'],
+  ['id', 'applies', 'grouped', 'family', 'name', 'hint', 'head', 'lazy', 'parameters'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
     applies: readField(fields, path, 'applies', readWord(APPLIES)),
+    grouped: readField(fields, path, 'grouped', readNullable(readWord(GROUPED_ROLES))),
     family: readField(fields, path, 'family', readString),
     name: readField(fields, path, 'name', readString),
     hint: readField(fields, path, 'hint', readString),

@@ -83,6 +83,7 @@ describe('the catalogue the host sends', () => {
     expect(shift).toEqual({
       id: 'Expr.shift',
       applies: 'expression',
+      grouped: null,
       family: 'rows',
       name: 'shift',
       hint: 'value n rows earlier',
@@ -113,6 +114,26 @@ describe('the catalogue the host sends', () => {
         },
       ],
     });
+  });
+
+  it('is read with what each call on a group by is there, and nothing of that for any other entry', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const roles = (grouped: string | null) =>
+      entries.filter((entry) => entry.grouped === grouped).map((entry) => entry.id);
+    expect(roles('having')).toEqual(['LazyGroupBy.having']);
+    expect(roles('finishes')).toContain('LazyGroupBy.agg');
+    expect(roles('finishes')).not.toContain('LazyGroupBy.having');
+    // A call on a group by is one or the other, and no other entry is either.
+    expect(
+      entries.filter((entry) => (entry.grouped === null) !== (entry.applies !== 'grouped')),
+    ).toEqual([]);
+  });
+
+  it('is refused where the role of a call on a group by is not one of the contract', () => {
+    const index = decodeCatalogue(catalogue).entries.findIndex((entry) => entry.grouped !== null);
+    expect(refusal(replaced(catalogue, ['entries', index, 'grouped'], 'keeps')).path).toBe(
+      `$.entries[${String(index)}].grouped`,
+    );
   });
 
   it('is read with the pattern of a method as a kind of its own and the flag that makes it text', () => {

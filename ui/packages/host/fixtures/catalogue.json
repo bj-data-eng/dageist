@@ -143,6 +143,7 @@
     {
       "id": "ChainedThen.otherwise",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "otherwise",
       "hint": "the value where no condition holds",
@@ -174,6 +175,7 @@
     {
       "id": "ChainedThen.when",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "when",
       "hint": "another condition",
@@ -228,6 +230,7 @@
     {
       "id": "ChainedWhen.then",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "then",
       "hint": "the value where that condition holds",
@@ -259,6 +262,7 @@
     {
       "id": "Expr.abs",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "abs",
       "hint": "absolute value",
@@ -269,6 +273,7 @@
     {
       "id": "Expr.add",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "add",
       "hint": "plus another value",
@@ -297,6 +302,7 @@
     {
       "id": "Expr.all",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "all",
       "hint": "true if every value is true",
@@ -329,6 +335,7 @@
     {
       "id": "Expr.and_",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "and",
       "hint": "true where all are true, bit by bit on whole numbers",
@@ -357,6 +364,7 @@
     {
       "id": "Expr.any",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "any",
       "hint": "true if some value is true",
@@ -389,6 +397,7 @@
     {
       "id": "Expr.approx_n_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "approx_n_unique",
       "hint": "number of different values, found quickly and nearly",
@@ -399,6 +408,7 @@
     {
       "id": "Expr.approx_quantile",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "approx_quantile",
       "hint": "the value a share of the values fall below, found quickly and nearly",
@@ -524,6 +534,7 @@
     {
       "id": "Expr.arccos",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arccos",
       "hint": "angle in radians whose cosine is the value",
@@ -534,6 +545,7 @@
     {
       "id": "Expr.arccosh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arccosh",
       "hint": "inverse hyperbolic cosine",
@@ -544,6 +556,7 @@
     {
       "id": "Expr.arcsin",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arcsin",
       "hint": "angle in radians whose sine is the value",
@@ -554,6 +567,7 @@
     {
       "id": "Expr.arcsinh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arcsinh",
       "hint": "inverse hyperbolic sine",
@@ -564,6 +578,7 @@
     {
       "id": "Expr.arctan",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arctan",
       "hint": "angle in radians whose tangent is the value",
@@ -574,6 +589,7 @@
     {
       "id": "Expr.arctanh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "arctanh",
       "hint": "inverse hyperbolic tangent",
@@ -584,6 +600,7 @@
     {
       "id": "Expr.arg_max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arg_max",
       "hint": "row of the highest value",
@@ -594,6 +611,7 @@
     {
       "id": "Expr.arg_min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arg_min",
       "hint": "row of the lowest value",
@@ -604,6 +622,7 @@
     {
       "id": "Expr.arg_sort",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "arg_sort",
       "hint": "the row each place in order comes from",
@@ -657,6 +676,7 @@
     {
       "id": "Expr.arg_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "arg_unique",
       "hint": "the place of the first of each different value",
@@ -667,6 +687,7 @@
     {
       "id": "Expr.arr.all",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.all",
       "hint": "true if every value of each array is true",
@@ -699,6 +720,7 @@
     {
       "id": "Expr.arr.any",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.any",
       "hint": "true if some value of each array is true",
@@ -731,6 +753,7 @@
     {
       "id": "Expr.arr.arg_max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.arg_max",
       "hint": "place of the largest value of each array",
@@ -741,6 +764,7 @@
     {
       "id": "Expr.arr.arg_min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.arg_min",
       "hint": "place of the smallest value of each array",
@@ -751,6 +775,7 @@
     {
       "id": "Expr.arr.first",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "arr.first",
       "hint": "first value of each array",
@@ -761,6 +786,7 @@
     {
       "id": "Expr.arr.last",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "arr.last",
       "hint": "last value of each array",
@@ -771,6 +797,7 @@
     {
       "id": "Expr.arr.len",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.len",
       "hint": "number of values in each array",
@@ -781,6 +808,7 @@
     {
       "id": "Expr.arr.max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.max",
       "hint": "largest value of each array",
@@ -791,6 +819,7 @@
     {
       "id": "Expr.arr.mean",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.mean",
       "hint": "average of the values of each array",
@@ -801,6 +830,7 @@
     {
       "id": "Expr.arr.median",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.median",
       "hint": "middle value of each array",
@@ -811,6 +841,7 @@
     {
       "id": "Expr.arr.min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.min",
       "hint": "smallest value of each array",
@@ -821,6 +852,7 @@
     {
       "id": "Expr.arr.n_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.n_unique",
       "hint": "number of different values in each array",
@@ -831,6 +863,7 @@
     {
       "id": "Expr.arr.sort",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "arr.sort",
       "hint": "the values of each array in order",
@@ -884,6 +917,7 @@
     {
       "id": "Expr.arr.std",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.std",
       "hint": "how far the values of each array spread from their average",
@@ -918,6 +952,7 @@
     {
       "id": "Expr.arr.sum",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.sum",
       "hint": "sum of the values of each array",
@@ -928,6 +963,7 @@
     {
       "id": "Expr.arr.to_list",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "arr.to_list",
       "hint": "each array as a list",
@@ -938,6 +974,7 @@
     {
       "id": "Expr.arr.to_struct",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "arr.to_struct",
       "hint": "a struct with a field for each place of the array, named as given or field_0 and on",
@@ -967,6 +1004,7 @@
     {
       "id": "Expr.arr.unique",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "arr.unique",
       "hint": "each different value of each array once",
@@ -999,6 +1037,7 @@
     {
       "id": "Expr.arr.var",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "arr.var",
       "hint": "square of how far the values of each array spread from their average",
@@ -1033,6 +1072,7 @@
     {
       "id": "Expr.backward_fill",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "backward_fill",
       "hint": "empty values filled from the next value",
@@ -1062,6 +1102,7 @@
     {
       "id": "Expr.bitwise_and",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "bitwise_and",
       "hint": "the bits that are set in every value",
@@ -1072,6 +1113,7 @@
     {
       "id": "Expr.bitwise_count_ones",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_count_ones",
       "hint": "number of bits that are set",
@@ -1082,6 +1124,7 @@
     {
       "id": "Expr.bitwise_count_zeros",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_count_zeros",
       "hint": "number of bits that are not set",
@@ -1092,6 +1135,7 @@
     {
       "id": "Expr.bitwise_leading_ones",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_leading_ones",
       "hint": "number of set bits before the first one that is not",
@@ -1102,6 +1146,7 @@
     {
       "id": "Expr.bitwise_leading_zeros",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_leading_zeros",
       "hint": "number of unset bits before the first one that is set",
@@ -1112,6 +1157,7 @@
     {
       "id": "Expr.bitwise_or",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "bitwise_or",
       "hint": "the bits that are set in some value",
@@ -1122,6 +1168,7 @@
     {
       "id": "Expr.bitwise_trailing_ones",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_trailing_ones",
       "hint": "number of set bits after the last one that is not",
@@ -1132,6 +1179,7 @@
     {
       "id": "Expr.bitwise_trailing_zeros",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "bitwise_trailing_zeros",
       "hint": "number of unset bits after the last one that is set",
@@ -1142,6 +1190,7 @@
     {
       "id": "Expr.bitwise_xor",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "bitwise_xor",
       "hint": "the bits that are set in an odd number of values",
@@ -1152,6 +1201,7 @@
     {
       "id": "Expr.bottom_k",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "bottom_k",
       "hint": "the k smallest values",
@@ -1185,6 +1235,7 @@
     {
       "id": "Expr.cast",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "cast",
       "hint": "converted to another dtype",
@@ -1255,6 +1306,7 @@
     {
       "id": "Expr.cbrt",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "cbrt",
       "hint": "cube root",
@@ -1265,6 +1317,7 @@
     {
       "id": "Expr.ceil",
       "applies": "expression",
+      "grouped": null,
       "family": "rounding",
       "name": "ceil",
       "hint": "rounded up to a whole number",
@@ -1275,6 +1328,7 @@
     {
       "id": "Expr.clip",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "clip",
       "hint": "limited to a lower and an upper bound",
@@ -1320,6 +1374,7 @@
     {
       "id": "Expr.cos",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "cos",
       "hint": "cosine of an angle in radians",
@@ -1330,6 +1385,7 @@
     {
       "id": "Expr.cosh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "cosh",
       "hint": "hyperbolic cosine",
@@ -1340,6 +1396,7 @@
     {
       "id": "Expr.cot",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "cot",
       "hint": "cotangent of an angle in radians",
@@ -1350,6 +1407,7 @@
     {
       "id": "Expr.count",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "count",
       "hint": "number of values that are not empty",
@@ -1360,6 +1418,7 @@
     {
       "id": "Expr.cum_count",
       "applies": "expression",
+      "grouped": null,
       "family": "cumulative",
       "name": "cum_count",
       "hint": "running count",
@@ -1392,6 +1451,7 @@
     {
       "id": "Expr.cum_max",
       "applies": "expression",
+      "grouped": null,
       "family": "cumulative",
       "name": "cum_max",
       "hint": "running maximum",
@@ -1424,6 +1484,7 @@
     {
       "id": "Expr.cum_min",
       "applies": "expression",
+      "grouped": null,
       "family": "cumulative",
       "name": "cum_min",
       "hint": "running minimum",
@@ -1456,6 +1517,7 @@
     {
       "id": "Expr.cum_prod",
       "applies": "expression",
+      "grouped": null,
       "family": "cumulative",
       "name": "cum_prod",
       "hint": "running product",
@@ -1488,6 +1550,7 @@
     {
       "id": "Expr.cum_sum",
       "applies": "expression",
+      "grouped": null,
       "family": "cumulative",
       "name": "cum_sum",
       "hint": "running total",
@@ -1520,6 +1583,7 @@
     {
       "id": "Expr.degrees",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "degrees",
       "hint": "an angle in radians, in degrees",
@@ -1530,6 +1594,7 @@
     {
       "id": "Expr.diff",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "diff",
       "hint": "value less the one n rows earlier",
@@ -1594,6 +1659,7 @@
     {
       "id": "Expr.drop_nans",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "drop_nans",
       "hint": "removes the NaNs, leaving fewer values",
@@ -1604,6 +1670,7 @@
     {
       "id": "Expr.drop_nulls",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "drop_nulls",
       "hint": "removes the empty values, leaving fewer values",
@@ -1614,6 +1681,7 @@
     {
       "id": "Expr.dt.base_utc_offset",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.base_utc_offset",
       "hint": "the offset of the zone from UTC, without daylight saving",
@@ -1624,6 +1692,7 @@
     {
       "id": "Expr.dt.cast_time_unit",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.cast_time_unit",
       "hint": "count in another time unit",
@@ -1666,6 +1735,7 @@
     {
       "id": "Expr.dt.century",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.century",
       "hint": "the century",
@@ -1676,6 +1746,7 @@
     {
       "id": "Expr.dt.combine",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.combine",
       "hint": "a date or moment with a time of day",
@@ -1739,6 +1810,7 @@
     {
       "id": "Expr.dt.convert_time_zone",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.convert_time_zone",
       "hint": "the same instant, in another time zone",
@@ -1768,6 +1840,7 @@
     {
       "id": "Expr.dt.date",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.date",
       "hint": "the date part",
@@ -1778,6 +1851,7 @@
     {
       "id": "Expr.dt.day",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.day",
       "hint": "the day of the month",
@@ -1788,6 +1862,7 @@
     {
       "id": "Expr.dt.days_in_month",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.days_in_month",
       "hint": "how many days the month has",
@@ -1798,6 +1873,7 @@
     {
       "id": "Expr.dt.dst_offset",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.dst_offset",
       "hint": "the daylight saving the zone adds",
@@ -1808,6 +1884,7 @@
     {
       "id": "Expr.dt.epoch",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.epoch",
       "hint": "time since 1970 in a unit or in days",
@@ -1862,6 +1939,7 @@
     {
       "id": "Expr.dt.hour",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.hour",
       "hint": "the hour",
@@ -1872,6 +1950,7 @@
     {
       "id": "Expr.dt.is_leap_year",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.is_leap_year",
       "hint": "true in a leap year",
@@ -1882,6 +1961,7 @@
     {
       "id": "Expr.dt.iso_year",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.iso_year",
       "hint": "the ISO year of the week",
@@ -1892,6 +1972,7 @@
     {
       "id": "Expr.dt.microsecond",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.microsecond",
       "hint": "the microseconds of the second",
@@ -1902,6 +1983,7 @@
     {
       "id": "Expr.dt.millennium",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.millennium",
       "hint": "the millennium",
@@ -1912,6 +1994,7 @@
     {
       "id": "Expr.dt.millisecond",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.millisecond",
       "hint": "the milliseconds of the second",
@@ -1922,6 +2005,7 @@
     {
       "id": "Expr.dt.minute",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.minute",
       "hint": "the minute",
@@ -1932,6 +2016,7 @@
     {
       "id": "Expr.dt.month",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.month",
       "hint": "the month",
@@ -1942,6 +2027,7 @@
     {
       "id": "Expr.dt.month_end",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.month_end",
       "hint": "last of the month",
@@ -1952,6 +2038,7 @@
     {
       "id": "Expr.dt.month_start",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.month_start",
       "hint": "first of the month",
@@ -1962,6 +2049,7 @@
     {
       "id": "Expr.dt.nanosecond",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.nanosecond",
       "hint": "the nanoseconds of the second",
@@ -1972,6 +2060,7 @@
     {
       "id": "Expr.dt.offset_by",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.offset_by",
       "hint": "move by a duration",
@@ -2000,6 +2089,7 @@
     {
       "id": "Expr.dt.ordinal_day",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.ordinal_day",
       "hint": "the day of the year",
@@ -2010,6 +2100,7 @@
     {
       "id": "Expr.dt.quarter",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.quarter",
       "hint": "the quarter of the year",
@@ -2020,6 +2111,7 @@
     {
       "id": "Expr.dt.replace",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.replace",
       "hint": "some parts of a moment set",
@@ -2189,6 +2281,7 @@
     {
       "id": "Expr.dt.replace_time_zone",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.replace_time_zone",
       "hint": "the same clock, in another time zone",
@@ -2291,6 +2384,7 @@
     {
       "id": "Expr.dt.round",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.round",
       "hint": "to the nearest period",
@@ -2319,6 +2413,7 @@
     {
       "id": "Expr.dt.second",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.second",
       "hint": "the second of the minute",
@@ -2351,6 +2446,7 @@
     {
       "id": "Expr.dt.strftime",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.strftime",
       "hint": "written as text by a format",
@@ -2380,6 +2476,7 @@
     {
       "id": "Expr.dt.time",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.time",
       "hint": "the time part",
@@ -2390,6 +2487,7 @@
     {
       "id": "Expr.dt.timestamp",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.timestamp",
       "hint": "time since 1970 in a unit",
@@ -2436,6 +2534,7 @@
     {
       "id": "Expr.dt.to_string",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.to_string",
       "hint": "written as text, by a format or as ISO",
@@ -2465,6 +2564,7 @@
     {
       "id": "Expr.dt.total_days",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_days",
       "hint": "whole days in a duration",
@@ -2497,6 +2597,7 @@
     {
       "id": "Expr.dt.total_hours",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_hours",
       "hint": "hours in a duration",
@@ -2529,6 +2630,7 @@
     {
       "id": "Expr.dt.total_microseconds",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_microseconds",
       "hint": "microseconds in a duration",
@@ -2561,6 +2663,7 @@
     {
       "id": "Expr.dt.total_milliseconds",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_milliseconds",
       "hint": "milliseconds in a duration",
@@ -2593,6 +2696,7 @@
     {
       "id": "Expr.dt.total_minutes",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_minutes",
       "hint": "minutes in a duration",
@@ -2625,6 +2729,7 @@
     {
       "id": "Expr.dt.total_nanoseconds",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_nanoseconds",
       "hint": "nanoseconds in a duration",
@@ -2657,6 +2762,7 @@
     {
       "id": "Expr.dt.total_seconds",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.total_seconds",
       "hint": "seconds in a duration",
@@ -2689,6 +2795,7 @@
     {
       "id": "Expr.dt.truncate",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.truncate",
       "hint": "cut to the start of the period",
@@ -2717,6 +2824,7 @@
     {
       "id": "Expr.dt.week",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.week",
       "hint": "the ISO week of the year",
@@ -2727,6 +2835,7 @@
     {
       "id": "Expr.dt.weekday",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.weekday",
       "hint": "the day of the week, Monday 1",
@@ -2737,6 +2846,7 @@
     {
       "id": "Expr.dt.year",
       "applies": "expression",
+      "grouped": null,
       "family": "temporal",
       "name": "dt.year",
       "hint": "the year",
@@ -2747,6 +2857,7 @@
     {
       "id": "Expr.entropy",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "entropy",
       "hint": "how evenly the values share their total",
@@ -2802,6 +2913,7 @@
     {
       "id": "Expr.eq",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "eq",
       "hint": "equal to",
@@ -2830,6 +2942,7 @@
     {
       "id": "Expr.eq_missing",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "eq_missing",
       "hint": "equal to, an empty value equal to another",
@@ -2858,6 +2971,7 @@
     {
       "id": "Expr.erf",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "erf",
       "hint": "error function",
@@ -2868,6 +2982,7 @@
     {
       "id": "Expr.erfc",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "erfc",
       "hint": "complementary error function",
@@ -2878,6 +2993,7 @@
     {
       "id": "Expr.exp",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "exp",
       "hint": "e raised to the value",
@@ -2888,6 +3004,7 @@
     {
       "id": "Expr.fill_nan",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "fill_nan",
       "hint": "NaN replaced by a value",
@@ -2916,6 +3033,7 @@
     {
       "id": "Expr.fill_null",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "fill_null",
       "hint": "empty values replaced",
@@ -3009,6 +3127,7 @@
     {
       "id": "Expr.filter",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "filter",
       "hint": "the values where a condition holds",
@@ -3060,6 +3179,7 @@
     {
       "id": "Expr.first",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "first",
       "hint": "first value",
@@ -3092,6 +3212,7 @@
     {
       "id": "Expr.floor",
       "applies": "expression",
+      "grouped": null,
       "family": "rounding",
       "name": "floor",
       "hint": "rounded down to a whole number",
@@ -3102,6 +3223,7 @@
     {
       "id": "Expr.floordiv",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "floordiv",
       "hint": "divided by another value, rounded down",
@@ -3130,6 +3252,7 @@
     {
       "id": "Expr.forward_fill",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "forward_fill",
       "hint": "empty values filled from the value before",
@@ -3159,6 +3282,7 @@
     {
       "id": "Expr.gather",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "gather",
       "hint": "the values at the given places",
@@ -3208,6 +3332,7 @@
     {
       "id": "Expr.gather_every",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "gather_every",
       "hint": "every nth value",
@@ -3260,6 +3385,7 @@
     {
       "id": "Expr.ge",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "ge",
       "hint": "at least",
@@ -3288,6 +3414,7 @@
     {
       "id": "Expr.gt",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "gt",
       "hint": "greater than",
@@ -3316,6 +3443,7 @@
     {
       "id": "Expr.has_nulls",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "has_nulls",
       "hint": "true if any value is empty",
@@ -3326,6 +3454,7 @@
     {
       "id": "Expr.head",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "head",
       "hint": "the first n values",
@@ -3359,6 +3488,7 @@
     {
       "id": "Expr.implode",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "implode",
       "hint": "the values gathered into one list",
@@ -3391,6 +3521,7 @@
     {
       "id": "Expr.is_between",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "is_between",
       "hint": "between a lower and an upper bound",
@@ -3475,6 +3606,7 @@
     {
       "id": "Expr.is_close",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "is_close",
       "hint": "equal within a tolerance",
@@ -3570,6 +3702,7 @@
     {
       "id": "Expr.is_duplicated",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_duplicated",
       "hint": "true where the value occurs more than once",
@@ -3580,6 +3713,7 @@
     {
       "id": "Expr.is_finite",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_finite",
       "hint": "true for a number that is neither infinite nor NaN",
@@ -3590,6 +3724,7 @@
     {
       "id": "Expr.is_first_distinct",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_first_distinct",
       "hint": "true at the first of each value",
@@ -3600,6 +3735,7 @@
     {
       "id": "Expr.is_in",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "is_in",
       "hint": "whether the value is among the others",
@@ -3649,6 +3785,7 @@
     {
       "id": "Expr.is_infinite",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_infinite",
       "hint": "true for an infinite number",
@@ -3659,6 +3796,7 @@
     {
       "id": "Expr.is_last_distinct",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_last_distinct",
       "hint": "true at the last of each value",
@@ -3669,6 +3807,7 @@
     {
       "id": "Expr.is_nan",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_nan",
       "hint": "true for NaN",
@@ -3679,6 +3818,7 @@
     {
       "id": "Expr.is_not_nan",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_not_nan",
       "hint": "true unless NaN",
@@ -3689,6 +3829,7 @@
     {
       "id": "Expr.is_not_null",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "is_not_null",
       "hint": "has a value",
@@ -3699,6 +3840,7 @@
     {
       "id": "Expr.is_null",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "is_null",
       "hint": "has no value",
@@ -3709,6 +3851,7 @@
     {
       "id": "Expr.is_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "checks",
       "name": "is_unique",
       "hint": "true where the value occurs once",
@@ -3719,6 +3862,7 @@
     {
       "id": "Expr.kurtosis",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "kurtosis",
       "hint": "how heavy the tails of the values are",
@@ -3772,6 +3916,7 @@
     {
       "id": "Expr.last",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "last",
       "hint": "last value",
@@ -3804,6 +3949,7 @@
     {
       "id": "Expr.le",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "le",
       "hint": "at most",
@@ -3832,6 +3978,7 @@
     {
       "id": "Expr.len",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "len",
       "hint": "number of values",
@@ -3842,6 +3989,7 @@
     {
       "id": "Expr.limit",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "limit",
       "hint": "the first n values, as head",
@@ -3875,6 +4023,7 @@
     {
       "id": "Expr.list.all",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.all",
       "hint": "true if every value of each list is true",
@@ -3907,6 +4056,7 @@
     {
       "id": "Expr.list.any",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.any",
       "hint": "true if some value of each list is true",
@@ -3939,6 +4089,7 @@
     {
       "id": "Expr.list.arg_max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.arg_max",
       "hint": "place of the largest value of each list",
@@ -3949,6 +4100,7 @@
     {
       "id": "Expr.list.arg_min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.arg_min",
       "hint": "place of the smallest value of each list",
@@ -3959,6 +4111,7 @@
     {
       "id": "Expr.list.drop_nulls",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "list.drop_nulls",
       "hint": "each list without its empty values",
@@ -3969,6 +4122,7 @@
     {
       "id": "Expr.list.first",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "list.first",
       "hint": "first value of each list",
@@ -3979,6 +4133,7 @@
     {
       "id": "Expr.list.last",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "list.last",
       "hint": "last value of each list",
@@ -3989,6 +4144,7 @@
     {
       "id": "Expr.list.len",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.len",
       "hint": "number of values in each list",
@@ -3999,6 +4155,7 @@
     {
       "id": "Expr.list.max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.max",
       "hint": "largest value of each list",
@@ -4009,6 +4166,7 @@
     {
       "id": "Expr.list.mean",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.mean",
       "hint": "average of the values of each list",
@@ -4019,6 +4177,7 @@
     {
       "id": "Expr.list.median",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.median",
       "hint": "middle value of each list",
@@ -4029,6 +4188,7 @@
     {
       "id": "Expr.list.min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.min",
       "hint": "smallest value of each list",
@@ -4039,6 +4199,7 @@
     {
       "id": "Expr.list.n_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.n_unique",
       "hint": "number of different values in each list",
@@ -4049,6 +4210,7 @@
     {
       "id": "Expr.list.reverse",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "list.reverse",
       "hint": "the values of each list in reverse order",
@@ -4059,6 +4221,7 @@
     {
       "id": "Expr.list.sort",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "list.sort",
       "hint": "the values of each list in order",
@@ -4112,6 +4275,7 @@
     {
       "id": "Expr.list.std",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.std",
       "hint": "how far the values of each list spread from their average",
@@ -4146,6 +4310,7 @@
     {
       "id": "Expr.list.sum",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.sum",
       "hint": "sum of the values of each list",
@@ -4156,6 +4321,7 @@
     {
       "id": "Expr.list.to_struct",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "list.to_struct",
       "hint": "a struct whose fields are the first values of each list, under the names given",
@@ -4185,6 +4351,7 @@
     {
       "id": "Expr.list.unique",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "list.unique",
       "hint": "each different value of each list once",
@@ -4217,6 +4384,7 @@
     {
       "id": "Expr.list.var",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "list.var",
       "hint": "square of how far the values of each list spread from their average",
@@ -4251,6 +4419,7 @@
     {
       "id": "Expr.log",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "log",
       "hint": "logarithm to a base, e unless another is given",
@@ -4284,6 +4453,7 @@
     {
       "id": "Expr.log1p",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "log1p",
       "hint": "natural logarithm of one plus the value",
@@ -4294,6 +4464,7 @@
     {
       "id": "Expr.lt",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "lt",
       "hint": "less than",
@@ -4322,6 +4493,7 @@
     {
       "id": "Expr.max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "max",
       "hint": "highest value",
@@ -4332,6 +4504,7 @@
     {
       "id": "Expr.mean",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "mean",
       "hint": "average",
@@ -4342,6 +4515,7 @@
     {
       "id": "Expr.median",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "median",
       "hint": "middle value",
@@ -4352,6 +4526,7 @@
     {
       "id": "Expr.min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "min",
       "hint": "lowest value",
@@ -4362,6 +4537,7 @@
     {
       "id": "Expr.mod",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "mod",
       "hint": "remainder of a division",
@@ -4390,6 +4566,7 @@
     {
       "id": "Expr.mode",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "mode",
       "hint": "the values that occur most often",
@@ -4422,6 +4599,7 @@
     {
       "id": "Expr.mul",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "mul",
       "hint": "times another value",
@@ -4450,6 +4628,7 @@
     {
       "id": "Expr.n_unique",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "n_unique",
       "hint": "number of different values",
@@ -4460,6 +4639,7 @@
     {
       "id": "Expr.nan_max",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "nan_max",
       "hint": "highest value, not a number if one is",
@@ -4470,6 +4650,7 @@
     {
       "id": "Expr.nan_min",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "nan_min",
       "hint": "lowest value, not a number if one is",
@@ -4480,6 +4661,7 @@
     {
       "id": "Expr.ne",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "ne",
       "hint": "not equal to",
@@ -4508,6 +4690,7 @@
     {
       "id": "Expr.ne_missing",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "ne_missing",
       "hint": "not equal to, an empty value equal to another",
@@ -4536,6 +4719,7 @@
     {
       "id": "Expr.neg",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "neg",
       "hint": "the value with its sign flipped",
@@ -4546,6 +4730,7 @@
     {
       "id": "Expr.not_",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "not",
       "hint": "the opposite, bit by bit on whole numbers",
@@ -4556,6 +4741,7 @@
     {
       "id": "Expr.null_count",
       "applies": "expression",
+      "grouped": null,
       "family": "nulls",
       "name": "null_count",
       "hint": "number of empty values",
@@ -4566,6 +4752,7 @@
     {
       "id": "Expr.or_",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "or",
       "hint": "true where any is true, bit by bit on whole numbers",
@@ -4594,6 +4781,7 @@
     {
       "id": "Expr.over",
       "applies": "expression",
+      "grouped": null,
       "family": "window",
       "name": "over",
       "hint": "within each group",
@@ -4742,6 +4930,7 @@
     {
       "id": "Expr.pct_change",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "pct_change",
       "hint": "how much a value grew from the one n rows earlier",
@@ -4775,6 +4964,7 @@
     {
       "id": "Expr.pow",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "pow",
       "hint": "raised to a power",
@@ -4803,6 +4993,7 @@
     {
       "id": "Expr.product",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "product",
       "hint": "the values multiplied",
@@ -4813,6 +5004,7 @@
     {
       "id": "Expr.quantile",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "quantile",
       "hint": "the value a share of the values fall below",
@@ -4888,6 +5080,7 @@
     {
       "id": "Expr.radians",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "radians",
       "hint": "an angle in degrees, in radians",
@@ -4898,6 +5091,7 @@
     {
       "id": "Expr.rank",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "rank",
       "hint": "the place of each value in order",
@@ -4995,6 +5189,7 @@
     {
       "id": "Expr.replace",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "replace",
       "hint": "values swapped for others of the same dtype",
@@ -5040,6 +5235,7 @@
     {
       "id": "Expr.replace_strict",
       "applies": "expression",
+      "grouped": null,
       "family": "conversion",
       "name": "replace_strict",
       "hint": "values swapped for others, whatever their dtype",
@@ -5119,6 +5315,7 @@
     {
       "id": "Expr.reverse",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "reverse",
       "hint": "the values from the last to the first",
@@ -5129,6 +5326,7 @@
     {
       "id": "Expr.rle_id",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "rle_id",
       "hint": "counts up each time the value changes",
@@ -5139,6 +5337,7 @@
     {
       "id": "Expr.round",
       "applies": "expression",
+      "grouped": null,
       "family": "rounding",
       "name": "round",
       "hint": "rounded to a number of decimal places",
@@ -5204,6 +5403,7 @@
     {
       "id": "Expr.round_sig_figs",
       "applies": "expression",
+      "grouped": null,
       "family": "rounding",
       "name": "round_sig_figs",
       "hint": "rounded to a number of significant figures",
@@ -5233,6 +5433,7 @@
     {
       "id": "Expr.search_sorted",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "search_sorted",
       "hint": "the place a value would take in the sorted values",
@@ -5317,6 +5518,7 @@
     {
       "id": "Expr.shift",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "shift",
       "hint": "value n rows earlier",
@@ -5367,6 +5569,7 @@
     {
       "id": "Expr.sign",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "sign",
       "hint": "-1, 0 or 1 by the sign of the value",
@@ -5377,6 +5580,7 @@
     {
       "id": "Expr.sin",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "sin",
       "hint": "sine of an angle in radians",
@@ -5387,6 +5591,7 @@
     {
       "id": "Expr.sinh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "sinh",
       "hint": "hyperbolic sine",
@@ -5397,6 +5602,7 @@
     {
       "id": "Expr.skew",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "skew",
       "hint": "how lopsided the values are",
@@ -5429,6 +5635,7 @@
     {
       "id": "Expr.slice",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "slice",
       "hint": "the values from a place, for a length",
@@ -5474,6 +5681,7 @@
     {
       "id": "Expr.sort",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "sort",
       "hint": "the values in order",
@@ -5527,6 +5735,7 @@
     {
       "id": "Expr.sort_by",
       "applies": "expression",
+      "grouped": null,
       "family": "order",
       "name": "sort_by",
       "hint": "the values in the order of other values",
@@ -5658,6 +5867,7 @@
     {
       "id": "Expr.sqrt",
       "applies": "expression",
+      "grouped": null,
       "family": "maths",
       "name": "sqrt",
       "hint": "square root",
@@ -5668,6 +5878,7 @@
     {
       "id": "Expr.std",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "std",
       "hint": "how far the values spread from their average",
@@ -5702,6 +5913,7 @@
     {
       "id": "Expr.str.contains",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "str.contains",
       "hint": "true where the text has a match for a pattern",
@@ -5773,6 +5985,7 @@
     {
       "id": "Expr.str.count_matches",
       "applies": "expression",
+      "grouped": null,
       "family": "search",
       "name": "str.count_matches",
       "hint": "how many times a pattern matches in the text",
@@ -5823,6 +6036,7 @@
     {
       "id": "Expr.str.ends_with",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "str.ends_with",
       "hint": "true where the text ends with a suffix",
@@ -5851,6 +6065,7 @@
     {
       "id": "Expr.str.escape_regex",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.escape_regex",
       "hint": "put a backslash before each character that has a meaning in a pattern",
@@ -5861,6 +6076,7 @@
     {
       "id": "Expr.str.extract",
       "applies": "expression",
+      "grouped": null,
       "family": "search",
       "name": "str.extract",
       "hint": "the text one group of the first match holds, nothing where there is none",
@@ -5913,6 +6129,7 @@
     {
       "id": "Expr.str.extract_all",
       "applies": "expression",
+      "grouped": null,
       "family": "search",
       "name": "str.extract_all",
       "hint": "a list of every match of a pattern",
@@ -5942,6 +6159,7 @@
     {
       "id": "Expr.str.extract_groups",
       "applies": "expression",
+      "grouped": null,
       "family": "search",
       "name": "str.extract_groups",
       "hint": "a struct of the text each group of a pattern matched, its fields named as the groups are",
@@ -5971,6 +6189,7 @@
     {
       "id": "Expr.str.find",
       "applies": "expression",
+      "grouped": null,
       "family": "search",
       "name": "str.find",
       "hint": "where a pattern first matches, in characters from the start, nothing where it does not",
@@ -6042,6 +6261,7 @@
     {
       "id": "Expr.str.head",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.head",
       "hint": "the first characters",
@@ -6070,6 +6290,7 @@
     {
       "id": "Expr.str.join",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.join",
       "hint": "all the text of the column as one, with a delimiter between",
@@ -6125,6 +6346,7 @@
     {
       "id": "Expr.str.len_bytes",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.len_bytes",
       "hint": "length in bytes",
@@ -6135,6 +6357,7 @@
     {
       "id": "Expr.str.len_chars",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.len_chars",
       "hint": "length in characters",
@@ -6145,6 +6368,7 @@
     {
       "id": "Expr.str.pad_end",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.pad_end",
       "hint": "add characters at the end up to a length",
@@ -6196,6 +6420,7 @@
     {
       "id": "Expr.str.pad_start",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.pad_start",
       "hint": "add characters at the start up to a length",
@@ -6247,6 +6472,7 @@
     {
       "id": "Expr.str.replace",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.replace",
       "hint": "replace the first match of a pattern, or the first n, by a text where $1 and ${name} stand for what a group matched",
@@ -6337,6 +6563,7 @@
     {
       "id": "Expr.str.replace_all",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.replace_all",
       "hint": "replace every match of a pattern by a text where $1 and ${name} stand for what a group matched",
@@ -6404,6 +6631,7 @@
     {
       "id": "Expr.str.reverse",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.reverse",
       "hint": "the text backwards",
@@ -6414,6 +6642,7 @@
     {
       "id": "Expr.str.slice",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.slice",
       "hint": "part of the text from a position",
@@ -6459,6 +6688,7 @@
     {
       "id": "Expr.str.split",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.split",
       "hint": "a list of the pieces between a separator",
@@ -6550,6 +6780,7 @@
     {
       "id": "Expr.str.split_exact",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.split_exact",
       "hint": "a struct of the pieces between a separator, one field more than the number of splits",
@@ -6617,6 +6848,7 @@
     {
       "id": "Expr.str.splitn",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.splitn",
       "hint": "a struct of at most n pieces between a separator, the last holding the rest",
@@ -6663,6 +6895,7 @@
     {
       "id": "Expr.str.starts_with",
       "applies": "expression",
+      "grouped": null,
       "family": "compare",
       "name": "str.starts_with",
       "hint": "true where the text starts with a prefix",
@@ -6691,6 +6924,7 @@
     {
       "id": "Expr.str.strip_chars",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.strip_chars",
       "hint": "remove characters from both ends, spaces if none are given",
@@ -6719,6 +6953,7 @@
     {
       "id": "Expr.str.strip_chars_end",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.strip_chars_end",
       "hint": "remove characters from the end, spaces if none are given",
@@ -6747,6 +6982,7 @@
     {
       "id": "Expr.str.strip_chars_start",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.strip_chars_start",
       "hint": "remove characters from the start, spaces if none are given",
@@ -6775,6 +7011,7 @@
     {
       "id": "Expr.str.strip_prefix",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.strip_prefix",
       "hint": "remove a prefix where the text starts with it",
@@ -6803,6 +7040,7 @@
     {
       "id": "Expr.str.strip_suffix",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.strip_suffix",
       "hint": "remove a suffix where the text ends with it",
@@ -6831,6 +7069,7 @@
     {
       "id": "Expr.str.tail",
       "applies": "expression",
+      "grouped": null,
       "family": "pieces",
       "name": "str.tail",
       "hint": "the last characters",
@@ -6859,6 +7098,7 @@
     {
       "id": "Expr.str.to_lowercase",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.to_lowercase",
       "hint": "all lowercase",
@@ -6869,6 +7109,7 @@
     {
       "id": "Expr.str.to_titlecase",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.to_titlecase",
       "hint": "the first letter of each word capitalised",
@@ -6879,6 +7120,7 @@
     {
       "id": "Expr.str.to_uppercase",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.to_uppercase",
       "hint": "all uppercase",
@@ -6889,6 +7131,7 @@
     {
       "id": "Expr.str.zfill",
       "applies": "expression",
+      "grouped": null,
       "family": "text",
       "name": "str.zfill",
       "hint": "add zeros at the start up to a length",
@@ -6917,6 +7160,7 @@
     {
       "id": "Expr.struct.drop",
       "applies": "expression",
+      "grouped": null,
       "family": "structs",
       "name": "struct.drop",
       "hint": "the struct without the fields named",
@@ -6966,6 +7210,7 @@
     {
       "id": "Expr.struct.field",
       "applies": "expression",
+      "grouped": null,
       "family": "structs",
       "name": "struct.field",
       "hint": "the value of one field of the struct",
@@ -7011,6 +7256,7 @@
     {
       "id": "Expr.struct.json_encode",
       "applies": "expression",
+      "grouped": null,
       "family": "structs",
       "name": "struct.json_encode",
       "hint": "the struct as text in JSON",
@@ -7021,6 +7267,7 @@
     {
       "id": "Expr.struct.rename_fields",
       "applies": "expression",
+      "grouped": null,
       "family": "structs",
       "name": "struct.rename_fields",
       "hint": "the same struct, its fields under new names, in the order they are",
@@ -7050,6 +7297,7 @@
     {
       "id": "Expr.struct.unnest",
       "applies": "expression",
+      "grouped": null,
       "family": "structs",
       "name": "struct.unnest",
       "hint": "a column for each field of the struct, named as the field is",
@@ -7060,6 +7308,7 @@
     {
       "id": "Expr.sub",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "sub",
       "hint": "minus another value",
@@ -7088,6 +7337,7 @@
     {
       "id": "Expr.sum",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "sum",
       "hint": "total",
@@ -7098,6 +7348,7 @@
     {
       "id": "Expr.tail",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "tail",
       "hint": "the last n values",
@@ -7131,6 +7382,7 @@
     {
       "id": "Expr.tan",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "tan",
       "hint": "tangent of an angle in radians",
@@ -7141,6 +7393,7 @@
     {
       "id": "Expr.tanh",
       "applies": "expression",
+      "grouped": null,
       "family": "trigonometry",
       "name": "tanh",
       "hint": "hyperbolic tangent",
@@ -7151,6 +7404,7 @@
     {
       "id": "Expr.top_k",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "top_k",
       "hint": "the k largest values",
@@ -7184,6 +7438,7 @@
     {
       "id": "Expr.truediv",
       "applies": "expression",
+      "grouped": null,
       "family": "arithmetic",
       "name": "truediv",
       "hint": "divided by another value",
@@ -7212,6 +7467,7 @@
     {
       "id": "Expr.truncate",
       "applies": "expression",
+      "grouped": null,
       "family": "rounding",
       "name": "truncate",
       "hint": "cut off after a number of decimal places",
@@ -7246,6 +7502,7 @@
     {
       "id": "Expr.unique",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "unique",
       "hint": "each different value once",
@@ -7278,6 +7535,7 @@
     {
       "id": "Expr.unique_counts",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "unique_counts",
       "hint": "how often each different value occurs",
@@ -7288,6 +7546,7 @@
     {
       "id": "Expr.value_counts",
       "applies": "expression",
+      "grouped": null,
       "family": "rows",
       "name": "value_counts",
       "hint": "a struct of each different value and how often it occurs",
@@ -7380,6 +7639,7 @@
     {
       "id": "Expr.var",
       "applies": "expression",
+      "grouped": null,
       "family": "aggregate",
       "name": "var",
       "hint": "square of how far the values spread from their average",
@@ -7414,6 +7674,7 @@
     {
       "id": "Expr.xor",
       "applies": "expression",
+      "grouped": null,
       "family": "logic",
       "name": "xor",
       "hint": "true where exactly one is true, bit by bit on whole numbers",
@@ -7442,6 +7703,7 @@
     {
       "id": "LazyFrame.drop",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "drop",
       "hint": "some columns removed",
@@ -7491,6 +7753,7 @@
     {
       "id": "LazyFrame.drop_nans",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "drop_nans",
       "hint": "the rows that hold a NaN left out",
@@ -7519,6 +7782,7 @@
     {
       "id": "LazyFrame.drop_nulls",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "drop_nulls",
       "hint": "the rows that hold an empty value left out",
@@ -7547,6 +7811,7 @@
     {
       "id": "LazyFrame.fill_nan",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "fill_nan",
       "hint": "NaN replaced by a value in every float column",
@@ -7576,6 +7841,7 @@
     {
       "id": "LazyFrame.filter",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "filter",
       "hint": "the rows where a condition holds",
@@ -7630,6 +7896,7 @@
     {
       "id": "LazyFrame.first",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "first",
       "hint": "the first row",
@@ -7640,6 +7907,7 @@
     {
       "id": "LazyFrame.gather_every",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "gather_every",
       "hint": "every nth row",
@@ -7692,6 +7960,7 @@
     {
       "id": "LazyFrame.group_by",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "group_by",
       "hint": "the rows gathered into groups by some keys, and a value for each group",
@@ -7770,6 +8039,7 @@
     {
       "id": "LazyFrame.head",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "head",
       "hint": "the first rows",
@@ -7804,6 +8074,7 @@
     {
       "id": "LazyFrame.join",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "join",
       "hint": "columns from another table, by a key",
@@ -8167,6 +8438,7 @@
     {
       "id": "LazyFrame.last",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "last",
       "hint": "the last row",
@@ -8177,6 +8449,7 @@
     {
       "id": "LazyFrame.limit",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "limit",
       "hint": "the first rows, as head",
@@ -8211,6 +8484,7 @@
     {
       "id": "LazyFrame.pivot",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "pivot",
       "hint": "the values of a field as columns",
@@ -8385,6 +8659,7 @@
     {
       "id": "LazyFrame.rename",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "rename",
       "hint": "columns under new names",
@@ -8441,6 +8716,7 @@
     {
       "id": "LazyFrame.reverse",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "reverse",
       "hint": "the rows from the last to the first",
@@ -8451,6 +8727,7 @@
     {
       "id": "LazyFrame.select",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "select",
       "hint": "some of the columns",
@@ -8508,6 +8785,7 @@
     {
       "id": "LazyFrame.slice",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "slice",
       "hint": "some rows from a place on",
@@ -8555,6 +8833,7 @@
     {
       "id": "LazyFrame.sort",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "sort",
       "hint": "the rows in the order of some fields",
@@ -8692,6 +8971,7 @@
     {
       "id": "LazyFrame.tail",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "tail",
       "hint": "the last rows",
@@ -8726,6 +9006,7 @@
     {
       "id": "LazyFrame.with_columns",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "with_columns",
       "hint": "a new column from a chain",
@@ -8783,6 +9064,7 @@
     {
       "id": "LazyFrame.with_row_index",
       "applies": "frame",
+      "grouped": null,
       "family": "steps",
       "name": "with_row_index",
       "hint": "a count of the rows as the first column",
@@ -8840,6 +9122,7 @@
     {
       "id": "LazyGroupBy.agg",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "agg",
       "hint": "one value for each group from a chain that aggregates, and a list of its values for each group from one that does not",
@@ -8897,6 +9180,7 @@
     {
       "id": "LazyGroupBy.all",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "all",
       "hint": "the values of each group in a list, for every column that is not a key",
@@ -8907,6 +9191,7 @@
     {
       "id": "LazyGroupBy.first",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "first",
       "hint": "the first value of each group, for every column that is not a key",
@@ -8939,6 +9224,7 @@
     {
       "id": "LazyGroupBy.having",
       "applies": "grouped",
+      "grouped": "having",
       "family": "grouped",
       "name": "having",
       "hint": "only the groups for which every condition holds",
@@ -8970,6 +9256,7 @@
     {
       "id": "LazyGroupBy.head",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "head",
       "hint": "the first rows of each group",
@@ -9004,6 +9291,7 @@
     {
       "id": "LazyGroupBy.last",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "last",
       "hint": "the last value of each group, for every column that is not a key",
@@ -9036,6 +9324,7 @@
     {
       "id": "LazyGroupBy.len",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "len",
       "hint": "the number of rows of each group",
@@ -9065,6 +9354,7 @@
     {
       "id": "LazyGroupBy.max",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "max",
       "hint": "the largest value of each group, for every column that is not a key",
@@ -9075,6 +9365,7 @@
     {
       "id": "LazyGroupBy.mean",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "mean",
       "hint": "the mean of each group, for every column that is not a key",
@@ -9085,6 +9376,7 @@
     {
       "id": "LazyGroupBy.median",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "median",
       "hint": "the median of each group, for every column that is not a key",
@@ -9095,6 +9387,7 @@
     {
       "id": "LazyGroupBy.min",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "min",
       "hint": "the smallest value of each group, for every column that is not a key",
@@ -9105,6 +9398,7 @@
     {
       "id": "LazyGroupBy.n_unique",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "n_unique",
       "hint": "how many different values each group has, for every column that is not a key",
@@ -9115,6 +9409,7 @@
     {
       "id": "LazyGroupBy.quantile",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "quantile",
       "hint": "the value a share of each group falls below, for every column that is not a key",
@@ -9191,6 +9486,7 @@
     {
       "id": "LazyGroupBy.sum",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "sum",
       "hint": "the sum of each group, for every column that is not a key",
@@ -9201,6 +9497,7 @@
     {
       "id": "LazyGroupBy.tail",
       "applies": "grouped",
+      "grouped": "finishes",
       "family": "grouped",
       "name": "tail",
       "hint": "the last rows of each group",
@@ -9235,6 +9532,7 @@
     {
       "id": "Then.otherwise",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "otherwise",
       "hint": "the value where no condition holds",
@@ -9266,6 +9564,7 @@
     {
       "id": "Then.when",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "when",
       "hint": "another condition",
@@ -9320,6 +9619,7 @@
     {
       "id": "When.then",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "then",
       "hint": "the value where the condition holds",
@@ -9351,6 +9651,7 @@
     {
       "id": "polars.col",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "col",
       "hint": "a column of the table",
@@ -9396,6 +9697,7 @@
     {
       "id": "polars.date",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "date",
       "hint": "a date made of a year, a month and a day",
@@ -9458,6 +9760,7 @@
     {
       "id": "polars.date_range",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "date_range",
       "hint": "the dates from a start to an end, an interval apart",
@@ -9585,6 +9888,7 @@
     {
       "id": "polars.datetime",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "datetime",
       "hint": "a moment made of a date and a time of day",
@@ -9810,6 +10114,7 @@
     {
       "id": "polars.datetime_range",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "datetime_range",
       "hint": "the moments from a start to an end, an interval apart",
@@ -9989,6 +10294,7 @@
     {
       "id": "polars.duration",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "duration",
       "hint": "a length of time made of weeks, days, hours and the like",
@@ -10167,6 +10473,7 @@
     {
       "id": "polars.element",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "element",
       "hint": "each value of the cell being combined",
@@ -10177,6 +10484,7 @@
     {
       "id": "polars.from_epoch",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "from_epoch",
       "hint": "a date or a moment from a count since 1970",
@@ -10248,6 +10556,7 @@
     {
       "id": "polars.int_range",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "int_range",
       "hint": "whole numbers from a start up to, not including, an end",
@@ -10359,6 +10668,7 @@
     {
       "id": "polars.linear_space",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "linear_space",
       "hint": "a number of values evenly spaced from a start to an end",
@@ -10481,6 +10791,7 @@
     {
       "id": "polars.lit",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "lit",
       "hint": "a value written out",
@@ -10548,6 +10859,7 @@
     {
       "id": "polars.repeat",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "repeat",
       "hint": "one value repeated a number of times",
@@ -10631,6 +10943,7 @@
     {
       "id": "polars.struct",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "struct",
       "hint": "a struct that holds the values given, each as a field named as it is",
@@ -10726,6 +11039,7 @@
     {
       "id": "polars.time",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "time",
       "hint": "a time of day made of an hour, a minute and the like",
@@ -10805,6 +11119,7 @@
     {
       "id": "polars.time_range",
       "applies": "function",
+      "grouped": null,
       "family": "start",
       "name": "time_range",
       "hint": "the times of day from a start to an end, an interval apart",
@@ -10932,6 +11247,7 @@
     {
       "id": "polars.when",
       "applies": "condition",
+      "grouped": null,
       "family": "condition",
       "name": "when",
       "hint": "choose a value by a condition",
