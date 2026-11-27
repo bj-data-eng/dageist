@@ -241,6 +241,7 @@ impl Step {
             selected: Vec::new(),
             of_lists: Vec::new(),
             step: self.call(),
+            links: self.links(),
             source,
             inputs,
             other,
@@ -259,6 +260,7 @@ impl Step {
             walker.step_options(link);
             walker.path.clear();
         }
+        walker.grouping(self);
         walker.selected_items_meet();
         walker.written_names_are_distinct();
         walker.step_options(self.call());
@@ -432,6 +434,8 @@ enum Cur {
 
 struct Walker<'a> {
     step: &'a Call,
+    /// The calls after `step`, where it is a call of `group_by`.
+    links: &'a [Call],
     source: &'a Schema,
     inputs: &'a Inputs,
     other: Option<SchemaRef>,
@@ -1219,6 +1223,192 @@ impl Walker<'_> {
         }
     }
 
+    /// The expressions that the items of the starred parameter `parameter` of the call at `path`
+    /// hold, each with where it is and the name it is written under, where the walk knows it.
+    fn items_named(
+        &self,
+        call: &Call,
+        path: &[Segment],
+        parameter: &str,
+    ) -> Vec<(Place, Option<String>)> {
+        let Some(Value::Many(items)) = call.argument(parameter) else {
+            return Vec::new();
+        };
+        items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| matches!(item, Value::Expression(_)))
+            .map(|(at, _)| {
+                let place = path
+                    .iter()
+                    .cloned()
+                    .chain([Segment::Parameter(parameter.to_owned()), Segment::Item(at)])
+                    .fold(self.base.clone(), Place::then);
+                let name = self
+                    .walked
+                    .iter()
+                    .find(|walked| walked.place == place)
+                    .and_then(|walked| walked.output_name.clone());
+                (place, name)
+            })
+            .collect()
+    }
+
+    /// The names the entries of the double-starred parameter `parameter` of the call at `path` are
+    /// given, each with where its expression is.
+    fn pairs_named(
+        &self,
+        call: &Call,
+        path: &[Segment],
+        parameter: &str,
+    ) -> Vec<(Place, Option<String>)> {
+        let Some(Value::Pairs(pairs)) = call.argument(parameter) else {
+            return Vec::new();
+        };
+        pairs
+            .iter()
+            .enumerate()
+            .map(|(at, (key, _))| {
+                let place = path
+                    .iter()
+                    .cloned()
+                    .chain([Segment::Parameter(parameter.to_owned()), Segment::Value(at)])
+                    .fold(self.base.clone(), Place::then);
+                let name = match key {
+                    Value::Columns(names) => match names.as_slice() {
+                        [name] => Some(name.clone()),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                (place, name)
+            })
+            .collect()
+    }
+
+    /// The checks of a step that groups: the columns it gives are named differently, and a
+    /// shortcut that finishes it is asked of the tables for each column it aggregates.
+    fn grouping(&mut self, step: &Step) {
+        let Some(finish) = step.links().last() else {
+            return;
+        };
+        let finish_at = step.links().len() - 1;
+        let mut keys = self.items_named(step.call(), &[], "by");
+        keys.extend(self.pairs_named(step.call(), &[], "named_by"));
+        let mut given = keys.clone();
+        for (at, link) in step.links().iter().enumerate() {
+            if link.entry().id().as_str() == "LazyGroupBy.agg" {
+                let path = [Segment::Link(at)];
+                given.extend(self.items_named(link, &path, "aggs"));
+                given.extend(self.pairs_named(link, &path, "named_aggs"));
+            }
+        }
+        // `len` gives its count the name it is given, or `len`.
+        if finish.entry().id().as_str() == "LazyGroupBy.len" {
+            let name = match finish.argument("name") {
+                Some(Value::String(name)) => name.clone(),
+                _ => "len".to_owned(),
+            };
+            let place = self
+                .base
+                .clone()
+                .then(Segment::Link(finish_at))
+                .then(Segment::Parameter("name".to_owned()));
+            given.push((place, Some(name)));
+        }
+        let mut seen: Vec<&String> = Vec::new();
+        for (place, name) in &given {
+            let Some(name) = name else { continue };
+            if seen.contains(&name) {
+                if let Err(refusal) = allowed::rule_forbids_a_grouped_name_given_twice(name) {
+                    self.refusal.get_or_insert(WalkRefusal {
+                        place: place.clone(),
+                        refusal,
+                        at_end: true,
+                        argument_unknown: false,
+                    });
+                }
+                break;
+            }
+            seen.push(name);
+        }
+        self.shortcut_columns(finish, finish_at, &keys);
+    }
+
+    /// Asks the tables whether the method a shortcut aggregates every column with may stand in an
+    /// aggregate of each column that is not a key, as Polars expands it: it refuses the shortcut
+    /// where it refuses the method for one of them, with the method's words.
+    fn shortcut_columns(
+        &mut self,
+        finish: &Call,
+        finish_at: usize,
+        keys: &[(Place, Option<String>)],
+    ) {
+        let method = match finish.entry().id().as_str() {
+            "LazyGroupBy.sum" => "Expr.sum",
+            "LazyGroupBy.mean" => "Expr.mean",
+            "LazyGroupBy.median" => "Expr.median",
+            "LazyGroupBy.min" => "Expr.min",
+            "LazyGroupBy.max" => "Expr.max",
+            "LazyGroupBy.n_unique" => "Expr.n_unique",
+            "LazyGroupBy.first" => "Expr.first",
+            "LazyGroupBy.last" => "Expr.last",
+            "LazyGroupBy.quantile" => "Expr.quantile",
+            "LazyGroupBy.head" => "Expr.head",
+            "LazyGroupBy.tail" => "Expr.tail",
+            // The values of each group in a list, and a count, are what any dtype has.
+            _ => return,
+        };
+        let Some(entry) = catalog::entry(method) else {
+            return;
+        };
+        let names: Option<Vec<&str>> = keys.iter().map(|(_, name)| name.as_deref()).collect();
+        let Some(names) = names else {
+            self.path = vec![Segment::Link(finish_at)];
+            self.blind("the names of the keys are not known, so the columns it aggregates are not");
+            self.path.clear();
+            return;
+        };
+        let (words, _) = option_words(finish);
+        let options: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
+        let shares = [("quantile", Representative::Float64)];
+        let chosen = Chosen::default().with_options(&options);
+        let chosen = if method == "Expr.quantile" {
+            chosen.with_arguments(&shares)
+        } else {
+            chosen
+        };
+        for (name, dtype) in self.source.iter() {
+            if names.contains(&name.as_str()) {
+                continue;
+            }
+            let Some(class) = Representative::of(dtype) else {
+                self.path = vec![Segment::Link(finish_at)];
+                self.blind(format!(
+                    "the dtype of the column {name:?} is none the tables have a class of"
+                ));
+                self.path.clear();
+                continue;
+            };
+            let place = OfferPlace::new(
+                Context::step(Outer::Aggregate),
+                After::Value {
+                    dtype: class,
+                    shape: Shape::Many,
+                },
+            );
+            if let Verdict::Refused(refusal) = allowed::offer(entry, &place, &chosen) {
+                self.path = vec![Segment::Link(finish_at)];
+                self.refuse(&refusal, false);
+                self.path.clear();
+                return;
+            }
+        }
+    }
+
     /// Asks whether the columns that `drop_nans` is told to look at may each be tested for a NaN,
     /// which is what Polars makes of them: it refuses a column that `is_nan` refuses, such as text,
     /// when the rows run, with that method's words. The tables say which dtypes those are. The
@@ -1891,6 +2081,20 @@ impl Walker<'_> {
     /// How many other expressions stand beside the one being walked in the list of items it is one
     /// of: the other predicates and constraints of a filter, where it is an item of one.
     fn siblings_of_the_item(&self) -> usize {
+        // The predicates of a `having` are combined as a filter's are.
+        if let Some(Segment::Link(at)) = self.path.first()
+            && let Some(link) = self.links.get(*at)
+            && link.entry().id().as_str() == "LazyGroupBy.having"
+            && matches!(
+                self.path.get(1),
+                Some(Segment::Parameter(name)) if name == "predicates"
+            )
+        {
+            return match link.argument("predicates") {
+                Some(Value::Many(items)) => items.len().saturating_sub(1),
+                _ => 0,
+            };
+        }
         if self.step.entry().id().as_str() != "LazyFrame.filter" {
             return 0;
         }
@@ -2110,6 +2314,7 @@ impl Walker<'_> {
                 let numbers = start.numbers();
                 let chosen = Chosen::default()
                     .following_fields(start_fields.as_ref())
+                    .among_others(self.siblings_of_the_item())
                     .with_names(&names)
                     .with_numbers(&numbers)
                     .with_inputs(&input_names);

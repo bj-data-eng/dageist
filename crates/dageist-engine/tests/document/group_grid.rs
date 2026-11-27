@@ -343,16 +343,9 @@ fn aggregates_known() -> Vec<Known> {
 #[test]
 fn every_aggregate_over_every_class_is_what_polars_says_in_agg() {
     let verdicts = Grid::<Aggregated>::new()
-        .axis(
-            "method",
-            {
-                aggregates()
-                    .into_iter()
-                    .map(|(label, entry)| (label, entry))
-                    .collect()
-            },
-            |point, entry| point.entry = Some(entry),
-        )
+        .axis("method", aggregates(), |point, entry| {
+            point.entry = Some(entry)
+        })
         .axis("class", classes(), |point, column| {
             point.column = Some(column.clone());
         })
@@ -769,4 +762,80 @@ fn a_chain_that_does_not_end_in_one_finishing_call_is_refused_before_polars_is_a
         .saying("cannot be"),
     );
     verdicts.assert_agree(&known, 2);
+}
+
+// ---------------------------------------------------------------------------
+// What a group gives
+
+#[test]
+fn a_column_that_is_not_aggregated_is_a_list_of_its_dtype_for_each_group_and_an_aggregate_is_not() {
+    use dageist_engine::document::{Document, Inputs, Outcome, Resolution, Segment};
+    let mut checked = 0;
+    for column in &WORLD.columns {
+        let dtype = WORLD
+            .frame
+            .column(&column.name)
+            .expect("the column")
+            .dtype()
+            .clone();
+        let first = of(column, vec![call("Expr.first", json!({}))]);
+        let text = crate::support::document(vec![crate::support::grouping(
+            "g",
+            by(vec![field("n")]),
+            vec![finishing(
+                "LazyGroupBy.agg",
+                json!({ "named_aggs": named(vec![("all", of(column, vec![])), ("one", first)]) }),
+            )],
+        )]);
+        let document = Document::read(&text).expect("a document");
+        let report = document
+            .run_on(&Inputs::new(), &WORLD.frame)
+            .expect("the table has a schema");
+        let step = &report.steps()[0];
+        let Outcome::Valid { schema, .. } = step.outcome() else {
+            panic!("{}: {:?}", column.label, step.outcome())
+        };
+        // Polars' own words for the dtypes, written by hand: a list of what the column has for the
+        // values of each group, and what the column has for its first.
+        assert_eq!(
+            schema.get("all"),
+            Some(&DataType::List(Box::new(dtype.clone()))),
+            "{}",
+            column.label
+        );
+        assert_eq!(schema.get("one"), Some(&dtype), "{}", column.label);
+        // The report says the same of the column alone and of its first, where they stand.
+        let trace = |at: usize, links: usize| {
+            let place = dageist_engine::document::Place::of_step(
+                0,
+                Some(dageist_engine::document::StepId::new("g").expect("an id")),
+            )
+            .then(Segment::Link(0))
+            .then(Segment::Parameter("named_aggs".to_owned()))
+            .then(Segment::Value(at));
+            let expression = step
+                .expressions()
+                .iter()
+                .find(|expression| expression.place() == &place)
+                .unwrap_or_else(|| panic!("{}: no expression at {place}", column.label));
+            match if links == 0 {
+                expression.start()
+            } else {
+                &expression.links()[links - 1]
+            } {
+                Resolution::Dtype(dtype) => dtype.clone(),
+                other => panic!("{}: {other:?}", column.label),
+            }
+        };
+        assert_eq!(
+            trace(0, 0),
+            DataType::List(Box::new(dtype.clone())),
+            "{}",
+            column.label
+        );
+        assert_eq!(trace(1, 0), DataType::List(Box::new(dtype.clone())));
+        assert_eq!(trace(1, 1), dtype, "{}", column.label);
+        checked += 1;
+    }
+    assert!(checked > 40, "{checked} classes were checked");
 }

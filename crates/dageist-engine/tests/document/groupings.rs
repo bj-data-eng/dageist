@@ -294,3 +294,42 @@ fn a_step_that_groups_runs_before_the_steps_after_it_and_gives_them_its_table() 
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
     assert!(matches!(report.steps()[1].outcome(), Outcome::Valid { .. }));
 }
+
+fn walk_of(then: Vec<Value>) -> dageist_engine::document::Walk {
+    let document = Document::read(&document(vec![grouping(
+        "g",
+        json!({ "by": by_k() }),
+        then,
+    )]))
+    .expect("a document");
+    document.steps()[0].walk(
+        0,
+        table().schema(),
+        &dageist_engine::document::Inputs::new(),
+    )
+}
+
+#[test]
+fn a_number_typed_in_stands_alone_in_a_having_and_must_be_a_boolean_beside_another() {
+    let number = || crate::support::whole(1);
+    let having = |predicates: Vec<Value>| {
+        finish(
+            "LazyGroupBy.having",
+            json!({ "predicates": many(predicates) }),
+        )
+    };
+    // Alone, Polars casts a number to a Boolean to keep the group or not.
+    let walk = walk_of(vec![having(vec![number()]), len()]);
+    assert!(walk.refusal().is_none(), "{:?}", walk.refusal());
+    // Beside another predicate, which Polars combines it with, it must be a Boolean.
+    let walk = walk_of(vec![having(vec![number(), number()]), len()]);
+    let refusal = walk.refusal().expect("a number beside another predicate");
+    assert_eq!(
+        refusal.place(),
+        &place_of(
+            "g",
+            vec![Segment::Link(0), parameter("predicates"), Segment::Item(0)]
+        )
+    );
+    assert!(refusal.at_end());
+}

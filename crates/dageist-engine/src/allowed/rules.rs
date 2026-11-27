@@ -27,10 +27,14 @@ pub enum Rule {
     /// what gives the values of the group is a list that Polars cannot cast to a `Boolean` when it
     /// runs the rows.
     HavingGivesOneValue,
-    /// A `having`'s predicate is a value Polars casts to a `Boolean` to keep a group or not: a
-    /// `Boolean`, a number, or null. Text, a date, a list, a struct and the rest it refuses when it
-    /// runs the rows.
+    /// A `having`'s predicate is a value Polars casts to a `Boolean` to keep a group or not where
+    /// it stands alone: a `Boolean`, a number, or null. Text, a date, a list, a struct and the rest
+    /// it refuses when it runs the rows, and beside another predicate, which Polars combines it with
+    /// as a filter's are, it must be a `Boolean`.
     HavingCastsToBoolean,
+    /// The columns a group by gives are named differently: its keys and its aggregates, each named
+    /// by the column its chain reads or by the name it is given, and Polars refuses two of one name.
+    GroupedNamesAreDistinct,
     /// A filter's only predicate is one column: an expression that gives several, as the unnest of a
     /// struct of several fields does, or none, as the unnest of a struct of no field does, is
     /// refused there, and taken beside another predicate.
@@ -141,7 +145,7 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 31] = [
         Self::ArraysMeetAtOneWidth,
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
@@ -152,6 +156,7 @@ impl Rule {
         Self::FieldNamesFitTheStruct,
         Self::FilterPredicateIsBoolean,
         Self::FoldedFunctionIsNoJoinKey,
+        Self::GroupedNamesAreDistinct,
         Self::HavingCastsToBoolean,
         Self::HavingGivesOneValue,
         Self::IsInTakesAList,
@@ -189,6 +194,7 @@ impl Rule {
             Self::FieldNamesFitTheStruct => "field-names-fit-the-struct",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
+            Self::GroupedNamesAreDistinct => "grouped-names-are-distinct",
             Self::HavingCastsToBoolean => "having-casts-to-boolean",
             Self::HavingGivesOneValue => "having-gives-one-value",
             Self::IsInTakesAList => "is-in-takes-a-list",
@@ -250,11 +256,14 @@ impl Rule {
             Self::FoldedFunctionIsNoJoinKey => {
                 "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
             }
+            Self::GroupedNamesAreDistinct => {
+                "the columns a group by gives must be named differently: a key is named by the column it reads or the name it is given, an aggregate by the column its chain reads or the name it is given, and Polars refuses two that are named alike, as a key and an aggregate of the same column are"
+            }
             Self::HavingGivesOneValue => {
                 "a having's predicate must give one value for each group: the values of the group, as a column or a method that keeps some of them gives, are a list that Polars cannot cast to a Boolean when it runs the rows, so give an aggregate such as the sum, the first value, whether all are true, or a count compared with a number"
             }
             Self::HavingCastsToBoolean => {
-                "a having's predicate must be a value Polars casts to a Boolean to keep a group or not: a Boolean, a number, or null, and not text, a date, a list or a struct, which it refuses when it runs the rows"
+                "a having's predicate must be a value Polars casts to a Boolean to keep a group or not: a Boolean, a number, or null where it stands alone, and not text, a date, a list or a struct, which it refuses when it runs the rows; beside another predicate, which Polars combines it with as the predicates of a filter are, it must be a Boolean"
             }
             Self::IsInTakesAList => {
                 "is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded"
@@ -327,6 +336,7 @@ impl Rule {
             | Self::MomentsShareAZone
             | Self::FieldIsOfTheStruct
             | Self::FieldNamesFitTheStruct
+            | Self::GroupedNamesAreDistinct
             | Self::IsInTakesAList
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
@@ -458,6 +468,9 @@ impl Rule {
     /// The rule that forbids a chain to end in `context` with a value of the
     /// dtype `result` and the shape `shape`, if one does.
     ///
+    /// `among_others` is how many other predicates stand beside the one the chain is, where it is an
+    /// item of a list of them.
+    ///
     /// `result` is `None` where the dtype is not known: a start takes the
     /// dtype of a column, and a method that takes an argument gives a dtype
     /// the argument decides. An end rule that is about a dtype does not refuse
@@ -468,6 +481,7 @@ impl Rule {
         context: Context,
         result: Option<&ResultDtype>,
         shape: Shape,
+        among_others: usize,
     ) -> Option<Self> {
         let known_not_boolean =
             result.is_some_and(|result| result.class() != Some(Representative::Boolean));
@@ -475,13 +489,22 @@ impl Rule {
             return Some(Self::PivotAggregateGivesOneValue);
         }
         // A predicate of a `having` is one value for each group, which Polars casts to a `Boolean`
-        // as it can, so a number is kept and a dtype it cannot cast is not.
+        // as it can where it stands alone, so a number is kept and a dtype it cannot cast is not.
+        // Beside another predicate it is combined with it as a filter's are, which must be a
+        // `Boolean`.
         if context == Context::step(Outer::Having) {
             if shape != Shape::One {
                 return Some(Self::HavingGivesOneValue);
             }
+            let kept = |result: &ResultDtype| {
+                if among_others == 0 {
+                    casts_to_boolean(result)
+                } else {
+                    result.class() == Some(Representative::Boolean)
+                }
+            };
             return result
-                .is_some_and(|result| !casts_to_boolean(result))
+                .is_some_and(|result| !kept(result))
                 .then_some(Self::HavingCastsToBoolean);
         }
         if known_not_boolean {
@@ -531,6 +554,7 @@ impl Rule {
             | Self::MomentsShareAZone
             | Self::FieldIsOfTheStruct
             | Self::FieldNamesFitTheStruct
+            | Self::GroupedNamesAreDistinct
             | Self::IsInTakesAList
             | Self::OneColumnIsNeeded
             | Self::ParameterTakesOneValue
@@ -568,6 +592,7 @@ fn casts_to_boolean(result: &ResultDtype) -> bool {
                 | R::Float16
                 | R::Float32
                 | R::Float64
+                | R::Decimal
         )
     )
 }

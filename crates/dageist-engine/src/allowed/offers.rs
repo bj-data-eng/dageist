@@ -1715,6 +1715,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             }
         }
         ends = cell.ends.clone();
+        // A having needs one value for each group, which the table measured of an entry that gives
+        // one value for each row of a group as refused, whatever the receiver is: where what the
+        // entry follows is one value it gives one, and the rules of how the chain ends say what a
+        // predicate may be. What the entry may stand after is the line of the chain that continues.
+        if place.context.outer() == Outer::Having {
+            ends = Outcome::Allowed(None);
+        }
     }
     // A method that follows one value gives one: the aggregate of a value is that value, and a
     // method that takes some of the values of one keeps it. One that follows a count that the
@@ -1754,37 +1761,38 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         .flatten()
         .and_then(|(read, _)| read);
     let judged = read.as_ref().or(result.as_ref());
-    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, judged, shape) {
-        Ending::Refused(Refusal::rule(rule))
-    } else if let Some(refusal) = Refusal::count(place.context, shape) {
-        Ending::Refused(refusal)
-    } else if let Some(read) = &read {
-        if read.class().is_none() && boolean_needed {
+    let mut ending =
+        if let Some(rule) = Rule::forbids_end(place.context, judged, shape, chosen.among_others) {
+            Ending::Refused(Refusal::rule(rule))
+        } else if let Some(refusal) = Refusal::count(place.context, shape) {
+            Ending::Refused(refusal)
+        } else if let Some(read) = &read {
+            if read.class().is_none() && boolean_needed {
+                Ending::NotKnown(Unknown::TheResultsDtype)
+            } else {
+                Ending::Allowed
+            }
+        } else if entry.applies() == Applies::Function {
+            // The table measured a start with one argument, and what its arguments
+            // decide is the dtype of the value: a column's own, a literal's. Told
+            // it, the rules above have judged it; not told, the table speaks only
+            // where the dtype does not matter, and a refusal it recorded may be one
+            // that another argument does not meet.
+            if chosen.gives.is_some() {
+                Ending::Allowed
+            } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
+                Ending::NotKnown(Unknown::TheStartsDtype)
+            } else {
+                Ending::Allowed
+            }
+        } else if result.is_none() && boolean_needed {
             Ending::NotKnown(Unknown::TheResultsDtype)
         } else {
-            Ending::Allowed
-        }
-    } else if entry.applies() == Applies::Function {
-        // The table measured a start with one argument, and what its arguments
-        // decide is the dtype of the value: a column's own, a literal's. Told
-        // it, the rules above have judged it; not told, the table speaks only
-        // where the dtype does not matter, and a refusal it recorded may be one
-        // that another argument does not meet.
-        if chosen.gives.is_some() {
-            Ending::Allowed
-        } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
-            Ending::NotKnown(Unknown::TheStartsDtype)
-        } else {
-            Ending::Allowed
-        }
-    } else if result.is_none() && boolean_needed {
-        Ending::NotKnown(Unknown::TheResultsDtype)
-    } else {
-        match &ends {
-            Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
-            Outcome::Allowed(_) => Ending::Allowed,
-        }
-    };
+            match &ends {
+                Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
+                Outcome::Allowed(_) => Ending::Allowed,
+            }
+        };
     // A struct is written with the fields the chain carries, and the call that reads, names or makes
     // fields gives what it says of them: not what the tables measured on a struct of two.
     let mut fields = None;
@@ -2217,6 +2225,19 @@ pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
     Err(Refusal::rule_because(
         Rule::WrittenNamesAreDistinct,
         &format!("two items write the name {name:?}"),
+    ))
+}
+
+/// Whether a group by gives two columns of one name, which the caller found: its keys and its
+/// aggregates are named differently.
+///
+/// # Errors
+///
+/// Always: the caller asks it where it found a name given twice.
+pub fn rule_forbids_a_grouped_name_given_twice(name: &str) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::GroupedNamesAreDistinct,
+        &format!("two columns are named {name:?}"),
     ))
 }
 
