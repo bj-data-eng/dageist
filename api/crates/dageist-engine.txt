@@ -168,6 +168,7 @@ pub dageist_engine::allowed::Rule::HavingCastsToBoolean
 pub dageist_engine::allowed::Rule::HavingGivesOneValue
 pub dageist_engine::allowed::Rule::IsInTakesAList
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
+pub dageist_engine::allowed::Rule::KeptOrderNeedsKeysOfTheRows
 pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::MomentsShareAZone
 pub dageist_engine::allowed::Rule::OneColumnIsNeeded
@@ -185,7 +186,7 @@ pub dageist_engine::allowed::Rule::WindowInputIsNotCounted
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 pub dageist_engine::allowed::Rule::WrittenNamesAreDistinct
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 31]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 32]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -406,6 +407,7 @@ pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::En
 pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_grouped_name_given_twice(name: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_key_that_takes_some_values_in_order() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_name_written_twice(name: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_parameter_given_more_than_one_value(parameter: &str, given: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_range_that_cannot_be_made(said: &str) -> core::result::Result<(), dageist_engine::allowed::Refusal>
