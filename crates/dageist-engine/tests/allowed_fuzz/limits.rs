@@ -4450,7 +4450,11 @@ fn applies(
             let a_value_per_row = refusal.stage == Stage::Rows
                 && (refusal.reason.contains("multivalue replacement")
                     || refusal.reason.contains("replacement value length")
-                    || refusal.reason.contains("output length of `map`"))
+                    || refusal.reason.contains("output length of `map`")
+                    || refusal
+                        .reason
+                        .contains("the function should apply element-wise")
+                    || refusal.reason.contains("expected scalar for expr"))
                 && grouped;
             // A strict replacement lists the values of a group, a list for each group, where a
             // select lists the values of the column, which Polars finds incomplete as it runs them.
@@ -5682,6 +5686,8 @@ mod tests {
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
             "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+            "uncovered-a-group-aggregate--a-part-of-a-moment-given-what-removes-elements.case",
+            "uncovered-a-group-aggregate--a-replacement-that-must-be-a-scalar.case",
             "uncovered-a-group-aggregate--a-part-of-a-moment-given-the-values-of-a-group.case",
             "uncovered-a-group-aggregate--a-count-that-is-a-value-of-each-group.case",
             "uncovered-a-group-aggregate--a-window-over-the-values-of-a-group-that-polars-refuses.case",
