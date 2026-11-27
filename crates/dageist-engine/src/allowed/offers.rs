@@ -107,6 +107,9 @@ pub struct Chosen<'a> {
     /// How many other expressions stand beside this one in the list it is an item of: the other
     /// predicates of a filter.
     pub(super) among_others: usize,
+    /// The chain is a null literal, which a `having` casts to a `Boolean` whatever its dtype, as
+    /// every value of it is null.
+    pub(super) null_literal: bool,
     /// The names the call is given, each by the parameter that holds it: the name of a field to read
     /// or drop, the new names of the fields, the name of a count.
     pub(super) names: &'a [(&'a str, &'a str)],
@@ -201,6 +204,13 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
+        self
+    }
+
+    /// The chain is a null literal.
+    #[must_use]
+    pub const fn of_a_null_literal(mut self, null: bool) -> Self {
+        self.null_literal = null;
         self
     }
 
@@ -1779,38 +1789,44 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         .flatten()
         .and_then(|(read, _)| read);
     let judged = read.as_ref().or(result.as_ref());
-    let mut ending =
-        if let Some(rule) = Rule::forbids_end(place.context, judged, shape, chosen.among_others) {
-            Ending::Refused(Refusal::rule(rule))
-        } else if let Some(refusal) = Refusal::count(place.context, shape) {
-            Ending::Refused(refusal)
-        } else if let Some(read) = &read {
-            if read.class().is_none() && boolean_needed {
-                Ending::NotKnown(Unknown::TheResultsDtype)
-            } else {
-                Ending::Allowed
-            }
-        } else if entry.applies() == Applies::Function {
-            // The table measured a start with one argument, and what its arguments
-            // decide is the dtype of the value: a column's own, a literal's. Told
-            // it, the rules above have judged it; not told, the table speaks only
-            // where the dtype does not matter, and a refusal it recorded may be one
-            // that another argument does not meet.
-            if chosen.gives.is_some() {
-                Ending::Allowed
-            } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
-                Ending::NotKnown(Unknown::TheStartsDtype)
-            } else {
-                Ending::Allowed
-            }
-        } else if result.is_none() && boolean_needed {
+    let mut ending = if let Some(rule) =
+        Rule::forbids_end(place.context, judged, shape, chosen.among_others).filter(|rule| {
+            // A null literal alone is cast to a `Boolean` by a `having`, as it is a null of
+            // every dtype; beside another predicate it is combined with it as a filter's are.
+            !(chosen.null_literal
+                && chosen.among_others == 0
+                && *rule == Rule::HavingCastsToBoolean)
+        }) {
+        Ending::Refused(Refusal::rule(rule))
+    } else if let Some(refusal) = Refusal::count(place.context, shape) {
+        Ending::Refused(refusal)
+    } else if let Some(read) = &read {
+        if read.class().is_none() && boolean_needed {
             Ending::NotKnown(Unknown::TheResultsDtype)
         } else {
-            match &ends {
-                Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
-                Outcome::Allowed(_) => Ending::Allowed,
-            }
-        };
+            Ending::Allowed
+        }
+    } else if entry.applies() == Applies::Function {
+        // The table measured a start with one argument, and what its arguments
+        // decide is the dtype of the value: a column's own, a literal's. Told
+        // it, the rules above have judged it; not told, the table speaks only
+        // where the dtype does not matter, and a refusal it recorded may be one
+        // that another argument does not meet.
+        if chosen.gives.is_some() {
+            Ending::Allowed
+        } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
+            Ending::NotKnown(Unknown::TheStartsDtype)
+        } else {
+            Ending::Allowed
+        }
+    } else if result.is_none() && boolean_needed {
+        Ending::NotKnown(Unknown::TheResultsDtype)
+    } else {
+        match &ends {
+            Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
+            Outcome::Allowed(_) => Ending::Allowed,
+        }
+    };
     // A struct is written with the fields the chain carries, and the call that reads, names or makes
     // fields gives what it says of them: not what the tables measured on a struct of two.
     let mut fields = None;

@@ -492,8 +492,10 @@ impl Rule {
         // as it can where it stands alone, so a number is kept and a dtype it cannot cast is not.
         // Beside another predicate it is combined with it as a filter's are, which must be a
         // `Boolean`.
-        if context == Context::step(Outer::Having) {
-            if shape != Shape::One {
+        // The value a condition gives is the predicate where the condition stands as it, so the
+        // value of each branch is judged as the predicate is.
+        if Self::is_a_having_predicate(context) {
+            if context.nested().is_none() && shape != Shape::One {
                 return Some(Self::HavingGivesOneValue);
             }
             let kept = |result: &ResultDtype| {
@@ -516,6 +518,12 @@ impl Rule {
         }
     }
 
+    /// Whether `context` is the predicate of a `having` or the value a condition gives as it.
+    pub(super) fn is_a_having_predicate(context: Context) -> bool {
+        context.outer() == Outer::Having
+            && matches!(context.nested(), None | Some(Nested::ConditionValue))
+    }
+
     /// Whether some rule says a chain must end `Boolean` in `context`.
     pub(super) fn boolean_needed(context: Context) -> bool {
         Self::ALL
@@ -534,10 +542,7 @@ impl Rule {
                 context.outer() == Outer::Filter
                     && matches!(context.nested(), None | Some(Nested::ConditionValue))
             }
-            Self::HavingCastsToBoolean => {
-                context.outer() == Outer::Having
-                    && matches!(context.nested(), None | Some(Nested::ConditionValue))
-            }
+            Self::HavingCastsToBoolean => Self::is_a_having_predicate(context),
             Self::PivotAggregateGivesOneValue
             | Self::HavingGivesOneValue
             | Self::ElementOnlyInPivotAggregate

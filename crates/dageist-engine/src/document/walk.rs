@@ -2315,6 +2315,10 @@ impl Walker<'_> {
                 let chosen = Chosen::default()
                     .following_fields(start_fields.as_ref())
                     .among_others(self.siblings_of_the_item())
+                    .of_a_null_literal(
+                        start.entry().id().as_str() == "polars.lit"
+                            && matches!(start.argument("value"), Some(Value::Flag(None))),
+                    )
                     .with_names(&names)
                     .with_numbers(&numbers)
                     .with_inputs(&input_names);
@@ -2812,12 +2816,22 @@ impl Walker<'_> {
                 meeting,
                 taken,
                 widths,
+                single,
+                values_single,
                 ..
             } => Operand {
                 dtype: unify(&values),
                 loose: None,
+                // A condition that is given one value for each group, and gives one for each, as
+                // its predicates and its values are one value, is one value in a group; elsewhere
+                // it is the rows, as what is made of one value and rows is.
                 shape: if meeting.0 == Shape::Counted {
                     Shape::Counted
+                } else if matches!(context.outer(), Outer::Aggregate | Outer::Having)
+                    && single
+                    && values_single
+                {
+                    Shape::One
                 } else {
                     Shape::Many
                 },
@@ -3738,6 +3752,23 @@ impl Walker<'_> {
                         );
                     }
                 };
+                // Where a group evaluates it, a condition whose predicates and values are each one
+                // value is one value where it ends, with no `otherwise` to say so.
+                if matches!(
+                    entry.id().as_str(),
+                    "When.then" | "ChainedWhen.then" | "Then.when" | "ChainedThen.when"
+                ) && matches!(place.context().outer(), Outer::Aggregate | Outer::Having)
+                    && single
+                    && values_single
+                    && meeting.0 != Shape::Counted
+                    && allowance.shape() != Shape::One
+                {
+                    let again = allowed::offer(entry, &place, &chosen.giving_shape(Shape::One));
+                    if let Verdict::Allowed(refreshed) = &again {
+                        *last_end = Some(refreshed.can_end().clone());
+                    }
+                    standing.verdict = Some(again);
+                }
                 Cur::Condition {
                     state,
                     values,
