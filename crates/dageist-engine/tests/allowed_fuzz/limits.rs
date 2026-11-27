@@ -82,51 +82,50 @@ pub enum Limit {
     ALiteral,
     /// A pivot's aggregate, and what a group by gives its aggregates and its `having`, is run on
     /// the values of each group, not on a column in `select`, and Polars uses other kernels for
-    /// them: it takes the
-    /// `max` of a `Struct` there, which `select` refuses, and compares, casts
-    /// and windows what `select` does not. A table with no rows has no groups,
-    /// and the values of an aggregate over none have no dtype. The empty table's
-    /// refusal is gated by its reason, which has no place; the tables refusing
-    /// is placed, in the aggregate, with a reason about a kernel.
+    /// them: it takes the `max` of a `Struct` there, which `select` refuses, and compares, casts
+    /// and windows what `select` does not.
     ///
-    /// The refusals of the empty table and the dtypes the kernels give against the plan, for a null
-    /// literal or a column of Null inside an aggregate, are the issue 245's.
-    ///
-    /// A group by adds a replacement that is given a pattern for each row, which Polars does not yet
-    /// implement in the kernels of a group.
-    ///
-    /// The reasons the gate accepts, each at a call of the aggregate of a pivot or of a group by:
-    /// - the tables refusing, which Polars allows, with a reason that says a dtype an operation
-    ///   does not support or a function that makes a length of time expects numbers, a comparison,
-    ///   an operation, an evaluation, a cast, a struct field, the
-    ///   lengths of a window over a group, a replacement pattern per row, duplicates in what a
-    ///   replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype, or
-    ///   the plan saying another dtype than the rows give;
-    /// - the tables refusing a failed conversion, which Polars allows, of the values a
-    ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
-    ///   arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or
-    ///   a kurtosis in the same places, which convert what they follow to a float as a cast
-    ///   does, and of the text of a count or a position, made by a fill with a text literal after
-    ///   the call that counts, or of the numbers of a group cast or filled to text by the first
-    ///   call, which a fill, a reverse, a sort, a drop of the nulls, a running maximum or
-    ///   minimum or one value picked may follow, and which read as the numbers, or of the
-    ///   values of a group written by a first call with a format of digits alone, as the year,
-    ///   which read as numbers, or of what
-    ///   a column of the dtype Null is compared or calculated with, which stays null;
-    /// - Polars refusing the empty table, with no place, for an operation not supported, a null
-    ///   dtype, or a conversion to `null`;
-    /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
-    ///   share that is no number: a select reads the text the share is written as, and the
-    ///   kernel that takes the values of a group does not.
+    /// What the form of a call decides is held to Polars in the grids of
+    /// `tests/document/group_kernels_grid.rs` and modelled by the walk: the key of a window in `agg`
+    /// and `having` is elementwise, and no literal that a method maps or replaces the values of is
+    /// given values beside it. What stays is the limit, and each of its causes has a control that
+    /// Polars gives or is the empty table:
+    /// - a table with no rows has no groups, and the values of an aggregate over none have no
+    ///   dtype: Polars refusing the empty table, with no place, for an operation not supported, a
+    ///   null dtype, or a conversion to `null`. These refusals and the dtypes the kernels give
+    ///   against the plan, for a null literal or a column of Null inside an aggregate, are the
+    ///   issue 245's, and no grid can hold what the empty table has no rows to say;
+    /// - Polars refusing the rows, with no place, of a pivot's aggregate that holds a quantile, for
+    ///   a share that is no number: a select reads the text the share is written as, and the kernel
+    ///   that takes the values of a group does not;
+    /// - Polars refusing a step that groups, for a replacement that is given a pattern for each row
+    ///   that its kernels do not yet implement, a count or a place converted for each group, or the
+    ///   lengths a replacement of text meets, where it does not refuse the same aggregates and
+    ///   predicates as the items of a `select` of the same frames for that objection: the control
+    ///   is the select, which Polars runs, and what no rule of the walk reaches is what the data
+    ///   decide in a group of more than one row, which the grid's sample cannot fix;
+    /// - the tables refusing, which Polars allows, in a call after the group by or in a pivot's
+    ///   aggregate, with a reason that says a dtype an operation does not support or a function that
+    ///   makes a length of time expects numbers, a comparison, an operation, an evaluation, a cast, a
+    ///   struct field, the lengths of a window over a group, a replacement pattern per row, duplicates
+    ///   in what a replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype,
+    ///   or the plan saying another dtype than the rows give; and the cumulative sum of a literal that
+    ///   orders a window, which Polars reads as a literal;
+    /// - the tables refusing a failed conversion, which Polars allows, in a pivot's aggregate, of the
+    ///   values a replacement lists, of a cast of a literal, or of a cast that follows a comparison or
+    ///   an arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or a
+    ///   kurtosis in the same places, which convert what they follow to a float as a cast does, and of
+    ///   the text of a count or a position, made by a fill with a text literal after the call that
+    ///   counts, or of the numbers of a group cast or filled to text by the first call, which a fill, a
+    ///   reverse, a sort, a drop of the nulls, a running maximum or minimum or one value picked may
+    ///   follow, and which read as the numbers, or of the values of a group written by a first call
+    ///   with a format of digits alone, as the year, which read as numbers, or of what a column of the
+    ///   dtype Null is compared or calculated with, which stays null.
     ///
     /// A cast of a value that literals alone make, by a function that makes a date, a moment or a
     /// length of time of them, is one too where the same chain through the cast, run in a select on
     /// the sample, is converted without a failure: it converts a null or a number that no group's
     /// text is.
-    ///
-    /// None of the others has a control that a rerun of Polars could give: the cause is that the group's
-    /// kernels run what `select` refuses or converts otherwise, which no case in `select` shows,
-    /// so the gate is the pivot and the reason, and the kept cases and tests state each.
     AGroupAggregate,
     /// A key that is wholly a single value, an aggregate or a null, is not one
     /// that has to be elementwise: Polars allows in it what a key may not hold,
@@ -669,7 +668,7 @@ impl Limit {
                 "a panic of Polars depends on the plan it makes, which another place may not make"
             }
             Self::AGroupAggregate => {
-                "a pivot's aggregate, and an aggregate or a having of a group by, is run on groups, with kernels of its own, not on a column in select (what it refuses of a null literal or a column of Null, as the empty table's refusals and the kernels' dtypes against the plan, is tracked by #245)"
+                "a pivot's aggregate, and an aggregate or a having of a group by, is run on groups, with kernels of its own, not on a column in select: what the form of a call decides is held in the grids and modelled by the walk, and what stays has a control (what it refuses of a null literal or a column of Null, as the empty table's refusals and the kernels' dtypes against the plan, is tracked by #245)"
             }
             Self::AShiftThatLeavesNulls => {
                 "a shift leaves nulls, which Polars does not meet with the dtype the tables refuse"
@@ -2372,10 +2371,28 @@ fn expression_without(expression: &Expression, undo: Undo<'_>) -> Option<Express
     Expression::new(start, links).ok()
 }
 
+/// The step with `change` made of its call and of each call after it in a group by, which gives
+/// `None` where it changes none of them or the step cannot be made.
+fn step_made(step: &Step, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Step> {
+    let changes: Vec<Option<Call>> = std::iter::once(step.call())
+        .chain(step.links())
+        .map(change)
+        .collect();
+    if changes.iter().all(Option::is_none) {
+        return None;
+    }
+    let mut calls = std::iter::once(step.call())
+        .chain(step.links())
+        .zip(changes)
+        .map(|(call, changed)| changed.unwrap_or_else(|| call.clone()));
+    let first = calls.next()?;
+    Step::chain(step.id().clone(), first, calls.collect()).ok()
+}
+
 /// The case with the arguments `undo` names undone, the same in all else.
 fn case_without(case: &Case, undo: Undo<'_>) -> Option<Case> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_without(step.call(), undo)?).ok()?;
+    let rebuilt = step_made(step, &|call| call_without(call, undo))?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -2492,7 +2509,7 @@ fn expression_changed(
 /// The case with every call that `change` gives another call made into it, the same in all else.
 pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Case> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_changed(step.call(), change)?).ok()?;
+    let rebuilt = step_made(step, &|call| call_changed(call, change))?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -3218,7 +3235,7 @@ fn holds_a_replacement_of_a_literal_alone(expression: &Expression) -> bool {
 /// starts from a literal holds a replacement.
 fn refused_for_a_value_of_another_length_with_columns(case: &Case) -> Option<bool> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_with_text_columns(step.call())?).ok()?;
+    let rebuilt = step_made(step, &call_with_text_columns)?;
     let control = Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -3637,10 +3654,13 @@ fn refused_for_a_failed_conversion_without_bounds(case: &Case) -> Option<bool> {
 }
 
 /// Whether the reason is how Polars refuses a replacement that lists the values of a column where
-/// it meets the values of a group: as a pattern for each row, or as a call whose output is the
-/// length of the column and not of what it follows.
+/// it meets the values of a group: as a pattern for each row, as a call whose output is the
+/// length of the column and not of what it follows, or as the scalar that a window of one value
+/// expected.
 fn says_a_replacement_of_a_group_is_refused(reason: &str) -> bool {
-    reason.contains("replacement pattern per row") || reason.contains("output length of `map`")
+    reason.contains("replacement pattern per row")
+        || reason.contains("output length of `map`")
+        || reason.contains("expected scalar for expr")
 }
 
 /// Whether the call is a replacement that lists what it replaces, or what replaces it, as the
@@ -3794,7 +3814,7 @@ fn call_without_folds(call: &Call) -> Option<Call> {
 /// The case with every call that Polars folds into a null left out.
 fn case_without_folds(case: &Case) -> Option<Case> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_without_folds(step.call())?).ok()?;
+    let rebuilt = step_made(step, &call_without_folds)?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -4161,7 +4181,12 @@ fn applies(
     let pivot = is(step, "LazyFrame.pivot");
     // What a group by evaluates on the values of each group, as a pivot's aggregate is.
     let grouped = !case.document.steps()[0].links().is_empty();
-    let held = operands(step);
+    // What the step is given, and what the calls after a group by are given, which the controls of
+    // the limits rebuild alike.
+    let held: Vec<(&str, &Expression)> = operands(step)
+        .into_iter()
+        .chain(case.document.steps()[0].links().iter().flat_map(operands))
+        .collect();
     let explodes_in = |expression: &Expression| any_call(expression, &has_explode);
     match (limit, disagreement) {
         (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsRefuses(refusal)) => {
@@ -4425,70 +4450,46 @@ fn applies(
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &|call| is(call, "Expr.quantile")));
-            // Polars does not yet implement a replacement that is given a pattern for each row in
-            // the kernels of a group, though it does in a select.
-            let a_pattern_per_row = refusal.stage != Stage::Schema
-                && refusal.reason.contains("not yet implemented")
-                && refusal.reason.contains("replacement pattern per row")
-                && grouped;
-            // A count or a place that a call takes of the values of a group, converted for each
-            // group, as the NaN a group's kurtosis is cannot be, where a select takes the one value.
-            let a_conversion_per_group = refusal.stage == Stage::Rows
-                && unplaced(refusal)
-                && is_a_failed_conversion(&refusal.reason)
-                && grouped;
-            // A window partitioned by a column, which the tables measured as a partition of the
-            // rows, is partitioned by the values of a group where a group evaluates it.
-            let a_window_by_the_values = refusal.stage == Stage::Rows
-                && refusal
-                    .reason
-                    .contains("window expression with non-elementwise")
-                && grouped;
-            // A replacement of text given the values of a group as its value, a list for each
-            // group, is refused for the values it is given as many as it is, where a select gives
-            // it the column.
-            let a_value_per_row = refusal.stage == Stage::Rows
-                && (refusal.reason.contains("multivalue replacement")
+            // What Polars refuses of the values of a group that it does not refuse of the
+            // column in a select, and no sibling limit holds: a replacement that is given a pattern
+            // for each row, which the kernels of a group do not yet implement, a count or a place
+            // that a call takes of the values of a group, converted for each group, as the NaN a
+            // group's kurtosis is cannot be, and a replacement of text given the values of a group
+            // as its value, a list for each group, that is refused for the lengths it meets.
+            let by_the_kernels = refusal.stage != Stage::Schema
+                && (refusal.reason.contains("not yet implemented")
+                    && refusal.reason.contains("replacement pattern per row")
+                    || (unplaced(refusal) && is_a_failed_conversion(&refusal.reason))
+                    || refusal.reason.contains("multivalue replacement")
                     || refusal.reason.contains("replacement value length")
                     || refusal.reason.contains("output length of `map`")
                     || refusal
                         .reason
                         .contains("the function should apply element-wise")
-                    || refusal.reason.contains("expected scalar for expr"))
-                && grouped;
-            // A strict replacement lists the values of a group, a list for each group, where a
-            // select lists the values of the column, which Polars finds incomplete as it runs them.
-            let an_incomplete_mapping = refusal.stage == Stage::Rows
-                && refusal
-                    .reason
-                    .contains("incomplete mapping specified for `replace_strict`")
-                && grouped
-                && held
-                    .iter()
-                    .map(|(_, held)| *held)
-                    .chain(
-                        case.document.steps()[0]
-                            .links()
-                            .iter()
-                            .flat_map(operands)
-                            .map(|(_, held)| held),
-                    )
-                    .any(|held| any_call(held, &|call| is(call, "Expr.replace_strict")));
+                    || refusal.reason.contains("expected scalar for expr"));
             pivot && (of_nothing || a_text_share)
                 || grouped
-                    && (of_nothing
-                        || a_pattern_per_row
-                        || an_incomplete_mapping
-                        || a_value_per_row
-                        || a_window_by_the_values
-                        || a_conversion_per_group)
+                    && (of_nothing || (by_the_kernels && refused_by_the_group_alone(case, refusal)))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
-            (pivot || grouped)
+            let in_the_group =
+                pivot || (grouped && is_in_a_call_after_the_group_by(&refused.place));
+            // Polars reads the cumulative sum of a literal as a literal where it orders a window,
+            // which the tables measured on a column refuse as not elementwise (the grid of the keys
+            // of a window names it).
+            let a_literal_ordering_a_window = in_the_group
+                && refused
+                    .reason
+                    .contains("window expression with non-elementwise")
+                && locate(case, &refused.place)
+                    .chain
+                    .is_some_and(starts_from_a_literal);
+            a_literal_ordering_a_window
+                || in_the_group
                 && [
                     "not supported for dtype",
                     "cannot compare",
@@ -4504,7 +4505,6 @@ fn applies(
                     "with a replacement pattern per row",
                     "failed to determine supertype",
                     "cannot unpack series of type",
-                    "window expression with non-elementwise",
                     "must not contain duplicates",
                     "fill null strategy not yet supported",
                     "fill-null strategy",
@@ -5318,6 +5318,71 @@ pub fn as_a_select(case: &Case, place: Option<&Place>) -> Option<Case> {
     })
 }
 
+/// Whether `place` is in a call after the group by of a step that groups, which evaluates its
+/// expressions on the values of each group: the aggregates of `agg` and the predicates of `having`.
+/// The keys of the group by are in the call itself, and are evaluated as the items of a select are.
+fn is_in_a_call_after_the_group_by(place: &Place) -> bool {
+    matches!(place.path().first(), Some(Segment::Link(_)))
+}
+
+/// The aggregates and the predicates of a step that groups, as the items of a `select` of the same
+/// frames, the named ones named as they are. `None` where the step holds none: a count and a
+/// shortcut aggregate the columns that are not keys, and no expression is asked.
+fn aggregates_as_a_select(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let mut items: Vec<Value> = Vec::new();
+    let mut named: Vec<(Value, Value)> = Vec::new();
+    for link in step.links() {
+        for given in link.arguments() {
+            match (given.parameter(), given.value()) {
+                ("aggs" | "predicates", Value::Many(values)) => items.extend(
+                    values
+                        .iter()
+                        .filter(|value| matches!(value, Value::Expression(_)))
+                        .cloned(),
+                ),
+                ("named_aggs", Value::Pairs(pairs)) => named.extend(pairs.iter().cloned()),
+                _ => {}
+            }
+        }
+    }
+    let mut arguments = Vec::new();
+    if !items.is_empty() {
+        arguments.push(("exprs", Value::Many(items)));
+    }
+    if !named.is_empty() {
+        arguments.push(("named_exprs", Value::Pairs(named)));
+    }
+    if arguments.is_empty() {
+        return None;
+    }
+    let select = Call::new(catalog::entry("LazyFrame.select")?, arguments).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        structs: case.structs.clone(),
+        document: Document::new(vec![Step::new(step.id().clone(), select).ok()?]).ok()?,
+    })
+}
+
+/// Whether Polars refuses a step that groups for `refusal`, where it does not refuse its
+/// aggregates and predicates for that objection as the items of a `select` of the same frames: the
+/// kernels that take the values of each group are then the cause.
+fn refused_by_the_group_alone(case: &Case, refusal: &Refusal) -> bool {
+    aggregates_as_a_select(case).is_some_and(|control| {
+        !(0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|alone| {
+                is_the_same_objection(
+                    Some(&alone.stage),
+                    &alone.reason,
+                    Some(&refusal.stage),
+                    &refusal.reason,
+                )
+            })
+        })
+    })
+}
+
 /// The expression of the step's own call or of a call after it that `place` is in.
 fn expression_at(step: &Step, place: &Place) -> Option<Expression> {
     let mut path = place.path().iter();
@@ -5680,23 +5745,13 @@ mod tests {
     #[test]
     fn what_is_excused_of_a_group_by_is_what_polars_does_with_the_values_of_a_group() {
         for name in [
-            "uncovered-a-group-aggregate--a-replacement-pattern-per-row.case",
             "uncovered-a-group-aggregate--is_close-of-a-column-of-nulls.case",
             "uncovered-a-group-aggregate--the-schema-says-null-of-a-null-literal.case",
             "uncovered-a-group-aggregate--degrees-in-the-order-of-a-window.case",
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
-            "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
             "uncovered-a-group-aggregate--a-literal-of-text-in-a-bitwise-call.case",
-            "uncovered-a-group-aggregate--a-part-of-a-moment-given-what-removes-elements.case",
-            "uncovered-a-group-aggregate--a-replacement-that-must-be-a-scalar.case",
-            "uncovered-a-group-aggregate--a-part-of-a-moment-given-the-values-of-a-group.case",
-            "uncovered-a-group-aggregate--a-count-that-is-a-value-of-each-group.case",
-            "uncovered-a-group-aggregate--a-window-over-the-values-of-a-group-that-polars-refuses.case",
-            "uncovered-a-group-aggregate--a-replacement-of-text-given-the-values-of-a-group.case",
             "uncovered-a-group-aggregate--a-replacement-value-of-the-length-of-a-group.case",
-            "uncovered-a-group-aggregate--a-window-over-a-column-in-a-having.case",
-            "uncovered-a-group-aggregate--a-strict-replacement-of-the-values-of-a-group.case",
         ] {
             assert_eq!(
                 excused_by_kept(name),
@@ -5704,6 +5759,48 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn a_strict_replacement_in_a_group_by_is_excused_for_the_want_of_a_default_only() {
+        // Given no default it finds the mapping incomplete, which a default lets pass.
+        for name in [
+            "uncovered-a-strict-replacement-given-no-default--in-a-group.case",
+            "uncovered-a-strict-replacement-given-no-default--of-the-values-of-a-group.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AStrictReplacementGivenNoDefault],
+                "{name}"
+            );
+        }
+        // Given one, the refusal is not for the want of one, and the kernels of a group are not
+        // why Polars finds a mapping incomplete: no text of the reason is a cause.
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                "tests/allowed_fuzz/regressions/uncovered-a-strict-replacement-given-no-default--in-a-group.case",
+            ),
+        )
+        .expect("a kept case");
+        let text = String::from_utf8(bytes).expect("text");
+        let listed = r#""new":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Int64"}}},"then":[]}}"#;
+        let given = text.replace(
+            listed,
+            &format!(
+                r#"{listed},"default":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"integer":2}},"dtype":{{"dtype":"Int64"}}}}}},"then":[]}}}}"#
+            ),
+        );
+        assert_ne!(given, text, "a default was added");
+        let case = Case::decode(given.as_bytes()).expect("a case");
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                None,
+                Stage::Rows,
+                "incomplete mapping specified for `replace_strict`"
+            ),
+            vec![]
+        );
     }
 
     #[test]
