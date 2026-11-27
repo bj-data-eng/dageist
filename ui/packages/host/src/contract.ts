@@ -660,6 +660,7 @@ export const RULE_NAMES = [
   'having-gives-one-value',
   'having-casts-to-boolean',
   'grouped-names-are-distinct',
+  'kept-order-needs-keys-of-the-rows',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */

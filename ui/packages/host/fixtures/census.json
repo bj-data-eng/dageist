@@ -553,6 +553,10 @@
       "statement": "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
     },
     {
+      "name": "kept-order-needs-keys-of-the-rows",
+      "statement": "where `maintain_order` keeps the order of the groups, a key must give one value or as many as the table has rows: Polars refuses a key that takes some of the values, as head, filter and drop_nulls do, for lengths that differ where the arguments or the data make it fewer, so give the key as a column, or leave the order unset"
+    },
+    {
       "name": "key-is-elementwise",
       "statement": "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
     },

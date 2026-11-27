@@ -530,6 +530,18 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
         )),
     });
 
+    // Where the order of the groups is kept, a key that takes some of the values is no key of the
+    // rows.
+    let head = r#"{"entry":"Expr.head","arguments":{"n":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":2}}},"then":[]}}}}"#;
+    let ordered = format!(
+        r#"{{"entry":"LazyFrame.group_by","arguments":{{"by":{{"many":[{}]}},"maintain_order":{{"flag":true}}}}}}"#,
+        column(&whole, head)
+    );
+    cases.push(Case {
+        name: "a group by that keeps its order and a key that takes the first values".to_owned(),
+        document: named(&step(&ordered, finishing)),
+    });
+
     // Two keys of each side that read the same columns pair the same two names twice.
     let right = right_column_of(Representative::Int64);
     cases.push(Case {

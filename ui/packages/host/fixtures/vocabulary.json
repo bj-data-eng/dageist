@@ -27,6 +27,7 @@
     "having-gives-one-value",
     "is-in-takes-a-list",
     "join-key-names-are-not-repeated",
+    "kept-order-needs-keys-of-the-rows",
     "key-is-elementwise",
     "moments-share-a-zone",
     "one-column-is-needed",
