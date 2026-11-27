@@ -13,6 +13,7 @@ mod edits;
 mod floats;
 mod frames;
 mod grid;
+mod groupings;
 mod holes;
 mod inputs;
 mod join_keys;

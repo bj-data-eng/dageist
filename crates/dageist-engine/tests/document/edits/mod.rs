@@ -4,6 +4,7 @@
 
 mod arguments;
 mod chains;
+mod groups;
 mod refusals;
 mod round_trip;
 mod steps;

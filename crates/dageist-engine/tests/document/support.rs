@@ -64,6 +64,12 @@ pub fn step(id: &str, entry: &str, arguments: Value) -> Value {
     json!({ "id": id, "call": call(entry, arguments) })
 }
 
+/// A step that groups: the call `entry` of `group_by`, which gives a group by, and the calls
+/// `then` on it, the last of which finishes the grouping.
+pub fn grouping(id: &str, arguments: Value, then: Vec<Value>) -> Value {
+    json!({ "id": id, "call": call("LazyFrame.group_by", arguments), "then": then })
+}
+
 /// The text of a document of `steps`.
 pub fn document(steps: Vec<Value>) -> String {
     json!({ "version": 1, "steps": steps }).to_string()
