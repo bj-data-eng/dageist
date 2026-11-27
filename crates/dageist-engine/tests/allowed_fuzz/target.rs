@@ -710,7 +710,13 @@ impl CaseTarget for AllowedTarget {
             .expressions
             .iter()
             .any(|expected| expected.start.is_some() || expected.links.iter().any(Option::is_some));
-        if let Some(difference) = dtype_difference(case, &prediction, &observed) {
+        // A step that groups that the tables refuse and Polars refuses is no expression whose
+        // prefixes either gives the dtype of: the walk stops at the refusal, and what stands after
+        // it was not asked, as a condition's value that the walk gives as many is.
+        let both_refuse = !case.document.steps()[0].links().is_empty()
+            && matches!(prediction.verdict, Verdict::Refuses(_))
+            && observed.refusal.is_some();
+        if !both_refuse && let Some(difference) = dtype_difference(case, &prediction, &observed) {
             // A prefix that Polars refuses where the tables allow it is the refusal of the case a
             // limit may explain: it is not a dtype the tables got wrong.
             if difference.contains(A_PREFIX_POLARS_REFUSES)
