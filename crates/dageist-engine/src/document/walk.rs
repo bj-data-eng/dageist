@@ -1768,7 +1768,7 @@ impl Walker<'_> {
             // What an expression held here ends: a filter's predicate does, and
             // a value of a condition does when the condition does.
             let ends = match slot {
-                Some(Slot::Outer(Outer::Filter)) => true,
+                Some(Slot::Outer(Outer::Filter | Outer::Having)) => true,
                 Some(Slot::Nested(Nested::ConditionValue)) => values_end,
                 _ => false,
             };
@@ -2732,7 +2732,8 @@ impl Walker<'_> {
             // A value of a condition in a filter need be a Boolean only where
             // the condition ends the predicate.
             let asked = held == Some(true)
-                || context != Context::inside(Outer::Filter, Nested::ConditionValue);
+                || (context != Context::inside(Outer::Filter, Nested::ConditionValue)
+                    && context != Context::inside(Outer::Having, Nested::ConditionValue));
             if asked {
                 ending = last_end;
             }
