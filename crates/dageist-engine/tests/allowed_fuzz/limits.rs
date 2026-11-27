@@ -196,6 +196,15 @@ pub enum Limit {
     /// take the values of a column below zero; the sample's rows are 1, a null and 3, which a
     /// sum or a product of them does not.
     ANegativeExponent,
+    /// A literal is given a dtype that its value does not cast to: a whole number past the dtype's
+    /// edges, a float with a fraction or a text that is no number of it given to whole numbers, a
+    /// text given `Boolean`. The step engine builds the literal by casting the value to the dtype
+    /// strictly, as Python's `lit` does, so Polars refuses the step when it is built, before any
+    /// table is asked, and the tables measured literals of a dtype that holds the number 1.
+    /// Polars refusing the schema with a failed conversion or a cast it does not support, in a
+    /// case that holds such a literal: the case run again with each such literal made the number 1
+    /// of its dtype is not refused for a failed conversion.
+    ALiteralThatDoesNotCast,
     /// A value of the dtype Null, a column or a literal, typed as it or not, or what a call
     /// gives that dtype, is an operand of `and`, `or` and `xor` that the tables allow,
     /// giving a `Boolean`, as `select` shows. Polars treats it in ways `select` hides. It
@@ -491,7 +500,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 40] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -501,6 +510,7 @@ impl Limit {
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::ANegativeExponent,
+        Self::ALiteralThatDoesNotCast,
         Self::ABitwiseCallOnANull,
         Self::ADivisionByZero,
         Self::AValueBeyondADecimal,
@@ -545,6 +555,7 @@ impl Limit {
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
+            Self::ALiteralThatDoesNotCast => "a-literal-that-does-not-cast",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::ADivisionByZero => "a-division-by-zero",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
@@ -602,6 +613,9 @@ impl Limit {
             }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
+            }
+            Self::ALiteralThatDoesNotCast => {
+                "the step engine casts the value of a literal to its dtype strictly when it builds the step, and refuses one that does not fit, before the tables are asked, where they were measured with literals of a dtype that holds the number 1"
             }
             Self::ABitwiseCallOnANull => {
                 "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
@@ -1132,10 +1146,19 @@ fn gives_a_predicate_the_dtype_null(
         && along.is_null_after.last().copied().unwrap_or(false)
 }
 
-/// Whether `call` is a literal that is a whole number below zero.
+/// Whether `call` is a literal that is a number below zero, as written or as it casts to its dtype.
 fn is_a_whole_number_below_zero(call: &Call) -> bool {
-    is(call, "polars.lit")
-        && matches!(call.argument("value"), Some(Value::Integer(number)) if *number < 0)
+    if !is(call, "polars.lit") {
+        return false;
+    }
+    if let Some(Value::Integer(number)) = call.argument("value") {
+        return *number < 0;
+    }
+    // A float or a text given a dtype is the number it casts to.
+    cast_of_a_literal(call)
+        .and_then(Result::ok)
+        .and_then(|cast| cast.get(0).ok()?.try_extract::<f64>().ok())
+        .is_some_and(|number| number < 0.0)
 }
 
 /// Whether `call` is a `pow` whose exponent holds a value that may be below zero: a whole number
@@ -3442,6 +3465,65 @@ fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
     })
 }
 
+/// The cast of the value of a literal to its dtype, which the step engine builds a literal given a
+/// dtype as, strictly, as Python's `lit` does; `None` where the call is no literal, or has no dtype.
+fn cast_of_a_literal(
+    call: &Call,
+) -> Option<polars::prelude::PolarsResult<polars::prelude::Series>> {
+    use polars::prelude::{NamedFrom, Series};
+    if !is(call, "polars.lit") {
+        return None;
+    }
+    let (Some(value), Some(Value::Dtype(dtype))) = (call.argument("value"), call.argument("dtype"))
+    else {
+        return None;
+    };
+    let name = "literal".into();
+    let series = match value {
+        Value::Integer(number) => Series::new(name, [*number]),
+        Value::Float(number) => Series::new(name, [*number]),
+        Value::String(text) => Series::new(name, [text.as_str()]),
+        Value::Flag(Some(flag)) => Series::new(name, [*flag]),
+        Value::Flag(None) => Series::new_null(name, 1),
+        _ => return None,
+    };
+    Some(series.strict_cast(dtype.as_polars()))
+}
+
+/// Whether the call is a literal given a dtype that its value does not cast to.
+fn is_a_literal_that_does_not_cast(call: &Call) -> bool {
+    cast_of_a_literal(call).is_some_and(|cast| cast.is_err())
+}
+
+/// The case with each literal whose value does not cast to its dtype made the number 1 of the
+/// dtype, which the dtypes of the document hold.
+fn case_with_casting_literals(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_literal_that_does_not_cast(call) {
+            return None;
+        }
+        let dtype = call.argument("dtype")?.clone();
+        Call::new(
+            catalog::entry("polars.lit")?,
+            vec![("value", Value::Integer(1)), ("dtype", dtype)],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for a failed conversion or a cast it does not support still
+/// when every literal casts to its dtype: the literal that did not is then no cause of it.
+fn refused_for_a_failed_conversion_with_casting_literals(case: &Case) -> Option<bool> {
+    changed(case_with_casting_literals(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                is_a_failed_conversion(&refusal.reason)
+                    || refusal.reason.starts_with("casting from ")
+            })
+        })
+    })
+}
+
 /// Whether the reason is that a dtype could not be cast to another, in Polars' words for a
 /// failed conversion of values or of a list's type.
 fn is_a_failed_cast(reason: &str) -> bool {
@@ -4393,6 +4475,17 @@ fn applies(
                 && held.iter().any(|(_, held)| {
                     any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
                 })
+        }
+        (Limit::ALiteralThatDoesNotCast, Disagreement::PolarsRefuses(refusal)) => {
+            // The refusal is of the schema, for the step is refused when it is built, and is a
+            // failed conversion or a cast that Polars does not support.
+            refusal.stage == Stage::Schema
+                && (is_a_failed_conversion(&refusal.reason)
+                    || refusal.reason.starts_with("casting from "))
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_literal_that_does_not_cast))
+                && refused_for_a_failed_conversion_with_casting_literals(case) == Some(false)
         }
         (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
             let reason = refusal.reason.as_str();
@@ -6873,6 +6966,109 @@ mod tests {
         assert_eq!(
             polars_refuses(&nested, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
             vec![Limit::ANegativeExponent]
+        );
+    }
+
+    fn literal_of(value: Value, dtype: polars::prelude::DataType) -> Call {
+        call(
+            "polars.lit",
+            vec![
+                ("value", value),
+                ("dtype", Value::Dtype(Dtype::new(dtype).expect("a dtype"))),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_literal_does_not_cast_to_its_dtype_and_not_where_it_does()
+     {
+        use polars::prelude::DataType as D;
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal-that-does-not-cast.case"),
+            vec![Limit::ALiteralThatDoesNotCast]
+        );
+        let refused = |literal: Call, reason: &str| {
+            polars_refuses(
+                &select(vec![chain_of(literal, Vec::new())]),
+                None,
+                Stage::Schema,
+                reason,
+                Vec::new(),
+            )
+        };
+        let conversion =
+            "conversion from `i64` to `i8` failed in column 'literal' for 1 out of 1 values: [300]";
+        // A whole number past the dtype's edge, a float that is one and a text that is no number of
+        // the dtype do not cast.
+        for literal in [
+            literal_of(Value::Integer(300), D::Int8),
+            literal_of(Value::Float(300.0), D::Int8),
+            literal_of(Value::String("abc".to_owned()), D::Int8),
+        ] {
+            let said = format!("{:?}", literal.argument("value"));
+            assert_eq!(
+                refused(literal, conversion),
+                vec![Limit::ALiteralThatDoesNotCast],
+                "{said}"
+            );
+        }
+        assert_eq!(
+            refused(
+                literal_of(Value::String("1".to_owned()), D::Boolean),
+                "casting from Utf8View to Boolean not supported"
+            ),
+            vec![Limit::ALiteralThatDoesNotCast]
+        );
+        // A literal that casts is no cause of the failed conversion, and a float with a fraction
+        // casts to whole numbers by cutting it.
+        for literal in [
+            literal_of(Value::Integer(100), D::Int8),
+            literal_of(Value::Float(100.0), D::Int8),
+            literal_of(Value::Float(1.5), D::Int8),
+            literal_of(Value::String("100".to_owned()), D::Int8),
+        ] {
+            assert_eq!(refused(literal, conversion), Vec::<Limit>::new());
+        }
+        // Nor is one where the refusal is of the rows.
+        assert_eq!(
+            polars_refuses(
+                &select(vec![chain_of(
+                    literal_of(Value::Integer(300), D::Int8),
+                    Vec::new()
+                )]),
+                None,
+                Stage::Rows,
+                conversion,
+                Vec::new()
+            ),
+            Vec::<Limit>::new()
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_number_that_casts_below_zero()
+     {
+        use polars::prelude::DataType as D;
+        let refused = |exponent: Call| {
+            let case = select(vec![chain_of(
+                column("a"),
+                vec![pow_of(chain_of(exponent, Vec::new()))],
+            )]);
+            polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new())
+        };
+        // A text and a float given a dtype are the number they cast to.
+        assert_eq!(
+            refused(literal_of(Value::String("-1".to_owned()), D::Int32)),
+            vec![Limit::ANegativeExponent]
+        );
+        assert_eq!(
+            refused(literal_of(Value::Float(-2.0), D::Int8)),
+            vec![Limit::ANegativeExponent]
+        );
+        // And one that casts to a number from zero is not below it.
+        assert_eq!(
+            refused(literal_of(Value::String("1".to_owned()), D::Int32)),
+            Vec::<Limit>::new()
         );
     }
 
