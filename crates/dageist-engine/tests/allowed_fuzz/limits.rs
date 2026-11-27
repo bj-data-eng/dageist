@@ -398,6 +398,14 @@ pub enum Limit {
     /// tracks the values a table does not hold). Polars refusing the schema for a quantile that
     /// should be between 0 and 1, in a step that has a quantile.
     AShareOutsideZeroToOne,
+    /// A `having` casts the value it is given to a `Boolean` as it can, and a null is cast whatever
+    /// its dtype, as every value of it is null. The walk follows a null that a null literal, a
+    /// moment made with a null part or one value's difference makes through the calls that keep it,
+    /// and no more: a predicate that is a null by another way, as a comparison with a null is, is
+    /// refused for its dtype by the rule. Polars allowing a `having` that the rule of the cast
+    /// refuses, in a case where the predicate run in the group by of the case, with the test of
+    /// whether it is no null, finds none that is.
+    AHavingPredicateOfNulls,
     /// A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table
     /// only where each piece it runs them in is no longer than that one value, and never over a table
     /// with no rows, so a replacement of it given many values is refused where the column of text the
@@ -519,7 +527,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 42] = [
+    pub const ALL: [Self; 43] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -549,6 +557,7 @@ impl Limit {
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
         Self::AShareOutsideZeroToOne,
+        Self::AHavingPredicateOfNulls,
         Self::ALiteralTextBesideManyReplacementValues,
         Self::AReplacementOfAnAggregateInAWindowKey,
         Self::AFormatTheDtypeCannotWrite,
@@ -600,6 +609,7 @@ impl Limit {
                 "a-replacement-of-more-than-the-first-match"
             }
             Self::AShareOutsideZeroToOne => "a-share-outside-zero-to-one",
+            Self::AHavingPredicateOfNulls => "a-having-predicate-of-nulls",
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a-literal-text-beside-many-replacement-values"
             }
@@ -738,6 +748,9 @@ impl Limit {
             }
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a literal text, or a struct of literals written as text, is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
+            }
+            Self::AHavingPredicateOfNulls => {
+                "a having casts a predicate that is null in every group whatever its dtype, and the walk follows only the nulls that a null literal, a moment's null part or the difference of one value make"
             }
             Self::AShareOutsideZeroToOne => {
                 "Polars refuses a share outside 0 to 1 as it builds the step, which no table holds, as the tables measure a share inside it (tracked by #224)"
@@ -4273,6 +4286,12 @@ fn applies(
                     .any(|(_, held)| holds_a_replacement_of_a_literal(held))
                 && refused_for_a_value_of_another_length_with_columns(case) == Some(false)
         }
+        (Limit::AHavingPredicateOfNulls, Disagreement::RuleRefuses(refused)) => {
+            // The null is the cause where the predicate, run in the group by of the case, finds
+            // no value that is not null.
+            matches!(&refused.source, Source::Rule(rule) if *rule == "having-casts-to-boolean")
+                && is_null_in_every_group(case, &refused.place)
+        }
         (Limit::AShareOutsideZeroToOne, Disagreement::PolarsRefuses(refusal)) => {
             // The share is the cause where Polars names it: nothing else says a quantile should be
             // between 0 and 1.
@@ -5153,6 +5172,55 @@ pub fn a_key_drops_values(case: &Case) -> bool {
         .any(|key| matches!(key, Value::Expression(key) if any_call(key, &is_a_drop)))
 }
 
+/// Whether the predicate of a `having` at `place` is null in every group of the sample: the step's
+/// group by is run with that predicate, tested for being no null, as its only aggregate.
+fn is_null_in_every_group(case: &Case, place: &Place) -> bool {
+    let step = &case.document.steps()[0];
+    let Some(predicate) = expression_at(step, place) else {
+        return false;
+    };
+    let Some(not_null) =
+        catalog::entry("Expr.is_not_null").and_then(|entry| Call::new(entry, Vec::new()).ok())
+    else {
+        return false;
+    };
+    let links: Vec<Call> = predicate
+        .links()
+        .iter()
+        .cloned()
+        .chain(std::iter::once(not_null))
+        .collect();
+    let control = Expression::new(predicate.start().clone(), links)
+        .ok()
+        .and_then(|tested| {
+            let agg = Call::new(
+                catalog::entry("LazyGroupBy.agg")?,
+                vec![("aggs", Value::Many(vec![Value::Expression(tested)]))],
+            )
+            .ok()?;
+            let step = Step::chain(step.id().clone(), step.call().clone(), vec![agg]).ok()?;
+            Document::new(vec![step]).ok()
+        });
+    let Some(control) = control else {
+        return false;
+    };
+    let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
+    asked::first_rows(&control, &frames).is_some_and(|rows| {
+        rows.height() > 0
+            && rows.width() > 0
+            && rows
+                .columns()
+                .last()
+                .and_then(|column| {
+                    column
+                        .bool()
+                        .ok()
+                        .map(|flags| flags.iter().all(|flag| flag == Some(false)))
+                })
+                .unwrap_or(false)
+    })
+}
+
 /// Whether two refusals of Polars are one objection: the same stage and the same reason, as the
 /// probes read a reason.
 pub fn is_the_same_objection<S: PartialEq>(
@@ -5603,6 +5671,27 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn a_having_predicate_that_is_null_in_every_group_is_cast_and_one_that_is_not_is_refused() {
+        for name in [
+            "uncovered-a-having-predicate-of-nulls--a-condition-of-a-comparison-of-nulls.case",
+            "uncovered-a-having-predicate-of-nulls--a-condition-of-nulls-beside-a-test.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AHavingPredicateOfNulls],
+                "{name}"
+            );
+        }
+        // The first value of a date is no null, so a having is not given a date as a null.
+        let dates = Case::decode(
+            br#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.group_by","arguments":{}},"then":[{"entry":"LazyGroupBy.having","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[{"entry":"Expr.first","arguments":{}}]}}]}}},{"entry":"LazyGroupBy.agg","arguments":{}}]}]}"#,
+        )
+        .expect("a case");
+        assert!(!excused_by(&dates).contains(&Limit::AHavingPredicateOfNulls));
     }
 
     #[test]

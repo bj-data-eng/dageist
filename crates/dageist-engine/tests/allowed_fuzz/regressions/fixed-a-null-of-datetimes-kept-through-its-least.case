@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.group_by","arguments":{}},"then":[{"entry":"LazyGroupBy.having","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}},"then":[{"entry":"Expr.nan_min","arguments":{}}]}}]}}},{"entry":"LazyGroupBy.agg","arguments":{}}]}]}
