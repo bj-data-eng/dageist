@@ -1072,11 +1072,14 @@ is two rows, as the report counts them.
 
 What Polars does with each is what the document tests say, and some of it is not what a name suggests:
 
-- `head`, `limit` and `tail` take `n`, which Python's binding passes on as an unsigned 32-bit number, so a
-  build refuses a negative one and one above it; Python refuses them as `ValueError` and `OverflowError`.
+- `head`, `limit` and `tail` take `n`. `head` is the slice of the first `n` rows and Python gives a slice
+  its length as a whole number of the platform, so a count above 32 bits keeps every row and a negative
+  one is refused as `ValueError`; `tail` takes an index, an unsigned 32-bit number, so a build refuses a
+  negative one and one above it, as Python refuses it as `OverflowError`.
   `limit` is `head` under another name, and both are offered because both are Polars' names. `slice`
-  takes a signed `offset`, counted from the end where it is negative, and a `length` that is left out
-  as the most rows an index holds; a negative length is refused. `first` is the slice of the first row
+  takes a signed `offset`, counted from the end where it is negative, and a `length` that is a whole number
+  of the platform and is not given is the end of the table, whatever the `offset` is; a negative length is
+  refused. `first` is the slice of the first row
   and `last` the tail of one, so a table with no rows has none.
 - `gather_every` takes `n` and `offset` as unsigned numbers and gathers the rows `offset`, `offset + n`,
   and so on, of every column. Polars refuses an `n` of zero when it runs rows. Python runs it, as it runs

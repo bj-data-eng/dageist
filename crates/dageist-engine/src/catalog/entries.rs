@@ -1874,14 +1874,17 @@ fn sort(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError
     Ok(frame.sort_by_exprs(by, options))
 }
 
-/// The number of rows `head`, `limit` and `tail` take: Python's binding passes it on as an
-/// unsigned 32-bit number, so a negative one and one that is too large are refused.
+/// The number of rows `tail` takes: Python's binding passes it on as an index, an unsigned 32-bit
+/// number in the Polars the engine builds, so a negative one and one that is too large are refused.
 fn row_count(arguments: &Arguments) -> Result<u32, BuildError> {
     unsigned(arguments, "n", 5)
 }
 
+/// `head` and `limit` are a slice of the first rows, which Python gives the number of rows as the
+/// length of a slice, a whole number of the platform: a negative one is refused, and one above 32 bits
+/// is not.
 fn frame_head(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.slice(Slice::head(row_count(arguments)? as usize)))
+    Ok(frame.slice(Slice::head(index(arguments, "n", 5)?)))
 }
 
 fn frame_tail(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
