@@ -317,3 +317,65 @@ fn a_list_column_looked_up_in_lists_of_lists_is_not_refused_for_an_option_either
     );
     assert_eq!(walk_of(looked_up).refusal(), None);
 }
+
+#[test]
+fn is_in_in_the_deprecated_form_of_a_dtype_no_class_holds_is_refused_by_the_rule_before_it_is_built()
+ {
+    // A binary, an enum and a categorical are no class of the tables, so the walk does not know
+    // their dtype and judges none of these. The step's run does, and refuses each by the rule that
+    // refuses the form, where Polars would accept it with a warning that it is deprecated.
+    let enumeration = FrozenCategories::new(["x", "y"]).expect("the categories of an enum");
+    let dtypes = [
+        ("i", DataType::Int64),
+        ("bin", DataType::Binary),
+        ("en", DataType::from_frozen_categories(enumeration)),
+        ("cat", DataType::from_categories(Categories::global())),
+        ("s", DataType::String),
+    ];
+    let columns: Vec<Column> = dtypes
+        .iter()
+        .map(|(name, dtype)| {
+            let values = if *name == "i" {
+                Series::new((*name).into(), [1_i64, 2, 3])
+            } else {
+                Series::new((*name).into(), ["x", "y", "x"])
+            };
+            values.cast(dtype).expect("a column of the dtype").into()
+        })
+        .collect();
+    let table = DataFrame::new(3, columns).expect("columns of three rows");
+    for (receiver, other) in [
+        ("bin", "bin"),
+        ("en", "en"),
+        ("cat", "cat"),
+        ("i", "bin"),
+        ("bin", "i"),
+        ("s", "en"),
+    ] {
+        let given = field_then(receiver, vec![is_in(field(other))]);
+        let report = Document::read(&selecting(given))
+            .expect("a document")
+            .run_on(&inputs(), &table)
+            .expect("the table has a schema");
+        let Outcome::Refused(refusal) = report.steps()[0].outcome() else {
+            panic!(
+                "{receiver} in {other}: the step is not refused: {:?}",
+                report.steps()[0].outcome()
+            );
+        };
+        match refusal.cause() {
+            RunCause::NotAllowed(refusal) => match refusal.source() {
+                RefusalSource::Rule(rule) => {
+                    assert_eq!(rule.name(), RULE, "{receiver} in {other}");
+                }
+                other_source => panic!(
+                    "{receiver} in {other}: refused by {other_source:?}: {}",
+                    refusal.reason()
+                ),
+            },
+            other_cause => {
+                panic!("{receiver} in {other}: refused for another cause: {other_cause}")
+            }
+        }
+    }
+}
