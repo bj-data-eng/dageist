@@ -1086,6 +1086,53 @@ pub(crate) fn refused_for_every_number(
     if !follows_a_moment(place) {
         return None;
     }
+    refused_for_every_dtype(number, |class| {
+        let mut arguments = chosen.arguments.to_vec();
+        arguments.push((parameter, class));
+        offer(entry, place, &chosen.with_arguments(&arguments))
+    })
+}
+
+/// Why Polars refuses a call that follows a number typed without a dtype and is given a date, a
+/// moment, a length of time or a time of day as `argument`, where no dtype the number could take
+/// lets the call stand: the number is the other side of the arithmetic of a moment, and has no
+/// dtype beside it, whichever of the two the other is given to. As [`refused_for_every_number`]
+/// says it for the number that is given, this says it for the number that is followed. `None`
+/// where some dtype lets the call stand, as a length of time multiplied by a number does.
+pub(crate) fn refused_for_every_receiver_number(
+    entry: &'static Entry,
+    context: Context,
+    shape: Shape,
+    argument: (&str, Representative),
+    number: Loose,
+) -> Option<Refusal> {
+    if !is_a_moment(argument.1) {
+        return None;
+    }
+    refused_for_every_dtype(number, |class| {
+        let place = Place::new(
+            context,
+            After::Value {
+                dtype: class,
+                shape,
+            },
+        );
+        offer(
+            entry,
+            &place,
+            &Chosen::default().with_arguments(&[argument]),
+        )
+    })
+}
+
+/// The refusal for the dtype a number typed without a dtype has alone, where the tables refuse the
+/// call for every dtype it could take, and only for what Polars refuses when it works out the
+/// schema: what it refuses when the rows run is the table of rows' to say, as it is for a number of a
+/// dtype. `None` where some dtype lets the call stand.
+fn refused_for_every_dtype(
+    number: Loose,
+    mut offered: impl FnMut(Representative) -> Verdict,
+) -> Option<Refusal> {
     let alone = if number.is_whole() {
         Representative::Int64
     } else {
@@ -1096,15 +1143,11 @@ pub(crate) fn refused_for_every_number(
         .into_iter()
         .filter(|class| could_be_taken_by_a_number(*class) && number.fits(*class))
     {
-        let mut arguments = chosen.arguments.to_vec();
-        arguments.push((parameter, class));
-        match offer(entry, place, &chosen.with_arguments(&arguments)) {
+        match offered(class) {
             Verdict::Allowed(_) => return None,
             Verdict::Refused(refusal) => refusals.push((class, refusal)),
         }
     }
-    // Only what Polars refuses when it works out the schema is said here: what it refuses when
-    // the rows run is the table of rows' to say, as it is for a number of a dtype.
     if refusals
         .iter()
         .any(|(_, refusal)| refusal.source != RefusalSource::Polars(Stage::Schema))
@@ -1118,20 +1161,22 @@ pub(crate) fn refused_for_every_number(
     refusals.into_iter().nth(at).map(|(_, refusal)| refusal)
 }
 
+/// Whether the dtype is a date, a moment, a length of time or a time of day.
+const fn is_a_moment(dtype: Representative) -> bool {
+    matches!(
+        dtype,
+        Representative::Date
+            | Representative::Time
+            | Representative::Datetime
+            | Representative::DatetimeZoned
+            | Representative::Duration
+    )
+}
+
 /// Whether the call follows a date, a moment, a length of time or a time of day, which a number
 /// typed without a dtype has no dtype beside, where it has one beside every other number.
 fn follows_a_moment(place: &Place) -> bool {
-    matches!(
-        place.after(),
-        After::Value {
-            dtype: Representative::Date
-                | Representative::Time
-                | Representative::Datetime
-                | Representative::DatetimeZoned
-                | Representative::Duration,
-            ..
-        }
-    )
+    matches!(place.after(), After::Value { dtype, .. } if is_a_moment(dtype))
 }
 
 /// Why Polars refuses the value `fill_null` fills with, where it is a number typed without a

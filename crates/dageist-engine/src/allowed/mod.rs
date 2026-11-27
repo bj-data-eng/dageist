@@ -73,7 +73,7 @@ pub use offers::{
 };
 pub(crate) use offers::{
     refusal_of_a_connected_list, refused_as_ambiguous, refused_for_every_number,
-    same_for_any_number,
+    refused_for_every_receiver_number, same_for_any_number,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

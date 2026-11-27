@@ -2847,6 +2847,36 @@ impl Walker<'_> {
                 count,
                 taken,
             } => {
+                // A number typed without a dtype that the call follows has none beside a date, a
+                // moment, a length of time or a time of day it is given, where no dtype it could
+                // take lets the call stand: Polars refuses it as it refuses it given to them.
+                let refused = receiver_loose.and_then(|number| {
+                    arguments
+                        .iter()
+                        .filter(|(name, operand)| {
+                            operand.loose.is_none()
+                                && receiver_beside(entry, name, number) == Some(Receiver::Adapts)
+                        })
+                        .find_map(|(name, operand)| {
+                            allowed::refused_for_every_receiver_number(
+                                entry,
+                                context,
+                                *shape,
+                                (name.as_str(), operand.dtype?),
+                                number,
+                            )
+                        })
+                });
+                if let Some(refusal) = refused {
+                    self.refuse(&refusal, false);
+                    return (
+                        Cur::Dead,
+                        Standing {
+                            follows: None,
+                            verdict: Some(Verdict::Refused(refusal)),
+                        },
+                    );
+                }
                 self.blind(format!(
                     "the dtype before {} is not known",
                     entry.id().as_str()

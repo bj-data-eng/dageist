@@ -862,14 +862,16 @@ fn known_role_limits(scale: Scale) -> Vec<Known> {
         .saying("`quantile` should be between"),
         Known::new(
             Kind::PolarsRefusesOnly,
-            Pattern::new()
-                .is("column", "String")
-                .starts("method", "Expr.add"),
-            "Polars refuses a number typed without a dtype added to text, which the walk leaves to \
-             the tables because the kept cases of the fuzz campaign settle such a prefix as one \
-             they could not judge (candidate to file)",
+            Pattern::new().is("column", "String"),
+            "Polars refuses arithmetic of text and a number typed without a dtype, on either side, \
+             which the walk leaves to the tables because the kept cases of the fuzz campaign settle \
+             such a prefix as one they could not judge (candidate to file)",
         )
-        .saying("arithmetic on dtypes str and dyn"),
+        .saying_one_of(&[
+            "arithmetic on dtypes str and dyn",
+            "arithmetic on dtypes dyn",
+            "division with 'String' datatypes",
+        ]),
         Known::new(
             Kind::PolarsRefusesOnly,
             Pattern::new().starts("method", "Expr.str.pad_start"),

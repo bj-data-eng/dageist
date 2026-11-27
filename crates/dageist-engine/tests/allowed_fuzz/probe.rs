@@ -2273,6 +2273,13 @@ mod tests {
         Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
     }
 
+    /// Where a case is kept that is no disagreement and so no kept case: the case a probe is tried on.
+    fn path_of_a_probe(name: &str) -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/probes")
+            .join(name)
+    }
+
     fn refusal(case: &Case) -> Refused {
         match predict(case).verdict {
             Verdict::Refuses(refused) => refused,
@@ -2795,11 +2802,12 @@ mod tests {
 
     #[test]
     fn a_call_is_refused_on_a_value_with_an_argument_of_no_known_dtype_left_at_its_default() {
-        // `lit("1d").log(base=1 // null)`: Polars drops the sort key, which is one value. The
-        // base is refused first as written, and its dtype is not known, so no column stands in
-        // for it. The log of a column of text, given no base, is refused as the tables say.
-        let name = "stricter-a-call-given-an-argument-of-no-known-dtype.case";
-        let case = kept(name);
+        // `lit("1d").log(base=1 // "1d")`: the base is refused first as written, and its dtype is
+        // not known, for a number beside text has none, so no column stands in for it. The log of
+        // a column of text, given no base, is refused as the tables say.
+        let name = "a-call-given-an-argument-of-no-known-dtype.case";
+        let case =
+            Case::decode(&std::fs::read(path_of_a_probe(name)).expect("a case")).expect("a case");
         let refused = refusal(&case);
         assert_eq!(settle(&case, &refused), None);
         let found =
@@ -2809,12 +2817,7 @@ mod tests {
         assert!(!found.probe.contains("floordiv"), "{}", found.probe);
         // A receiver that a log takes is allowed with the default base: nothing shows the tables
         // right.
-        let text = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/allowed_fuzz/regressions")
-                .join(name),
-        )
-        .expect("a kept case");
+        let text = std::fs::read_to_string(path_of_a_probe(name)).expect("a case");
         let number = Case::decode(
             text.replace("{\"string\":\"1d\"}", "{\"integer\":4}")
                 .as_bytes(),
