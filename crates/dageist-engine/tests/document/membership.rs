@@ -307,3 +307,27 @@ fn a_list_column_looked_up_in_a_collection_of_lists_is_not_judged_by_the_tables(
     assert_eq!(rule, "element-dtype-is-measured");
     assert!(said.contains("Expr.is_in"), "{said}");
 }
+
+#[test]
+fn a_list_column_looked_up_in_lists_of_lists_with_an_option_is_refused_by_a_rule_too() {
+    // The option table records what a rule refuses, for it never runs it, so a refusal read from
+    // it is the rule's, and not Polars'.
+    let looked_up = field_then(
+        "l",
+        vec![call(
+            "Expr.is_in",
+            json!({
+                "other": field_then("l", vec![implode(), implode()]),
+                "nulls_equal": { "flag": false },
+            }),
+        )],
+    );
+    let walk = walk_of(looked_up);
+    let refusal = walk.refusal().expect("a refusal").refusal();
+    assert!(
+        matches!(refusal.source(), RefusalSource::Rule(_)),
+        "refused by {:?}: {}",
+        refusal.source(),
+        refusal.reason()
+    );
+}
