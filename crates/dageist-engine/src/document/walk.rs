@@ -3660,7 +3660,7 @@ impl Walker<'_> {
                 ) {
                     // What a key drops of the values it reads is how many the data decide, as what
                     // a filter keeps is, where a group by meets it with the other keys and the rows.
-                    Ok(found)
+                    Ok(_)
                         if place.context() == Context::step(Outer::GroupKey)
                             && matches!(
                                 entry.id().as_str(),
