@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.group_by","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.last","arguments":{}},{"entry":"Expr.std","arguments":{}},{"entry":"Expr.drop_nulls","arguments":{}}]}}]},"maintain_order":{"flag":true}}},"then":[{"entry":"LazyGroupBy.agg","arguments":{}}]}]}
