@@ -279,6 +279,7 @@ fn the_key_of_a_window_in_agg_and_in_having_is_what_polars_says() {
 
 #[derive(Default)]
 struct Given {
+    stands: &'static str,
     context: &'static str,
     method: Option<(&'static catalog::Entry, &'static str)>,
     receiver: &'static str,
@@ -319,6 +320,7 @@ fn operand(family: &str, kind: &str, receiver: bool) -> Value {
         "column" => field(column),
         "literal" => literal,
         "aggregate" => field_then(column, vec![one("Expr.first")]),
+        "null" => lit(json!({ "flag": null })),
         other => panic!("no operand {other}"),
     }
 }
@@ -366,6 +368,10 @@ fn given_case(point: &Given) -> Result<Case, String> {
     let (entry, under_test) = point.method.ok_or("no method")?;
     let id = entry.id().as_str();
     let family = family_of(id);
+    // Polars looks one value up in another for ever where the first is a null literal.
+    if id == "Expr.is_in" && point.receiver == "null" && point.argument == "literal" {
+        return Err("Polars never ends".to_owned());
+    }
     let mut given = serde_json::Map::new();
     for parameter in entry.parameters() {
         let value = if parameter.name() == under_test {
@@ -394,17 +400,54 @@ fn given_case(point: &Given) -> Result<Case, String> {
         };
         given.insert(parameter.name().to_owned(), value);
     }
-    grouped(
-        point.context,
-        then(
-            operand(family, point.receiver, true),
-            call(id, Value::Object(given)),
-        ),
-    )
+    let made = then(
+        operand(family, point.receiver, true),
+        call(id, Value::Object(given)),
+    );
+    // What stands beside an aggregate is met by it where the chain goes on, as one operand is by
+    // another.
+    let value = match point.stands {
+        "alone" => made,
+        "as an operand" => {
+            let first = |column: &str| field_then(column, vec![one("Expr.first")]);
+            match family {
+                "text" => then(first("t"), call("Expr.eq", json!({ "other": made }))),
+                "date" => then(first("d"), call("Expr.eq", json!({ "other": made }))),
+                _ => then(first("m"), call("Expr.add", json!({ "other": made }))),
+            }
+        }
+        other => panic!("no standing {other}"),
+    };
+    grouped(point.context, value)
 }
 
 fn given_known() -> Vec<Known> {
     vec![
+        Known::new(
+            Kind::Unbuildable,
+            Pattern::new()
+                .is("method", "Expr.is_in.other")
+                .is("receiver", "null")
+                .is("argument", "literal"),
+            "Polars never ends on one value looked up in another where the first is a null literal, so no cell can ask it",
+        )
+        .saying("Polars never ends"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .one_of(
+                    "method",
+                    &[
+                        "Expr.and_.others",
+                        "Expr.or_.others",
+                        "Expr.xor.other",
+                        "Expr.floordiv.other",
+                    ],
+                )
+                .is("receiver", "null"),
+            "Polars has no kernel of a bitwise call or of a floor division for the dtype Null where a group evaluates it, which the tables measured with a column of a dtype: what the kernels of a group refuse of a null literal is tracked by #245",
+        )
+        .saying("not supported for dtype `null`"),
         Known::new(
             Kind::PolarsRefusesOnly,
             Pattern::new().is("method", "Expr.gather.indices"),
@@ -485,6 +528,11 @@ fn given_known() -> Vec<Known> {
 #[test]
 fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says() {
     let verdicts = Grid::<Given>::new()
+        .axis(
+            "stands",
+            labelled(&[("alone", "alone"), ("as an operand", "as an operand")]),
+            |point, stands| point.stands = stands,
+        )
         .axis("context", labelled(&CONTEXTS), |point, context| {
             point.context = context;
         })
@@ -497,6 +545,7 @@ fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says()
                 ("column", "column"),
                 ("literal", "literal"),
                 ("aggregate", "aggregate"),
+                ("null", "null"),
             ]),
             |point, receiver| point.receiver = receiver,
         )
