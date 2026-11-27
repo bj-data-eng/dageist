@@ -149,6 +149,34 @@ fn key_arguments(column: &Col, form: &str, order: Option<bool>) -> Value {
             column,
             vec![call("Expr.head", json!({ "n": whole(1) }))],
         )]),
+        // What takes some of the values of the column gives as many as the data or the arguments
+        // decide, which Polars meets with the other keys and with the rows of the table.
+        "drop_nulls, some of the values" => {
+            by(vec![of(column, vec![call("Expr.drop_nulls", json!({}))])])
+        }
+        "unique" => by(vec![of(column, vec![call("Expr.unique", json!({}))])]),
+        "head 2, some of the values" => by(vec![of(
+            column,
+            vec![call("Expr.head", json!({ "n": whole(2) }))],
+        )]),
+        "filter, some of the values" => by(vec![of(
+            column,
+            vec![call(
+                "Expr.filter",
+                json!({ "predicates": many(vec![field_then(
+                    "n",
+                    vec![call("Expr.gt", json!({ "other": whole(1) }))],
+                )]) }),
+            )],
+        )]),
+        "head 2 and n, two lengths" => by(vec![
+            of(column, vec![call("Expr.head", json!({ "n": whole(2) }))]),
+            field("n"),
+        ]),
+        "drop_nulls and n, two lengths" => by(vec![
+            of(column, vec![call("Expr.drop_nulls", json!({}))]),
+            field("n"),
+        ]),
         "implode, one list" => by(vec![of(column, vec![call("Expr.implode", json!({}))])]),
         "window by n" => by(vec![of(
             column,
@@ -168,7 +196,7 @@ fn key_arguments(column: &Col, form: &str, order: Option<bool>) -> Value {
     arguments
 }
 
-const KEY_FORMS: [&str; 12] = [
+const KEY_FORMS: [&str; 18] = [
     "column",
     "named",
     "named, a name given twice",
@@ -176,6 +204,12 @@ const KEY_FORMS: [&str; 12] = [
     "first, an aggregate",
     "sorted",
     "head, some of the values",
+    "drop_nulls, some of the values",
+    "unique",
+    "head 2, some of the values",
+    "filter, some of the values",
+    "head 2 and n, two lengths",
+    "drop_nulls and n, two lengths",
     "implode, one list",
     "window by n",
     "literal",
@@ -318,7 +352,7 @@ fn aggregates_known() -> Vec<Known> {
             Pattern::new()
                 .one_of("method", &["Expr.kurtosis", "Expr.skew"])
                 .is("class", "String"),
-            "in a select Polars converts the text to numbers strictly and refuses when the rows run, which the tables record; in a group by it gives a result, and the walk keeps the refusal the tables record for the method",
+            "the tables are measured on text that is a duration, which converts to no number, and the text of a column of digits does: what the data decide, for Polars converts text strictly in a select and in a group by alike and fails on text that is no number in both",
         )
         .saying("conversion from"),
         Known::new(
