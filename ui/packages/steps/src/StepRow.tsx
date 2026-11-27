@@ -489,7 +489,16 @@ function HavingLine({ call, at, frame }: HeadProps & { readonly at: number }): R
         }
         add={null}
       >
-        <Word>having</Word>
+        {/* The word opens a list that has nothing to offer but what takes it away. */}
+        <Slot
+          label="having"
+          tone="verb"
+          look="verb"
+          names
+          describedAs="The predicates that keep groups. Take the having away"
+          placeholder="Nothing to change here"
+          offers={() => []}
+        />
       </Piece>
       <ConditionBlocks
         path={under(callPath, parameterSegment(PREDICATES))}
