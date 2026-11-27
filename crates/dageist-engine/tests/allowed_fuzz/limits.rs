@@ -5057,7 +5057,7 @@ fn excuses_as_in_a_select(case: &Case, disagreement: &Disagreement) -> Vec<Limit
 /// The expression of a step that groups that `place` is in, alone in a `select` of the same frames,
 /// or every expression the step holds where the place does not name one, as a refusal of the rows
 /// does not.
-fn as_a_select(case: &Case, place: Option<&Place>) -> Option<Case> {
+pub fn as_a_select(case: &Case, place: Option<&Place>) -> Option<Case> {
     let step = &case.document.steps()[0];
     let expressions = place
         .and_then(|place| expression_at(step, place))
@@ -5407,6 +5407,28 @@ mod tests {
                 .join()
                 .expect("the limits are asked")
         })
+    }
+
+    #[test]
+    fn what_a_select_excuses_of_an_expression_is_excused_of_it_in_a_step_that_groups() {
+        // A text literal compared with a null literal of a number: the tables refuse it, as they
+        // do in a select, and Polars allows it as it does there.
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal--given-to-a-comparison-in-a-group.case"),
+            vec![Limit::ALiteral]
+        );
+    }
+
+    #[test]
+    fn what_only_a_group_makes_is_not_excused_by_what_a_select_excuses() {
+        // A key that drops the nulls it reads, where the order of the groups is kept, is refused
+        // by Polars for lengths that differ, which the same key alone in a select is not.
+        let case = Case::decode(
+            br#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.group_by","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.drop_nulls","arguments":{}}]}}]},"maintain_order":{"flag":true}}},"then":[{"entry":"LazyGroupBy.agg","arguments":{}}]}]}"#,
+        )
+        .expect("a case");
+        assert_eq!(excused_by(&case), Vec::<Limit>::new());
     }
 
     #[test]

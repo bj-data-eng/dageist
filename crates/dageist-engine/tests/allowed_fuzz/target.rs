@@ -14,7 +14,7 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
-use super::limits::{Limit, excuses, excuses_a_refused_prefix, strict};
+use super::limits::{Limit, as_a_select, excuses, excuses_a_refused_prefix, strict};
 use super::observe::{
     Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
 };
@@ -776,6 +776,24 @@ impl CaseTarget for AllowedTarget {
                     // A count that is the table's rows, or one value, by chance.
                     if let Some(outcome) = by_design(case, &refused, &why) {
                         return outcome;
+                    }
+                    // What a step that groups is given is judged as a select judges it, and the
+                    // probes read the call of a step and not the calls after `group_by`: the
+                    // expression alone in a select, refused by the tables and allowed by Polars as
+                    // it is here, is excused as it is there.
+                    if let Some(selected) = as_a_select(case, Some(&refused.place))
+                        && case.document.steps()[0].call().entry().id().as_str()
+                            == "LazyFrame.group_by"
+                        && matches!(
+                            &predict(&selected).verdict,
+                            Verdict::Refuses(alone) if matches!(alone.source, Source::Polars)
+                        )
+                        && observe_checked(&selected).refusal.is_none()
+                        && let Ok(outcome) = self.evaluate(&selected)
+                        && outcome.kind() == dageist_fuzz::OutcomeKind::ExpectedRejection
+                    {
+                        tally(format!("refused in a group, excused in a select: {why}"));
+                        return Ok(outcome);
                     }
                     return failure(
                         ALLOWANCE,
