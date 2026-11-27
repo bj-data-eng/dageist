@@ -1305,6 +1305,15 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             }
         }
     }
+    // `is_in` given a collection that no class of the tables is, as a list of structs or of lists
+    // is, is not judged: the tables hold no line of it, and a call of no class that fits is not
+    // refused for that, which Polars may accept.
+    if id == "Expr.is_in" && chosen.unclassed.contains(&"other") {
+        return Err(Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &"Expr.is_in is given a collection that no class of the tables is, which they do not measure",
+        ));
+    }
     // What the call says of a struct: a field that is none, names that do not fit, or fields made.
     let receiver_class = match place.after {
         After::Value { dtype, .. } => Some(dtype),
