@@ -270,6 +270,7 @@ pub const fn dageist_engine::allowed::Chosen<'a>::giving_one(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_shape(self, shape: dageist_engine::allowed::Shape) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::in_zone(self, zone: core::option::Option<&'a str>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::named(self, name: core::option::Option<&'a str>) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::of_a_null_literal(self, null: bool) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_argument_fields(self, fields: &'a [(&'a str, &'a dageist_engine::allowed::Fields)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
