@@ -3397,6 +3397,9 @@ impl Walker<'_> {
                 Some((result, shape)) => (result.class(), shape),
                 None => (None, Shape::Many),
             };
+            // One value is met by each of the values of an operand of many, whatever dtype the
+            // operand that is not known has.
+            let shape = broadcast(link, arguments, shape);
             // What a method that takes some of the values gives of how many is the arguments' to
             // say, whether or not the dtype of one of them is known.
             let (option_words, _) = option_words(link);
