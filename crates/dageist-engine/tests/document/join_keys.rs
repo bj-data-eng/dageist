@@ -568,6 +568,21 @@ fn a_key_that_tests_membership_in_a_list_is_elementwise_as_polars_takes_it() {
             )),
             true,
         ),
+        // What a method made of the literal is not folded: the literal gathered is an aggregate.
+        (
+            "a literal made by a method, imploded",
+            keyed(is_in(
+                "a",
+                chain(
+                    call(
+                        "polars.lit",
+                        json!({ "value": { "integer": 1 }, "dtype": { "dtype": "Int64" } }),
+                    ),
+                    vec![call("Expr.abs", json!({})), call("Expr.implode", json!({}))],
+                ),
+            )),
+            false,
+        ),
         (
             "a column imploded",
             keyed(is_in(

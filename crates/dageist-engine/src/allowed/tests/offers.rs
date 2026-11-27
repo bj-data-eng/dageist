@@ -1341,3 +1341,27 @@ fn a_part_given_to_replace_beside_an_option_is_refused_as_converted_too() {
         refusal.reason()
     );
 }
+
+#[test]
+fn is_in_may_follow_a_value_whose_own_list_the_tables_measure_before_it_is_given_one() {
+    // A value is looked up in a list of its own dtype, so the method stands after it where some list
+    // fits, and not only where a list of whole numbers or of text does.
+    for dtype in [
+        Representative::Boolean,
+        Representative::Date,
+        Representative::Datetime,
+        Representative::Float64,
+        Representative::Int64,
+        Representative::String,
+    ] {
+        let allowed = offer(
+            entry("Expr.is_in"),
+            &select_after(dtype),
+            &Chosen::default(),
+        );
+        assert!(
+            matches!(allowed, Verdict::Allowed(_)),
+            "{dtype}: {allowed:?}"
+        );
+    }
+}
