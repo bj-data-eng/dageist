@@ -1740,6 +1740,24 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let Some(given) = chosen.shape {
         shape = given;
     }
+    // Where the values are evaluated on the rows of each group, a method that takes some of the
+    // values of one value, as `drop_nulls`, `unique`, `head` and `mode` do, gives a list of them for
+    // each group, which is many values and not the one value it takes them of: Polars keeps one value
+    // that a method keeps whole, as `sort` and `abs` do, and gathers what is taken into a list.
+    if matches!(place.context.outer(), Outer::Aggregate | Outer::Having)
+        && is_method(entry)
+        && matches!(
+            place.after,
+            After::Value {
+                shape: Shape::One,
+                ..
+            }
+        )
+        && (catalog::Counting::of(entry, chosen.options).is_some()
+            || matches!(id, "Expr.drop_nulls" | "Expr.drop_nans"))
+    {
+        shape = Shape::Many;
+    }
     // What a method that takes some of the values says of how it ends is what the table of counts
     // says of the count it gives, which it is not where what it follows is one value: the first of
     // one value is that value, which ends where one value does.
