@@ -2637,8 +2637,16 @@ impl Walker<'_> {
                     fields,
                     from_a_list,
                     output_name: name_before.as_deref(),
-                    null_kept: starts_from_a_null(expression)
-                        && expression.links()[..=at].iter().all(keeps_a_null),
+                    null_kept: (starts_from_a_null(expression)
+                        && expression.links()[..=at].iter().all(keeps_a_null))
+                        // A condition whose values are all nulls gives a null.
+                        || (matches!(expression.start(), Start::Call(start)
+                            if start.entry().id().as_str() == "polars.when")
+                            && !statements.is_empty()
+                            && statements.iter().all(|statement| {
+                                starts_from_a_null(statement)
+                                    && statement.links().iter().all(keeps_a_null)
+                            })),
                 },
             );
             unit = unit_after(link, unit, &standing);
