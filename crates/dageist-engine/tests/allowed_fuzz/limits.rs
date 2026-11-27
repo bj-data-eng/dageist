@@ -4409,7 +4409,26 @@ fn applies(
                 && refusal.reason.contains("not yet implemented")
                 && refusal.reason.contains("replacement pattern per row")
                 && grouped;
-            pivot && (of_nothing || a_text_share) || grouped && (of_nothing || a_pattern_per_row)
+            // A strict replacement lists the values of a group, a list for each group, where a
+            // select lists the values of the column, which Polars finds incomplete as it runs them.
+            let an_incomplete_mapping = refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .contains("incomplete mapping specified for `replace_strict`")
+                && grouped
+                && held
+                    .iter()
+                    .map(|(_, held)| *held)
+                    .chain(
+                        case.document.steps()[0]
+                            .links()
+                            .iter()
+                            .flat_map(operands)
+                            .map(|(_, held)| held),
+                    )
+                    .any(|held| any_call(held, &|call| is(call, "Expr.replace_strict")));
+            pivot && (of_nothing || a_text_share)
+                || grouped && (of_nothing || a_pattern_per_row || an_incomplete_mapping)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
@@ -4431,6 +4450,7 @@ fn applies(
                     "cannot cast",
                     "with a replacement pattern per row",
                     "failed to determine supertype",
+                    "window expression with non-elementwise",
                     "must not contain duplicates",
                     "fill null strategy not yet supported",
                     "fill-null strategy",
@@ -5524,11 +5544,11 @@ mod tests {
 
     #[test]
     fn what_a_select_excuses_of_an_expression_is_excused_of_it_in_a_step_that_groups() {
-        // A strict replacement that lists one value, given no default: Polars refuses a value it
-        // does not list as it does alone in a select, where the limit excuses it.
+        // A text typed in that does not cast to the dtype it is given as a key: Polars refuses it as
+        // it does alone in a select, where the limit excuses it.
         assert_eq!(
-            excused_by_kept("uncovered-a-strict-replacement-given-no-default--in-a-group.case"),
-            vec![Limit::AStrictReplacementGivenNoDefault]
+            excused_by_kept("uncovered-a-literal-that-does-not-cast--in-a-group-key.case"),
+            vec![Limit::ALiteralThatDoesNotCast]
         );
     }
 
@@ -5562,7 +5582,10 @@ mod tests {
             "uncovered-a-group-aggregate--the-schema-says-null-of-a-null-literal.case",
             "uncovered-a-group-aggregate--degrees-in-the-order-of-a-window.case",
             "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
+            "uncovered-a-group-aggregate--a-strict-replacement-given-no-default.case",
             "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
+            "uncovered-a-group-aggregate--a-window-over-a-column-in-a-having.case",
+            "uncovered-a-group-aggregate--a-strict-replacement-of-the-values-of-a-group.case",
         ] {
             assert_eq!(
                 excused_by_kept(name),
