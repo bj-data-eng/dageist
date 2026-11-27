@@ -657,7 +657,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 34] = [
+const PREDICATES: [&str; 35] = [
     "the values",
     "all null",
     "first",
@@ -692,6 +692,7 @@ const PREDICATES: [&str; 34] = [
     "a null of lists, approx_quantile",
     "a null of dates, quantile",
     "a null of dates, std",
+    "a condition of nulls of lists, with an otherwise",
 ];
 
 fn typed_null_then(dtype: &str, entry: &str) -> Value {
@@ -825,6 +826,22 @@ fn predicate_of(column: &Col, form: &str) -> Value {
                 "Expr.quantile",
                 json!({ "quantile": lit(json!({ "float": 0.5 })) }),
             )],
+        ),
+        "a condition of nulls of lists, with an otherwise" => crate::support::chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![of(column, vec![one("Expr.first"), one("Expr.is_not_null")])]) }),
+            ),
+            vec![
+                call(
+                    "When.then",
+                    json!({ "statement": typed_null("List(Int64)") }),
+                ),
+                call(
+                    "Then.otherwise",
+                    json!({ "statement": typed_null("List(Int64)") }),
+                ),
+            ],
         ),
         "a null of dates, std" => typed_null_then("Date", "Expr.std"),
         "a null of text" => typed_null("String"),
