@@ -250,6 +250,44 @@ fn an_aggregate_that_does_not_aggregate_is_reported_as_a_list_for_each_group() {
 }
 
 #[test]
+fn a_key_read_in_an_aggregate_is_no_second_column_of_its_name_in_what_the_report_says() {
+    // The window of `x` is ordered by the key, which the expression of the key says alone as the
+    // column `k`, which an aggregate of that name beside the key is not.
+    let ordered = field_then(
+        "x",
+        vec![call(
+            "Expr.over",
+            json!({ "order_by": many(vec![field("k")]) }),
+        )],
+    );
+    let report = run(vec![grouping(
+        "g",
+        json!({ "by": by_k() }),
+        vec![finish(
+            "LazyGroupBy.agg",
+            json!({ "aggs": many(vec![ordered]) }),
+        )],
+    )]);
+    let [group] = report.steps() else {
+        panic!("one step")
+    };
+    assert!(
+        matches!(group.outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        group.outcome()
+    );
+    for expression in group.expressions() {
+        for resolved in std::iter::once(expression.start()).chain(expression.links()) {
+            assert!(
+                !matches!(resolved, Resolution::Refused(_)),
+                "{} says {resolved:?}",
+                expression.place()
+            );
+        }
+    }
+}
+
+#[test]
 fn what_is_still_to_be_picked_in_a_call_after_group_by_makes_the_step_incomplete() {
     let hole = crate::edits::hole();
     let report = run(vec![grouping(
