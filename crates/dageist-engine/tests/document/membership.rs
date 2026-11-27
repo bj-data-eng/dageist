@@ -6,11 +6,12 @@
 //! numbers 2 and 3 is connected as `wanted`. Every expected value is worked out by hand from what
 //! Python Polars 2.2.0 gives for the same call.
 
-use dageist_engine::document::{Document, Inputs, ListOrigin, Outcome, StepId, Walk};
+use dageist_engine::allowed::RefusalSource;
+use dageist_engine::document::{Document, Inputs, ListOrigin, Outcome, RunCause, StepId, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, field_then, many, step};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn table() -> DataFrame {
     let lists = Series::new(
@@ -151,4 +152,144 @@ fn is_in_tests_a_value_typed_in_against_a_collection_imploded() {
     );
     assert_eq!(walk_of(among.clone()).refusal(), None);
     assert_eq!(cells(among), cell_texts(&["true"]));
+}
+
+/// The rule that refuses `is_in` given what is nested as the value it follows is, which is a form
+/// Polars deprecates.
+const RULE: &str = "is-in-takes-a-list";
+
+/// The refusal of the walk of `expression`, with the name of the rule that refused and the words
+/// it said.
+fn refused_by_a_rule(expression: Value) -> (String, String) {
+    let walk = walk_of(expression);
+    let refusal = walk.refusal().expect("a refusal").refusal();
+    match refusal.source() {
+        RefusalSource::Rule(rule) => (rule.name().to_owned(), refusal.reason().to_owned()),
+        other => panic!("refused by {other:?}: {}", refusal.reason()),
+    }
+}
+
+#[test]
+fn is_in_given_what_is_nested_as_the_value_it_follows_is_refused_by_a_rule_that_says_to_give_a_list()
+ {
+    // Python Polars 2.2.0 warns that the form is ambiguous and deprecated, and asks for the
+    // collection imploded, which gives the same answer.
+    for (name, receiver, other) in [
+        ("whole numbers", "a", "b"),
+        ("text", "s", "t"),
+        ("whole numbers and text", "a", "s"),
+        ("lists", "l", "l"),
+    ] {
+        let given = field_then(receiver, vec![is_in(field(other))]);
+        let (rule, said) = refused_by_a_rule(given.clone());
+        assert_eq!(rule, RULE, "{name}");
+        assert!(
+            said.contains("implode") && said.contains("list"),
+            "{name}: {said}"
+        );
+        let report = Document::read(&selecting(given))
+            .expect("a document")
+            .run_on(&inputs(), &table())
+            .expect("the table has a schema");
+        assert!(
+            !matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+            "{name}: the step is run"
+        );
+    }
+}
+
+#[test]
+fn is_in_given_a_number_typed_in_is_refused_by_the_same_rule() {
+    // A number typed in is a scalar of the dtype it adapts to, which is nested as a column that is
+    // no list is, whatever the dtype is.
+    let given = field_then("a", vec![is_in(whole(2))]);
+    let (rule, said) = refused_by_a_rule(given);
+    assert_eq!(rule, RULE);
+    assert!(said.contains("implode") && said.contains("list"), "{said}");
+}
+
+#[test]
+fn a_value_typed_in_looked_up_in_a_value_typed_in_is_refused_and_not_run_into_a_panic() {
+    // Python Polars 2.2.0 panics on `pl.lit(5).is_in(pl.lit(1))`. A number typed in without a
+    // dtype adapts to what it meets, so the walk cannot tell its dtype, and the step is refused as
+    // it is built, by the same rule, before Polars is asked of the call.
+    let given = chain(
+        call("polars.lit", json!({ "value": { "integer": 5 } })),
+        vec![is_in(whole(1))],
+    );
+    let report = Document::read(&selecting(given))
+        .expect("a document")
+        .run_on(&inputs(), &table())
+        .expect("the table has a schema");
+    let Outcome::Refused(refusal) = report.steps()[0].outcome() else {
+        panic!("the step is not refused: {:?}", report.steps()[0].outcome());
+    };
+    match refusal.cause() {
+        RunCause::NotAllowed(refusal) => match refusal.source() {
+            RefusalSource::Rule(rule) => assert_eq!(rule.name(), RULE),
+            other => panic!("refused by {other:?}: {}", refusal.reason()),
+        },
+        other => panic!("refused for another cause: {other}"),
+    }
+}
+
+#[test]
+fn a_connected_list_given_to_is_in_is_its_values_looked_up_and_is_allowed() {
+    let among = field_then("a", vec![is_in(from_input("wanted", vec![]))]);
+    assert_eq!(walk_of(among.clone()).refusal(), None);
+    assert_eq!(dtype_of(among.clone()), DataType::Boolean);
+    assert_eq!(cells(among), cell_texts(&["false", "true", "true"]));
+}
+
+#[test]
+fn a_chain_of_a_connected_list_given_to_is_in_is_refused_until_it_is_imploded() {
+    let chained = |links: Vec<Value>| field_then("a", vec![is_in(from_input("wanted", links))]);
+    let unique = || call("Expr.unique", json!({}));
+    assert_eq!(refused_by_a_rule(chained(vec![unique()])).0, RULE);
+    let imploded = chained(vec![unique(), implode()]);
+    assert_eq!(walk_of(imploded.clone()).refusal(), None);
+    assert_eq!(cells(imploded), cell_texts(&["false", "true", "true"]));
+}
+
+/// The name of the test below that runs in a process of its own.
+const WARNING_TEST: &str = "membership::a_connected_list_given_to_is_in_makes_no_warning_of_polars";
+
+/// Set in the process that the test below starts, to tell it to run the document.
+const CHILD: &str = "DAGEIST_TEST_MEMBERSHIP_CHILD";
+
+#[test]
+fn a_connected_list_given_to_is_in_makes_no_warning_of_polars() {
+    // Polars prints a warning on the standard error stream where `is_in` is given a collection
+    // nested as the value it follows is, which a list of the values' own dtype is, so the list is
+    // built imploded. The document is run in a process of its own to read what it prints.
+    if std::env::var(CHILD).is_ok() {
+        let among = field_then("a", vec![is_in(from_input("wanted", vec![]))]);
+        assert_eq!(cells(among), cell_texts(&["false", "true", "true"]));
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().expect("the test program"))
+        .args([
+            "--exact",
+            WARNING_TEST,
+            "--nocapture",
+            "--test-threads",
+            "1",
+        ])
+        .env(CHILD, "1")
+        .output()
+        .expect("the test program starts again");
+    let printed = format!(
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("running 1 test"),
+        "the process did not run exactly the test\n{printed}"
+    );
+    assert!(
+        output.status.success(),
+        "the document is not run\n{printed}"
+    );
+    assert!(!printed.contains("deprecated"), "Polars warned\n{printed}");
 }
