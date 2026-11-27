@@ -946,7 +946,7 @@ To write the grid of a new rule:
 3. Give `judge` the `Question` the grid asks and a function that builds the `Case` of a point through
    `Case::of_step`, or says why it cannot, which makes the cell unbuildable. Ask only the schema of
    Polars unless the outcome depends on execution, a strict cast of a value, a length, a panic: then
-   ask `Depth::Rows`, or call `needing_rows` on the cases that need them. A cell that the walk
+   ask `Depth::Rows`. A cell that the walk
    refuses on rows is asked them whatever the depth is.
 4. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of
    its axes and a reason written for a reader: the walk refuses only, Polars refuses only, and every

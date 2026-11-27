@@ -28,7 +28,7 @@
 //! in turn, so the grid is judged on every core the host gives it (`DAGEIST_GRID_THREADS` sets
 //! the number). Most refusals happen while Polars works out the dtypes, so a cell is judged from
 //! the schema Polars works out of its query, on the table's schema, with no row read. Only a grid
-//! that asks for [`Depth::Rows`], or a case that says it [`Case::needing_rows`], runs the rows of
+//! that asks for [`Depth::Rows`], runs the rows of
 //! a table of three, which is where a strict cast of a value, a length and a panic of Polars
 //! show. The tally says how many cells each depth decided, and how many cells a second the
 //! grid was judged at. A panic of Polars or of the walk is a cell's outcome, not a crash of the
@@ -49,8 +49,6 @@
 //! The literal kinds and the edge values that rules which read a literal are crossed with are in
 //! [`literals`], and the one-step cases in [`Case`].
 
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::sync::Mutex;
@@ -58,8 +56,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use dageist_engine::allowed::{RefusalSource, Stage};
-use dageist_engine::document::{Document, Inputs, ListOrigin, WalkRefusal};
-use polars::prelude::{DataFrame, IntoLazy, NamedFrom, Scalar, Series};
+use dageist_engine::document::{Document, Inputs, WalkRefusal};
+use polars::prelude::{DataFrame, IntoLazy, NamedFrom, Series};
 use serde_json::Value;
 
 use crate::ask_polars::{self, Connected};
@@ -157,21 +155,6 @@ impl<P: Default + 'static> Grid<P> {
             .collect();
         self.axes.push(Axis { name, choices });
         self
-    }
-
-    /// An axis whose labels are the words the values are shown with.
-    #[must_use]
-    pub fn axis_shown<V: Clone + Send + Sync + std::fmt::Display + 'static>(
-        self,
-        name: &'static str,
-        values: Vec<V>,
-        set: fn(&mut P, &V),
-    ) -> Self {
-        let choices = values
-            .into_iter()
-            .map(|value| (value.to_string(), value))
-            .collect();
-        self.axis(name, choices, set)
     }
 
     /// How many cells the grid has.
@@ -355,12 +338,10 @@ impl Partial {
 // ---------------------------------------------------------------------------
 // The case of a cell
 
-/// What is connected to a step by name: tables, values and lists.
+/// What is connected to a step by name: its tables.
 #[derive(Default, Clone)]
 pub struct Connections {
     tables: Vec<(String, DataFrame)>,
-    values: Vec<(String, Scalar)>,
-    lists: Vec<(String, Series)>,
 }
 
 impl Connections {
@@ -375,34 +356,12 @@ impl Connections {
         self
     }
 
-    #[must_use]
-    pub fn value(mut self, name: &str, value: Scalar) -> Self {
-        self.values.push((name.to_owned(), value));
-        self
-    }
-
-    #[must_use]
-    pub fn list(mut self, name: &str, list: Series) -> Self {
-        self.lists.push((name.to_owned(), list));
-        self
-    }
-
     fn inputs(&self) -> Inputs {
         let mut inputs = Inputs::new();
         for (name, table) in &self.tables {
             inputs
                 .add_table(name, name, table.clone().lazy())
                 .expect("a table that is connected once");
-        }
-        for (name, value) in &self.values {
-            inputs
-                .add_value(name, value.clone())
-                .expect("a value that is connected once");
-        }
-        for (name, list) in &self.lists {
-            inputs
-                .add_list(name, ListOrigin::Parameter, list.clone())
-                .expect("a list that is connected once");
         }
         inputs
     }
@@ -413,9 +372,6 @@ pub struct Case {
     pub document: Document,
     pub working: DataFrame,
     pub connections: Connections,
-    /// Whether what Polars says depends on the rows, so the cell runs them: a strict cast of a
-    /// value, a length, a panic.
-    pub rows: bool,
 }
 
 impl Case {
@@ -436,15 +392,7 @@ impl Case {
             document,
             working,
             connections,
-            rows: false,
         })
-    }
-
-    /// The same case, whose cell runs the rows.
-    #[must_use]
-    pub const fn needing_rows(mut self) -> Self {
-        self.rows = true;
-        self
     }
 }
 
@@ -664,42 +612,38 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
             .find(|(held, _)| held == name)
             .map(|(_, table)| table.clone().lazy())
     };
-    let literals = |name: &str| {
-        case.connections
-            .values
-            .iter()
-            .find(|(held, _)| held == name)
-            .map(|(_, value)| polars::prelude::lit(value.clone()))
-            .or_else(|| {
-                case.connections
-                    .lists
-                    .iter()
-                    .find(|(held, _)| held == name)
-                    .map(|(_, list)| polars::prelude::lit(list.clone()))
-            })
-    };
+    let literals = |_: &str| None;
     let connected = Connected::new(&tables, &literals);
-    let rows = case.rows || question.depth == Depth::Rows || walk_said_rows;
+    let rows = question.depth == Depth::Rows || walk_said_rows;
     let mode = std::cell::Cell::new(Mode::Plan);
     let polars_started = Instant::now();
     // A panic of Polars is its answer, as a refusal is.
     let asked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
         || match ask_polars::schema_of(step, 0, &case.working, connected) {
-            None => (None, false),
-            Some(Err(refused)) => (Some(refused.reason), refused.at_build),
-            Some(Ok(_)) if !rows => (None, false),
+            None => None,
+            Some(Err(refused)) => Some((Some(refused.reason), refused.at_build)),
+            Some(Ok(_)) if !rows => Some((None, false)),
             Some(Ok(_)) => {
                 mode.set(Mode::Rows);
-                (
+                Some((
                     ask_polars::collect(step, 0, &case.working, connected, 100).err(),
                     false,
-                )
+                ))
             }
         },
     ));
     let polars_spent = polars_started.elapsed();
     let (polars, at_build, panicked) = match asked {
-        Ok((polars, at_build)) => (polars, at_build, false),
+        // A step that holds what cannot be asked, a hole, is no cell that Polars judged.
+        Ok(None) => {
+            return Judged::of(
+                Outcome::Unbuildable(
+                    "Polars cannot be asked of the step: it holds a hole".to_owned(),
+                ),
+                Mode::Plan,
+            );
+        }
+        Ok(Some((polars, at_build))) => (polars, at_build, false),
         Err(payload) => (
             Some(format!("Polars panicked: {}", panic_words(&*payload))),
             false,
@@ -925,6 +869,13 @@ impl Known {
         self
     }
 
+    /// How many things the line says of a cell: the parts of its pattern, and the words. Where a
+    /// cell is named by more than one line, the most specific one counts it, so that a wide line
+    /// cannot starve a narrow one.
+    fn specificity(&self) -> usize {
+        self.pattern.parts.len() + usize::from(self.saying.is_some())
+    }
+
     fn names(&self, cell: &Cell) -> bool {
         self.kind == cell.outcome.kind()
             && self.pattern.matches(cell)
@@ -970,12 +921,6 @@ impl Verdicts {
         self.listed
             .iter()
             .map(|(index, outcome)| self.cell(*index, outcome))
-    }
-
-    /// How many cells ended each way.
-    #[must_use]
-    pub fn tally(&self) -> &BTreeMap<Kind, usize> {
-        &self.counts
     }
 
     /// How many cells Polars and the walk both said something of.
@@ -1036,7 +981,13 @@ impl Verdicts {
         let mut unnamed: Vec<Cell> = Vec::new();
         let mut used = vec![0_usize; known.len()];
         for cell in self.listed() {
-            match known.iter().position(|line| line.names(&cell)) {
+            let naming = known
+                .iter()
+                .enumerate()
+                .filter(|(_, line)| line.names(&cell))
+                .max_by_key(|(at, line)| (line.specificity(), std::cmp::Reverse(*at)))
+                .map(|(at, _)| at);
+            match naming {
                 Some(at) => used[at] += 1,
                 None => unnamed.push(cell),
             }
