@@ -1,4 +1,4 @@
-//! What the engine says of every entry at every place: the offers of all 30 contexts, each at
+//! What the engine says of every entry at every place: the offers of all 45 contexts, each at
 //! nothing, at every class of dtype in each shape, and at each state of a condition.
 //!
 //! The corpus plans from it, which is the engine's own answer, and its tests hold the corpus

@@ -1709,7 +1709,7 @@ entry.
 Four view tests hold the editor against what the engine and the host allow, and three of them hold the list of
 gaps. The
 host writes the grid of every call the engine allows at every place of every kind,
-`ui/packages/host/fixtures/offers-grid.json`: 30 contexts, each with nothing, 67
+`ui/packages/host/fixtures/offers-grid.json`: 45 contexts, each with nothing, 67
 classes of dtype in 3 shapes and 4 states of a condition. The grid test,
 `model/grid.test.ts`, runs the functions above over every cell of it and checks
 three things. For each cell, that each start that leads to it can have a method
@@ -1797,6 +1797,10 @@ Today the declared gaps are these:
 
 - A further case of a condition, which the editor draws as a `when` after
   `otherwise`, in the 24 contexts where the engine allows one.
+- A step that groups: the step, and the fifteen places of its keys, its aggregates and its `having`,
+  each alone and inside each of the four positions inside an expression. A place no word draws is one gap
+  that covers every entry the engine allows there, so the entries are not declared one by one. The
+  editor draws the step in a later change on [#114](https://github.com/bj-data-eng/dageist/issues/114).
 - The functions the editor does not start a chain from: `date`, `date_range`,
   `datetime`, `datetime_range`, `duration`, `from_epoch`, `int_range`,
   `linear_space`, `repeat`, `struct`, `time` and `time_range`. It starts a chain from a
@@ -1864,12 +1868,13 @@ brings in, while a document runs on the columns it reads.
   a connected value, a connected list, a number, text and a flag typed in, and nothing
   picked yet, each alone and where the engine allows one with a method after it; a
   condition with every link of one and one that is followed by a method; and a chain in
-  each of the 30 contexts, which are the six positions of a step alone and with each of
+  each of the 45 contexts, which are the nine positions of a step alone and with each of
   the four positions inside an expression.
 - *Parameters.* Each method, function and link of a condition given every parameter the
   engine offers, where a chain did not.
-- *Steps.* Each of the 20 steps of the catalogue as the editor adds it, with what it
-  must be given, and with each parameter the engine offers given in turn.
+- *Steps.* Each of the 21 steps of the catalogue as the editor adds it, with what it
+  must be given, and with each parameter the engine offers given in turn; and each call of a
+  group by, in the step that groups, with what it must be given and with each parameter given.
 - *Refusals.* Each cause the engine gives for a step: a table that is not connected, an
   input that is a table, a step with something still to be picked, one that Polars
   accepts and cannot run on the rows, the step after one that was refused and after one
@@ -1972,7 +1977,7 @@ draw and a step that says nothing fail with the piece named; and a gap declared 
 editor adds is stale.
 
 **How the three tests fit.** The grid test is the breadth of places: every entry at every one
-of 30 contexts and 206 kinds of what comes before, and every start that leads there, with no
+of 45 contexts and 206 kinds of what comes before, and every start that leads there, with no
 document. The census is the breadth of kinds: every variant of a type the host or the engine
 has, with the words each is shown with. The corpus is the depth: the pieces together, in
 documents the engine made and reports it gave, so that a piece the grid and the census cannot
@@ -1992,7 +1997,9 @@ parameter left out takes its default. An expression is a start, a function
 such as `polars.col` or `polars.lit`, `polars.when`, a connected input, or a hole,
 `{ "hole": null }`, where nothing is picked yet,
 followed by a list of calls, one for each method or link of a condition, so
-columns, literals and conditions are written the same way. Dtypes are written
+columns, literals and conditions are written the same way. A step that groups
+holds the calls after `group_by` in the same way, as `then`: see
+[the step that groups](#the-step-that-groups). Dtypes are written
 as Python prints them, such as `Datetime(time_unit='us', time_zone=None)`.
 
 Reading is strict. A field, entry or argument the catalogue does not know,
@@ -2219,6 +2226,72 @@ name cannot be written bare, and writing a document that holds one is refused wi
 its place. The graph's input names are Python names already, but it does not yet
 refuse `lf`, `pl`, `dg` or Python's own words as one.
 
+### The Step That Groups
+
+`LazyFrame.group_by` gives a `LazyGroupBy`, not a table, so a step that groups is a chain of
+calls, as Python Polars writes it: `group_by(*by, maintain_order=False, **named_by)`, then
+optionally `having(*predicates)`, then exactly one call that finishes the grouping and gives
+the table: `agg(*aggs, **named_aggs)`, one of the shortcuts (`len(name)`, `sum`, `mean`, `median`,
+`min`, `max`, `n_unique`, `first(ignore_nulls)`, `last(ignore_nulls)`, `quantile(quantile,
+interpolation)` and `all`), or `head(n)` and `tail(n)`, which give rows of each group and not one
+value. `map_groups` stays left out, as the catalogue says: it takes a Python function. The calls
+keep Polars' names and parameters, and `maintain_order` keeps Polars' default of false, so the
+order of the groups is Polars' to choose until the flag is set.
+
+The step document holds the calls in order, as an expression holds its start and its links: the step's
+`call` is `group_by`, and its `then` is the calls after it, written as the links of an expression
+are. A step that does not group has no `then`, and the writer leaves it out. The model, `Step`, is
+the call that starts the step and its links, and `Step::chain` makes one, as `Expression::new` makes
+an expression, so that a chain that is not as Python writes it cannot be held: a call that is
+not a method of a group by, any call after a step that does not group, a second `having`, a call
+after the one that finishes the grouping, and a grouping that stops before one finishes it are each
+refused with the reason, at the link, before Polars is asked. A place in a step that groups is a
+step, then a `Link` segment for the call, then the way into its arguments, as a place in an
+expression is. Its edits are the ones of any call's arguments, at the place of the call, and three of
+its own: `insert_group_call` puts a `having` in before the call that finishes the grouping,
+`swap_group_call` changes the call that finishes it for another and keeps what the new call has of
+the same name, kind and shape, and `remove_group_call` takes a call out. A new step that groups
+starts with a key still to be picked and an `agg` of one new column still to be picked.
+
+The keys are drawn as the keys of a sort are, a list of columns or expressions, and a named key as the
+columns a step adds are: a name and a chain. The aggregates of `agg` are named chains drawn the same way.
+Each stands in a context of the tables of allowed combinations: `group_key`, `aggregate` and `having`.
+
+#### The Aggregation Context
+
+An aggregate and a predicate of a `having` are evaluated on the rows of each group, so an
+expression stands there as Polars evaluates it in a group by, and not as it does in a select. An
+expression that aggregates, such as `col("a").sum()` or `len()`, gives one value for each group. One that
+does not, such as `col("a")` or `col("a") + 1`, gives the values of the group, a list for each group,
+as Polars does: the step's report gives its dtype as a `List` of what it gives in a select, and the
+hint of `agg` says that a chain that does not aggregate gives a list for each group. The shape the walk follows through the chain
+is the one it follows in a select, one value or as many as the rows, so the tables' lines for the
+contexts say what Polars accepts there and what each method gives for one value or for many, and
+a chain that ends in many values ends as a list. The report of an expression in these contexts is
+worked out by Polars in a group by of the step's own keys, so what it says of every link is what the
+group gives.
+
+A predicate of a `having` needs one value for each group, which Polars casts to a `Boolean` to keep
+the group or not: the rule `having-gives-one-value` refuses the values of the group, which it cannot cast
+when the rows run, and `having-casts-to-boolean` refuses a dtype that it cannot cast, such as text, a date,
+a list or a struct. A number or null is cast where the predicate stands alone, as Polars does, and beside
+another predicate it must be a `Boolean`, for Polars combines the predicates as a filter's are. Whether
+a predicate may end is what the rules say and not what the table recorded for a column, which gives the
+values of a group. The columns a group by gives, its keys
+and its aggregates, are named differently, whether by the name a pair gives them or by the column the
+chain reads, and `grouped-names-are-distinct` refuses two of one name, as Polars does when it works out
+the schema.
+
+A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
+the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the
+aggregation context for each such column, with the options the shortcut was given, and refuses the shortcut with the
+method's words where Polars refuses the method for one of them, as it refuses the sum of text. Where it cannot
+tell which columns are aggregated, because a key's name is not known, it says it cannot tell.
+
+A grouping over keys that do not include a working window's key is not exact on a window; the step
+says nothing about windows until they exist, which [#118](https://github.com/bj-data-eng/dageist/issues/118) records. The time-based groupings, `group_by_dynamic` and `rolling`, are
+their own steps and start the same chain.
+
 ## Which Combinations Polars Allows
 
 Polars' schema resolution does not refuse every invalid combination. The
@@ -2269,7 +2342,8 @@ unit and the zone of a moment. [Lists and arrays](#lists-and-arrays) says which 
 classes each method is measured on.
 
 The contexts are a `select` item, a filter's predicate, a sort key, a join key
-on each side, and a pivot's aggregate, each also with, inside the expression
+on each side, a pivot's aggregate, a key of `group_by`, an aggregate of `agg`
+and a predicate of `having`, each also with, inside the expression
 that stands there, `over`'s `partition_by` or `order_by` or a condition's
 predicate or value. That is two levels deep, and a place deeper than that is
 judged by its outer position and the innermost nested one: an `over` key inside
@@ -2278,7 +2352,9 @@ A join's `right_on` is evaluated against the other table, whose columns are
 named differently from the left table's, so a column of the wrong table is
 found missing. A join's `on` is the keys of both tables, so Polars evaluates it
 against each, and the walk judges it in both contexts. A pivot's aggregate starts
-from `element()`.
+from `element()`. An aggregate of `agg` and a predicate of `having` are evaluated on
+the rows of each group: [the aggregation context](#the-aggregation-context) says what
+that makes of an expression.
 
 Whether an entry may stand at a place is not whether it may end an expression
 there, so the context table measures each entry in each context twice. On the
@@ -2287,7 +2363,8 @@ continuation that the context needs, and the line says whether the entry may
 stand there at all: `.is_not_null()` where a `Boolean` is required (a filter's
 predicate, what a condition gives in a filter, a condition's predicate), a cast
 to the dtype of the other table's key for the whole expression in a join key,
-and `.first()` for the whole expression in a pivot's aggregate; nothing where
+`.first()` for the whole expression in a pivot's aggregate, and
+`.is_not_null().all()` for the whole expression in a `having`; nothing where
 the context needs nothing. A window in a join key, or in a pivot's aggregate,
 is refused however it goes on. On the line of `ends`, the chain ends at the
 entry as it is, and the line says whether the entry may end an expression
@@ -3083,6 +3160,18 @@ casting the value as the catalogue does, and what Polars panics on in a debug bu
 (a text padded to a length no memory holds). The grid of `is_in` is in `membership_grid.rs`, on the same
 helper: a receiver of every dtype crossed with every form of what it looks up in, in a `select` and as a join's
 key.
+
+`tests/document/group_grid.rs` holds the grids of [a step that groups](#the-step-that-groups), on the same
+helper, over a table with a column of every class and two to group by: a key of every class in twelve
+forms (a column, a named key, an expression, an aggregate, a literal, a window, two of one name) with
+`maintain_order` unset, true and false; every method of the family of aggregates, and the first, the last
+and the gathering of the values, in `agg`, over every class, by position and by name; what does not aggregate
+in `agg`, over every class; every shortcut with each of its options over every class, grouped by another
+column and by the one it aggregates; a `having` predicate of every class, one or two of them; and the chains
+that do not end in one finishing call, which the document refuses before Polars is asked. What the grids
+leave is named in the test with its reason: the reverse of an array whose element Polars panics on, on a
+thread of its own that no test can catch, the element dtypes the tables do not measure, what a select refuses
+that a group by gives, and the range of a quantile's share, which Polars reads as it builds the step.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a

@@ -356,7 +356,7 @@ step documents the engine made by its own edits and the report the host gives of
 `crates/dageist-tauri/src/corpus/`: a chain of methods that stands after each shape of value the
 engine allows each method after, each function that starts a chain, each kind of start, each step
 of the catalogue with each parameter it has, a refusal for each cause and for each rule and stage the
-tables give a call, and a chain in each of the 30 contexts. The other tests of the module hold what
+tables give a call, and a chain in each of the 45 contexts. The other tests of the module hold what
 it holds against the engine's own tables, so a catalogue entry, a step, a parameter, a context or a
 kind of start that no document holds fails there, naming it. Write the files, then run the view's
 tests, which rebuild every document:
@@ -585,6 +585,12 @@ A new step of a table also needs what a new step starts with, in `start_step` in
 of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.
 A step that holds no expression is drawn for itself by the fuzz target, where it is listed among the
 `Plain` steps of `allowed_fuzz/generate.rs` with the arguments Polars takes of it.
+A call of a group by, which follows `group_by` in [a step that groups](explanation.md#the-step-that-groups),
+is built by `Build::GroupedStep`, which continues the group by, or `Build::GroupedEnd`, which finishes it in a
+table, and is in the family `Grouped`. What it starts with when the editor adds it is `start_link` in
+`crates/dageist-engine/src/catalog/starting.rs`. A shortcut that aggregates every column that is not a key is
+asked of the tables for the method it stands for in `shortcut_columns` of
+`crates/dageist-engine/src/document/walk.rs`, and `tests/document/group_grid.rs` holds it to Polars.
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 

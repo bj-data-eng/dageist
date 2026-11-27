@@ -5,7 +5,10 @@
 //! frame, such as `LazyFrame.with_columns`, with arguments for its parameters,
 //! and builds on the table the step before it gives. An argument that is an
 //! expression holds a chain: where it starts, then the methods and the links
-//! of a condition that follow.
+//! of a condition that follow. A step that groups, a call of `group_by`, holds
+//! the calls on the group by that follow it the same way: at most one `having`,
+//! then exactly one call that finishes the grouping, which [`Step::chain`]
+//! checks and refuses with the reason where it is not so.
 //!
 //! [`Document::read`] is strict and names the place of every refusal, down to
 //! the link of an expression; [`Document::write`] gives text that reads back as
@@ -48,7 +51,9 @@
 //! - [`Segment::Key`] and [`Segment::Value`]: the key or the value of an entry
 //!   of pairs;
 //! - [`Segment::Start`] and [`Segment::Link`]: the call an expression starts
-//!   with, and one of the links after it.
+//!   with, and one of the links after it; and, first in the way into a step that
+//!   groups, [`Segment::Link`] is one of the calls after `group_by`, counted from
+//!   the first, and the way after it goes into that call's arguments.
 //!
 //! ## What a place does not guard against
 //!
@@ -94,6 +99,7 @@
 //! | An argument | [`set_argument`](Document::set_argument), [`clear_argument`](Document::clear_argument), [`add_option`](Document::add_option), [`set_for_item`](Document::set_for_item) |
 //! | Lists and pairs | [`insert_item`](Document::insert_item), [`remove_item`](Document::remove_item), [`insert_test`](Document::insert_test), [`insert_entry`](Document::insert_entry), [`remove_entry`](Document::remove_entry) |
 //! | An expression | [`set_start`](Document::set_start), [`start_with`](Document::start_with), [`insert_link`](Document::insert_link), [`swap_link`](Document::swap_link), [`remove_link`](Document::remove_link), [`move_link`](Document::move_link) |
+//! | A step that groups | [`insert_group_call`](Document::insert_group_call), [`swap_group_call`](Document::swap_group_call), [`remove_group_call`](Document::remove_group_call) |
 //!
 //! What the engine decides a new part starts with, a step, a link, an option
 //! or a test, comes from the catalogue's starts and the tables of allowed

@@ -18,7 +18,9 @@ impl Document {
     /// Reads a document from JSON text.
     ///
     /// The text is an object of the fields `version`, which is 1, and `steps`.
-    /// A step is `{ "id": …, "call": … }` and a call is
+    /// A step is `{ "id": …, "call": … }`, and, for a step that groups, whose call is
+    /// `group_by`, `{ "id": …, "call": …, "then": [<call>, …] }` with the calls on the group by that
+    /// follow it, the last of which finishes the grouping. A call is
     /// `{ "entry": "<catalogue identifier>", "arguments": { "<parameter>": <argument> } }`.
     /// An argument is an object of one key, which says what it is: `expression`,
     /// `columns`, `integer`, `float`, `string`, `flag`, `choice`, `dtype`,
