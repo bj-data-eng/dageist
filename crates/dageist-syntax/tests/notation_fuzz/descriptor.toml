@@ -1,0 +1,23 @@
+schema = 1
+fixtures = []
+
+[[targets]]
+id = "dageist-syntax::notation"
+owner = "dageist-syntax"
+binary = "notation-fuzz"
+properties = [
+    "dageist-syntax::refusals-lie-within-the-text",
+    "dageist-syntax::printing-is-a-fixed-point",
+]
+source_references = [
+    "crates/dageist-syntax/src/lex.rs",
+    "crates/dageist-syntax/src/parse.rs",
+    "crates/dageist-syntax/src/print.rs",
+]
+format = { identity = "dageist-syntax::notation-text", revision = 1 }
+generator_identity = { identity = "dageist-syntax::token-run", revision = 1 }
+encoding = "structured"
+limits = { bytes = 16384, nodes = 0, depth = 0, text_units = 0, operations = 0 }
+requirements = { features = [], capabilities = ["property"] }
+min_evaluated = 1
+max_generation_rejections = 0
