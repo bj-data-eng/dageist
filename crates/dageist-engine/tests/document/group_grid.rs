@@ -367,7 +367,7 @@ struct Listed {
     links: &'static str,
 }
 
-const NOT_AGGREGATING: [&str; 12] = [
+const NOT_AGGREGATING: [&str; 16] = [
     "the column",
     "sort",
     "reverse",
@@ -380,6 +380,10 @@ const NOT_AGGREGATING: [&str; 12] = [
     "implode",
     "sort then head 1 then first",
     "is_null then not then sum",
+    "first then drop_nulls",
+    "first then head 1",
+    "first then sort",
+    "first then unique",
 ];
 
 fn links_of(words: &str) -> Vec<Value> {
@@ -401,6 +405,13 @@ fn links_of(words: &str) -> Vec<Value> {
             one("Expr.first"),
         ],
         "is_null then not then sum" => vec![one("Expr.is_null"), one("Expr.not_"), one("Expr.sum")],
+        "first then drop_nulls" => vec![one("Expr.first"), one("Expr.drop_nulls")],
+        "first then head 1" => vec![
+            one("Expr.first"),
+            call("Expr.head", json!({ "n": whole(1) })),
+        ],
+        "first then sort" => vec![one("Expr.first"), one("Expr.sort")],
+        "first then unique" => vec![one("Expr.first"), one("Expr.unique")],
         other => panic!("no links {other}"),
     }
 }
@@ -590,7 +601,7 @@ struct Predicated {
     predicates: usize,
 }
 
-const PREDICATES: [&str; 13] = [
+const PREDICATES: [&str; 17] = [
     "the values",
     "all null",
     "first",
@@ -604,6 +615,10 @@ const PREDICATES: [&str; 13] = [
     "literal 1",
     "literal text",
     "sorted",
+    "first then drop_nulls",
+    "first then head 1",
+    "first then sort",
+    "literal null then drop_nulls",
 ];
 
 fn predicate_of(column: &Col, form: &str) -> Value {
@@ -628,6 +643,21 @@ fn predicate_of(column: &Col, form: &str) -> Value {
         "literal 1" => lit(json!({ "integer": 1 })),
         "literal text" => lit(json!({ "string": "a" })),
         "sorted" => of(column, vec![one("Expr.sort"), one("Expr.is_null")]),
+        // What takes some of the values of one value gives a list for each group, which a having
+        // cannot cast; what keeps the one value whole stays one value.
+        "first then drop_nulls" => of(column, vec![one("Expr.first"), one("Expr.drop_nulls")]),
+        "first then head 1" => of(
+            column,
+            vec![
+                one("Expr.first"),
+                call("Expr.head", json!({ "n": whole(1) })),
+            ],
+        ),
+        "first then sort" => of(column, vec![one("Expr.first"), one("Expr.sort")]),
+        "literal null then drop_nulls" => crate::support::chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            vec![one("Expr.drop_nulls")],
+        ),
         other => panic!("no predicate {other}"),
     }
 }
