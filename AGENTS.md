@@ -286,14 +286,11 @@ cargo test --offline --locked -p dageist-workspace
 cargo clippy --offline --locked -p dageist-workspace --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
-Engine checks from the repository root. The tables are measured, and the
-campaign target's fixed seed and kept cases run, in the profile `measure`,
-which builds Polars as its release does; the debug run is a stricter pass, as
-[the how-to](docs/how-to.md#check-the-tables-against-polars) says:
+Engine checks from the repository root. The tables are measured in the
+profile `measure`, which builds Polars as its release does:
 
 ```sh
 cargo test --offline --locked -p dageist-engine
-cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz
 cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
@@ -305,10 +302,13 @@ the grids (`grids`, which run every choice of every axis and take the longest;
 and the campaign target's fixed seed and kept cases (`allowed_fuzz`); the
 grids that ask the rows of every cell and the campaigns are ignored and run on
 request, as [the how-to](docs/how-to.md#hold-a-rule-to-polars-with-a-grid)
-says:
+says. The campaign target's fixed seed and kept cases run in the profile
+`measure` too, and the debug run is a stricter pass, as
+[the how-to](docs/how-to.md#check-the-tables-against-polars) says:
 
 ```sh
 cargo test --offline --locked -p dageist-engine-fuzz
+cargo test --offline --locked --profile measure -p dageist-engine-fuzz --test allowed_fuzz
 cargo clippy --offline --locked -p dageist-engine-fuzz --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
