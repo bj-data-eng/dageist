@@ -558,7 +558,11 @@
     },
     {
       "name": "key-is-elementwise",
-      "statement": "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+      "statement": "a join's key, and the key of a window in what a group by evaluates in `agg` or `having`, must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+    },
+    {
+      "name": "literal-beside-values-in-a-group",
+      "statement": "in `agg` and `having`, a literal that dt.replace, str.splitn or str.split_exact maps may not be given the values of the group beside it (in a `having` only where it stands beside another value), nor one value that an aggregate gave in a `having`, a literal that sort_by sorts by them may not stand alone, and a literal that replace, replace_strict, str.replace or str.replace_all replaces may not be given either: Polars cannot replace a literal by values for each row, and refuses the map of one value beside many as of another length"
     },
     {
       "name": "moments-share-a-zone",

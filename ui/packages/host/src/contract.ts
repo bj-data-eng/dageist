@@ -639,6 +639,7 @@ export const RULE_NAMES = [
   'folded-function-is-no-join-key',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'literal-beside-values-in-a-group',
   'moments-share-a-zone',
   'parameter-takes-one-value',
   'pattern-is-valid',

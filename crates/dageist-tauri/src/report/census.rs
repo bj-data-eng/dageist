@@ -853,7 +853,10 @@ pub(crate) fn census() -> Value {
         "causes": words(&causes(), "kind"),
         "refusalSources": words(&sources(), "by"),
         "stages": plains(&Stage::ALL.map(stage_view)),
-        "rules": Rule::ALL.map(|rule| json!({ "name": rule.name(), "statement": rule.statement() })),
+        "rules": Rule::ALL
+            .iter()
+            .map(|rule| json!({ "name": rule.name(), "statement": rule.statement() }))
+            .collect::<Vec<_>>(),
         "notKnown": Unknown::ALL.map(|unknown| json!({ "name": unknown.name(), "because": unknown.to_string() })),
         "outcomes": words(&outcomes(), "status"),
         "rowsStates": words(&counts(), "kind"),

@@ -25,7 +25,7 @@ pub(crate) fn vocabulary() -> serde_json::Value {
     serde_json::json!({
         "outer": Outer::ALL.map(Outer::name),
         "nested": Nested::ALL.map(Nested::name),
-        "rules": Rule::ALL.map(Rule::name),
+        "rules": Rule::ALL.iter().map(|rule| rule.name()).collect::<Vec<_>>(),
         "stages": words(&Stage::ALL.map(stage_view)),
         "conditionStates": words(&ConditionState::ALL.map(condition_state_view)),
         "valueShapes": words(&Shape::ALL.map(shape_view)),

@@ -216,9 +216,9 @@ describe('the grid, run through the functions the components call', () => {
     );
   });
 
-  it('finds a further case of a condition in the 38 contexts where the engine allows one', () => {
+  it('finds a further case of a condition in the 39 contexts where the engine allows one', () => {
     // The engine allows the links of a further case in every context but the keys of a window in a
-    // join key or a pivot's aggregate, 38 of the 45 that the editor draws, which include the 15 of
+    // join key or a pivot's aggregate, 39 of the 45 that the editor draws, which include the 15 of
     // a step that groups; each shows in one place of each.
     for (const id of [
       'ChainedThen.otherwise',
@@ -226,7 +226,7 @@ describe('the grid, run through the functions the components call', () => {
       'ChainedWhen.then',
       'Then.when',
     ]) {
-      expect(found.gaps.get(`entry ${id}`)?.places, id).toBe(38);
+      expect(found.gaps.get(`entry ${id}`)?.places, id).toBe(39);
     }
   });
 

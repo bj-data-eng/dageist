@@ -29,6 +29,7 @@
     "join-key-names-are-not-repeated",
     "kept-order-needs-keys-of-the-rows",
     "key-is-elementwise",
+    "literal-beside-values-in-a-group",
     "moments-share-a-zone",
     "one-column-is-needed",
     "parameter-takes-one-value",

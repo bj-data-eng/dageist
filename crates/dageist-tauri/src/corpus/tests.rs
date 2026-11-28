@@ -382,6 +382,10 @@ fn the_corpus_holds_each_outcome_of_a_step_each_state_of_its_rows_and_each_cause
 /// allowed. These are the rest.
 const NOT_HELD: &[(&str, &str)] = &[
     (
+        "literal-beside-values-in-a-group",
+        "no document the corpus plans gives a method that maps a literal, or replaces the values of one, the values of a group or one value of an aggregate beside it; the grid of the kernels of a group holds each cell of it to Polars",
+    ),
+    (
         "one-column-is-needed",
         "no document the corpus plans unnests a struct of several fields where a filter needs one column; one was not tried, and may be built",
     ),
