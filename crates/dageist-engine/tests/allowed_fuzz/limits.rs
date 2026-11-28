@@ -50,7 +50,8 @@ use super::literal::{
     placed_operands, starts_from_a_literal,
 };
 use super::observe::{
-    Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_checked, observe_probe,
+    Observed, Refusal, SCHEMA_SAYS, Stage, Tables, is_the_targets_own, observe, observe_checked,
+    observe_probe,
 };
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
@@ -4469,27 +4470,20 @@ fn applies(
                     || refusal.reason.contains("expected scalar for expr"));
             pivot && (of_nothing || a_text_share)
                 || grouped
-                    && (of_nothing || (by_the_kernels && refused_by_the_group_alone(case, refusal)))
+                    && ((of_nothing || by_the_kernels) && refused_by_the_group_alone(case, refusal))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, &case.structs, None);
-            // The kernels that take the values of a group accept what the ones of
-            // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
-            // struct, or a window over a group.
-            let in_the_group =
-                pivot || (grouped && is_in_a_call_after_the_group_by(&refused.place));
-            // Polars reads the cumulative sum of a literal as a literal where it orders a window,
-            // which the tables measured on a column refuse as not elementwise (the grid of the keys
-            // of a window names it).
-            let a_literal_ordering_a_window = in_the_group
-                && refused
-                    .reason
-                    .contains("window expression with non-elementwise")
-                && locate(case, &refused.place)
-                    .chain
-                    .is_some_and(starts_from_a_literal);
-            a_literal_ordering_a_window
-                || in_the_group
+            // The kernels that take the values of a group accept what the ones of `select` refuse:
+            // the tables refuse in the aggregate of a group, with the measure of `select`, and the
+            // control is Polars refusing the expression for that objection as the item of a
+            // `select` of the same frames, where it does not as the aggregate of a group.
+            let in_a_group = grouped
+                && is_in_a_call_after_the_group_by(&refused.place)
+                && refused_alone_in_a_select(case, refused);
+            // A pivot's aggregate reads no column to stand in a select, so what it is refused for
+            // is the gate of the reasons Polars gives the tables.
+            let in_a_pivot = pivot
                 && [
                     "not supported for dtype",
                     "cannot compare",
@@ -4512,7 +4506,9 @@ fn applies(
                 ]
                 .iter()
                 .any(|words| refused.reason.contains(words))
-                && locate(case, &refused.place).call.is_some()
+                && locate(case, &refused.place).call.is_some();
+            in_a_group
+                || in_a_pivot
                 // A replacement casts the values it lists, which are a pivot's literals, and a
                 // cast converts a literal that it follows, and a text that reads as the number
                 // converts where the sample's text, which the tables measured, does not.
@@ -5365,6 +5361,25 @@ fn aggregates_as_a_select(case: &Case) -> Option<Case> {
     })
 }
 
+/// Whether Polars, asked of the expression that `refused` is at alone as the item of a `select` of
+/// the same frames, refuses it for what the tables say of it, which it allows as the aggregate or
+/// the predicate of a group: the tables are right of what a select does, and the group is why the
+/// refusal does not stand. Where the tables say the plan gives one dtype and the rows another,
+/// that is the target's own comparison, which a select shows as it does a refusal of Polars's.
+fn refused_alone_in_a_select(case: &Case, refused: &Refused) -> bool {
+    as_a_select(case, Some(&refused.place)).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|alone| {
+                if is_the_targets_own(&refused.reason) {
+                    alone.reason == refused.reason
+                } else {
+                    same_reason(&Source::Polars, &refused.reason, &alone.reason)
+                }
+            })
+        })
+    })
+}
+
 /// Whether Polars refuses a step that groups for `refusal`, where it does not refuse its
 /// aggregates and predicates for that objection as the items of a `select` of the same frames: the
 /// kernels that take the values of each group are then the cause.
@@ -5748,8 +5763,6 @@ mod tests {
             "uncovered-a-group-aggregate--is_close-of-a-column-of-nulls.case",
             "uncovered-a-group-aggregate--the-schema-says-null-of-a-null-literal.case",
             "uncovered-a-group-aggregate--degrees-in-the-order-of-a-window.case",
-            "uncovered-a-group-aggregate--a-comparison-of-a-literal.case",
-            "uncovered-a-group-aggregate--an-ordinal-day-in-a-having.case",
             "uncovered-a-group-aggregate--a-literal-of-text-in-a-bitwise-call.case",
             "uncovered-a-group-aggregate--a-replacement-value-of-the-length-of-a-group.case",
         ] {
@@ -5801,6 +5814,29 @@ mod tests {
             ),
             vec![]
         );
+    }
+
+    #[test]
+    fn what_the_tables_refuse_in_a_group_is_excused_for_the_group_only_where_a_select_refuses_it() {
+        // A null literal that the tables measured as a column, and a part that Polars does not
+        // evaluate, are excused by the limit for a literal and by a probe, not by the kernels of a
+        // group: a select of the same expression does not refuse them for what the tables say.
+        for name in [
+            "uncovered-a-literal--null-literals-replaced-in-a-group.case",
+            "uncovered-a-literal--a-null-literal-compared-in-a-group.case",
+            "uncovered-a-literal--a-null-literal-compared-in-a-having.case",
+        ] {
+            assert_eq!(excused_by_kept(name), vec![Limit::ALiteral], "{name}");
+        }
+        for name in [
+            "stricter-a-sort-key-of-text-multiplied-in-a-group.case",
+            "stricter-a-condition-of-one-expression-in-a-group.case",
+        ] {
+            assert!(
+                !excused_by_kept(name).contains(&Limit::AGroupAggregate),
+                "{name}"
+            );
+        }
     }
 
     #[test]
