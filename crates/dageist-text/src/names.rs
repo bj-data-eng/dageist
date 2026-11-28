@@ -6,6 +6,8 @@
 //! functions are named as a Polars plugin names its own: `dageist.<name>` is written
 //! `dg.<name>(...)`, and a method in their namespace, `Expr.dg.<name>`, `.dg.<name>(...)`.
 
+use std::collections::{HashMap, HashSet};
+
 use dageist_engine::catalog::{self, Entry, LeftOut};
 use dageist_syntax::KEYWORDS;
 
@@ -124,11 +126,15 @@ pub(crate) fn stem(entry: &Entry) -> &'static str {
 /// of a step added at the end: the stem, then the stem with `_2`, `_3` and on, the first that no
 /// step has. A name the text gives is taken before any is made.
 pub(crate) fn default_names(stems: &[&str], given: &[Option<&str>]) -> Vec<String> {
-    let mut taken: Vec<String> = given
+    let mut taken: HashSet<String> = given
         .iter()
         .flatten()
         .map(|name| (*name).to_owned())
         .collect();
+    // Where each stem's numbering has come to. A name before it was taken when it was passed, and
+    // a taken name stays taken, so the search for a stem's next name goes on from there rather
+    // than from the stem, which keeps naming many steps of one entry linear.
+    let mut next: HashMap<&str, u64> = HashMap::new();
     stems
         .iter()
         .zip(given)
@@ -136,12 +142,18 @@ pub(crate) fn default_names(stems: &[&str], given: &[Option<&str>]) -> Vec<Strin
             if let Some(name) = given {
                 return (*name).to_owned();
             }
-            let name = std::iter::once((*stem).to_owned())
-                .chain((2_u64..).map(|number| format!("{stem}_{number}")))
-                .find(|name| !taken.contains(name))
-                .unwrap_or_else(|| (*stem).to_owned());
-            taken.push(name.clone());
-            name
+            let number = next.entry(stem).or_insert(1);
+            loop {
+                let name = if *number == 1 {
+                    (*stem).to_owned()
+                } else {
+                    format!("{stem}_{number}")
+                };
+                *number += 1;
+                if taken.insert(name.clone()) {
+                    return name;
+                }
+            }
         })
         .collect()
 }
@@ -158,4 +170,55 @@ pub(crate) fn is_bare_step_name(name: &str) -> bool {
         && name
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || "_-.".contains(character))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::default_names as named;
+
+    #[test]
+    fn steps_are_named_as_the_editor_names_steps_added_at_the_end() {
+        assert_eq!(
+            named(&["sort", "head", "sort", "sort", "head"], &[None; 5]),
+            ["sort", "head", "sort_2", "sort_3", "head_2"]
+        );
+    }
+
+    #[test]
+    fn a_name_the_text_gives_is_taken_before_any_is_made() {
+        assert_eq!(
+            named(&["sort", "sort", "sort"], &[Some("sort_2"), None, None]),
+            ["sort_2", "sort", "sort_3"]
+        );
+        assert_eq!(
+            named(&["sort", "sort", "sort"], &[None, None, Some("sort")]),
+            ["sort_2", "sort_3", "sort"]
+        );
+        assert_eq!(
+            named(&["sort", "sort", "head"], &[None, None, Some("sort_3")]),
+            ["sort", "sort_2", "sort_3"]
+        );
+    }
+
+    #[test]
+    fn a_stem_that_is_another_steps_made_name_shares_the_names_taken() {
+        assert_eq!(
+            named(&["sort", "sort_2", "sort", "sort_by"], &[None; 4]),
+            ["sort", "sort_2", "sort_3", "sort_by"]
+        );
+        assert_eq!(
+            named(&["sort_2", "sort", "sort"], &[None, None, Some("sort_2")]),
+            ["sort_2_2", "sort", "sort_2"]
+        );
+    }
+
+    #[test]
+    fn many_steps_of_one_entry_are_each_named_once() {
+        let stems = vec!["with_columns"; 20_000];
+        let names = named(&stems, &vec![None; stems.len()]);
+        assert_eq!(names[0], "with_columns");
+        assert_eq!(names[19_999], "with_columns_20000");
+        let distinct: std::collections::HashSet<&String> = names.iter().collect();
+        assert_eq!(distinct.len(), names.len());
+    }
 }
