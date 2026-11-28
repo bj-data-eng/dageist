@@ -140,11 +140,10 @@ feature. Follow the [view structure](docs/explanation.md#how-the-view-is-divided
 Decoders in `ui/packages/host` read what the host sends and refuse a value of
 the wrong shape instead of trusting a type assertion.
 
-Tauri is the interim host. [Surgeist](https://github.com/bj-data-eng/surgeist)
-is the intended eventual host, so keep host-specific code inside the host
-adapter where a later Surgeist adapter can replace it without core changes.
-A capability the view needs that Surgeist lacks is Surgeist's work; report it
-to that repository rather than implementing it here.
+Tauri is the host. Design for the best application on Tauri, not for how a
+choice would move to another host. The core still never depends on the host,
+because Rust owns the application's behavior, not because a host change is
+planned.
 
 Dageist is developed and tested on macOS. Code that touches files, locks, paths,
 processes, dialogs or window chrome records any assumption that may not hold on
@@ -237,12 +236,15 @@ in every brief, whatever a brief leaves out.
 Product packages share the root lockfile.
 
 Select focused checks through `$pisct:testing`; execute through `$pisct:process`.
-No blanket workspace tests. A Cargo command run on its own uses Cargo's default
-parallelism. When several Cargo commands run at the same time, give each one
-build job with `-j 1`. Monitor `pisct host status` and follow coordination's
-pressure guidance. Use separate targets for concurrent worktrees changing the
-same packages; reuse an existing target when source/context permit. Keep default
-test parallelism unless host status recommends a limit.
+No blanket workspace tests. Cargo commands keep Cargo's default parallelism,
+also when several run at the same time, while only this repository's work is
+using the machine; when other sessions or projects are building too, give each
+concurrent Cargo command one build job with `-j 1`. Monitor `pisct host status`
+and follow coordination's pressure guidance. Check free disk (`df -h /`) before
+a heavy build or campaign, and start none while less than about 100 GB is free.
+Use separate targets for concurrent worktrees changing the same packages; reuse
+an existing target when source/context permit. Keep default test parallelism
+unless host status recommends a limit.
 
 The root manifest's profiles: a debug build is optimised lightly, with debug
 assertions and overflow checks on, and runs the tests about as fast as a
