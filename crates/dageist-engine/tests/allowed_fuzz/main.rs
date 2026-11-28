@@ -84,14 +84,27 @@ fn regressions() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/allowed_fuzz/regressions")
 }
 
-/// Runs `work` on a thread with a stack large enough for Polars to build and
-/// resolve the deepest expression a case makes in a debug build, which the
-/// two megabytes of a test thread are not.
-fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
+/// The stack the application gives the engine: Tauri runs its commands on Tokio's threads, and
+/// the bridge each connection on a thread of the standard library, and both give a thread two
+/// megabytes.
+const APPLICATION_STACK: usize = 2 << 20;
+
+/// The stack a case runs on. A build without debug assertions, as the application is built, runs
+/// it on the stack the application gives the engine, so a chain that overflows it is found: it
+/// ends the process, and the case is the file `current.case` among the kept evidence. A debug
+/// build's frames are many times larger, so it runs a case on 256 megabytes.
+const CASE_STACK: usize = if cfg!(debug_assertions) {
+    256 << 20
+} else {
+    APPLICATION_STACK
+};
+
+/// Runs `work` on a thread with the stack of a case.
+fn on_the_stack_of_a_case<T: Send>(work: impl FnOnce() -> T + Send) -> T {
     std::thread::scope(|scope| {
         std::thread::Builder::new()
             .name("allowed-fuzz".to_owned())
-            .stack_size(256 << 20)
+            .stack_size(CASE_STACK)
             .spawn_scoped(scope, work)
             .expect("a thread with a large stack")
             .join()
@@ -113,7 +126,7 @@ fn env_focus() -> Option<Focus> {
 #[test]
 fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
     let started = Instant::now();
-    let report = on_a_large_stack(|| {
+    let report = on_the_stack_of_a_case(|| {
         let target = AllowedTarget::new();
         campaign::run(
             &Settings::new(SEED, CASES, None, keep_directory()),
@@ -192,7 +205,7 @@ fn a_campaign() {
         .map(|focus| format!(" focused on {}", focus.names()))
         .unwrap_or_default();
     let started = Instant::now();
-    let report = on_a_large_stack(|| {
+    let report = on_the_stack_of_a_case(|| {
         let target = AllowedTarget::new();
         let mut settings = Settings::new(seed, cases, focus, keep_directory());
         settings.deadline = Some(env_deadline());
@@ -241,7 +254,7 @@ fn replay_a_case() {
             let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
                 .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
             let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
-            let described = on_a_large_stack(|| target::describe(&case));
+            let described = on_the_stack_of_a_case(|| target::describe(&case));
             (evaluation, described)
         });
     println!("{}", String::from_utf8_lossy(&evaluation.canonical));
@@ -306,7 +319,7 @@ fn a_group_that_both_refuse_is_no_difference_of_dtypes() {
 /// not settled are reported, so one run names all of them.
 #[test]
 fn every_kept_case_replays_as_settled() {
-    on_a_large_stack(kept_cases_replay_as_settled);
+    on_the_stack_of_a_case(kept_cases_replay_as_settled);
 }
 
 /// What a kept case is settled as, by the name it is kept under.
@@ -400,6 +413,14 @@ impl Settled {
                 "stricter where Polars does not evaluate the part",
                 target::STRICTER_WHERE_UNEVALUATED,
             ),
+            // What only a debug build does, a build as Polars' release is built does not do: the
+            // tables and Polars agree on the case there.
+            Self::Excused(named)
+                if !cfg!(debug_assertions)
+                    && named.iter().all(|limit| limit.is_of_a_debug_build()) =>
+            {
+                Self::Fixed.holds_for(name, outcome)
+            }
             Self::Excused(named) => {
                 // The detail is the statement of every limit that excuses the case, in order.
                 let expected: Vec<&str> = Limit::ALL
@@ -433,7 +454,8 @@ fn settled_on_few_threads(name: &str) -> Option<Settled> {
         return None;
     }
     match name {
-        "fixed-polars-evaluates-an-overflow.case" => {
+        // Only a debug build panics on the overflow.
+        "fixed-polars-evaluates-an-overflow.case" if cfg!(debug_assertions) => {
             Some(Settled::Excused(vec![Limit::AnOverflow]))
         }
         "by-engine-a-replacement-in-a-sort-key-of-one-value.case" => Some(Settled::Stricter),

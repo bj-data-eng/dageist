@@ -42,8 +42,11 @@ The engine builds Polars from the source of a Python Polars release, kept in
 `vendor/polars`, with the same features, crate patches, dependency versions
 and toolchain as that release. Polars' Rust crates are released less often
 than Python Polars and from other commits, so this is the only way for a step
-to behave in dageist as it does in Python Polars. The release's optimisation
-profile and CPU settings are not copied; they change speed, not results.
+to behave in dageist as it does in Python Polars. A release build of dageist
+also uses the optimisation settings the release builds its wheels with, and the
+tables and the fuzz campaigns run Polars as the release runs it, without the
+checks of a debug build; [How Dageist Is Built](#how-dageist-is-built) gives the
+profiles and their reasons.
 
 Building Polars as the release is built is not all the release does: when the
 Python module loads, it also sets Polars up. [Polars Is Set Up As The Release
@@ -381,6 +384,104 @@ The engine's [start-up module](../crates/dageist-engine/src/startup.rs) lists
 each part with its reason. When `vendor/polars` moves to a new release, that
 module is checked against the new release's `on_startup.rs`; see
 [Move Polars To A New Release](how-to.md#move-polars-to-a-new-release).
+
+## How Dageist Is Built
+
+The root manifest has three profiles. They were chosen by measuring each on the
+same commit, on an 8-core Apple silicon machine (four performance and four
+efficiency cores) that was busy with the measuring builds themselves, so the
+figures are approximate and their ratios are what matters.
+
+**A debug build** is optimised at level 1, dageist's crates and Polars alike,
+with debug assertions and overflow checks on. Polars is nearly all of what a
+build compiles and of the time the tests take, and the walk is most of the rest,
+so an unoptimised build ran the tests several times slower than a release build.
+Level 1 runs them about as fast as a release build and rebuilds a change to the
+engine in a third of the time. Optimising only the dependencies left the walk
+slow, and level 3 for the dependencies built twice as long and ran the grids
+slower than level 1. A debugger that has to show every variable wants
+`CARGO_PROFILE_DEV_OPT_LEVEL=0`.
+
+**A release build** uses the settings Polars builds its Python wheels with
+(`dist-release` in `vendor/polars/Cargo.toml`, which
+`vendor/polars/.github/workflows/release-python.yml` builds with): fat link-time
+optimisation, one codegen unit, no debug information, and the SQL parser
+optimised for size. Its symbols are stripped. Panics still unwind: Polars'
+streaming executor catches the panics of its tasks, and the engine catches one
+Polars raises on a duration string. Polars is nearly all of the binary, so these
+settings decide its size. Measured on main at 6c7c5e9, timing the bridge's
+`open_sample_window` of 50,000 claims from the generated 2 GB Parquet sample,
+each build run in turn and the median taken:
+
+| Build | Binary | gzip | Window | Clean build |
+| --- | --- | --- | --- | --- |
+| Cargo's default release settings | 187 MB | | 1.06 s | 14 min |
+| The same, stripped | 133 MB | 39 MB | the same | |
+| Fat LTO, one codegen unit, no debug information, stripped | 103.6 MB | 36 MB | 0.99 s | 28 min |
+| The same, `opt-level = "s"` | 71.2 MB | 24 MB | about 20% slower | 15 min |
+| The same, `opt-level = "z"` | 45.7 MB | 20 MB | about 70% slower | 18.5 min |
+
+The third row is the release profile: 55% of the size at the same speed, for a
+clean build twice as long. Optimising for size trades too much of Polars' speed.
+On main at 1da3f0db, with the SQL parser optimised for size too, the release
+profile built clean in 13 minutes on an otherwise quiet machine and gave a
+stripped binary of 114 MB; a change to the host relinks the whole program in 8
+minutes, and the bridge opened a working window of 50,000 keys of the
+generated documents sample in 0.39 s, the median of three.
+
+**The profile `measure`** is Polars as its release runs it, optimised and
+without debug assertions or overflow checks; its link-time optimisation and
+codegen units are Cargo's defaults, thin local LTO and 16 units, which change
+speed and not behaviour. The tables of allowed combinations are measured in it, and the fuzz
+campaigns, the fixed seed and the replay of the kept cases run in it. A debug
+build of Polars runs another program than the application: it panics on an
+integer overflow where the release wraps, runs Polars' `debug_assert` checks and
+its `cfg(debug_assertions)` code, enlarges the stacks of the `recursive` crate,
+and runs at another speed, which can show or hide what depends on timing.
+Errors Polars returns, such as schema refusals and failed conversions, are the
+same in both. A debug build measures the same tables today, and the engine's
+ordinary tests run the fuzz target there too, as a stricter pass: a finding only
+a debug build makes is a candidate to report to Polars, not a fact for the
+tables. The limit `an-overflow` excuses the overflows a debug build panics on,
+and its kept case replays in `measure` as one the tables and Polars agree on. A
+case of a campaign runs in `measure` on the stack the application gives the
+engine, two megabytes, which Tauri's Tokio threads and the bridge's threads
+have, so a chain that overflows it is found: it ends the process, and the case
+is `current.case` among the kept evidence. The bound is the thread's, and
+approximate for its frames: `measure` is optimised at level 1, the application
+at level 3 with link-time optimisation, so a frame's size differs between them.
+
+Each candidate below was built clean into a target of its own. A campaign is
+seed `2409001` with 2000 cases, at the default number of Polars' threads and at
+two; a review round is 24 seeds of 8000 cases at both thread counts, eight
+campaigns side by side, of which 14 to 16 stop early on findings that are much
+the same seeds in every profile; the grids are the engine's grid tests. The
+study ran before the kept case of a debug build's overflow was settled for a
+release-like build, so the kept cases of those builds were timed on a replay
+that failed on that one case:
+
+| Profile | Clean build | Rebuild of the engine | Rebuild of the fuzz target | Campaign, default threads | Campaign, two threads | Fixed seed | Kept cases | Tables | Review round | Grids | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Debug, unoptimised (before) | 2.6 min | 22.5 s | 4.5 s | 11.5 s | 9.8 s | 10.7 s | 9.9 s | 74.3 s | 596 s | 113 s | 21 GB |
+| Debug, level 1 (chosen) | 7.9 min | 8.2 s | 2.4 s | 2.1 s | 1.9 s | 2.7 s | 1.9 s | 17.5 s | 109 s | 15.1 s | 21 GB |
+| Debug, dependencies at level 3 | 16.4 min | 11.4 s | 2.3 s | 3.7 s | 3.3 s | 3.8 s | 3.1 s | 19.7 s | 172 s | 48.6 s | 23 GB |
+| Debug, dependencies at level 1 | 7.4 min | 8.7 s | 2.6 s | 3.6 s | 3.1 s | 3.7 s | 2.9 s | 18.4 s | 173 s | 32.0 s | 21 GB |
+| Release behaviour, level 1 (`measure`) | 8.2 min | 9.3 s | 2.3 s | 2.1 s | 1.7 s | 2.6 s | 1.8 s | 16.3 s | 110 s | 15.7 s | 14 GB |
+| Release behaviour, level 2 | 10.9 min | 9.4 s | 2.3 s | 1.9 s | 1.7 s | 2.5 s | 1.7 s | 16.1 s | | | 16 GB |
+| Release behaviour, level 3 | 11.5 min | 10.1 s | 2.3 s | 1.9 s | 1.7 s | 2.6 s | 1.7 s | 16.4 s | | 13.2 s | 16 GB |
+| Release behaviour, level 3, thin LTO | 53 min | 48 min | 4.3 min | 1.7 s | 1.5 s | 4.0 s | 1.6 s | 21.3 s | | | 89 GB |
+| Release behaviour, dependencies only at level 3 | 8.3 min | 8.2 s | 2.1 s | 3.2 s | 2.7 s | 3.3 s | 2.6 s | 16.7 s | | | 15 GB |
+
+The tables came out the same in every profile. A campaign's process used about
+200 MB at its peak in the unoptimised build and 150 MB in the others, and about
+one core, since each case is a table of three rows and Polars' pool adds little,
+so eight campaigns run side by side on this machine before it is saturated.
+Level 1 runs a campaign as fast as levels 2 and 3 and builds in three quarters
+of their time, so `measure` is level 1; thin link-time optimisation makes every
+rebuild a link of the whole, which the incremental loop of adding to the
+catalogue cannot afford. A clean build of `measure` costs about five and a half
+minutes more than the unoptimised debug build did, which one review round, 486
+seconds faster, pays back, as do about 72,000 cases.
 
 ## The Bridge
 
@@ -2452,7 +2553,9 @@ one has fewer than the table has rows, which Polars refuses to meet them.
 
 Every call is built through the catalogue's own build functions and run on
 fixed sample tables, by an engine test that checks the committed files are
-current and, with `DAGEIST_REFRESH_TABLES=1`, rewrites them. The test runs
+current and, with `DAGEIST_REFRESH_TABLES=1` in the profile `measure`, which runs
+Polars as its release runs ([How Dageist Is Built](#how-dageist-is-built)),
+rewrites them. The test runs
 Polars on one thread in a process of its own, because Polars runs two sides of
 some operations in parallel and reports whichever fails first, which would
 give a different reason from run to run. The
@@ -3100,7 +3203,7 @@ These are what remains of the fuzz items of #129. The gate is lifted when a camp
 | A shift that leaves nulls | The tables ran every call on columns that hold values, so what Polars does with a call that has only nulls to meet was not measured: it does not meet the dtype that the tables refuse when they run rows. A shift fills with a null unless it is given a `fill_value`, and the sample's three rows decide what is left, so the target follows them through the chain. The start column holds a value in each row, and `a` and `b` a null in the middle one; a start that is not one column of the sample holds nothing known, except the null literal that a fill of NaN follows, which keeps its null whatever it is given. A shift moves the rows down for a positive number and up for a negative one, and the rows it empties hold the `fill_value` (a null where there is none). A running sum or maximum and the parts of a date keep each row where it is and null where it was; `is_null`, `is_not_null` and `cum_count` give a value in every row; a comparison and arithmetic give a null in each row where the rows they follow hold one, or an operand does (a column with a null in the middle row, or an aggregate that is null, meets every row), and leave the others unknown; `and` and `or` carry none, for a null with a true is a true; `xor` does carry one, and is left unknown, which excuses less; `offset_by`, a condition and a window that is not an `explode` keep the rows in place and leave what they hold unknown, and give the one value that an aggregate leaves to each of the sample's three rows; any other call leaves nothing known. The first and the last take a row, or the first or last that is not null where they skip nulls; the minimum and the maximum are null of rows that are all null and a value of any that holds one; a sum of rows that are all null is not known, since it is zero of numbers and null of a column of `Null`. The tables refusing, when they run rows, at a call that follows a chain whose rows are all null, or is given one. Polars refuses a comparison of a list with a `Boolean` after none, one or two shifts, and allows it after three. Nulls that Polars folds whatever the rows are, as those of a comparison with a null, are not the sample's: a probe settles them. A literal that holds a value is one value, where the sample's columns hold three, so a shift that moves it away leaves a null, as the one value a moment is counted from does. |
 | A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal (no place). |
 | The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode`, or one that is refused for lengths still when each `explode` is undone, as a sort by a replacement whose default is a value cut to decimals is, and with no drop of nulls or NaNs, or one that is refused for lengths still when each is made a fill (no place). |
-| An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
+| An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place), in a debug build only: in `measure`, as in the application, the overflow wraps. |
 | A value beyond a decimal | Polars compares a `UInt128` with a `Decimal` by casting the `UInt128` to `decimal[38,0]`, which holds 38 digits, and a `UInt128` holds more. The sample's values are within the decimal, so the tables measured what a value within it meets, and a comparison of a `UInt128` with a `Decimal` is allowed by the dtypes alone; a value beyond it, which a subtraction wraps to below zero, fails the cast. Polars refusing the rows with a failed conversion of `u128` to a decimal, in a case that holds a subtraction (no place: the reason and the subtraction gate it). The table with no rows holds no value to fail, and another conversion is not this. |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
 | A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |

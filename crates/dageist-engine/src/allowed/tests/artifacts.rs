@@ -16,6 +16,10 @@ use super::generate::{Generated, generate};
 /// Set to rewrite the tables instead of checking them.
 const REFRESH: &str = "DAGEIST_REFRESH_TABLES";
 
+/// The command that writes the tables again, in the profile that builds Polars as its release does.
+const REFRESH_COMMAND: &str = "DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked --profile measure \
+     -p dageist-engine allowed::tests::artifacts";
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -109,11 +113,14 @@ fn header(title: &str, release: &Release, counts: &Counts, format: &[String]) ->
             .to_owned(),
         "# one thread, so that a reason that depends on which of two failures comes first is the"
             .to_owned(),
-        "# same every time. Do not edit.".to_owned(),
+        "# same every time, in the Cargo profile `measure`, which builds Polars as its release"
+            .to_owned(),
+        "# does: optimised, without debug assertions or overflow checks. Do not edit.".to_owned(),
         "# To refresh after a change of the catalogue or of Polars:".to_owned(),
         format!(
-            "#   {REFRESH}=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts"
+            "#   {REFRESH}=1 cargo test --offline --locked --profile measure -p dageist-engine \\"
         ),
+        "#     allowed::tests::artifacts".to_owned(),
         "# See docs/how-to.md, \"Refresh The Tables Of Allowed Combinations\".".to_owned(),
         "#".to_owned(),
     ];
@@ -401,6 +408,13 @@ fn the_committed_tables_are_what_polars_gives() {
         table::OPTIONS,
     ];
     if std::env::var_os(REFRESH).is_some() {
+        // A debug build checks what a release build does not, so it measures another Polars.
+        if cfg!(debug_assertions) {
+            panic!(
+                "the tables are measured as Polars' release runs, in a build without debug \
+                 assertions: {REFRESH_COMMAND}"
+            );
+        }
         for (name, text) in &files {
             let path = root().join("api/catalogue").join(name);
             std::fs::create_dir_all(path.parent().expect("a directory")).expect("a directory");
@@ -412,8 +426,7 @@ fn the_committed_tables_are_what_polars_gives() {
         assert!(
             committed == made,
             "api/catalogue/{name} is not what Polars gives for the catalogue now. Refresh it with: \
-             {REFRESH}=1 cargo test --offline --locked -p dageist-engine \
-             allowed::tests::artifacts\n{}",
+             {REFRESH_COMMAND}\n{}",
             difference(committed, made)
         );
     }

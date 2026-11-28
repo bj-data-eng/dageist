@@ -216,6 +216,14 @@ pressure guidance. Use separate targets for concurrent worktrees changing the
 same packages; reuse an existing target when source/context permit. Keep default
 test parallelism unless host status recommends a limit.
 
+The root manifest's profiles: a debug build is optimised lightly, with debug
+assertions and overflow checks on, and runs the tests about as fast as a
+release build; `--release` builds as Polars builds its wheels and takes the
+longest; `--profile measure` is Polars as its release runs, for the tables and
+the campaigns.
+[The explanation](docs/explanation.md#how-dageist-is-built) gives the reasons
+and the measurements.
+
 Core checks from the repository root. The core depends on the engine, so they
 build Polars:
 
@@ -266,10 +274,14 @@ cargo test --offline --locked -p dageist-workspace
 cargo clippy --offline --locked -p dageist-workspace --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
-Engine checks from the repository root:
+Engine checks from the repository root. The tables are measured, and the
+campaign target's fixed seed and kept cases run, in the profile `measure`,
+which builds Polars as its release does; the debug run is a stricter pass, as
+[the how-to](docs/how-to.md#check-the-tables-against-polars) says:
 
 ```sh
 cargo test --offline --locked -p dageist-engine
+cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz
 cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 

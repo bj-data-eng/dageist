@@ -4,9 +4,11 @@
 # Generated from the catalogue and Polars by the engine test
 # `allowed::tests::artifacts::the_committed_tables_are_what_polars_gives`, with Polars on
 # one thread, so that a reason that depends on which of two failures comes first is the
-# same every time. Do not edit.
+# same every time, in the Cargo profile `measure`, which builds Polars as its release
+# does: optimised, without debug assertions or overflow checks. Do not edit.
 # To refresh after a change of the catalogue or of Polars:
-#   DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts
+#   DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked --profile measure -p dageist-engine \
+#     allowed::tests::artifacts
 # See docs/how-to.md, "Refresh The Tables Of Allowed Combinations".
 #
 # Each line is: context | count | outcome.

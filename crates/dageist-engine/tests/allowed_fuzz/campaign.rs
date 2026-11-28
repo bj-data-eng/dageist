@@ -551,14 +551,14 @@ mod tests {
     fn a_campaign_keeps_every_case_that_fails_and_goes_on_to_the_next() {
         let target = AllowedTarget::new();
         let needle = "\"entry\":\"Expr.abs\"";
-        let clean = super::super::on_a_large_stack(|| {
+        let clean = super::super::on_the_stack_of_a_case(|| {
             let never = Misses {
                 evaluation: InProcess::new(&target),
                 needle: "no case holds this",
             };
             run(&settings("campaign-clean"), &never)
         });
-        let failing = super::super::on_a_large_stack(|| {
+        let failing = super::super::on_the_stack_of_a_case(|| {
             let misses = Misses {
                 evaluation: InProcess::new(&target),
                 needle,

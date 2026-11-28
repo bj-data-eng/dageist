@@ -127,7 +127,7 @@ fn a_campaign_for_a_parent_to_watch() {
         file_of(&directory, name).map(|text| unhex(String::from_utf8_lossy(&text).trim()))
     };
     let settings = child_settings(&directory);
-    super::on_a_large_stack(|| {
+    super::on_the_stack_of_a_case(|| {
         let target = AllowedTarget::new();
         let scripted = Scripted {
             evaluation: InProcess::new(&target),
