@@ -385,6 +385,17 @@ npm --prefix ui run build
 cargo run --release --offline --locked -p dageist-tauri
 ```
 
+A release build uses the settings Polars builds its Python wheels with, so a clean one takes about
+twice as long as Cargo's default release settings did, and a change relinks the whole program with
+link-time optimisation, which takes minutes; it gives a binary of about half the size that runs as
+fast. [The explanation](explanation.md#how-dageist-is-built) gives the measurements. Its symbols are stripped,
+so a panic prints its message and not the names in its backtrace. To read them, build it without
+stripping, or use a debug build:
+
+```sh
+CARGO_PROFILE_RELEASE_STRIP=none RUST_BACKTRACE=1 cargo run --release --offline --locked -p dageist-tauri
+```
+
 The first time the workspace opens, the host writes the sample, about 2 GB of
 Parquet, into a `documents-…` folder in the application cache
 (`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later runs reuse

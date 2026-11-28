@@ -49,6 +49,23 @@ exclude = ["vendor"]
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+# A release build uses the settings Polars builds its Python wheels with (`dist-release` in
+# vendor/polars/Cargo.toml): fat link-time optimisation, one codegen unit and no debug
+# information. Its symbols are stripped. Panics still unwind: Polars' streaming executor catches
+# the panics of its tasks, and the engine catches one Polars raises on a duration string.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+debug = false
+strip = "symbols"
+
+# Polars' release optimises its SQL parser for size, as a cold path.
+[profile.release.package.sqlparser]
+opt-level = "s"
+
+[profile.release.package.polars-sql]
+opt-level = "s"
+
 # The crate patches the Polars release in vendor/polars applies to the crates dageist builds,
 # at the same revisions. Polars' `color-backtrace` patch serves only its Python binding.
 # The API generator's release check keeps these equal to vendor/polars/Cargo.toml.
