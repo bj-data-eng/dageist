@@ -777,6 +777,69 @@ fn a_chain_that_does_not_end_in_one_finishing_call_is_refused_before_polars_is_a
             ),
             "the document refuses a chain that does not end in exactly one finishing call, with \
              the reason, before Polars is asked",
+
+// ---------------------------------------------------------------------------
+// What the engine reports a group gives
+
+#[test]
+fn a_column_that_is_not_aggregated_is_a_list_of_its_dtype_for_each_group_and_an_aggregate_is_not() {
+    use dageist_engine::document::{
+        Document, Inputs, Outcome as Reported, Place, Resolution, Segment, StepId,
+    };
+    use polars::prelude::DataType;
+    let world = World::get();
+    let mut checked = 0;
+    for (label, held) in world.columns("column").iter() {
+        let dtype = held.dtype.clone();
+        let first = column_then(&held.name, vec![call("Expr.first", json!({}))]);
+        let text = dageist_engine_fuzz::doc::document(vec![dageist_engine_fuzz::doc::grouping(
+            "g",
+            by(vec![column("n")]),
+            vec![call(
+                "LazyGroupBy.agg",
+                json!({ "named_aggs": named(vec![("all", column(&held.name)), ("one", first)]) }),
+            )],
+        )]);
+        let document = Document::read(&text).expect("a document");
+        let report = document
+            .run_on(&Inputs::new(), world.frame())
+            .expect("the table has a schema");
+        let step = &report.steps()[0];
+        let Reported::Valid { schema, .. } = step.outcome() else {
+            panic!("{label}: {:?}", step.outcome())
+        };
+        // Polars' own words for the dtypes, written by hand: a list of what the column has for the
+        // values of each group, and what the column has for its first.
+        let listed = DataType::List(Box::new(dtype.clone()));
+        assert_eq!(schema.get("all"), Some(&listed), "{label}");
+        assert_eq!(schema.get("one"), Some(&dtype), "{label}");
+        // The report says the same of the column alone and of its first, where they stand.
+        let trace = |at: usize, links: usize| {
+            let place = Place::of_step(0, Some(StepId::new("g").expect("an id")))
+                .then(Segment::Link(0))
+                .then(Segment::Parameter("named_aggs".to_owned()))
+                .then(Segment::Value(at));
+            let expression = step
+                .expressions()
+                .iter()
+                .find(|expression| expression.place() == &place)
+                .unwrap_or_else(|| panic!("{label}: no expression at {place}"));
+            match if links == 0 {
+                expression.start()
+            } else {
+                &expression.links()[links - 1]
+            } {
+                Resolution::Dtype(dtype) => dtype.clone(),
+                other => panic!("{label}: {other:?}"),
+            }
+        };
+        assert_eq!(trace(0, 0), listed, "{label}");
+        assert_eq!(trace(1, 0), listed, "{label}");
+        assert_eq!(trace(1, 1), dtype, "{label}");
+        checked += 1;
+    }
+    assert!(checked > 40, "{checked} columns were checked");
+}
         )
         .saying("not a document"),
         Known::new(
