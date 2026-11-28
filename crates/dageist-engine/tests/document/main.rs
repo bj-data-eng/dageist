@@ -1,7 +1,10 @@
 //! The step document through its public interface: reading and writing it,
 //! and running it on a small documents table.
 
-#[path = "../ask_polars/mod.rs"]
+// The tests that still ask Polars here read the asker of the package that owns it, until they
+// move onto its grids; each uses a part of it.
+#[allow(dead_code)]
+#[path = "../../fuzz/src/ask.rs"]
 mod ask_polars;
 mod counted;
 mod counts;

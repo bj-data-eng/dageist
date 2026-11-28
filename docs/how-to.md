@@ -674,7 +674,7 @@ expression holds.
 ## Check The Tables Against Polars
 
 The tables are measured one combination at a time. A property target in
-`crates/dageist-engine/tests/allowed_fuzz/` makes the combinations they were not
+`crates/dageist-engine/fuzz/tests/allowed_fuzz/` makes the combinations they were not
 measured as and checks them against Polars, as
 [the explanation](explanation.md#what-the-tables-are-checked-against) says. It runs
 with the engine's tests, from a fixed seed, on 1000 cases, with the replay of every kept case,
@@ -682,7 +682,7 @@ which takes seconds. Campaigns run in the profile `measure`, as Polars' release 
 fixed seed and the kept cases are run there too, in the build the tables are measured in:
 
 ```sh
-cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz
+cargo test --offline --locked --profile measure -p dageist-engine-fuzz --test allowed_fuzz
 ```
 
 The engine's ordinary tests run the same target in a debug build, a stricter pass: a debug build
@@ -714,7 +714,7 @@ alone, since a case that runs Polars is heavy:
 
 ```sh
 DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked --profile measure \
-  -p dageist-engine --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
+  -p dageist-engine-fuzz --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A campaign draws its methods evenly, so the more methods the catalogue holds, the
@@ -744,7 +744,7 @@ makes a moment is refused, and the refusal names it. A campaign focused on the m
 
 ```sh
 DAGEIST_FUZZ_FOCUS=dt.,replace_strict DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 \
-  cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz \
+  cargo test --offline --locked --profile measure -p dageist-engine-fuzz --test allowed_fuzz \
   a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
@@ -817,7 +817,7 @@ no `timeout.env` and stops the loop, and is `current.case` in the directory:
       set -a; . "$keep/timeout.env"; set +a
       mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
     fi
-    cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz \
+    cargo test --offline --locked --profile measure -p dageist-engine-fuzz --test allowed_fuzz \
       a_campaign -- --ignored --nocapture --test-threads=1 --exact
     [ -f "$keep/timeout.env" ] || break
   done
@@ -835,7 +835,7 @@ status:
 
 ```sh
 DAGEIST_FUZZ_REPLAY=$PWD/target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \
-  --profile measure -p dageist-engine --test allowed_fuzz replay_a_case -- --ignored --nocapture
+  --profile measure -p dageist-engine-fuzz --test allowed_fuzz replay_a_case -- --ignored --nocapture
 ```
 
 It prints the case, what the tables predicted of it and where, what Polars did and
@@ -851,7 +851,7 @@ Polars by hand, and decide which it is:
   tables): write the test that fails for it in `crates/dageist-engine/src/allowed/tests/`
   first, then correct it, refreshing the tables as
   [above](#refresh-the-tables-of-allowed-combinations) if they change. Keep the
-  case as `crates/dageist-engine/tests/allowed_fuzz/regressions/fixed-<what>.case`.
+  case as `crates/dageist-engine/fuzz/tests/allowed_fuzz/regressions/fixed-<what>.case`.
   The normal run replays it and expects it to check something.
 - **A part Polars does not evaluate**: the tables refuse a part, and Polars allows
   the step because it never evaluates the part. The target settles it by itself: it
@@ -942,7 +942,7 @@ Polars by hand, and decide which it is:
 - **The asker differing from the engine** (the finding `asker-differs-from-the-engine`
   of the property `asker-agrees-with-engine`, which is no disagreement between the
   tables and Polars): the target asks Polars about a step the walk refuses through
-  `tests/ask_polars/mod.rs`, a copy of what the step engine builds, and for a case whose
+  `crates/dageist-engine/fuzz/src/ask.rs`, a copy of what the step engine builds, and for a case whose
   step the walk allows it asks the engine and the asker both and compares whether and where
   Polars refuses it, in what words and the dtype of every expression. The words of a refusal
   of the rows are compared with the values they name left out, and of the schema exactly.

@@ -17,8 +17,6 @@
 //! Polars' answer: the callers run these under `catch_unwind`. A panic on a thread of Polars' own
 //! does not reach it.
 
-#![allow(dead_code)]
-
 use dageist_engine::allowed::{self, Context, Position, Representative};
 use dageist_engine::catalog::{
     Argument, Arguments, Build, BuildError, Conditional, DefaultValue, DurationUse, Kind,

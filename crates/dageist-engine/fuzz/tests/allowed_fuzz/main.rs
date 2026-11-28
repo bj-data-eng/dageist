@@ -17,8 +17,7 @@
 //! on request, focused on chosen methods where it is asked to be, and
 //! [`replay_a_case`] replays one kept case; the how-to guide says how.
 
-#[path = "../ask_polars/mod.rs"]
-mod ask_polars;
+use dageist_engine_fuzz::ask as ask_polars;
 mod asked;
 mod campaign;
 mod case;

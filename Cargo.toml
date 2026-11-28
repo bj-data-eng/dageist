@@ -33,6 +33,7 @@ resolver = "3"
 default-members = ["."]
 members = [
     "crates/dageist-engine",
+    "crates/dageist-engine/fuzz",
     "crates/dageist-fuzz",
     "crates/dageist-graph",
     "crates/dageist-pack",

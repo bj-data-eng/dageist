@@ -1,0 +1,29 @@
+[package]
+name = "dageist-engine-fuzz"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Grids and campaigns that hold the engine's tables and walk to what Polars does."
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+dageist-engine = { path = ".." }
+# The grids and the campaign target run on this framework's grid and property runner. The
+# fuzz framework depends on no production crate, and no production crate depends on this one.
+dageist-fuzz = { path = "../../dageist-fuzz", features = ["property"] }
+# Polars with the features the engine turns on, which the engine's dependency gives every
+# build of this package.
+polars = { path = "../../../vendor/polars/crates/polars", default-features = false }
+# How many threads Polars runs on, and the result of a query run by an engine, which its own
+# pool and query result say and no part of the `polars` crate gives.
+polars-core = { path = "../../../vendor/polars/crates/polars-core", default-features = false }
+# Builds and compares the JSON of step documents. The versions Cargo.lock already resolves for
+# the engine and the fuzz framework, so they add no package.
+serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }
+# Reads the campaign target's descriptor.
+toml = { version = "=1.2.1", default-features = false, features = ["parse", "serde", "std"] }
