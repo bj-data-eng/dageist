@@ -23,7 +23,8 @@
 //! ```
 //!
 //! A line of a test that names cells says why the walk and Polars part there; a reason that ends in
-//! a candidate to file is a difference this repository has not settled.
+//! an issue is a difference this repository has not settled, and one that names a Polars bug
+//! candidate is Polars' own.
 
 use dageist_engine::allowed::{Context, Nested, Outer, Representative};
 use dageist_engine::catalog::{self, Applies, Family, Kind as ParameterKind, ValueType};
@@ -425,7 +426,7 @@ fn known_casts() -> Vec<Known<Kind>> {
              text that is no number of it, a text given Boolean, a float that overflows it. The \
              step engine refuses the step when it builds the literal, as Python's lit does, and \
              the walk allows it, though it could foretell it by casting the value as the \
-             catalogue does (candidate to file)",
+             catalogue does (#225)",
         )
         .saying_one_of(&["conversion from `", "casting from ", "cannot cast "]),
     ]
@@ -441,7 +442,7 @@ fn known_integers() -> Vec<Known<Kind>> {
             "the catalogue holds a whole number typed in to the range the parameter of Python's \
              binding takes, a count or a place below nothing or past an index of 32 bits, and \
              refuses one outside it when it builds the step, as Python does; the walk reads no \
-             value typed in (candidate to file)",
+             value typed in (#259)",
         )
         .saying("takes a whole number from"),
         Known::new(
@@ -449,7 +450,7 @@ fn known_integers() -> Vec<Known<Kind>> {
             Pattern::new().is("parameter", "Expr.fill_null(limit)"),
             "fill_null takes a limit only beside a strategy, which the grid does not choose: the \
              catalogue refuses the limit alone when it builds the step, and the walk allows it \
-             (candidate to file)",
+             (#259)",
         )
         .saying("can only specify `limit` when strategy"),
         Known::new(
@@ -457,7 +458,7 @@ fn known_integers() -> Vec<Known<Kind>> {
             Pattern::new().is("parameter", "Expr.round_sig_figs(digits)"),
             "Polars rounds to one significant figure at least and refuses fewer when it works out \
              the schema, where the catalogue takes any whole number of 32 bits and the walk allows \
-             it (candidate to file)",
+             it (#259)",
         )
         .saying("digits must be an integer >="),
         Known::new(
@@ -493,7 +494,7 @@ fn known_function_parts() -> Vec<Known<Kind>> {
             Pattern::new().starts("part", "polars.datetime("),
             "Polars casts a text of a number given String, and a flag, to the part it stands for \
              and folds the call, which a join's key may not hold; the walk takes only a number \
-             typed in as a part that folds (candidate to file)",
+             typed in as a part that folds (#259)",
         )
         .saying("'alias' is not allowed in a join key"),
         Known::new(
@@ -501,7 +502,7 @@ fn known_function_parts() -> Vec<Known<Kind>> {
             Pattern::new().contains_one_of("part", ["_range("]),
             "the walk panics in a debug build where it works out the count of a range of dates, \
              moments or times whose bound is a number with a fraction past what a whole number of \
-             64 bits holds, which overflows its arithmetic (candidate to file)",
+             64 bits holds, which overflows its arithmetic (#260)",
         )
         .saying_one_of(&[
             "attempt to subtract with overflow",
@@ -527,7 +528,7 @@ fn known_counts() -> Vec<Known<Kind>> {
             "Polars reads the count of top_k, bottom_k and shift as a whole number that fits an \
              index and is no null, and casts the count of diff and the length of a slice to a \
              whole number strictly, when the rows run, and refuses a float, a text, a null or a \
-             number beyond them; the walk reads no value of a count (candidate to file)",
+             number beyond them; the walk reads no value of a count (#229)",
         )
         .saying_one_of(&[
             "invalid value of 'k' in top_k",
@@ -539,7 +540,7 @@ fn known_counts() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().is("order", "the column first"),
             "Polars cannot extract a length or an offset from a null, or from a value of 128 bits \
-             that does not fit 64, which the walk does not read (candidate to file)",
+             that does not fit 64, which the walk does not read (#230)",
         )
         .saying("unable to extract"),
         Known::new(
@@ -547,7 +548,7 @@ fn known_counts() -> Vec<Known<Kind>> {
             Pattern::new().is("value", "null"),
             "the table of the schema refuses a conversion of a whole number to the dtype Null, \
              which the null given as the count, the fill, the share or the value is, where Polars \
-             folds it (candidate to file)",
+             folds it (#228)",
         )
         .saying("to `null` failed"),
         Known::new(
@@ -588,7 +589,7 @@ fn known_one_value_given_the_column() -> Known<Kind> {
         Pattern::new().is("order", "the literal first"),
         "the walk does not refuse the column given as a parameter Polars reads as one value, a \
          count, a fill, a share or a place, where the call follows a literal, though it refuses \
-         it after a column (candidate to file)",
+         it after a column (#252)",
     )
     .saying_one_of(&["must be a scalar value", "should be a scalar"])
 }
@@ -625,11 +626,12 @@ fn known_moments() -> Vec<Known<Kind>> {
                     "Expr.replace(old)",
                     "Expr.replace(new)",
                     "Expr.replace_strict(old)",
+                    "Expr.fill_nan(value)",
                 ],
             ),
-            "Polars casts a bound, and the values a replacement lists, to the dtype of what they \
-             follow strictly and refuses one that dtype cannot hold when the rows run, which the \
-             walk does not read (candidate to file)",
+            "Polars casts a bound, the values a replacement lists and the value fill_nan fills \
+             with to the dtype of what they follow strictly and refuses one that dtype cannot \
+             hold when the rows run, which the walk does not read (#225)",
         )
         .saying("failed in column 'literal'"),
         Known::new(
@@ -639,7 +641,7 @@ fn known_moments() -> Vec<Known<Kind>> {
                 ["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
             ),
             "a share outside 0 to 1 is refused by Polars, and the walk does not read the value of \
-             a share (candidate to file)",
+             a share (#224)",
         )
         .saying("`quantile` should be between"),
         Known::new(
@@ -651,7 +653,7 @@ fn known_moments() -> Vec<Known<Kind>> {
                 )
                 .is("order", "the literal first"),
             "Polars reads a share of numbers only, and refuses a date, a moment, a length of time \
-             or a time of day given as one, which the walk allows (candidate to file)",
+             or a time of day given as one, which the walk allows (#252)",
         )
         .saying("expected expression of dtype 'numeric' for quantile"),
         Known::new(
@@ -665,7 +667,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             "a replacement that follows a literal and is given the column as its new values, of \
              another number than its one old value, is refused by Polars where the column is of \
              dates, moments, lengths of time or times of day; the walk refuses it for every other \
-             column (candidate to file)",
+             column (#252)",
         )
         .saying("`new` input for `replace` must have the same length"),
         Known::new(
@@ -676,7 +678,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             ),
             "Polars finds no dtype for a number typed without a dtype beside a date, a moment, a \
              length of time or a time of day in is_close on either side, or in fill_null of the \
-             number given the column, which the walk allows (candidate to file)",
+             number given the column, which the walk allows (#227)",
         )
         .saying("got invalid or ambiguous dtypes"),
     ]
@@ -687,7 +689,7 @@ fn known_texts_measured_as_1d() -> Known<Kind> {
         Kind::WalkRefusesOnly,
         Pattern::new(),
         "the tables were measured with the text 1d, which is no number, so they refuse on rows \
-         a text of a number that Polars casts to the dtype it meets (candidate to file)",
+         a text of a number that Polars casts to the dtype it meets (#226)",
     )
     .saying_one_of(&[
         "tables of Polars at Rows: conversion from `str`",
@@ -702,7 +704,7 @@ fn known_literal_cast_as_one_value() -> Known<Kind> {
         "a literal is one value, which Polars casts or broadcasts as it does not a column, and \
          the tables measure the argument as a column of its dtype: a flag met bit by bit with a \
          list or an array, a text read as a bound of an interval of moments, the one new value \
-         of a strict replacement of lists (candidate to file)",
+         of a strict replacement of lists (#258)",
     )
     .saying_one_of(&[
         "`bitand` operation not supported for dtype",
@@ -717,7 +719,7 @@ fn known_nulls_met_by_a_flag() -> Known<Kind> {
         Pattern::new().is("column", "Null"),
         "the table of rows measured what a Boolean added to or divided by a number gives, \
          which a column of nulls met by a typed flag does not change in Polars' plan \
-         (candidate to file)",
+         (#258)",
     )
     .saying("the schema says Boolean and the rows give")
 }
@@ -728,7 +730,7 @@ fn known_shift_filled_with_another_dtype() -> Known<Kind> {
         Pattern::new(),
         "the table of rows measured a shift filled with a value of another dtype than what it \
          shifts, on which Polars panics there, where Polars casts a typed literal to the dtype \
-         of what it fills (candidate to file)",
+         of what it fills (#258)",
     )
     .saying("tables of Polars at Rows: Polars panicked: should not fail: SchemaMismatch")
 }
@@ -745,6 +747,51 @@ fn known_literals_are_one_value() -> Vec<Known<Kind>> {
     ]
 }
 
+/// An exponent of whole numbers that does not fit an unsigned number of 32 bits, which only the
+/// rows show.
+fn known_exponents() -> Known<Kind> {
+    Known::new(
+        Kind::PolarsRefusesOnly,
+        Pattern::new().is("parameter", "Expr.pow(exponent)"),
+        "Polars converts the exponent of whole numbers to an unsigned 32 bit number when the rows \
+         run and refuses one below nothing or above it, which the walk does not read (#224)",
+    )
+    .saying("failed in column 'literal'")
+}
+
+/// A refusal the walk gives at the schema that Polars gives only when the rows run: the verdict is
+/// the same, and its stage is not.
+fn known_stages() -> Vec<Known<Kind>> {
+    vec![
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().is("parameter", "Expr.fill_nan(value)"),
+            "the walk refuses fill_nan of a date, a moment, a length of time, a time of day, a \
+             list or an array filled with a number typed without a dtype at the schema, as no \
+             supertype of the two, where Polars refuses it only when the rows run, for its test \
+             of NaN takes none of them (#231)",
+        )
+        .saying("failed to determine supertype of"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .one_of("column", ["List(Int64)", "Array(Int64, 2)"])
+                .one_of(
+                    "parameter",
+                    [
+                        "Expr.replace_strict(old)",
+                        "Expr.replace_strict(new)",
+                        "Expr.replace_strict(default)",
+                    ],
+                ),
+            "the walk refuses at the schema a strict replacement of a list or an array given a \
+             value of another dtype, where Polars refuses it only when the rows run, as it cannot \
+             replace the values of the column by it (#231)",
+        )
+        .saying("failed to determine supertype of"),
+    ]
+}
+
 /// A share outside 0 to 1, or of another dtype than numbers.
 fn known_shares() -> Vec<Known<Kind>> {
     let quantiles: &[&str] = &["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"];
@@ -753,7 +800,7 @@ fn known_shares() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().one_of("parameter", quantiles),
             "a share outside 0 to 1 is refused by Polars, and the walk does not read the value of \
-             a share (candidate to file)",
+             a share (#224)",
         )
         .saying("`quantile` should be between"),
         Known::new(
@@ -762,7 +809,7 @@ fn known_shares() -> Vec<Known<Kind>> {
                 .one_of("parameter", quantiles)
                 .is("order", "the literal first"),
             "Polars reads a share of numbers only, and refuses a column of another dtype given as \
-             one after a literal, which the walk allows (candidate to file)",
+             one after a literal, which the walk allows (#252)",
         )
         .saying("expected expression of dtype 'numeric' for quantile"),
     ]
@@ -779,8 +826,7 @@ fn known_ambiguous_dtypes() -> Known<Kind> {
             .is("dtype", "none"),
         "Polars finds no dtype for a number typed without a dtype beside a value that is no \
          number, a date, a moment, a length of time, a time of day, a text, a list or an \
-         array, in is_close on either side or in fill_null, which the walk allows (candidate \
-         to file)",
+         array, in is_close on either side or in fill_null, which the walk allows (#227)",
     )
     .saying("got invalid or ambiguous dtypes")
 }
@@ -791,7 +837,7 @@ fn known_bitwise_flags() -> Known<Kind> {
         Pattern::new().is("column", "Boolean").is("dtype", "none"),
         "Polars refuses to meet a Boolean with a number typed without a dtype in a bitwise \
          call, on either side, which the walk leaves not known as it does the arithmetic of \
-         text (candidate to file)",
+         text (#227)",
     )
     .saying("is not supported Hint: cast the Boolean")
 }
@@ -802,7 +848,7 @@ fn known_text_arithmetic() -> Known<Kind> {
         Pattern::new().is("column", "String"),
         "Polars refuses arithmetic of text and a number typed without a dtype, on either side, \
          which the walk leaves to the tables because the kept cases of the fuzz campaign settle \
-         such a prefix as one they could not judge (candidate to file)",
+         such a prefix as one they could not judge (#227)",
     )
     .saying_one_of(&[
         "arithmetic on dtypes str and dyn",
@@ -816,7 +862,7 @@ fn known_text_division() -> Known<Kind> {
         Pattern::new().is("parameter", "Expr.truediv(other)"),
         "Polars refuses to divide text, or a list or a struct that holds it, which the walk \
          leaves to the tables where a number typed without a dtype or a text meets it \
-         (candidate to file)",
+         (#227)",
     )
     .saying("division with 'String' datatypes")
 }
@@ -835,8 +881,7 @@ fn known_padding_lengths() -> Known<Kind> {
             )
             .is("column", "String"),
         "Polars converts the length of a padding to an unsigned 32 bit number and refuses a \
-         number below nothing, a fraction or a date, which the walk does not read (candidate \
-         to file)",
+         number below nothing, a fraction or a date, which the walk does not read (#224)",
     )
     .saying("failed in column 'scalar'")
 }
@@ -849,8 +894,7 @@ fn known_struct_arithmetic_after_a_number() -> Known<Kind> {
             .is("order", "the literal first"),
         "a number typed without a dtype added to, multiplied by or divided by a struct with a \
          field of text is refused by Polars, which the rule struct-arithmetic-needs-numbers \
-         refuses where the struct comes first and not where the number does (candidate to \
-         file)",
+         refuses where the struct comes first and not where the number does (#227)",
     )
     .saying("a struct with non-numeric field")
 }
@@ -862,7 +906,7 @@ fn known_struct_met_by_a_date() -> Known<Kind> {
             .starts("column", "Struct(")
             .is("dtype", "Date"),
         "a struct met by a date typed in, on either side, in arithmetic, is refused by \
-         Polars, which the walk allows (candidate to file)",
+         Polars, which the walk allows (#227)",
     )
     .saying_one_of(&[
         "not allowed on",
@@ -877,7 +921,7 @@ fn known_interval_of_structs() -> Known<Kind> {
             .starts("column", "Struct(")
             .is("order", "the literal first"),
         "an interval of a number whose bounds are a struct is refused by Polars, which asks a \
-         struct of one field there, and the walk allows it (candidate to file)",
+         struct of one field there, and the walk allows it (#227)",
     )
     .saying("must specify one field in the struct")
 }
@@ -888,7 +932,7 @@ fn known_typed_null_folded() -> Known<Kind> {
         Pattern::new().is("value", "null"),
         "a null given a dtype is one value, which Polars folds where it meets a value it cannot \
          compare, cast, list twice or find a dtype with; the tables measured a column of the \
-         dtype there and refuse what Polars takes (candidate to file)",
+         dtype there and refuse what Polars takes (#228)",
     )
     .saying("tables of Polars at")
 }
@@ -899,7 +943,7 @@ fn known_typed_null_of_another_dtype() -> Known<Kind> {
         Pattern::new().is("value", "null"),
         "Polars finds no dtype for a value and a null given a dtype it does not meet, a list or an \
          array filled with a null of a number, a flag or a date, a struct divided by a null, which \
-         the walk allows (candidate to file)",
+         the walk allows (#228)",
     )
     .saying_one_of(&["failed to determine supertype of", "cannot div two structs"])
 }
@@ -919,7 +963,7 @@ fn known_text_bounded_by_a_date() -> Known<Kind> {
         Kind::PolarsRefusesOnly,
         Pattern::new().is("column", "String").is("dtype", "Date"),
         "a text compared with a date typed in as a bound of an interval is refused by Polars, \
-         which the walk allows (candidate to file)",
+         which the walk allows (#227)",
     )
     .saying("cannot compare 'date/datetime/time' to a string value")
 }
@@ -930,7 +974,7 @@ fn known_flags_replaced_by_a_date() -> Known<Kind> {
         Pattern::new().is("column", "Boolean").is("dtype", "Date"),
         "a strict replacement of flags given a date typed in as its new values or its default \
          is refused by Polars, which finds no dtype for the two, and the walk allows it \
-         (candidate to file)",
+         (#227)",
     )
     .saying("failed to determine supertype of")
 }
@@ -943,7 +987,7 @@ fn known_strict_default_of_the_column() -> Known<Kind> {
             .is("order", "the literal first"),
         "a strict replacement that follows a literal and is given the column as its default, \
          of more values than the literal, is allowed by Polars where the column is of flags or \
-         text, which the rule replacement-values-match-in-number refuses (candidate to file)",
+         text, which the rule replacement-values-match-in-number refuses (#252)",
     )
     .saying("rule replacement-values-match-in-number")
 }
@@ -980,6 +1024,9 @@ fn known_literal_grid() -> Vec<Known<Kind>> {
     // The counts are read when the rows run, which this grid asks only where the walk refuses.
     known.extend(known_counts().into_iter().map(Known::shared));
     known.extend(known_overflows().into_iter().map(Known::shared));
+    known.push(known_exponents().shared());
+    // The large grid asks the rows of every cell, where Polars refuses these too.
+    known.extend(known_stages().into_iter().map(Known::shared));
     known.push(known_one_value_given_the_column());
     known.extend(known_literals_are_one_value());
     known.extend(known_shares());
@@ -1012,6 +1059,11 @@ fn a_number_typed_without_a_dtype_beside_a_moment_is_taken_as_polars_takes_it_wh
 
 #[test]
 fn the_walk_takes_a_comparison_with_a_literal_where_a_predicate_stands_as_polars_does() {
+    comparison_grid(Scale::Normal).assert_agree(&known_comparison_grid(), 50_000);
+}
+
+/// Every line of the grid of the comparisons with a literal.
+fn known_comparison_grid() -> Vec<Known<Kind>> {
     let mut known = known_casts();
     known.extend([
         known_literal_cast_as_one_value(),
@@ -1022,7 +1074,7 @@ fn the_walk_takes_a_comparison_with_a_literal_where_a_predicate_stands_as_polars
         known_date_past_its_range().shared(),
         known_typed_null_folded().shared(),
     ]);
-    comparison_grid(Scale::Normal).assert_agree(&known, 50_000);
+    known
 }
 
 #[test]
@@ -1040,11 +1092,11 @@ fn a_function_of_numbers_typed_in_is_a_join_key_as_polars_takes_it_however_they_
 #[test]
 #[ignore = "the large grid, run on request"]
 fn the_large_grid_of_a_literal_by_the_role_of_its_parameter_is_taken_as_polars_does() {
-    literal_grid(Scale::Large).assert_agree(&known_casts(), 1_000_000);
+    literal_grid(Scale::Large).assert_agree(&known_literal_grid(), 1_000_000);
 }
 
 #[test]
 #[ignore = "the large grid, run on request"]
 fn the_large_grid_of_a_comparison_with_a_literal_is_taken_as_polars_does() {
-    comparison_grid(Scale::Large).assert_agree(&known_casts(), 200_000);
+    comparison_grid(Scale::Large).assert_agree(&known_comparison_grid(), 200_000);
 }

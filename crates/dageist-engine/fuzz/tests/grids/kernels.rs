@@ -298,14 +298,14 @@ fn operands(name: &'static str, receiver: bool) -> Choices<Operand> {
     }
 }
 
-/// Every expression parameter of a method, but the one that adds more of another, which `over`'s
-/// `more_exprs` and `sort_by`'s `more_by` are.
+/// Every expression parameter of a method, but one that adds more of a parameter before it, which
+/// `over`'s `more_exprs` and `sort_by`'s `more_by` are. A method whose only operands are many, as
+/// `and_` and `or_` take theirs, keeps them.
 fn methods() -> Choices<Param> {
     axes::expression_parameters("method").keep_unless(|_, param| {
-        param
-            .parameter
-            .variadic()
-            .map(|_| "it adds more of another parameter, which the grid gives".to_owned())
+        let first = param.entry.parameters().first().map(|first| first.name());
+        (param.parameter.variadic().is_some() && first != Some(param.parameter.name()))
+            .then(|| "it adds more of a parameter before it, which the grid gives".to_owned())
     })
 }
 
@@ -391,7 +391,7 @@ fn given_known() -> Vec<Known<Kind>> {
                 .is("argument", "null"),
             "the tables measured the values a replacement replaces as a column of the dtype Null, \
              whose values repeat, which a replacement refuses, and a null literal is one value, \
-             which Polars takes, in a select as well",
+             which Polars takes, in a select as well (#228)",
         )
         .saying("must not contain duplicates"),
         Known::new(
@@ -399,7 +399,7 @@ fn given_known() -> Vec<Known<Kind>> {
             Pattern::new(),
             "the tables were measured with the text 1d, which is no number, and the world's text \
              is of digits, which Polars reads as the count or the length of a method of text, in a \
-             select as well",
+             select as well (#226)",
         )
         .saying_one_of(&[
             "tables of Polars at Rows: conversion from `str`",
@@ -427,7 +427,7 @@ fn given_known() -> Vec<Known<Kind>> {
             Kind::WalkRefusesOnly,
             Pattern::new().is("argument", "null"),
             "the tables measured a count, a share, a fill and a length as a literal of a number, \
-             and a null literal converts to none, which Polars takes, in a select as well",
+             and a null literal converts to none, which Polars takes, in a select as well (#228)",
         )
         .saying("to `null` failed"),
         Known::new(
@@ -487,7 +487,7 @@ fn given_known() -> Vec<Known<Kind>> {
                 .is("argument", "column"),
             "Polars refuses a count that is given the values of a column, in a select as well, so \
              the cell is not the group's: the catalogue does not take the count of head, limit and \
-             tail as one value (candidate to file)",
+             tail as one value (#252)",
         )
         .saying("must be a scalar value"),
         Known::new(
@@ -495,7 +495,7 @@ fn given_known() -> Vec<Known<Kind>> {
             Pattern::new().is("receiver", "literal"),
             "a call that maps one value, a literal, given the values of a group, gives fewer values \
              than the group, which Polars refuses in a group and allows in a select, and the walk \
-             does not follow the length it gives (candidate to file)",
+             does not follow the length it gives (#252)",
         )
         .saying("output length of `map`"),
         Known::new(

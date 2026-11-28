@@ -10,10 +10,11 @@
 //! - Polars refuses it for another reason than the one the grid asks about, which sets it aside.
 //!
 //! Most refusals happen while Polars works out the dtypes, so a cell is judged from the schema
-//! Polars works out of its query, with no row read. A question that asks for [`Depth::Rows`], and a
-//! cell the walk refuses, runs the rows of the table too, which is where a strict cast of a value, a
-//! length and a panic of Polars show: a walk that refuses what the plan allows is a disagreement only
-//! where the rows run too. A panic of Polars or of the walk is a cell's outcome.
+//! Polars works out of its query, with no row read. A question that asks for [`Depth::Rows`] runs
+//! the rows of the table too, which is where a strict cast of a value, a length and a panic of
+//! Polars show. So does a cell the walk refuses by a rule, which names no stage, or by what the
+//! tables recorded on rows; a cell the walk says Polars refuses at the plan is held to the plan. A
+//! panic of Polars or of the walk is a cell's outcome.
 
 use std::time::{Duration, Instant};
 
@@ -383,13 +384,16 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
         step.walk(0, case.working.schema(), &inputs)
     }));
     let walk_spent = walk_started.elapsed();
-    // The walk says Polars refuses it on rows, so the rows are what to ask.
+    // A refusal the walk does not say Polars gives at the plan, one the tables recorded on rows or
+    // one of a rule, which names no stage, is held to the rows: a rule may say what Polars refuses
+    // only when it runs them. A refusal the walk says Polars gives at the plan is held to the plan,
+    // so a plan that allows it is a disagreement of stage.
     let (walk_said, walk_said_rows, cannot_tell, walk) = match walked {
         Ok(walk) => {
             let rows = walk.refusal().is_some_and(|refusal| {
-                matches!(
+                !matches!(
                     refusal.refusal().source(),
-                    RefusalSource::Polars(Stage::Rows | Stage::Empty)
+                    RefusalSource::Polars(Stage::Schema)
                 )
             });
             let said = walk
@@ -423,9 +427,7 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
             .map(|(_, list)| polars::prelude::lit(list.clone()).implode(true))
     };
     let connected = Connected::new(&tables, &literals);
-    // A refusal of the walk that the plan does not confirm is held to the rows before it is called
-    // a disagreement: a rule may say what Polars refuses only when it runs them.
-    let rows = question.depth == Depth::Rows || walk_said_rows || walk_said.is_some();
+    let rows = question.depth == Depth::Rows || walk_said_rows;
     let decided = std::cell::Cell::new(SCHEMA);
     let polars_started = Instant::now();
     // A panic of Polars is its answer, as a refusal is.

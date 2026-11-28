@@ -272,7 +272,7 @@ fn known() -> Vec<Known<Kind>> {
             Pattern::new().starts("form", "?"),
             "what is looked up in is of a dtype with no class of the tables (a list of lists, of \
              structs, a binary, a categorical, an enum), so the walk cannot tell that Polars \
-             refuses it and leaves it to the step's run",
+             refuses it and leaves it to the step's run (#237)",
         )
         .saying("cannot check for"),
     );
@@ -282,7 +282,7 @@ fn known() -> Vec<Known<Kind>> {
             Pattern::new().starts("receiver", "?"),
             "the value is of a dtype with no class of the tables (a binary, a categorical, an \
              enum), so the walk cannot tell what it may be looked up in and leaves it to the \
-             step's run",
+             step's run (#237)",
         )
         .saying("cannot check for"),
     );
@@ -300,7 +300,7 @@ fn known() -> Vec<Known<Kind>> {
                 "the deprecated form with a dtype of no class on one side: Polars gathers what is \
                  looked up in into a list for it, which leaves a join's key not elementwise, and \
                  the walk, which does not know the dtype, cannot tell that it is the deprecated \
-                 form",
+                 form (#237)",
             )
             .saying("elementwise"),
         );

@@ -96,7 +96,7 @@ fn known() -> Vec<Known<Kind>> {
             Pattern::new(),
             "the value does not fit the dtype it is given, or is a text given Boolean, so the \
              catalogue builds no literal to compare and the step engine refuses the step before \
-             the walk is asked",
+             the walk is asked (#225)",
         )
         .saying_one_of(&["conversion from", "casting from", "cannot cast "]),
         Known::new(
@@ -117,7 +117,7 @@ fn known() -> Vec<Known<Kind>> {
             "a column compared with a null given a dtype, by a comparison that does not compare \
              missing values, is folded by Polars into a null, which leaves the key no elementwise \
              one; the rule key-is-elementwise refuses a column compared with a null typed without \
-             a dtype and not one given a dtype (candidate to file)",
+             a dtype and not one given a dtype (#228)",
         )
         .saying("must be elementwise"),
         Known::new(

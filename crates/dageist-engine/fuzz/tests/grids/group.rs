@@ -63,7 +63,7 @@ fn known_a_number_beside_what_nests(axis: &'static str) -> Known<Kind> {
         Pattern::new().contains_one_of(axis, NESTED),
         "a number typed without a dtype that meets a list, an array or a struct, compared with it, \
          replacing in it or bounding it, is refused by Polars, which compares, casts and bounds \
-         none of them by a number; the walk allows it (candidate to file)",
+         none of them by a number; the walk allows it (#227)",
     )
     .saying_one_of(&[
         "could not evaluate comparison between",
@@ -102,7 +102,7 @@ fn known_texts_measured_as_1d() -> Known<Kind> {
         Kind::WalkRefusesOnly,
         Pattern::new(),
         "the tables were measured with the text 1d, which is no number, and Polars reads the text of \
-         a number, or a null of text, where the walk keeps the refusal of the tables",
+         a number, or a null of text, where the walk keeps the refusal of the tables (#226)",
     )
     .saying_one_of(&[
         "tables of Polars at Rows: conversion from `str`",
@@ -117,7 +117,7 @@ fn known_a_number_beside_flags_text_and_nulls() -> Known<Kind> {
         Kind::PolarsRefusesOnly,
         Pattern::new(),
         "Polars refuses a number typed without a dtype met bit by bit with a flag or a null of no \
-         dtype, or compared with text, which the walk leaves to the tables (candidate to file)",
+         dtype, or compared with text, which the walk leaves to the tables (#227)",
     )
     .saying_one_of(&[
         "is not supported Hint: cast the Boolean",
@@ -234,7 +234,7 @@ fn keys_known() -> Vec<Known<Kind>> {
             Kind::BuildRefusesOnly,
             Pattern::new().contains_one_of("form", ["Expr.over"]),
             "over needs one of partition_by and order_by, which the catalogue marks neither of as \
-             needed and refuses when it builds the step; the walk allows it (candidate to file)",
+             needed and refuses when it builds the step; the walk allows it (#259)",
         )
         .saying("At least one of `partition_by` and `order_by`"),
         Known::new(
@@ -321,7 +321,7 @@ fn every_aggregate_over_every_class_is_what_polars_says_in_agg() {
             Kind::PolarsRefusesOnly,
             Pattern::new().is("method", "Expr.gather"),
             "Polars takes only whole numbers as the indices of gather and refuses a number with a \
-             fraction, which the walk allows (candidate to file)",
+             fraction, which the walk allows (#259)",
         )
         .saying("expected: integer type"),
     ];
@@ -405,7 +405,7 @@ fn what_does_not_aggregate_in_agg_is_what_polars_says_and_gives_a_list_of_its_dt
             Kind::DtypeDiffers,
             Pattern::new().has_one_of("then", ["Expr.arg_unique"]),
             "the walk takes the places of the first of each value as one value where it follows one, \
-             which Polars gives as a list of them for each group (candidate to file)",
+             which Polars gives as a list of them for each group (#244)",
         )
         .saying("Polars gives List("),
     ];
@@ -486,7 +486,7 @@ fn shortcuts_known() -> Vec<Known<Kind>> {
             Pattern::new(),
             "the catalogue holds a whole number typed in to the range the parameter of Python's \
              binding takes, a count of rows below nothing, and refuses one outside it when it builds \
-             the step, as Python does; the walk reads no value typed in (candidate to file)",
+             the step, as Python does; the walk reads no value typed in (#259)",
         )
         .saying("takes a whole number from"),
         Known::new(
@@ -638,7 +638,7 @@ fn a_having_predicate_of_every_class_is_what_polars_says() {
             Pattern::new().starts("predicate", "a null of"),
             "a null kept through a fill is a null, which Polars casts to a Boolean whatever its \
              dtype; the rule having-casts-to-boolean takes a null through the calls that keep one \
-             value and not through a fill (candidate to file)",
+             value and not through a fill (#257)",
         )
         .saying("rule having-casts-to-boolean"),
         Known::new(
@@ -646,7 +646,7 @@ fn a_having_predicate_of_every_class_is_what_polars_says() {
             Pattern::new().is("predicates", "two"),
             "two predicates of a having are met as flags, which Polars refuses for a value that is \
              no flag, where it casts one predicate alone; the walk casts each as it casts one \
-             (candidate to file)",
+             (#257)",
         )
         .saying("filter predicate must be of type `Boolean`"),
         Known::new(
@@ -654,7 +654,7 @@ fn a_having_predicate_of_every_class_is_what_polars_says() {
             Pattern::new().is("predicate", "the values, Expr.eq"),
             "the values of a group of dates, moments, lengths of time or decimals compared with a \
              number are a list of flags for each group, which Polars cannot cast to a flag, and the \
-             walk allows it (candidate to file)",
+             walk allows it (#257)",
         )
         .saying("cannot cast List type"),
     ];

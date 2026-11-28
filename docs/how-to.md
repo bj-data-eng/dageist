@@ -1027,8 +1027,9 @@ framework, and what an axis leaves out it names, with why:
 4. Judge every cell with `grid.judge(|point| question.judge(build(point)))`, where `build` returns the
    `Case` of the point or the words of why it cannot be built. The `Question` says which refusals answer
    it; ask `Depth::Rows` where the outcome depends on the rows (a strict cast of a value, a length, a
-   panic). A cell the walk refuses is asked the rows before it is called a disagreement, so a rule that
-   says what Polars refuses only when it runs is not a disagreement of the plan. `Question::with_dtypes`
+   panic). A cell the walk refuses by a rule, which names no stage, or by what the tables recorded on
+   rows is asked the rows before it is called a disagreement; one the walk says Polars refuses at the
+   plan is held to the plan, so a plan that allows it is a disagreement. `Question::with_dtypes`
    also holds the class the walk gives at each place of a step both allow to Polars' dtype there, and
    `Question::cannot_tell` says which words of what the walk cannot tell answer the question.
 5. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of its

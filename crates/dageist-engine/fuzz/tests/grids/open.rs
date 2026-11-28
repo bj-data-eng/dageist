@@ -713,7 +713,7 @@ fn a_whole_number_stays_open_through_the_calls_only_whole_numbers_take() {
                 )
                 .starts("number", "-"),
             "Polars keeps a whole number below nothing typed without a dtype open through a \
-             bitwise aggregate of it, which the walk does not say is open (candidate to file)",
+             bitwise aggregate of it, which the walk does not say is open (#227)",
         )
         .saying("datatypes of join keys"),
     );
