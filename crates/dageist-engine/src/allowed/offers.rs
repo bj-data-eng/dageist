@@ -1870,12 +1870,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Polars keeps a number typed without a dtype open in a struct that is a join's key, as `dyn
     // float` in its dtype, so the key does not match the other table's key that the number resolves
     // to, though both are one dtype: a key made of such a struct, or of a field read from one, is
-    // not told. The walk tells the same of a number that a chain keeps open outside a struct.
+    // not told. What follows such a struct and is no struct, as the text it is encoded as, is
+    // settled. The walk tells the same of a number that a chain keeps open outside a struct.
     let in_a_key = matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
         && place.context.nested().is_none();
     if in_a_key
         && ((id == "polars.struct" && chosen.inputs.iter().any(Input::is_loose))
-            || chosen.fields.is_some_and(Fields::has_a_loose_field)
+            || (chosen.fields.is_some_and(Fields::has_a_loose_field)
+                && result.as_ref().and_then(ResultDtype::class) == Some(Representative::Struct))
             || struct_gives.reads_a_loose_field())
     {
         ending = Ending::NotKnown(Unknown::AnOpenNumberInAKey);

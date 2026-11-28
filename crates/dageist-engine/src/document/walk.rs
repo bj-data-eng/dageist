@@ -1128,7 +1128,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
 /// number with a fraction settles it, as one that turns it into text does. An operand the number
 /// adapts to settles it where that is typed, and leaves it open where it is open too. The last
 /// value of a condition is open where every value of the condition is. A field read from a struct
-/// that holds an open number is open, which the call's own words say where it stands in a key.
+/// that holds an open number is open, which the call's own words say where it stands in a key; what
+/// else follows such a struct, as the text it is encoded as does, is not.
 fn open_after(
     link: &Call,
     arguments: &[(String, Operand)],
@@ -1139,10 +1140,12 @@ fn open_after(
 ) -> bool {
     let entry = link.entry();
     let allowance = standing.verdict().and_then(Verdict::allowance);
-    if matches!(
-        allowance.map(allowed::Allowance::can_end),
-        Some(Ending::NotKnown(Unknown::AnOpenNumberInAKey))
-    ) {
+    if entry.id().as_str() == "Expr.struct.field"
+        && matches!(
+            allowance.map(allowed::Allowance::can_end),
+            Some(Ending::NotKnown(Unknown::AnOpenNumberInAKey))
+        )
+    {
         return true;
     }
     match entry.id().as_str() {
