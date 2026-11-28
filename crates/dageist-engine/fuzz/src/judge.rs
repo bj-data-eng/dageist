@@ -498,21 +498,10 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
     }
 }
 
-/// The class the walk gives an expression at the `at`th of its places.
-fn claimed_at(
-    expression: &dageist_engine::document::WalkedExpression,
-    at: usize,
-) -> Option<dageist_engine::allowed::Representative> {
-    match expression.places().get(at).copied().flatten()?.after() {
-        dageist_engine::allowed::After::Value { dtype, .. } => Some(dtype),
-        _ => None,
-    }
-}
-
 /// Where the class the walk gives at the start of an expression or after a link is not the dtype
 /// Polars gives there, as the fuzz harness compares them: the words of the first place that
-/// differs. A place the walk gives no class of, or Polars no dtype of, is not compared, and the
-/// start of an expression is held to what [`ask::class_at_start`] says it is held to.
+/// differs. A place the walk gives no class of, or Polars no dtype of, is not compared, and what the
+/// walk claims is what [`ask::claimed_classes`] says, as the campaign holds it.
 fn dtype_difference(
     step: &dageist_engine::document::Step,
     walk: &dageist_engine::document::Walk,
@@ -542,17 +531,14 @@ fn dtype_difference(
                 _ => None,
             }
         };
-        if let Some(difference) = differs(
-            "at the start".to_owned(),
-            ask::class_at_start(step, expression, claimed_at(expression, 0)),
-            &trace.start,
-        ) {
+        let (start, links) = ask::claimed_classes(step, expression);
+        if let Some(difference) = differs("at the start".to_owned(), start, &trace.start) {
             return Some(difference);
         }
         for (at, said) in trace.links.iter().enumerate() {
             if let Some(difference) = differs(
                 format!("after link {}", at + 1),
-                claimed_at(expression, at + 1),
+                links.get(at).copied().flatten(),
                 said,
             ) {
                 return Some(difference);

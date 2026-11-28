@@ -209,6 +209,55 @@ pub fn class_at_start(
     }
 }
 
+/// The class of what a place follows, when it follows a value of one. Where the values are
+/// evaluated on the rows of each group, which an aggregate and a predicate of a group by are, what
+/// is many values is a list of them for each group: a list of the scalar dtype the tables measured,
+/// and no class for a list of a dtype that is no scalar.
+#[must_use]
+pub fn claimed_class(place: Option<allowed::Place>, by_group: bool) -> Option<Representative> {
+    match place?.after() {
+        allowed::After::Value { dtype, shape } if by_group && shape != allowed::Shape::One => {
+            allowed::Inner::of_class(dtype).map(Representative::List)
+        }
+        allowed::After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    }
+}
+
+/// The class the walk says `expression`, the expression of `step` at its place, has at its start
+/// and after each of its links, as Polars is held to it: in an aggregate and a predicate of a group
+/// by, what is many values is a list of them for each group, and elsewhere the start is held to
+/// what [`class_at_start`] says.
+#[must_use]
+pub fn claimed_classes(
+    step: &Step,
+    expression: &WalkedExpression,
+) -> (Option<Representative>, Vec<Option<Representative>>) {
+    let places = expression.places();
+    let by_group = expression.context().is_some_and(|context| {
+        matches!(
+            context.outer(),
+            allowed::Outer::Aggregate | allowed::Outer::Having
+        )
+    });
+    let followed = places
+        .first()
+        .copied()
+        .and_then(|place| claimed_class(place, by_group));
+    let start = if by_group {
+        followed
+    } else {
+        class_at_start(step, expression, followed)
+    };
+    let links = places
+        .iter()
+        .skip(1)
+        .copied()
+        .map(|place| claimed_class(place, by_group))
+        .collect();
+    (start, links)
+}
+
 /// Plans `step`, the `index`th of a document, on `source`, and works out the dtypes of its
 /// expressions; `None` for a step that cannot be asked.
 pub fn plan(step: &Step, index: usize, source: &DataFrame, tables: Tables) -> Option<Planned> {
