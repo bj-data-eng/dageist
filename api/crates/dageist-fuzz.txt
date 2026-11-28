@@ -371,6 +371,132 @@ pub const dageist_fuzz::generation::FLOAT_EDGES: &[u64]
 pub const dageist_fuzz::generation::INTEGER_EDGES: &[i64]
 pub fn dageist_fuzz::generation::bounded_vector<T>(count: usize, item_charge: dageist_fuzz::generation::BudgetCharge, budget: &mut dageist_fuzz::generation::Budget, construct: impl core::ops::function::FnMut() -> dageist_fuzz::Result<T>) -> dageist_fuzz::Result<alloc::vec::Vec<T>>
 pub fn dageist_fuzz::generation::forest_from_choices(choices: &[u64], budget: &mut dageist_fuzz::generation::Budget) -> dageist_fuzz::Result<dageist_fuzz::generation::OrderedForest>
+pub mod dageist_fuzz::grid
+pub enum dageist_fuzz::grid::Scale
+pub dageist_fuzz::grid::Scale::Large
+pub dageist_fuzz::grid::Scale::Normal
+pub struct dageist_fuzz::grid::AxisRecord
+pub dageist_fuzz::grid::AxisRecord::choices: usize
+pub dageist_fuzz::grid::AxisRecord::left_out: alloc::vec::Vec<dageist_fuzz::grid::LeftOutRecord>
+pub dageist_fuzz::grid::AxisRecord::name: &'static str
+pub dageist_fuzz::grid::AxisRecord::thinned: core::option::Option<dageist_fuzz::grid::ThinnedRecord>
+pub struct dageist_fuzz::grid::AxisTally
+pub dageist_fuzz::grid::AxisTally::labels: alloc::vec::Vec<alloc::string::String>
+pub dageist_fuzz::grid::AxisTally::left_out: alloc::vec::Vec<dageist_fuzz::grid::LeftOut>
+pub dageist_fuzz::grid::AxisTally::name: &'static str
+pub dageist_fuzz::grid::AxisTally::thinned: core::option::Option<dageist_fuzz::grid::Thinned>
+pub struct dageist_fuzz::grid::Cell<O>
+pub dageist_fuzz::grid::Cell::labels: alloc::vec::Vec<(&'static str, alloc::string::String)>
+pub dageist_fuzz::grid::Cell::outcome: O
+impl<O> dageist_fuzz::grid::Cell<O>
+pub fn dageist_fuzz::grid::Cell<O>::label(&self, axis: &str) -> core::option::Option<&str>
+pub fn dageist_fuzz::grid::Cell<O>::name(&self) -> alloc::string::String
+pub struct dageist_fuzz::grid::Choices<V>
+impl<V> dageist_fuzz::grid::Choices<V>
+pub fn dageist_fuzz::grid::Choices<V>::and(self, other: Self) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::get(&self, label: &str) -> core::option::Option<&V>
+pub fn dageist_fuzz::grid::Choices<V>::is_empty(&self) -> bool
+pub fn dageist_fuzz::grid::Choices<V>::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = (&str, &V)>
+pub fn dageist_fuzz::grid::Choices<V>::keep_unless(self, refuses: impl core::ops::function::Fn(&str, &V) -> core::option::Option<alloc::string::String>) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::labels(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn dageist_fuzz::grid::Choices<V>::leave_out(self, label: impl core::convert::Into<alloc::string::String>, reason: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::left_out(&self) -> &[dageist_fuzz::grid::LeftOut]
+pub fn dageist_fuzz::grid::Choices<V>::len(&self) -> usize
+pub fn dageist_fuzz::grid::Choices<V>::map<W>(self, make: impl core::ops::function::FnMut(V) -> W) -> dageist_fuzz::grid::Choices<W>
+pub const fn dageist_fuzz::grid::Choices<V>::name(&self) -> &'static str
+pub fn dageist_fuzz::grid::Choices<V>::named(self, name: &'static str) -> Self
+pub const fn dageist_fuzz::grid::Choices<V>::new(name: &'static str) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::of<L: core::convert::Into<alloc::string::String>>(name: &'static str, choices: impl core::iter::traits::collect::IntoIterator<Item = (L, V)>) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::one_of_each<K: core::cmp::Ord>(self, scale: dageist_fuzz::grid::Scale, rule: &str, kind: impl core::ops::function::Fn(&str, &V) -> K) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::relabel(self, label: impl core::ops::function::Fn(&str, &V) -> alloc::string::String) -> Self
+pub fn dageist_fuzz::grid::Choices<V>::thin(self, scale: dageist_fuzz::grid::Scale, every: usize) -> Self
+pub const fn dageist_fuzz::grid::Choices<V>::thinned(&self) -> core::option::Option<&dageist_fuzz::grid::Thinned>
+pub fn dageist_fuzz::grid::Choices<V>::with(self, label: impl core::convert::Into<alloc::string::String>, value: V) -> Self
+pub struct dageist_fuzz::grid::Grid<P>
+impl<P: core::default::Default + 'static> dageist_fuzz::grid::Grid<P>
+pub fn dageist_fuzz::grid::Grid<P>::axis<V: core::marker::Send + core::marker::Sync + 'static>(self, choices: dageist_fuzz::grid::Choices<V>, set: fn(&mut P, &V)) -> Self
+pub fn dageist_fuzz::grid::Grid<P>::draw(&self, entropy: &mut dageist_fuzz::generation::Entropy<'_>) -> dageist_fuzz::Result<usize>
+pub fn dageist_fuzz::grid::Grid<P>::judge<O: dageist_fuzz::grid::Outcome>(&self, judge: impl core::ops::function::Fn(&P) -> dageist_fuzz::grid::Judged<O> + core::marker::Sync) -> dageist_fuzz::grid::Verdicts<O>
+pub fn dageist_fuzz::grid::Grid<P>::labels(&self, index: usize) -> alloc::vec::Vec<(&'static str, alloc::string::String)>
+pub const fn dageist_fuzz::grid::Grid<P>::name(&self) -> &'static str
+pub const fn dageist_fuzz::grid::Grid<P>::new(name: &'static str) -> Self
+pub fn dageist_fuzz::grid::Grid<P>::point(&self, index: usize) -> P
+pub fn dageist_fuzz::grid::Grid<P>::size(&self) -> usize
+pub const fn dageist_fuzz::grid::Grid<P>::stack(self, bytes: usize) -> Self
+pub struct dageist_fuzz::grid::Judged<O>
+impl<O> dageist_fuzz::grid::Judged<O>
+pub const fn dageist_fuzz::grid::Judged<O>::decided_by(self, what: &'static str) -> Self
+pub const fn dageist_fuzz::grid::Judged<O>::new(outcome: O) -> Self
+pub fn dageist_fuzz::grid::Judged<O>::note(self, what: &'static str) -> Self
+pub const fn dageist_fuzz::grid::Judged<O>::outcome(&self) -> &O
+pub fn dageist_fuzz::grid::Judged<O>::spent(self, who: &'static str, time: core::time::Duration) -> Self
+pub struct dageist_fuzz::grid::Known<K>
+impl<K: dageist_fuzz::grid::Kind> dageist_fuzz::grid::Known<K>
+pub const fn dageist_fuzz::grid::Known<K>::is_shared(&self) -> bool
+pub const fn dageist_fuzz::grid::Known<K>::kind(&self) -> K
+pub const fn dageist_fuzz::grid::Known<K>::new(kind: K, pattern: dageist_fuzz::grid::Pattern, reason: &'static str) -> Self
+pub const fn dageist_fuzz::grid::Known<K>::reason(&self) -> &'static str
+pub fn dageist_fuzz::grid::Known<K>::saying(self, words: &'static str) -> Self
+pub fn dageist_fuzz::grid::Known<K>::saying_one_of(self, words: &[&'static str]) -> Self
+pub const fn dageist_fuzz::grid::Known<K>::shared(self) -> Self
+pub struct dageist_fuzz::grid::KnownTally
+pub dageist_fuzz::grid::KnownTally::cells: usize
+pub dageist_fuzz::grid::KnownTally::kind: &'static str
+pub dageist_fuzz::grid::KnownTally::reason: &'static str
+pub struct dageist_fuzz::grid::LeftOut
+pub dageist_fuzz::grid::LeftOut::label: alloc::string::String
+pub dageist_fuzz::grid::LeftOut::reason: alloc::string::String
+pub struct dageist_fuzz::grid::LeftOutRecord
+pub dageist_fuzz::grid::LeftOutRecord::label: alloc::string::String
+pub dageist_fuzz::grid::LeftOutRecord::reason: alloc::string::String
+pub struct dageist_fuzz::grid::Pattern
+impl dageist_fuzz::grid::Pattern
+pub fn dageist_fuzz::grid::Pattern::contains_one_of<S: core::convert::AsRef<str>>(self, axis: &'static str, words: impl core::iter::traits::collect::IntoIterator<Item = S>) -> Self
+pub fn dageist_fuzz::grid::Pattern::has_one_of<S: core::convert::AsRef<str>>(self, axis: &'static str, parts: impl core::iter::traits::collect::IntoIterator<Item = S>) -> Self
+pub fn dageist_fuzz::grid::Pattern::is(self, axis: &'static str, label: impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dageist_fuzz::grid::Pattern::new() -> Self
+pub fn dageist_fuzz::grid::Pattern::one_of<S: core::convert::AsRef<str>>(self, axis: &'static str, labels: impl core::iter::traits::collect::IntoIterator<Item = S>) -> Self
+pub fn dageist_fuzz::grid::Pattern::starts(self, axis: &'static str, prefix: impl core::convert::Into<alloc::string::String>) -> Self
+pub struct dageist_fuzz::grid::Tally
+pub dageist_fuzz::grid::Tally::axes: alloc::vec::Vec<dageist_fuzz::grid::AxisRecord>
+pub dageist_fuzz::grid::Tally::cells: usize
+pub dageist_fuzz::grid::Tally::decided_by: alloc::collections::btree::map::BTreeMap<&'static str, usize>
+pub dageist_fuzz::grid::Tally::grid: &'static str
+pub dageist_fuzz::grid::Tally::judged: usize
+pub dageist_fuzz::grid::Tally::kinds: alloc::collections::btree::map::BTreeMap<&'static str, usize>
+pub dageist_fuzz::grid::Tally::known: alloc::vec::Vec<dageist_fuzz::grid::KnownTally>
+pub dageist_fuzz::grid::Tally::notes: alloc::collections::btree::map::BTreeMap<&'static str, usize>
+pub dageist_fuzz::grid::Tally::stale: alloc::vec::Vec<&'static str>
+pub dageist_fuzz::grid::Tally::unnamed: usize
+impl dageist_fuzz::grid::Tally
+pub fn dageist_fuzz::grid::Tally::write_to(&self, folder: &std::path::Path) -> core::io::error::Result<std::path::PathBuf>
+pub struct dageist_fuzz::grid::Thinned
+pub dageist_fuzz::grid::Thinned::kept: usize
+pub dageist_fuzz::grid::Thinned::of: usize
+pub dageist_fuzz::grid::Thinned::rule: alloc::string::String
+pub struct dageist_fuzz::grid::ThinnedRecord
+pub dageist_fuzz::grid::ThinnedRecord::kept: usize
+pub dageist_fuzz::grid::ThinnedRecord::of: usize
+pub dageist_fuzz::grid::ThinnedRecord::rule: alloc::string::String
+pub struct dageist_fuzz::grid::Verdicts<O: dageist_fuzz::grid::Outcome>
+impl<O: dageist_fuzz::grid::Outcome> dageist_fuzz::grid::Verdicts<O>
+pub fn dageist_fuzz::grid::Verdicts<O>::assert_agree(&self, known: &[dageist_fuzz::grid::Known<<O as dageist_fuzz::grid::Outcome>::Kind>], judged_at_least: usize)
+pub fn dageist_fuzz::grid::Verdicts<O>::axes(&self) -> &[dageist_fuzz::grid::AxisTally]
+pub fn dageist_fuzz::grid::Verdicts<O>::cells_a_second(&self) -> f64
+pub fn dageist_fuzz::grid::Verdicts<O>::count(&self, kind: <O as dageist_fuzz::grid::Outcome>::Kind) -> usize
+pub fn dageist_fuzz::grid::Verdicts<O>::judged(&self) -> usize
+pub fn dageist_fuzz::grid::Verdicts<O>::listed(&self) -> impl core::iter::traits::iterator::Iterator<Item = dageist_fuzz::grid::Cell<O>> + '_
+pub const fn dageist_fuzz::grid::Verdicts<O>::size(&self) -> usize
+pub fn dageist_fuzz::grid::Verdicts<O>::tally(&self, known: &[dageist_fuzz::grid::Known<<O as dageist_fuzz::grid::Outcome>::Kind>]) -> dageist_fuzz::grid::Tally
+pub trait dageist_fuzz::grid::Kind: core::marker::Copy + core::cmp::Ord + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub const dageist_fuzz::grid::Kind::ALL: &'static [Self]
+pub fn dageist_fuzz::grid::Kind::is_agreed(self) -> bool
+pub fn dageist_fuzz::grid::Kind::is_judged(self) -> bool
+pub fn dageist_fuzz::grid::Kind::words(self) -> &'static str
+pub trait dageist_fuzz::grid::Outcome: core::clone::Clone + core::marker::Send + 'static
+pub type dageist_fuzz::grid::Outcome::Kind: dageist_fuzz::grid::Kind
+pub fn dageist_fuzz::grid::Outcome::kind(&self) -> Self::Kind
+pub fn dageist_fuzz::grid::Outcome::said(&self) -> alloc::string::String
 pub mod dageist_fuzz::reduction
 pub enum dageist_fuzz::reduction::ReductionInterruption
 pub dageist_fuzz::reduction::ReductionInterruption::Cancelled
