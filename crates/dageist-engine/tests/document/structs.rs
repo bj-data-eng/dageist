@@ -2024,6 +2024,28 @@ fn a_number_that_a_call_keeps_open_is_not_told_as_a_join_key() {
         ("the negation of a whole number", |typed| {
             chain(a_whole_number(typed), vec![negated()])
         }),
+        ("the largest of the absolute value of a float", |typed| {
+            chain(a_float(typed), vec![absolute(), largest()])
+        }),
+        ("the sum of the absolute value of a whole number", |typed| {
+            chain(
+                a_whole_number(typed),
+                vec![absolute(), call("Expr.sum", json!({}))],
+            )
+        }),
+        (
+            "the first of the absolute value of a whole number",
+            |typed| {
+                chain(
+                    a_whole_number(typed),
+                    vec![absolute(), call("Expr.first", json!({}))],
+                )
+            },
+        ),
+        (
+            "the absolute value of the largest of the absolute value of a float",
+            |typed| chain(a_float(typed), vec![absolute(), largest(), absolute()]),
+        ),
         (
             "the absolute value of the absolute value of a float",
             |typed| chain(a_float(typed), vec![absolute(), absolute()]),
@@ -2098,6 +2120,9 @@ fn a_number_that_stands_alone_or_is_settled_by_what_it_meets_is_told_as_a_join_k
         ("a float alone", |typed| chain(a_float(typed), vec![])),
         ("the largest of a float", |typed| {
             chain(a_float(typed), vec![largest()])
+        }),
+        ("the sum of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![call("Expr.sum", json!({}))])
         }),
         ("the absolute value of a float, as a Boolean is", |typed| {
             chain(a_float(typed), vec![call("Expr.is_nan", json!({}))])

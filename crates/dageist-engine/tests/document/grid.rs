@@ -986,7 +986,7 @@ impl Cell {
 enum Matcher {
     Is(&'static str),
     Starts(&'static str),
-    EndsOneOf(&'static [&'static str]),
+    ContainsOneOf(&'static [&'static str]),
     OneOf(&'static [&'static str]),
 }
 
@@ -995,7 +995,7 @@ impl Matcher {
         match self {
             Self::Is(word) => label == word,
             Self::Starts(prefix) => label.starts_with(prefix),
-            Self::EndsOneOf(suffixes) => suffixes.iter().any(|suffix| label.ends_with(suffix)),
+            Self::ContainsOneOf(words) => words.iter().any(|word| label.contains(word)),
             Self::OneOf(words) => words.contains(&label),
         }
     }
@@ -1028,10 +1028,10 @@ impl Pattern {
         self
     }
 
-    /// The label of `axis` ends with one of `suffixes`.
+    /// The label of `axis` holds one of `words`.
     #[must_use]
-    pub fn ends_one_of(mut self, axis: &'static str, suffixes: &'static [&'static str]) -> Self {
-        self.parts.push((axis, Matcher::EndsOneOf(suffixes)));
+    pub fn contains_one_of(mut self, axis: &'static str, words: &'static [&'static str]) -> Self {
+        self.parts.push((axis, Matcher::ContainsOneOf(words)));
         self
     }
 

@@ -27,7 +27,7 @@ use serde_json::{Value, json};
 
 use dageist_engine::allowed::{
     self, After, Chosen as Offered, Context, Outer, Place as Standing, Representative, Shape,
-    Verdict,
+    Unknown, Verdict,
 };
 use dageist_engine::catalog::{Applies, Entry, entries};
 
@@ -47,19 +47,12 @@ fn falls_back_to(number: &Written) -> &'static str {
 /// The numbers a grid writes, at the edges of the dtypes they fall back to and past them.
 fn numbers(normal: bool) -> Vec<Written> {
     if normal {
-        // Each kind and each edge, a few of each.
+        // A whole number, one past Int32, a fraction and one past Float32's range.
         return vec![
-            Written::Integer(0),
-            Written::Integer(-1),
             Written::Integer(5),
             Written::Integer(i64::from(i32::MAX) + 1),
-            Written::Integer(i64::MAX),
-            Written::Float(-0.0),
             Written::Float(1.5),
-            Written::Float(100.0),
-            Written::Float(9.3e18),
             Written::Float(1e40),
-            Written::Float(-1e40),
         ];
     }
     vec![
@@ -132,34 +125,82 @@ struct Chain {
     calls: Vec<Value>,
 }
 
-/// Whether the tables say that `entry`, given nothing, gives back the dtype it follows, for each
-/// dtype a number typed without a dtype falls back to: a call that Polars may leave such a number
-/// open through.
-fn gives_back_the_dtype(entry: &'static Entry) -> bool {
-    if std::env::var_os("SCRATCH_ALL").is_some() {
-        return true;
+/// What the tables say a call that is given nothing does with a number of each dtype a number
+/// typed without a dtype falls back to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Does {
+    /// It gives back the dtype it follows, for each of them, and as many values: a call Polars may
+    /// leave such a number open through.
+    Keeps,
+    /// It gives back the dtype it follows, for each of them, and one value of the many it follows.
+    Aggregates,
+    /// It gives back the dtype it follows for some of them and another for the rest, and as many
+    /// values: a call that turns whole numbers into numbers with a fraction, as a logarithm does.
+    KeepsSome,
+    /// It gives another dtype for each of them, for each of them allows.
+    Changes,
+}
+
+fn what_it_does(entry: &'static Entry) -> Option<Does> {
+    // `over` needs one of two parameters that neither is marked as needed, so it is given none.
+    if entry.id().as_str() == "Expr.over" {
+        return None;
     }
-    [
+    // For each dtype the call allows: whether it gives that dtype back, whether it gives one value,
+    // and whether what it gives is a number that a call that keeps the dtype can follow: a signed
+    // whole number or a number with a fraction, and no text, flag, list, struct or unsigned count.
+    let mut does = Vec::new();
+    for class in [
         Representative::Int32,
         Representative::Int64,
         Representative::Float64,
-    ]
-    .into_iter()
-    .all(|class| {
+    ] {
         let place = Standing::new(
             Context::step(Outer::Select),
             After::Value {
                 dtype: class,
-                shape: Shape::One,
+                shape: Shape::Many,
             },
         );
-        match allowed::offer(entry, &place, &Offered::default()) {
-            Verdict::Allowed(allowance) => {
-                allowance.result().and_then(allowed::ResultDtype::class) == Some(class)
-            }
-            Verdict::Refused(_) => false,
+        if let Verdict::Allowed(allowance) = allowed::offer(entry, &place, &Offered::default()) {
+            let given = allowance.result().and_then(allowed::ResultDtype::class);
+            let number = given.is_some_and(|given| {
+                matches!(
+                    given,
+                    Representative::Int8
+                        | Representative::Int16
+                        | Representative::Int32
+                        | Representative::Int64
+                        | Representative::Int128
+                        | Representative::Float16
+                        | Representative::Float32
+                        | Representative::Float64
+                )
+            });
+            does.push((
+                given == Some(class),
+                allowance.shape() == Shape::One,
+                number,
+            ));
         }
-    })
+    }
+    // A call that one of them refuses, as the bitwise calls refuse a number with a fraction, is
+    // crossed with no number: the grid would hold what Polars does of a refusal, not of an open
+    // number.
+    if does.len() < 3 {
+        return None;
+    }
+    let one = does.iter().all(|(_, one, _)| *one);
+    let keeps = does.iter().all(|(keeps, _, _)| *keeps);
+    let some = does.iter().any(|(keeps, _, _)| *keeps);
+    let numbers = does.iter().all(|(_, _, number)| *number);
+    match (keeps, some, numbers) {
+        (true, _, _) if one => Some(Does::Aggregates),
+        (true, _, _) => Some(Does::Keeps),
+        (false, true, true) if !one => Some(Does::KeepsSome),
+        (_, _, true) => Some(Does::Changes),
+        _ => None,
+    }
 }
 
 fn named(entry: &str) -> Value {
@@ -190,23 +231,81 @@ fn the_literal_field() -> Value {
     )
 }
 
-/// The calls a number is followed by, each with its label.
+/// The calls of the catalogue that are given nothing, by what the tables say they do with a number.
+fn catalogue_calls(wanted: Does) -> Vec<&'static str> {
+    entries()
+        .iter()
+        .filter(|entry| {
+            entry.applies() == Applies::Expression
+                && entry
+                    .parameters()
+                    .iter()
+                    .all(|parameter| !parameter.is_needed())
+                && what_it_does(entry) == Some(wanted)
+        })
+        .map(|entry| entry.id().as_str())
+        .collect()
+}
+
+/// The calls a number is followed by, each chain with its label: every call that keeps the dtype
+/// it follows, every aggregate that does, and every call that changes it, alone; every pair of the
+/// first two kinds; one of each kind of the first two, in both orders, with every call that changes
+/// the dtype; every chain of three that a few of the first two kinds make; and a few given an
+/// operand or a value.
 fn calls() -> Vec<(String, Vec<Value>)> {
-    let mut calls: Vec<(String, Vec<Value>)> = vec![("no call".to_owned(), Vec::new())];
-    for entry in entries() {
-        if entry.applies() == Applies::Expression
-            && entry
-                .parameters()
-                .iter()
-                .all(|parameter| !parameter.is_needed())
-            && gives_back_the_dtype(entry)
-        {
-            calls.push((
-                entry.id().as_str().to_owned(),
-                vec![named(entry.id().as_str())],
-            ));
+    let keeps = catalogue_calls(Does::Keeps);
+    let aggregates = catalogue_calls(Does::Aggregates);
+    let changes = catalogue_calls(Does::Changes);
+    let some = catalogue_calls(Does::KeepsSome);
+    let kept: Vec<&str> = keeps.iter().chain(&aggregates).copied().collect();
+    // A few of the calls that keep the dtype, and a few of the aggregates, which stand for them
+    // where a chain is longer than two.
+    let few: Vec<&str> = ["Expr.abs", "Expr.neg", "Expr.max", "Expr.sum"]
+        .into_iter()
+        .filter(|name| kept.contains(name))
+        .collect();
+    let mut chains: Vec<Vec<&str>> = vec![Vec::new()];
+    chains.extend(
+        kept.iter()
+            .chain(&changes)
+            .chain(&some)
+            .map(|name| vec![*name]),
+    );
+    for name in &some {
+        for kind in &few {
+            chains.push(vec![name, kind]);
+            chains.push(vec![kind, name]);
         }
     }
+    for first in &kept {
+        for second in &kept {
+            chains.push(vec![first, second]);
+        }
+    }
+    for kind in &few {
+        for changing in &changes {
+            chains.push(vec![kind, changing]);
+            chains.push(vec![changing, kind]);
+        }
+    }
+    for first in &few {
+        for second in &few {
+            for third in &few {
+                chains.push(vec![first, second, third]);
+            }
+        }
+    }
+    let mut calls: Vec<(String, Vec<Value>)> = chains
+        .into_iter()
+        .map(|names| {
+            let label = if names.is_empty() {
+                "no call".to_owned()
+            } else {
+                names.join(", ")
+            };
+            (label, names.into_iter().map(named).collect())
+        })
+        .collect();
     let with = |entry: &str, name: &str, other: Value| call(entry, json!({ name: other }));
     calls.push((
         "add an open number".to_owned(),
@@ -229,15 +328,7 @@ fn calls() -> Vec<(String, Vec<Value>)> {
         vec![with("Expr.fill_null", "value", open_float())],
     ));
     calls.push((
-        "abs, abs".to_owned(),
-        vec![named("Expr.abs"), named("Expr.abs")],
-    ));
-    calls.push((
-        "abs, neg".to_owned(),
-        vec![named("Expr.abs"), named("Expr.neg")],
-    ));
-    calls.push((
-        "abs, value_counts, max".to_owned(),
+        "Expr.abs, Expr.value_counts, Expr.max".to_owned(),
         vec![
             named("Expr.abs"),
             named("Expr.value_counts"),
@@ -245,7 +336,7 @@ fn calls() -> Vec<(String, Vec<Value>)> {
         ],
     ));
     calls.push((
-        "value_counts, field literal, max".to_owned(),
+        "Expr.value_counts, field literal, Expr.max".to_owned(),
         vec![
             named("Expr.value_counts"),
             the_literal_field(),
@@ -520,7 +611,8 @@ fn grid(normal: bool, repeated: bool, places: &[(&'static str, Place)]) -> Grid<
 }
 
 fn question() -> Question {
-    Question::any_refusal().cannot_tell(|_| true)
+    Question::any_refusal()
+        .cannot_tell(|words| words.contains(&Unknown::AnOpenNumberInAKey.to_string()))
 }
 
 fn keys(normal: bool) -> Verdicts {
@@ -531,92 +623,142 @@ fn elsewhere(normal: bool) -> Verdicts {
     grid(normal, false, &Place::ELSEWHERE).judge(&Question::any_refusal().with_dtypes(), case_of)
 }
 
-/// What the grid of the keys leaves, with the reason.
+/// The calls that are no elementwise ones, which the walk refuses in a key.
+const NOT_ELEMENTWISE: &[&str] = &[
+    ", Expr.backward_fill",
+    ", Expr.cum_max",
+    ", Expr.cum_min",
+    ", Expr.cum_prod",
+    ", Expr.cum_sum",
+    ", Expr.diff",
+    ", Expr.forward_fill",
+    ", Expr.pct_change",
+    ", Expr.rank",
+    ", Expr.reverse",
+    ", Expr.shift",
+    ", Expr.sort",
+];
+
+/// What the grid of the keys leaves, with the reason. A key the walk cannot tell for another
+/// reason than the open number it holds is one it neither refuses nor says is open: the grid
+/// counts it as allowed, and names it where Polars refuses it.
 fn known_keys() -> Vec<Known> {
+    let refused_for_the_number = |pattern: Pattern, reason: &'static str| {
+        Known::new(Kind::PolarsRefusesOnly, pattern, reason).saying("datatypes of join keys")
+    };
     vec![
         Known::new(
             Kind::WalkRefusesOnly,
-            Pattern::new().ends_one_of(
-                "chain",
-                &[
-                    ", Expr.backward_fill",
-                    ", Expr.cum_max",
-                    ", Expr.cum_min",
-                    ", Expr.cum_sum",
-                    ", Expr.diff",
-                    ", Expr.forward_fill",
-                    ", Expr.reverse",
-                    ", Expr.shift",
-                    ", Expr.sort",
-                ],
-            ),
-            "a key made of one number is one value that Polars takes whole, whatever the calls it \
-             holds, and the walk refuses the calls that are no elementwise ones, a running value, a \
-             difference, a fill, a shift, a reverse and a sort (the limit of a key that is wholly \
-             one value)",
+            Pattern::new().contains_one_of("chain", NOT_ELEMENTWISE),
+            "a key made wholly of one value, a number or a condition of numbers, is one value that \
+             Polars takes whole whatever calls it holds, and the walk refuses the calls that are no \
+             elementwise ones, a running value, a difference, a rank, a fill, a shift, a reverse and a \
+             sort (the limit of a key that is wholly one value)",
+        )
+        .saying("must be elementwise"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().contains_one_of("chain", &[", Expr.drop_nans", ", Expr.drop_nulls"]),
+            "the walk refuses a method that drops values from a number, a repeat of one or a \
+             condition of numbers as not elementwise even where an aggregate follows it, which \
+             Polars takes as one value",
         )
         .saying("must be elementwise"),
         Known::new(
             Kind::CannotTellPolarsAllows,
             Pattern::new().is("place", "both keys open"),
             "the walk judges each key apart, so where a key holds an open number it cannot tell the \
-             key, or has no dtype for the number to go on from, though Polars matches the two keys \
-             that hold the same open number, as `dyn float` is `dyn float` on both sides",
-        ),
+             key, though Polars matches the two keys that hold the same open number, as `dyn float` is \
+             `dyn float` on both sides",
+        )
+        .saying("stays open"),
         Known::new(
-            Kind::CannotTellPolarsAllows,
+            Kind::PolarsRefusesOnly,
             Pattern::new()
-                .starts("chain", "a condition with both values open")
-                .ends_one_of(
-                    "chain",
-                    &[
-                        ", add a column",
-                        ", add a typed number",
-                        ", eq_missing a column",
-                        ", fill_null with an open number",
-                    ],
-                ),
-            "the walk gives a condition whose values are all open numbers no dtype, so it tells \
-             nothing of a call that follows it, and Polars adapts the open values to the typed \
-             operand the call is given",
+                .is("place", "both keys open")
+                .contains_one_of("chain", &[", Expr.drop_nans", ", Expr.drop_nulls"]),
+            "Polars refuses a key that drops values of an open number as not elementwise, where it \
+             takes the number typed, and the walk, which takes a key of one value whole, allows it",
+        )
+        .saying("elementwise"),
+        refused_for_the_number(
+            Pattern::new().starts("chain", "a condition with both values open"),
+            "the walk gives a condition whose values are all open numbers no dtype, so the calls \
+             after it are not asked and the key is not said to be open, though Polars keeps it so",
         ),
-        Known::new(
-            Kind::CannotTellPolarsAllows,
+        refused_for_the_number(
+            Pattern::new().contains_one_of("chain", &[", field literal, "]),
+            "the walk gives a field read from a struct that holds an open number no dtype, as it \
+             gives the number none where it is read, so the calls after it are not asked and the \
+             key is not said to be open, though Polars keeps it so",
+        ),
+        refused_for_the_number(
             Pattern::new()
                 .starts("chain", "a condition with both values structs of the number")
-                .ends_one_of("chain", &[", field literal", ", field literal, abs"]),
+                .contains_one_of("chain", &[", field literal"]),
             "the walk does not carry the fields of a condition whose values are structs, so it \
-             cannot tell a field read from it, though the field is as typed as the structs are",
+             cannot tell a field read from it, though the field is as open as the structs are",
         ),
-        Known::new(
-            Kind::CannotTellPolarsAllows,
+        refused_for_the_number(
             Pattern::new()
-                .starts("chain", "the number, ")
-                .ends_one_of("chain", &[", fill_null with an open number"]),
-            "the walk gives no dtype to a number typed without a dtype that is filled with another, \
-             so it tells nothing of the key, and Polars takes the key as it takes the number alone",
+                .starts("chain", "a condition with both values the counts of the number")
+                .contains_one_of("chain", &[", field literal"]),
+            "the walk does not carry the fields of a condition whose values are the counts of a \
+             number, so it cannot tell a field read from it, though the field is as open as the \
+             number is",
         ),
+        refused_for_the_number(
+            Pattern::new().contains_one_of("chain", &[", Expr.log"]),
+            "a logarithm takes a base that the walk reads as an operand it is not given, so it has \
+             no dtype for the number to go on from after it, and the key is not said to be open, \
+             though Polars keeps a number with a fraction open through it",
+        ),
+        refused_for_the_number(
+            Pattern::new().is("chain", "the number, add an open number"),
+            "the walk gives no dtype to two numbers typed without a dtype that meet, so the key is \
+             not said to be open, though Polars keeps the sum of two open numbers open",
+        ),
+        refused_for_the_number(
+            Pattern::new().contains_one_of("chain", &[", Expr.product"]),
+            "Polars gives the product of a number with a fraction typed without a dtype the dtype \
+             Int64, where the number typed gives Float64 as the tables do, so the keys differ in \
+             dtype for the number and not for being open (candidate to file)",
+        ),
+    ]
+}
+
+/// What the grid of the other places leaves, with the reason.
+fn known_elsewhere() -> Vec<Known> {
+    vec![
+        Known::new(
+            Kind::DtypeDiffers,
+            Pattern::new().contains_one_of("chain", &[", Expr.product", ", Expr.cum_prod"]),
+            "the Polars the engine builds gives the product, and the running product, of a number \
+             with a fraction typed without a dtype the dtype Int64, where it gives Float64 for the \
+             number typed, as the tables and Python's Polars do for either (candidate to file)",
+        )
+        .saying("the tables give Float"),
     ]
 }
 
 #[test]
 fn a_number_typed_without_a_dtype_stays_open_through_the_calls_that_keep_it_as_a_key() {
-    keys(true).assert_agree(&known_keys(), 8_000);
+    keys(true).assert_agree(&known_keys(), 80_000);
 }
 
 #[test]
 fn a_number_typed_without_a_dtype_is_judged_as_before_in_a_select_a_filter_and_a_sort_key() {
-    elsewhere(true).assert_agree(&[], 9_000);
+    elsewhere(true).assert_agree(&known_elsewhere(), 90_000);
 }
 
 #[test]
 #[ignore = "the large grid, run on request"]
 fn the_large_grid_of_an_open_number_in_a_key_is_taken_as_polars_does() {
-    keys(false).assert_agree(&known_keys(), 16_000);
+    keys(false).assert_agree(&known_keys(), 400_000);
 }
 
 #[test]
 #[ignore = "the large grid, run on request"]
 fn the_large_grid_of_an_open_number_elsewhere_is_taken_as_polars_does() {
-    elsewhere(false).assert_agree(&[], 19_000);
+    elsewhere(false).assert_agree(&known_elsewhere(), 400_000);
 }
