@@ -29,6 +29,7 @@ mod nesting;
 mod not_run;
 mod nulls;
 mod omitted;
+mod open_grid;
 mod order;
 mod patterns;
 mod pivot_groups;

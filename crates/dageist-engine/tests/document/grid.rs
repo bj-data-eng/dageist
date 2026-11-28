@@ -458,6 +458,10 @@ pub struct Question {
     pub polars_counts: fn(&str) -> bool,
     /// How far each cell asks Polars, unless its case says it needs the rows.
     pub depth: Depth,
+    /// Whether the words of what the walk cannot tell of a step are the ones that answer the
+    /// question: a walk that refuses nothing and cannot tell a step for them does not allow it, as
+    /// one that refuses nothing and tells nothing does.
+    pub cannot_tell_counts: fn(&str) -> bool,
 }
 
 impl Question {
@@ -468,7 +472,16 @@ impl Question {
             walk_counts: |_| true,
             polars_counts: |_| true,
             depth: Depth::Plan,
+            cannot_tell_counts: |_| false,
         }
+    }
+
+    /// The same question, where a walk that cannot tell a step for words that `counts` holds is
+    /// not taken to allow it.
+    #[must_use]
+    pub const fn cannot_tell(mut self, counts: fn(&str) -> bool) -> Self {
+        self.cannot_tell_counts = counts;
+        self
     }
 
     /// The same question, asked to the depth.
@@ -491,6 +504,14 @@ pub enum Outcome {
     WalkRefusesOnly {
         walk: String,
     },
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars refuses it: the step is not allowed as the walk's answer, which is what Polars says.
+    CannotTellPolarsRefuses,
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars allows it.
+    CannotTellPolarsAllows {
+        walk: String,
+    },
     /// Polars refuses and the walk allows the step.
     PolarsRefusesOnly {
         polars: String,
@@ -511,6 +532,8 @@ pub enum Outcome {
 pub enum Kind {
     BothAllow,
     BothRefuse,
+    CannotTellPolarsRefuses,
+    CannotTellPolarsAllows,
     WalkRefusesOnly,
     PolarsRefusesOnly,
     WalkPanicked,
@@ -520,9 +543,11 @@ pub enum Kind {
 }
 
 impl Kind {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 10] = [
         Self::BothAllow,
         Self::BothRefuse,
+        Self::CannotTellPolarsRefuses,
+        Self::CannotTellPolarsAllows,
         Self::WalkRefusesOnly,
         Self::PolarsRefusesOnly,
         Self::WalkPanicked,
@@ -535,6 +560,8 @@ impl Kind {
         match self {
             Self::BothAllow => "both allow",
             Self::BothRefuse => "both refuse",
+            Self::CannotTellPolarsRefuses => "the walk cannot tell, Polars refuses",
+            Self::CannotTellPolarsAllows => "the walk cannot tell, Polars allows",
             Self::WalkRefusesOnly => "the walk refuses only",
             Self::PolarsRefusesOnly => "Polars refuses only",
             Self::WalkPanicked => "the walk panicked",
@@ -546,7 +573,10 @@ impl Kind {
 
     /// Whether the kind is one a test must name.
     const fn must_be_named(self) -> bool {
-        !matches!(self, Self::BothAllow | Self::BothRefuse)
+        !matches!(
+            self,
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses
+        )
     }
 }
 
@@ -556,6 +586,8 @@ impl Outcome {
         match self {
             Self::BothAllow => Kind::BothAllow,
             Self::BothRefuse => Kind::BothRefuse,
+            Self::CannotTellPolarsRefuses => Kind::CannotTellPolarsRefuses,
+            Self::CannotTellPolarsAllows { .. } => Kind::CannotTellPolarsAllows,
             Self::WalkRefusesOnly { .. } => Kind::WalkRefusesOnly,
             Self::PolarsRefusesOnly { .. } => Kind::PolarsRefusesOnly,
             Self::WalkPanicked(_) => Kind::WalkPanicked,
@@ -569,7 +601,10 @@ impl Outcome {
     #[must_use]
     pub fn said(&self) -> String {
         match self {
-            Self::BothAllow | Self::BothRefuse => String::new(),
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses => String::new(),
+            Self::CannotTellPolarsAllows { walk } => {
+                format!("walk cannot tell: {walk}; Polars allows it")
+            }
             Self::WalkRefusesOnly { walk } => format!("walk: {walk}; Polars allows it"),
             Self::PolarsRefusesOnly { polars } => format!("Polars: {polars}; the walk allows it"),
             Self::WalkPanicked(reason) => format!("the walk panicked: {reason}"),
@@ -641,7 +676,7 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
     }));
     let walk_spent = walk_started.elapsed();
     // The walk says Polars refuses it on rows, so the rows are what to ask.
-    let (walk_said, walk_said_rows) = match walked {
+    let (walk_said, walk_said_rows, cannot_tell) = match walked {
         Ok(walk) => {
             let rows = walk.refusal().is_some_and(|refusal| {
                 matches!(
@@ -653,7 +688,11 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
                 .refusal()
                 .filter(|refusal| (question.walk_counts)(refusal))
                 .map(walk_words);
-            (said, rows)
+            let cannot_tell = walk
+                .not_known()
+                .filter(|words| (question.cannot_tell_counts)(words))
+                .map(first_line);
+            (said, rows, cannot_tell)
         }
         Err(payload) => {
             return Judged::of(Outcome::WalkPanicked(panic_words(&*payload)), Mode::Plan);
@@ -717,6 +756,10 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
         (Some(_), Some(_)) if at_build => Outcome::BothRefuse,
         (None, Some(reason)) if at_build => Outcome::BuildRefusesOnly(reason),
         (_, Some(reason)) if !(question.polars_counts)(&reason) => Outcome::SetAside(reason),
+        (None, None) if cannot_tell.is_some() => Outcome::CannotTellPolarsAllows {
+            walk: cannot_tell.unwrap_or_default(),
+        },
+        (None, Some(_)) if cannot_tell.is_some() => Outcome::CannotTellPolarsRefuses,
         (None, None) => Outcome::BothAllow,
         (Some(_), Some(_)) => Outcome::BothRefuse,
         (Some(walk), None) => Outcome::WalkRefusesOnly { walk },
@@ -846,6 +889,7 @@ impl Cell {
 enum Matcher {
     Is(&'static str),
     Starts(&'static str),
+    EndsOneOf(&'static [&'static str]),
     OneOf(&'static [&'static str]),
 }
 
@@ -854,6 +898,7 @@ impl Matcher {
         match self {
             Self::Is(word) => label == word,
             Self::Starts(prefix) => label.starts_with(prefix),
+            Self::EndsOneOf(suffixes) => suffixes.iter().any(|suffix| label.ends_with(suffix)),
             Self::OneOf(words) => words.contains(&label),
         }
     }
@@ -883,6 +928,13 @@ impl Pattern {
     #[must_use]
     pub fn starts(mut self, axis: &'static str, prefix: &'static str) -> Self {
         self.parts.push((axis, Matcher::Starts(prefix)));
+        self
+    }
+
+    /// The label of `axis` ends with one of `suffixes`.
+    #[must_use]
+    pub fn ends_one_of(mut self, axis: &'static str, suffixes: &'static [&'static str]) -> Self {
+        self.parts.push((axis, Matcher::EndsOneOf(suffixes)));
         self
     }
 
@@ -1008,6 +1060,8 @@ impl Verdicts {
         [
             Kind::BothAllow,
             Kind::BothRefuse,
+            Kind::CannotTellPolarsRefuses,
+            Kind::CannotTellPolarsAllows,
             Kind::WalkRefusesOnly,
             Kind::PolarsRefusesOnly,
         ]

@@ -1644,6 +1644,7 @@ fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_r
             },
             polars_counts: |reason| reason.contains("elementwise"),
             depth: Depth::Plan,
+            ..Question::any_refusal()
         },
         |point| {
             let held = point.held.as_ref().expect("a column");
