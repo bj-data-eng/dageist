@@ -3146,7 +3146,11 @@ an array of whole numbers and the array of floats that a division of it gives, w
 tables take for one class, and that Polars refuses for the dtypes of the keys not matching,
 is no case at all: no dtype of the column fits both, and the target counts it apart
 (`join keys of different dtypes share a column`) and does not compare it. Polars joins whole
-numbers of different widths with one column, so a join it accepts is compared. The
+numbers of different widths with one column, so a join it accepts is compared. The start of an expression
+is compared with what the walk says the start gives itself, and not with the place the first call follows,
+where the walk has adapted a number typed without a dtype to the operand the call is given: Polars gives
+such a number alone the dtype it falls back to, and the dtype it takes beside the operand is held by what
+the call gives. The
 generator keeps to what the tables measured where a value, not a dtype, decides, except for the
 literals, which [grids](#grids-settle-what-a-campaign-does-not-reach) settle for the rules that read
 one and which a campaign draws, a quarter of the time, at an edge of their dtype (its lowest and highest
@@ -3194,7 +3198,11 @@ each decided and how many cells a second the grid ran at, which is a few hundred
 debug build, the walk being most of the time. A panic of Polars is the cell's outcome, and a cell that
 does not end names itself and ends the run.
 
-Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk
+Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk cannot
+tell (where a grid asks about the words that say a step is not told, and a walk that refuses nothing and
+cannot tell it is told apart from one that allows it) and Polars refuses, which is agreement, or allows,
+the dtype differs (where a grid asks, and both allow the step, the dtype the walk gives at the start of
+each expression and after each call is the one Polars gives there, as the fuzz harness compares them), the walk
 panicked, unbuildable (the case cannot be made, such as a text of a length no memory holds, or a step
 Polars cannot be asked of), the catalogue refuses only (the catalogue cannot build the step, so the
 step engine refuses it before the walk is asked, and the walk allows it: a value that does not cast to
@@ -3256,6 +3264,26 @@ by data, and the cells that a select shows are no group's, are named in the test
 group, a strict replacement that lists too few values, a share that the column's values are not, one value beside the
 values of a group that Polars takes for a group of one row, a null literal Polars takes or refuses as a value, a part it
 does not evaluate, and the kernels that still refuse where there is no key.
+
+`tests/document/open_grid.rs` holds the grids of a number typed without a dtype, which Polars keeps open as
+`dyn int` or `dyn float`, on the same helper. They cross a number, at the edges of the dtypes it falls back to and
+past them, with how it stands (alone, repeated, the values of a condition, one value of it open, a struct's field,
+a struct of its absolute value or of a repeat, the structs or the counts of it as the values of a condition), each
+call of the catalogue that is given nothing and gives back the dtype it follows for each dtype the number falls
+back to, a few that are given an operand or a value and chains of two or three. One puts them as a join's key,
+open on either side against the key of the number typed, open on both and typed on both: where Polars refuses the key
+the walk must say that it cannot tell it, in the words of an open number in a key, and where Polars takes the key typed on
+both sides it must tell it; the other puts
+them in a select, a filter and a sort key, open and typed, where none is refused for the number and the dtypes at
+each place are Polars'. What the grid of the keys leaves is named in the test: a key that holds a call that is no
+elementwise one, which the walk refuses where Polars takes a key of one value whole, two keys that are open
+numbers, which the walk judges apart where Polars matches them, a condition of open numbers whose dtype the walk
+does not give and the fields of a condition of structs, and a number filled with another. Polars settles the number
+that stands alone as a key and an aggregate of the literal that starts a chain, and keeps open the aggregate of a
+`repeat` and of the values of a condition, which the walk follows by what starts the chain and what the call after
+it is; the calls of a `repeat` that are no aggregate are refused by it as not elementwise. `tests/document/missing_start_grid.rs` crosses a column of every whole number dtype with `eq_missing` and
+`ne_missing`, in both orders, with the numbers the dtype holds and does not hold, as a join's key and in a select, and
+holds the dtype at the start and after the call to Polars'.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a
