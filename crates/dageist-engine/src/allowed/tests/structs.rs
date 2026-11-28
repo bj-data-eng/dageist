@@ -349,7 +349,7 @@ fn each_struct_call_the_walk_cannot_tell_says_why_in_words_of_its_own() {
             &Place::new(Context::step(Outer::JoinLeft), After::Start),
             &Chosen::default().with_inputs(&open).giving_many(),
         )),
-        "a number typed without a dtype stays open in a struct that is a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to"
+        "a number typed without a dtype stays open in a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to"
     );
     // Several columns of one field read, outside a select or a sort.
     assert_eq!(

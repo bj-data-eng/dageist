@@ -983,6 +983,14 @@ To write the grid of a new rule:
    that has gone is found. A disagreement is fixed, with a failing grid test committed first, or it is
    listed with its reason and filed.
 
+A grid whose rule is that the walk does not tell a step, as it does not tell a join's key that holds an open
+number, asks `Question::cannot_tell` which words of what the walk cannot tell answer it: a walk that refuses
+nothing and cannot tell a step for them is then not taken to allow it, and a cell where it cannot tell and
+Polars refuses is agreement, where one that Polars allows is a `Known` line to write. `Question::with_dtypes`
+also compares, in each cell that both allow, the dtype the walk gives at the start of each expression and after
+each call with the dtype Polars gives there, as the fuzz harness does. `Pattern::contains_one_of` names the cells
+whose label on an axis holds one of several calls, which a label that is a chain of them needs.
+
 A cell that Polars panics on or never ends is no crash of the run: a panic is Polars' answer, and a
 cell that does not end names itself and ends the run, so build it as unbuildable with the reason
 `Polars never ends` and list it.

@@ -475,8 +475,9 @@ pub enum Unknown {
     /// An unnest of a struct that has no field expands to no expression, which Polars leaves out of
     /// what holds it or decides by its siblings.
     AnUnnestOfNoField,
-    /// A number typed without a dtype stays open in a struct that is a join's key, and Polars does
-    /// not match it with the other table's key as its dtype resolves.
+    /// A number typed without a dtype stays open in a join's key, through the calls that keep it
+    /// so or as the field of a struct, and Polars does not match it with the other table's key as
+    /// its dtype resolves.
     AnOpenNumberInAKey,
     /// A field read by several names gives several columns, which are no value of one dtype outside
     /// a select or a sort.
@@ -532,7 +533,7 @@ impl fmt::Display for Unknown {
             Self::TheFieldsOfAStruct => "the fields of the struct are not known, so whether the names the call reads, drops or renames are fields of it cannot be said",
             Self::AnUnnestAsAKey => "an unnest as a join's key writes a column for each field, and how many keys the other table expands to is not known",
             Self::AnUnnestOfNoField => "an unnest of a struct that has no field expands to no expression, which Polars leaves out or decides by its siblings",
-            Self::AnOpenNumberInAKey => "a number typed without a dtype stays open in a struct that is a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to",
+            Self::AnOpenNumberInAKey => "a number typed without a dtype stays open in a join's key, as `dyn float` in its dtype, which Polars does not match with the dtype the other table's key resolves to",
             Self::SeveralColumnsOfAFieldRead => "a field read by several names gives several columns, which are no value of one dtype outside a select or a sort",
             Self::AnUnnestAmongPredicates => "an unnest that is one of several predicates of a filter expands to a predicate for each field, or to none, which Polars takes as they come",
             Self::ArithmeticOnAStruct => "arithmetic on a struct is done field by field, by the dtype of each field and of what meets it, and Polars does it irregularly",
@@ -1869,12 +1870,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Polars keeps a number typed without a dtype open in a struct that is a join's key, as `dyn
     // float` in its dtype, so the key does not match the other table's key that the number resolves
     // to, though both are one dtype: a key made of such a struct, or of a field read from one, is
-    // not told.
+    // not told. What follows such a struct and is no struct, as the text it is encoded as, is
+    // settled. The walk tells the same of a number that a chain keeps open outside a struct.
     let in_a_key = matches!(place.context.outer(), Outer::JoinLeft | Outer::JoinRight)
         && place.context.nested().is_none();
     if in_a_key
         && ((id == "polars.struct" && chosen.inputs.iter().any(Input::is_loose))
-            || chosen.fields.is_some_and(Fields::has_a_loose_field)
+            || (chosen.fields.is_some_and(Fields::has_a_loose_field)
+                && result.as_ref().and_then(ResultDtype::class) == Some(Representative::Struct))
             || struct_gives.reads_a_loose_field())
     {
         ending = Ending::NotKnown(Unknown::AnOpenNumberInAKey);

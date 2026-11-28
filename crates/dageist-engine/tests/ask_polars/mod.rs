@@ -24,7 +24,9 @@ use dageist_engine::catalog::{
     Argument, Arguments, Build, BuildError, Conditional, DefaultValue, DurationUse, Kind,
     any_moment, check_duration, check_pattern,
 };
-use dageist_engine::document::{Call, Expression, Place, Segment, Start, Step, Value};
+use dageist_engine::document::{
+    Call, Expression, Place, Segment, Start, Step, Value, WalkedExpression,
+};
 use polars::prelude::{
     DataFrame, DataType, Engine, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
@@ -129,6 +131,84 @@ pub fn first_line(text: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The expression `step` holds at `place`, the way down from the step to the expression: the
+/// arguments of its call, or of a call that follows it, and the items of the lists and the
+/// expressions that they hold.
+pub fn expression_at<'a>(step: &'a Step, place: &Place) -> Option<&'a Expression> {
+    enum Node<'a> {
+        Call(&'a Call),
+        Value(&'a Value),
+        Expression(&'a Expression),
+    }
+    fn enter(value: &Value) -> Node<'_> {
+        match value {
+            Value::Expression(expression) => Node::Expression(expression),
+            other => Node::Value(other),
+        }
+    }
+    let mut node = Node::Call(step.call());
+    for (at, segment) in place.path().iter().enumerate() {
+        node = match (node, segment) {
+            (Node::Call(call), Segment::Parameter(name)) => enter(call.argument(name)?),
+            (Node::Call(_), Segment::Link(link)) if at == 0 => Node::Call(step.links().get(*link)?),
+            (Node::Value(Value::Many(items)), Segment::Item(item)) => enter(items.get(*item)?),
+            (Node::Value(Value::Pairs(pairs)), Segment::Key(item)) => enter(&pairs.get(*item)?.0),
+            (Node::Value(Value::Pairs(pairs)), Segment::Value(item)) => enter(&pairs.get(*item)?.1),
+            (Node::Expression(expression), Segment::Start) => match expression.start() {
+                Start::Call(call) => Node::Call(call),
+                Start::Input(_) | Start::Hole => return None,
+            },
+            (Node::Expression(expression), Segment::Link(link)) => {
+                Node::Call(expression.links().get(*link)?)
+            }
+            _ => return None,
+        };
+    }
+    match node {
+        Node::Expression(expression) => Some(expression),
+        _ => None,
+    }
+}
+
+/// Whether `expression` starts from a number typed without a dtype: a literal of a whole number
+/// or of a number with a fraction that is given none.
+pub fn starts_from_an_open_number(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(call)
+        if call.entry().id().as_str() == "polars.lit"
+            && call.argument("dtype").is_none()
+            && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+}
+
+/// The class the tables are held to at the start of `expression`, given `followed`, the class of
+/// the place the first call of it follows, which is where the tables are asked of that call.
+///
+/// Where the start is a number typed without a dtype and the call is given an operand, the walk
+/// adapts the number to the operand there, as Polars does when it coerces the two, so `followed`
+/// is the dtype the number takes beside the operand, which no schema of the start alone gives:
+/// Polars gives the start alone the dtype the number falls back to. The start of such an expression
+/// is held to what the walk says the start gives itself, where that differs from `followed`; any
+/// other start is held to `followed`, for what a function says it gives is not what its arguments
+/// make of it.
+pub fn class_at_start(
+    step: &Step,
+    expression: &WalkedExpression,
+    followed: Option<Representative>,
+) -> Option<Representative> {
+    let opens = expression_at(step, expression.place()).is_some_and(starts_from_an_open_number);
+    let given = expression
+        .calls()
+        .first()
+        .and_then(|start| start.verdict())
+        .and_then(|verdict| verdict.allowance())
+        .and_then(|allowance| allowance.result())
+        .and_then(|result| result.class())
+        .filter(|_| opens);
+    match (given, followed) {
+        (Some(given), Some(followed)) if given != followed => Some(given),
+        (_, followed) => followed,
+    }
 }
 
 /// Plans `step`, the `index`th of a document, on `source`, and works out the dtypes of its

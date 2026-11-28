@@ -194,7 +194,7 @@ impl Fields {
     }
 
     /// Whether a field was made of a number typed without a dtype, which stays open.
-    pub(super) fn has_a_loose_field(&self) -> bool {
+    pub(crate) fn has_a_loose_field(&self) -> bool {
         self.0.iter().any(|field| {
             field.is_loose() || field.fields.as_ref().is_some_and(Fields::has_a_loose_field)
         })

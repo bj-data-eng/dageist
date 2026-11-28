@@ -55,8 +55,8 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-use dageist_engine::allowed::{RefusalSource, Stage};
-use dageist_engine::document::{Document, Inputs, WalkRefusal};
+use dageist_engine::allowed::{After, RefusalSource, Representative, Stage};
+use dageist_engine::document::{Document, Inputs, Step, Walk, WalkRefusal};
 use polars::prelude::{DataFrame, IntoLazy, NamedFrom, Series};
 use serde_json::Value;
 
@@ -458,6 +458,13 @@ pub struct Question {
     pub polars_counts: fn(&str) -> bool,
     /// How far each cell asks Polars, unless its case says it needs the rows.
     pub depth: Depth,
+    /// Whether the words of what the walk cannot tell of a step are the ones that answer the
+    /// question: a walk that refuses nothing and cannot tell a step for them does not allow it, as
+    /// one that refuses nothing and tells nothing does.
+    pub cannot_tell_counts: fn(&str) -> bool,
+    /// Whether the dtype the walk gives at each place of a step that both allow is compared with
+    /// the dtype Polars gives there, as the fuzz harness compares it.
+    pub dtypes: bool,
 }
 
 impl Question {
@@ -468,6 +475,8 @@ impl Question {
             walk_counts: |_| true,
             polars_counts: |_| true,
             depth: Depth::Plan,
+            cannot_tell_counts: |_| false,
+            dtypes: false,
         }
     }
 
@@ -475,6 +484,21 @@ impl Question {
     #[must_use]
     pub const fn at(mut self, depth: Depth) -> Self {
         self.depth = depth;
+        self
+    }
+
+    /// The same question, where a walk that cannot tell a step for words that `counts` holds is
+    /// not taken to allow it.
+    #[must_use]
+    pub const fn cannot_tell(mut self, counts: fn(&str) -> bool) -> Self {
+        self.cannot_tell_counts = counts;
+        self
+    }
+
+    /// The same question, which also compares the dtype at each place of a step that both allow.
+    #[must_use]
+    pub const fn with_dtypes(mut self) -> Self {
+        self.dtypes = true;
         self
     }
 }
@@ -491,6 +515,16 @@ pub enum Outcome {
     WalkRefusesOnly {
         walk: String,
     },
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars refuses it: the step is not allowed as the walk's answer, which is what Polars says.
+    CannotTellPolarsRefuses,
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars allows it.
+    CannotTellPolarsAllows {
+        walk: String,
+    },
+    /// Both allow the step, and the dtype the walk gives at a place is not the one Polars gives.
+    DtypeDiffers(String),
     /// Polars refuses and the walk allows the step.
     PolarsRefusesOnly {
         polars: String,
@@ -511,6 +545,9 @@ pub enum Outcome {
 pub enum Kind {
     BothAllow,
     BothRefuse,
+    CannotTellPolarsRefuses,
+    CannotTellPolarsAllows,
+    DtypeDiffers,
     WalkRefusesOnly,
     PolarsRefusesOnly,
     WalkPanicked,
@@ -520,9 +557,12 @@ pub enum Kind {
 }
 
 impl Kind {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 11] = [
         Self::BothAllow,
         Self::BothRefuse,
+        Self::CannotTellPolarsRefuses,
+        Self::CannotTellPolarsAllows,
+        Self::DtypeDiffers,
         Self::WalkRefusesOnly,
         Self::PolarsRefusesOnly,
         Self::WalkPanicked,
@@ -535,6 +575,9 @@ impl Kind {
         match self {
             Self::BothAllow => "both allow",
             Self::BothRefuse => "both refuse",
+            Self::CannotTellPolarsRefuses => "the walk cannot tell, Polars refuses",
+            Self::CannotTellPolarsAllows => "the walk cannot tell, Polars allows",
+            Self::DtypeDiffers => "the dtype differs",
             Self::WalkRefusesOnly => "the walk refuses only",
             Self::PolarsRefusesOnly => "Polars refuses only",
             Self::WalkPanicked => "the walk panicked",
@@ -546,7 +589,10 @@ impl Kind {
 
     /// Whether the kind is one a test must name.
     const fn must_be_named(self) -> bool {
-        !matches!(self, Self::BothAllow | Self::BothRefuse)
+        !matches!(
+            self,
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses
+        )
     }
 }
 
@@ -556,6 +602,9 @@ impl Outcome {
         match self {
             Self::BothAllow => Kind::BothAllow,
             Self::BothRefuse => Kind::BothRefuse,
+            Self::CannotTellPolarsRefuses => Kind::CannotTellPolarsRefuses,
+            Self::CannotTellPolarsAllows { .. } => Kind::CannotTellPolarsAllows,
+            Self::DtypeDiffers(_) => Kind::DtypeDiffers,
             Self::WalkRefusesOnly { .. } => Kind::WalkRefusesOnly,
             Self::PolarsRefusesOnly { .. } => Kind::PolarsRefusesOnly,
             Self::WalkPanicked(_) => Kind::WalkPanicked,
@@ -569,7 +618,11 @@ impl Outcome {
     #[must_use]
     pub fn said(&self) -> String {
         match self {
-            Self::BothAllow | Self::BothRefuse => String::new(),
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses => String::new(),
+            Self::CannotTellPolarsAllows { walk } => {
+                format!("walk cannot tell: {walk}; Polars allows it")
+            }
+            Self::DtypeDiffers(words) => words.clone(),
             Self::WalkRefusesOnly { walk } => format!("walk: {walk}; Polars allows it"),
             Self::PolarsRefusesOnly { polars } => format!("Polars: {polars}; the walk allows it"),
             Self::WalkPanicked(reason) => format!("the walk panicked: {reason}"),
@@ -641,7 +694,7 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
     }));
     let walk_spent = walk_started.elapsed();
     // The walk says Polars refuses it on rows, so the rows are what to ask.
-    let (walk_said, walk_said_rows) = match walked {
+    let (walk_said, walk_said_rows, cannot_tell, walk) = match walked {
         Ok(walk) => {
             let rows = walk.refusal().is_some_and(|refusal| {
                 matches!(
@@ -653,7 +706,11 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
                 .refusal()
                 .filter(|refusal| (question.walk_counts)(refusal))
                 .map(walk_words);
-            (said, rows)
+            let cannot_tell = walk
+                .not_known()
+                .filter(|words| (question.cannot_tell_counts)(words))
+                .map(first_line);
+            (said, rows, cannot_tell, walk)
         }
         Err(payload) => {
             return Judged::of(Outcome::WalkPanicked(panic_words(&*payload)), Mode::Plan);
@@ -710,6 +767,22 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
             true,
         ),
     };
+    // Where both allow it, and the walk tells the whole of it, the dtypes it gives are Polars'.
+    let differing = if question.dtypes
+        && walk_said.is_none()
+        && cannot_tell.is_none()
+        && polars.is_none()
+        && walk.refusal().is_none()
+        && walk.not_known().is_none()
+    {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            dtype_difference(step, &walk, case, connected)
+        }))
+        .ok()
+        .flatten()
+    } else {
+        None
+    };
     let outcome = match (walk_said, polars) {
         // The catalogue refuses the step itself where it cannot build it, before the walk is asked
         // and whatever Polars would say: the cell is both refuse where the walk refuses it too, and
@@ -717,7 +790,11 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
         (Some(_), Some(_)) if at_build => Outcome::BothRefuse,
         (None, Some(reason)) if at_build => Outcome::BuildRefusesOnly(reason),
         (_, Some(reason)) if !(question.polars_counts)(&reason) => Outcome::SetAside(reason),
-        (None, None) => Outcome::BothAllow,
+        (None, None) if cannot_tell.is_some() => Outcome::CannotTellPolarsAllows {
+            walk: cannot_tell.unwrap_or_default(),
+        },
+        (None, Some(_)) if cannot_tell.is_some() => Outcome::CannotTellPolarsRefuses,
+        (None, None) => differing.map_or(Outcome::BothAllow, Outcome::DtypeDiffers),
         (Some(_), Some(_)) => Outcome::BothRefuse,
         (Some(walk), None) => Outcome::WalkRefusesOnly { walk },
         (None, Some(polars)) => Outcome::PolarsRefusesOnly { polars },
@@ -728,6 +805,69 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
         panicked,
         spent: [walk_spent, polars_spent],
     }
+}
+
+/// The class the walk says an expression has at the `at`th of the places its links stand in.
+fn claimed_at(
+    expression: &dageist_engine::document::WalkedExpression,
+    at: usize,
+) -> Option<Representative> {
+    match expression.places().get(at).copied().flatten()?.after() {
+        After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    }
+}
+
+/// Where the dtype the walk gives at the start of an expression or after a link is not the dtype
+/// Polars gives there, as the fuzz harness compares them: one word of the first place that differs.
+fn dtype_difference(
+    step: &Step,
+    walk: &Walk,
+    case: &Case,
+    connected: Connected<'_>,
+) -> Option<String> {
+    let planned = ask_polars::plan(step, 0, &case.working, connected)?;
+    for expression in walk.expressions() {
+        let Some(trace) = planned
+            .traces
+            .iter()
+            .find(|trace| trace.place == *expression.place())
+        else {
+            continue;
+        };
+        let differs =
+            |what: String, claimed: Option<Representative>, said: &ask_polars::Said| match (
+                claimed, said,
+            ) {
+                (Some(claimed), ask_polars::Said::Dtype(_, name, Some(class)))
+                    if claimed != *class =>
+                {
+                    Some(format!(
+                        "{} {what}: the tables give {}, Polars gives {name}",
+                        expression.place(),
+                        claimed.name()
+                    ))
+                }
+                _ => None,
+            };
+        if let Some(difference) = differs(
+            "at the start".to_owned(),
+            ask_polars::class_at_start(step, expression, claimed_at(expression, 0)),
+            &trace.start,
+        ) {
+            return Some(difference);
+        }
+        for (at, said) in trace.links.iter().enumerate() {
+            if let Some(difference) = differs(
+                format!("after link {}", at + 1),
+                claimed_at(expression, at + 1),
+                said,
+            ) {
+                return Some(difference);
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
@@ -846,6 +986,8 @@ impl Cell {
 enum Matcher {
     Is(&'static str),
     Starts(&'static str),
+    ContainsOneOf(&'static [&'static str]),
+    HasOneOf(&'static [&'static str]),
     OneOf(&'static [&'static str]),
 }
 
@@ -854,6 +996,8 @@ impl Matcher {
         match self {
             Self::Is(word) => label == word,
             Self::Starts(prefix) => label.starts_with(prefix),
+            Self::ContainsOneOf(words) => words.iter().any(|word| label.contains(word)),
+            Self::HasOneOf(parts) => label.split(", ").any(|part| parts.contains(&part)),
             Self::OneOf(words) => words.contains(&label),
         }
     }
@@ -883,6 +1027,21 @@ impl Pattern {
     #[must_use]
     pub fn starts(mut self, axis: &'static str, prefix: &'static str) -> Self {
         self.parts.push((axis, Matcher::Starts(prefix)));
+        self
+    }
+
+    /// The label of `axis`, a list whose parts are told apart by a comma and a space, has one of
+    /// `parts` as a part: `Expr.log` names a chain with that call and not one with `Expr.log1p`.
+    #[must_use]
+    pub fn has_one_of(mut self, axis: &'static str, parts: &'static [&'static str]) -> Self {
+        self.parts.push((axis, Matcher::HasOneOf(parts)));
+        self
+    }
+
+    /// The label of `axis` holds one of `words`.
+    #[must_use]
+    pub fn contains_one_of(mut self, axis: &'static str, words: &'static [&'static str]) -> Self {
+        self.parts.push((axis, Matcher::ContainsOneOf(words)));
         self
     }
 
@@ -1008,6 +1167,9 @@ impl Verdicts {
         [
             Kind::BothAllow,
             Kind::BothRefuse,
+            Kind::CannotTellPolarsRefuses,
+            Kind::CannotTellPolarsAllows,
+            Kind::DtypeDiffers,
             Kind::WalkRefusesOnly,
             Kind::PolarsRefusesOnly,
         ]

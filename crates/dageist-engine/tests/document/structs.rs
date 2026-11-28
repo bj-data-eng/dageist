@@ -1973,3 +1973,185 @@ fn an_unnest_inside_a_condition_of_a_join_key_is_not_told_as_an_unnest_as_a_key_
         Unknown::AnUnnestAsAKey
     );
 }
+
+/// A condition whose two values are what `value` makes, where it is a start of a chain.
+fn condition_of(value: impl Fn() -> Value) -> Value {
+    let flag = chain(
+        call("polars.lit", json!({ "value": { "flag": true } })),
+        vec![],
+    );
+    chain(
+        call("polars.when", json!({ "predicates": many(vec![flag]) })),
+        vec![
+            call("When.then", json!({ "statement": value() })),
+            call("Then.otherwise", json!({ "statement": value() })),
+        ],
+    )
+}
+
+fn repeated(value: Value) -> Value {
+    call(
+        "polars.repeat",
+        json!({ "value": value, "n": crate::support::whole(3) }),
+    )
+}
+
+fn absolute() -> Value {
+    call("Expr.abs", json!({}))
+}
+
+fn negated() -> Value {
+    call("Expr.neg", json!({}))
+}
+
+#[test]
+fn a_number_that_a_call_keeps_open_is_not_told_as_a_join_key() {
+    // Polars keeps a number typed without a dtype open, as `dyn float` or `dyn int`, through the
+    // calls that give back the dtype they follow, through `repeat`, through a condition whose
+    // values are all open and through a struct, so a join's key that holds one is not matched with
+    // the typed key on the other side, whichever side it is on and whatever follows the number.
+    type Key = fn(bool) -> Value;
+    let cases: Vec<(&str, Key)> = vec![
+        ("the absolute value of a float", |typed| {
+            chain(a_float(typed), vec![absolute()])
+        }),
+        ("the negation of a float", |typed| {
+            chain(a_float(typed), vec![negated()])
+        }),
+        ("the absolute value of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![absolute()])
+        }),
+        ("the negation of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![negated()])
+        }),
+        ("the largest of the absolute value of a float", |typed| {
+            chain(a_float(typed), vec![absolute(), largest()])
+        }),
+        ("the sum of the absolute value of a whole number", |typed| {
+            chain(
+                a_whole_number(typed),
+                vec![absolute(), call("Expr.sum", json!({}))],
+            )
+        }),
+        (
+            "the first of the absolute value of a whole number",
+            |typed| {
+                chain(
+                    a_whole_number(typed),
+                    vec![absolute(), call("Expr.first", json!({}))],
+                )
+            },
+        ),
+        (
+            "the absolute value of the largest of the absolute value of a float",
+            |typed| chain(a_float(typed), vec![absolute(), largest(), absolute()]),
+        ),
+        (
+            "the absolute value of the absolute value of a float",
+            |typed| chain(a_float(typed), vec![absolute(), absolute()]),
+        ),
+        (
+            "the largest of the counts of the absolute value of a float",
+            |typed| chain(a_float(typed), vec![absolute(), counts(), largest()]),
+        ),
+        ("the largest of a repeated float", |typed| {
+            chain(repeated(chain(a_float(typed), vec![])), vec![largest()])
+        }),
+        ("the largest of a struct of a repeated float", |typed| {
+            chain(
+                struct_of(chain(repeated(chain(a_float(typed), vec![])), vec![])),
+                vec![largest()],
+            )
+        }),
+        ("a struct of the absolute value of a float", |typed| {
+            chain(struct_of(chain(a_float(typed), vec![absolute()])), vec![])
+        }),
+        (
+            "the largest of a condition whose values are the counts of a float",
+            |typed| {
+                let mut key = condition_of(|| chain(a_float(typed), vec![counts()]));
+                key["expression"]["then"]
+                    .as_array_mut()
+                    .expect("the links of an expression")
+                    .push(largest());
+                key
+            },
+        ),
+        (
+            "the largest of a condition whose values are structs of a float",
+            |typed| {
+                let mut key =
+                    condition_of(|| chain(struct_of(chain(a_float(typed), vec![])), vec![]));
+                key["expression"]["then"]
+                    .as_array_mut()
+                    .expect("the links of an expression")
+                    .push(largest());
+                key
+            },
+        ),
+    ];
+    for (what, key) in cases {
+        for open_on_the_left in [true, false] {
+            let (left, right) = if open_on_the_left {
+                (key(false), key(true))
+            } else {
+                (key(true), key(false))
+            };
+            assert_not_told_for(&join_of(left, right), &Unknown::AnOpenNumberInAKey, what);
+        }
+        // The number typed on both sides gives the keys one dtype, which the walk tells.
+        let typed = join_of(key(true), key(true));
+        assert_eq!(typed.polars, Said::Accepts, "{what}: {:?}", typed.polars);
+        assert!(
+            typed.walk_refusal.is_none() && typed.walk_knows_nothing_of_it.is_none(),
+            "{what}: {:?} {:?}",
+            typed.walk_refusal,
+            typed.walk_knows_nothing_of_it
+        );
+    }
+}
+
+#[test]
+fn a_number_that_stands_alone_or_is_settled_by_what_it_meets_is_told_as_a_join_key() {
+    // Polars settles a number typed without a dtype that stands alone as a key, and one that an
+    // aggregate takes of a literal, and one that meets a typed operand, so none of them is open.
+    type Key = fn(bool) -> Value;
+    let cases: Vec<(&str, Key)> = vec![
+        ("a float alone", |typed| chain(a_float(typed), vec![])),
+        ("the largest of a float", |typed| {
+            chain(a_float(typed), vec![largest()])
+        }),
+        ("the sum of a whole number", |typed| {
+            chain(a_whole_number(typed), vec![call("Expr.sum", json!({}))])
+        }),
+        ("the absolute value of a float, as a Boolean is", |typed| {
+            chain(a_float(typed), vec![call("Expr.is_nan", json!({}))])
+        }),
+        ("a float added to a typed one", |typed| {
+            chain(
+                a_float(typed),
+                vec![call(
+                    "Expr.add",
+                    json!({ "other": chain(a_float(true), vec![]) }),
+                )],
+            )
+        }),
+    ];
+    for (what, key) in cases {
+        for open_on_the_left in [true, false] {
+            let (left, right) = if open_on_the_left {
+                (key(false), key(true))
+            } else {
+                (key(true), key(false))
+            };
+            let found = join_of(left, right);
+            assert_eq!(found.polars, Said::Accepts, "{what}: {:?}", found.polars);
+            assert!(
+                found.walk_refusal.is_none() && found.walk_knows_nothing_of_it.is_none(),
+                "{what}: {:?} {:?}",
+                found.walk_refusal,
+                found.walk_knows_nothing_of_it
+            );
+        }
+    }
+}
