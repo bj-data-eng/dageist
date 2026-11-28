@@ -456,8 +456,8 @@ fn known_integers() -> Vec<Known<Kind>> {
         Known::new(
             Kind::PolarsRefusesOnly,
             Pattern::new().is("parameter", "Expr.round_sig_figs(digits)"),
-            "Polars rounds to one significant figure at least and refuses fewer when it works out \
-             the schema, where the catalogue takes any whole number of 32 bits and the walk allows \
+            "Polars rounds to one significant figure at least and refuses fewer when the rows \
+             run, where the catalogue takes any whole number of 32 bits and the walk allows \
              it (#259)",
         )
         .saying("digits must be an integer >="),
@@ -569,7 +569,7 @@ fn known_overflows() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new(),
             "Polars panics in a debug build where the arithmetic it does with a value typed in \
-             overflows: a check of the debug build, and the release builds run the same cells",
+             overflows: a check that only a debug build makes, which a release build does not",
         )
         .saying_one_of(&[
             "attempt to negate with overflow",
@@ -612,8 +612,8 @@ fn known_moments() -> Vec<Known<Kind>> {
                 )
                 .is("parameter", "Expr.shift(n)"),
             "Polars panics when the rows run where a date, a moment, a length of time or a time \
-             of day is shifted by a number with a fraction typed without a dtype (a Polars bug \
-             candidate)",
+             of day is shifted and filled with a whole number typed without a dtype, which the \
+             grid gives shift as the fill beside its count (a Polars bug candidate)",
         )
         .saying("should not fail: SchemaMismatch"),
         Known::new(
@@ -880,7 +880,7 @@ fn known_padding_lengths() -> Known<Kind> {
                 ],
             )
             .is("column", "String"),
-        "Polars converts the length of a padding to an unsigned 32 bit number and refuses a \
+        "Polars converts the length of a padding to an unsigned 64 bit number and refuses a \
          number below nothing, a fraction or a date, which the walk does not read (#224)",
     )
     .saying("failed in column 'scalar'")

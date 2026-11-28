@@ -248,10 +248,10 @@ fn keys_known() -> Vec<Known<Kind>> {
         Known::new(
             Kind::WalkRefusesOnly,
             Pattern::new().is("maintain_order", "true"),
-            "the walk cannot know how many values a key that takes some of them gives, which the \
-             data decide, so where the order is kept it refuses it by design, and Polars allows it \
-             by chance of this table: its filter keeps one row, which it broadcasts, and its values \
-             that differ are as many as the rows",
+            "the walk cannot know how many values a key gives where the data decide it, a filter, \
+             the values that differ and the like, so where the order is kept it refuses it by \
+             design, and Polars allows it by chance of this table, whose rows give such a key one \
+             value, which it broadcasts, or as many values as the rows",
         )
         .saying("kept-order-needs-keys-of-the-rows"),
     ]
