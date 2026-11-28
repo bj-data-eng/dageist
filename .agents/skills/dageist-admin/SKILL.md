@@ -43,6 +43,12 @@ Keep requirement coverage and consequential decisions with their owning issue
 or tracked source. Do not build a parallel progress database in local files or
 comments.
 
+An issue body states the current plan. When the plan changes, rewrite the body
+to the new state and fold in what still holds from its comments; do not post
+comments that announce a decision, a postponement or a superseded plan.
+Describe only what the product has: no requirement explains or compares
+something the product leaves out.
+
 ## Issue Labels And State
 
 Dageist tracks work in issues and lands changes on `main` through
@@ -108,12 +114,21 @@ and the split is recorded on the issue.
 
 The title supplies the merge-commit subject by default, with GitHub appending
 the pull request number. Validate the title against the repository's
-commit-message requirements before creating the pull request.
+commit-message requirements before creating the pull request, as the subject
+it will become: the title followed by ` (#999)`. A title of 65 characters or
+fewer keeps that subject within the 72-character limit; `main` is never
+rewritten, so a subject that is too long cannot be corrected after landing.
 The body states the change, public impact, and verification evidence. Keep
 decisions and judgement calls on the owning issue; the body may link them.
 
 Pull request text, commit messages and tracked files name no development
-tools and carry no "Generated with" lines or co-author trailers. Tracked files
+tools and carry no "Generated with" lines or co-author trailers. The required
+check "No tool names in text, commits or files" also rejects a short list of
+banned words anywhere in them, test data and identifiers included;
+[pr-hygiene.yml](../../../.github/workflows/pr-hygiene.yml) holds both lists
+and the paths each exempts. Before creating the pull request, match the same
+patterns, case-insensitively, against the files (`git grep`), the paths
+(`git ls-files`) and the branch's commit messages (`git log`). Tracked files
 cite no branch commit SHAs, because a rebase replaces them; describe a
 measurement by its method and inputs, or cite a commit already on `main`.
 
@@ -159,6 +174,14 @@ If `main` moves first and the branch becomes out of date, rebase it onto current
 After the merge, read back `main`: its first parent is the previous `main`, its
 second parent is the verified branch head, its tree equals the branch tree, and
 its subject uses the pull request title with the pull request number suffix.
+Also read back that GitHub records the pull request as merged
+(`gh api repos/bj-data-eng/dageist/pulls/N -q .merged` is `true`). If `main`
+holds the merge but the pull request is not recorded as merged, never push to
+its branch: pushing closes it unmerged for good. Revert the merge through a
+pull request whose body ends with a `Reverts: <full sha>` trailer, since GitHub
+builds the merge message from the title and the body, then land the original
+commits again, cherry-picked onto the reverted `main`, in a new pull request
+whose tree matches the reviewed head.
 Confirm the remote head branch was deleted; it stays restorable from the pull
 request. Remove local branches, worktrees, and Cargo targets only with cleanup
 authority.

@@ -51,6 +51,14 @@ second entry. Name it from the one dageist issue that tracks the matter, and
 from a pull request body only where it matters. Keep it out of commit messages
 and titles.
 
+For the same reason, no issue, pull request, commit message or tracked file
+describes the people who work on dageist, their work, their data or their
+machines. A need is described generically, and an example uses names that are
+made up or come from the [orders sample](samples/orders/workspace.json).
+GitHub keeps every revision of an issue or pull request body in its public edit
+history, and editing a body does not remove an earlier revision, so check the
+text before it is first posted.
+
 ## Discover The Current Structure
 
 Read the relevant sources below; manifests establish package/dependency facts
@@ -114,6 +122,15 @@ performs no data processing. The step editor writes its steps as a step
 document and shows what the engine reports of it: previews, dtypes and refusals
 are the engine's, and the view formats no value.
 
+A step document is configuration, kept in a workspace's git history, and holds
+no data: no sample values, expected results or cached rows. A short list typed
+into a step, such as the values of an `is_in`, is configuration; a reference
+table is a node connected to the step. Sample data stays out of code as well:
+code added to a crate or the view holds no sample's names, rows or steps, which
+belong in a sample workspace such as `samples/orders/` or in a test's corpus;
+[#194](https://github.com/bj-data-eng/dageist/issues/194) moves out what
+remains.
+
 The view is an npm workspace. The shell in `ui/apps/desktop` is the only place
 features are composed. `ui/packages/host` is the only package that knows Tauri
 or the bridge's transport.
@@ -128,6 +145,12 @@ is the intended eventual host, so keep host-specific code inside the host
 adapter where a later Surgeist adapter can replace it without core changes.
 A capability the view needs that Surgeist lacks is Surgeist's work; report it
 to that repository rather than implementing it here.
+
+Dageist is developed and tested on macOS. Code that touches files, locks, paths,
+processes, dialogs or window chrome records any assumption that may not hold on
+Windows in the body of
+[#204](https://github.com/bj-data-eng/dageist/issues/204), for a later pass on
+Windows.
 
 ## Backward Compatibility
 
@@ -203,6 +226,10 @@ in every brief, whatever a brief leaves out.
   Polars where in doubt, and reruns a checkpoint only when its evidence is
   missing, stale or contradictory. A small fix after an accepted review gets a
   review of that fix alone.
+- **The engine stays strict where Polars skips a part.** A refusal of a part
+  Polars does not evaluate is stricter by design, not a gap to close;
+  [the explanation](docs/explanation.md#what-the-tables-are-checked-against)
+  gives the rule.
 
 ## Command Inventory
 
@@ -221,7 +248,9 @@ The root manifest's profiles: a debug build is optimised lightly, with debug
 assertions and overflow checks on, and runs the tests about as fast as a
 release build; `--release` builds as Polars builds its wheels and takes the
 longest; `--profile measure` is Polars as its release runs, for the tables and
-the campaigns.
+the campaigns. Every profile unwinds on a panic: never build or measure with
+`panic = "abort"`, since Polars' streaming executor and the engine catch
+panics.
 [The explanation](docs/explanation.md#how-dageist-is-built) gives the reasons
 and the measurements.
 
