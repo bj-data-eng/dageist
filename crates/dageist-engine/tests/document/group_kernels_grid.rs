@@ -28,6 +28,7 @@ fn table() -> DataFrame {
             Series::new("n".into(), [1_i64, 1, 2]).into(),
             Series::new("m".into(), [3_i64, 4, 5]).into(),
             Series::new("t".into(), ["x", "y", "x"]).into(),
+            Series::new("f".into(), [true, false, true]).into(),
             Series::new("d".into(), [1_i32, 2, 3])
                 .cast(&DataType::Date)
                 .expect("a date")
@@ -62,7 +63,17 @@ fn labelled<T: Clone>(items: &[(&str, T)]) -> Vec<(String, T)> {
 
 /// A step that groups by `n`, and finishes with what `value` makes in the context: an aggregate
 /// of the name `out`, or a predicate that is one value for each group.
-fn grouped(context: &str, value: Value) -> Result<Case, String> {
+fn grouped(context: &str, keyed: bool, value: Value) -> Result<Case, String> {
+    // The same expression as an item of a select of the table, which is no group's: what Polars
+    // does there is what a cell of a group is told apart from.
+    if context == "select" {
+        return Case::of_step(
+            "LazyFrame.select",
+            json!({ "named_exprs": named(vec![("out", value)]) }),
+            table(),
+            Connections::new(),
+        );
+    }
     let finish = match context {
         "agg" => vec![call(
             "LazyGroupBy.agg",
@@ -85,7 +96,11 @@ fn grouped(context: &str, value: Value) -> Result<Case, String> {
         other => panic!("no context {other}"),
     };
     Case::of_grouping(
-        json!({ "by": many(vec![field("n")]) }),
+        if keyed {
+            json!({ "by": many(vec![field("n")]) })
+        } else {
+            json!({})
+        },
         finish,
         table(),
         Connections::new(),
@@ -106,11 +121,17 @@ fn then(value: Value, link: Value) -> Value {
 
 const CONTEXTS: [(&str, &str); 2] = [("agg", "agg"), ("having", "having")];
 
+/// The contexts of the grid of the methods: a select too, which a cell that is the group's is not
+/// refused or allowed in as it is in a group.
+const CONTEXTS_AND_SELECT: [(&str, &str); 3] =
+    [("agg", "agg"), ("having", "having"), ("select", "select")];
+
 // ---------------------------------------------------------------------------
 // The key of a window
 
 #[derive(Default)]
 struct Windowed {
+    keyed: bool,
     context: &'static str,
     part: &'static str,
     key: &'static str,
@@ -234,6 +255,7 @@ fn windowed_case(point: &Windowed) -> Result<Case, String> {
     // A predicate is one value for each group, which the sum of the window is.
     grouped(
         point.context,
+        point.keyed,
         if point.context == "having" {
             then(
                 then(windowed, one("Expr.sum")),
@@ -246,14 +268,40 @@ fn windowed_case(point: &Windowed) -> Result<Case, String> {
 }
 
 fn windowed_known() -> Vec<Known> {
-    vec![Known::new(
-        Kind::WalkRefusesOnly,
-        Pattern::new()
-            .is("part", "order_by")
-            .is("key", "literal cum_sum"),
-        "Polars reads the cumulative sum of a literal as a literal where it orders a window, and refuses it where it groups one, as it does the one of a column; the tables measured the cumulative sum of a column, and the walk does not fold the literal",
-    )
-    .saying("non-elementwise")]
+    vec![
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .is("keys", "a key")
+                .is("part", "order_by")
+                .is("key", "literal cum_sum"),
+            "Polars reads the cumulative sum of a literal as a literal where it orders a window, and refuses it where it groups one, as it does the one of a column; the tables measured the cumulative sum of a column, and the walk does not fold the literal",
+        )
+        .saying("non-elementwise"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().is("keys", "no key"),
+            "a group by with no key is one group that Polars evaluates as it evaluates a select, which accepts a window whose key is not elementwise, where the tables measured the groups of a key",
+        )
+        .saying("non-elementwise"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .is("keys", "no key")
+                .is("key", "n replace n by n"),
+            "the values of the column n repeat, which a replacement of them by themselves refuses in a select as well, so with no key the rule for a key that is not elementwise is not what refuses it",
+        )
+        .saying("must not contain duplicates"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .is("keys", "no key")
+                .is("part", "order_by")
+                .is("key", "literal head 1"),
+            "a window that orders by one value beside the rows is refused for its length in a select as well, so with no key the rule for a key that is not elementwise is not what refuses it",
+        )
+        .saying("order by expression evaluated to a length"),
+    ]
 }
 
 #[test]
@@ -264,6 +312,11 @@ fn the_key_of_a_window_in_agg_and_in_having_is_what_polars_says() {
         .axis("context", labelled(&CONTEXTS), |point, context| {
             point.context = context;
         })
+        .axis(
+            "keys",
+            labelled(&[("a key", true), ("no key", false)]),
+            |point, keyed| point.keyed = *keyed,
+        )
         .axis(
             "part",
             labelled(&[("partition_by", "partition_by"), ("order_by", "order_by")]),
@@ -279,6 +332,7 @@ fn the_key_of_a_window_in_agg_and_in_having_is_what_polars_says() {
 
 #[derive(Default)]
 struct Given {
+    keyed: bool,
     goes_on: bool,
     stands: &'static str,
     context: &'static str,
@@ -322,6 +376,10 @@ fn operand(family: &str, kind: &str, receiver: bool) -> Value {
         "literal" => literal,
         "aggregate" => field_then(column, vec![one("Expr.first")]),
         "null" => lit(json!({ "flag": null })),
+        // What Polars refuses in a select: text multiplied by text.
+        "text times text" => {
+            field_then("t", vec![call("Expr.mul", json!({ "other": field("t") }))])
+        }
         other => panic!("no operand {other}"),
     }
 }
@@ -423,11 +481,112 @@ fn given_case(point: &Given) -> Result<Case, String> {
         }
         other => panic!("no standing {other}"),
     };
-    grouped(point.context, value)
+    grouped(point.context, point.keyed, value)
 }
 
 fn given_known() -> Vec<Known> {
     vec![
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .one_of("method", &["Expr.replace.old", "Expr.replace_strict.old"])
+                .is("argument", "null"),
+            "the tables measured the values a replacement replaces as a column of the dtype Null, whose values repeat, which a replacement refuses, and a null literal is one value, which Polars takes, in a select as well",
+        )
+        .saying("must not contain duplicates"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .one_of(
+                    "method",
+                    &[
+                        "Expr.eq.other",
+                        "Expr.ne.other",
+                        "Expr.gt.other",
+                        "Expr.ge.other",
+                        "Expr.lt.other",
+                        "Expr.le.other",
+                        "Expr.fill_nan.value",
+                        "Expr.sort_by.by",
+                    ],
+                )
+                .is("argument", "text times text"),
+            "the tables refuse the multiplication of text by text, and Polars allows it as the other side of a comparison, as the value a NaN is filled with and as a sort key, in a select as well: a part that it does not evaluate, which a campaign settles by a probe",
+        )
+        .saying("mul operation not supported"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .is("method", "Expr.over.partition_by")
+                .is("keys", "no key"),
+            "a group by with no key is one group that Polars evaluates as it evaluates a select, which takes an aggregate as the key of a window, where the tables measured the groups of a key",
+        )
+        .saying("non-elementwise"),
+        Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new()
+                .one_of(
+                    "method",
+                    &[
+                        "Expr.approx_quantile.quantile",
+                        "Expr.head.n",
+                        "Expr.limit.n",
+                        "Expr.pct_change.n",
+                        "Expr.quantile.quantile",
+                        "Expr.shift.fill_value",
+                        "Expr.slice.length",
+                    ],
+                )
+                .is("argument", "null"),
+            "the tables measured a count, a share, a fill and a length as a literal of a number, and a null literal converts to none, which Polars takes, in a select as well",
+        )
+        .saying("to `null` failed"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .one_of(
+                    "method",
+                    &[
+                        "Expr.floordiv.other",
+                        "Expr.gather.indices",
+                        "Expr.shift.n",
+                        "Expr.str.replace_all.value",
+                    ],
+                )
+                .is("argument", "null"),
+            "Polars refuses a null literal as what a literal is divided by (and panics), as an index, as the count of a shift and as the value of a replacement of every match, which the walk reads as a value of any dtype, in a select as well (the limit a-replacement-of-every-match-given-a-null-value holds the last where a campaign meets it)",
+        ),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .one_of("method", &["Expr.replace.new", "Expr.replace_strict.new"])
+                .is("receiver", "literal")
+                .is("argument", "column"),
+            "a replacement of a literal by the values of a column has as many new values as old ones, or one, which the rule replacement-values-match-in-number does not reach beside a literal, in a select as well",
+        )
+        .saying("must have the same length as `old`"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .is("keys", "no key")
+                .is("context", "agg")
+                .one_of(
+                    "method",
+                    &[
+                        "Expr.replace_strict.default",
+                        "Expr.sort_by.by",
+                        "Expr.str.replace.value",
+                        "Expr.str.replace_all.value",
+                    ],
+                )
+                .is("argument", "column"),
+            "a group by with no key is one group that Polars evaluates for the most part as it evaluates a select, as the maps of a literal beside the values of the group show, and these kernels still refuse the values of the group beside a literal or an aggregate where the other calls do not",
+        )
+        .saying_one_of(&[
+            "`default` input for `replace_strict` must have the same length",
+            "lengths don't match: `sort_by`",
+            "replacement value length",
+        ]),
         Known::new(
             Kind::Unbuildable,
             Pattern::new()
@@ -547,6 +706,11 @@ fn given_known() -> Vec<Known> {
 fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says() {
     let verdicts = Grid::<Given>::new()
         .axis(
+            "keys",
+            labelled(&[("a key", true), ("no key", false)]),
+            |point, keyed| point.keyed = *keyed,
+        )
+        .axis(
             "stands",
             labelled(&[("alone", "alone"), ("as an operand", "as an operand")]),
             |point, stands| point.stands = stands,
@@ -556,9 +720,13 @@ fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says()
             labelled(&[("ends", false), ("goes on to an aggregate", true)]),
             |point, goes_on| point.goes_on = *goes_on,
         )
-        .axis("context", labelled(&CONTEXTS), |point, context| {
-            point.context = context;
-        })
+        .axis(
+            "context",
+            labelled(&CONTEXTS_AND_SELECT),
+            |point, context| {
+                point.context = context;
+            },
+        )
         .axis("method", methods(), |point, method| {
             point.method = Some(*method);
         })
@@ -578,9 +746,97 @@ fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says()
                 ("column", "column"),
                 ("aggregate", "aggregate"),
                 ("literal", "literal"),
+                ("null", "null"),
+                ("text times text", "text times text"),
             ]),
             |point, argument| point.argument = argument,
         )
         .judge(&Question::any_refusal().at(Depth::Rows), given_case);
     verdicts.assert_agree(&given_known(), 3_000);
+}
+
+// ---------------------------------------------------------------------------
+// A condition
+
+#[derive(Default)]
+struct Conditioned {
+    keyed: bool,
+    context: &'static str,
+    predicate: &'static str,
+    values: &'static str,
+}
+
+fn conditioned_case(point: &Conditioned) -> Result<Case, String> {
+    let predicate = match point.predicate {
+        "a Boolean against a date" => {
+            field_then("f", vec![call("Expr.ge", json!({ "other": field("d") }))])
+        }
+        "a number against text" => {
+            field_then("m", vec![call("Expr.ge", json!({ "other": field("t") }))])
+        }
+        "a number against a number" => {
+            field_then("m", vec![call("Expr.ge", json!({ "other": whole(1) }))])
+        }
+        other => panic!("no predicate {other}"),
+    };
+    let otherwise = match point.values {
+        "the same" => field("m"),
+        "different" => field("n"),
+        other => panic!("no values {other}"),
+    };
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![predicate]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": field("m") })),
+            call("Then.otherwise", json!({ "statement": otherwise })),
+        ],
+    );
+    grouped(point.context, point.keyed, condition)
+}
+
+#[test]
+fn a_condition_given_a_predicate_the_tables_refuse_is_what_polars_says_in_a_group() {
+    let verdicts = Grid::<Conditioned>::new()
+        .axis(
+            "context",
+            labelled(&CONTEXTS_AND_SELECT),
+            |point, context| {
+                point.context = context;
+            },
+        )
+        .axis(
+            "keys",
+            labelled(&[("a key", true), ("no key", false)]),
+            |point, keyed| point.keyed = *keyed,
+        )
+        .axis(
+            "predicate",
+            labelled(&[
+                ("a Boolean against a date", "a Boolean against a date"),
+                ("a number against text", "a number against text"),
+                ("a number against a number", "a number against a number"),
+            ]),
+            |point, predicate| point.predicate = predicate,
+        )
+        .axis(
+            "values",
+            labelled(&[("the same", "the same"), ("different", "different")]),
+            |point, values| point.values = values,
+        )
+        .judge(&Question::any_refusal().at(Depth::Rows), conditioned_case);
+    verdicts.assert_agree(
+        &[Known::new(
+            Kind::WalkRefusesOnly,
+            Pattern::new().is("values", "the same").one_of(
+                "predicate",
+                &["a Boolean against a date", "a number against text"],
+            ),
+            "Polars does not evaluate the predicate of a condition whose two values are one expression, in a select as well, and the tables refuse the comparison that is its predicate: a part Polars does not evaluate, where the other cells of the grid, whose values differ, are refused by both",
+        )
+        .saying("tables of Polars")],
+        30,
+    );
 }
