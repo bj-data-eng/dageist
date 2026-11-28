@@ -400,6 +400,8 @@ struct Around<'a> {
     /// Whether the chain the link is part of stands alone where it is held, as what `agg` or
     /// `having` is given, and is no operand of another call.
     alone: bool,
+    /// Whether the link after it is an aggregate, which takes one value of what it gives.
+    meets_an_aggregate: bool,
 }
 
 /// What a chain has so far.
@@ -2665,6 +2667,7 @@ impl Walker<'_> {
                     null_kept,
                     literal: is_made_of_literals(expression, at),
                     alone: held.is_some(),
+                    meets_an_aggregate: expression.links().get(at + 1).is_some_and(is_one_value),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -3000,6 +3003,7 @@ impl Walker<'_> {
             null_kept,
             literal: receiver_is_literal,
             alone,
+            meets_an_aggregate,
         } = around;
         // What the call says of a struct: the fields it follows, the names and numbers it is given.
         let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
@@ -3078,8 +3082,13 @@ impl Walker<'_> {
         if matches!(cur, Cur::Value { .. })
             && receiver_is_literal
             && matches!(context.outer(), Outer::Aggregate | Outer::Having)
-            && let Some((parameter, given)) =
-                given_values_beside_a_literal(entry, arguments, context.outer(), alone)
+            && let Some((parameter, given)) = given_values_beside_a_literal(
+                entry,
+                arguments,
+                context.outer(),
+                alone,
+                meets_an_aggregate,
+            )
             && let Err(refusal) =
                 allowed::rule_forbids_a_literal_beside_values_in_a_group(parameter, given)
         {
@@ -4528,6 +4537,9 @@ struct Beside {
     rows_in_having_beside: bool,
     one_in_agg: bool,
     one_in_having: bool,
+    /// Whether the refusal is of the call where it ends, and is not the one that Polars makes
+    /// where an aggregate takes one value of what the call gives.
+    unless_met_by_an_aggregate: bool,
 }
 
 /// What Polars refuses of what a literal receiver of `entry` is given for `parameter`, as the grid
@@ -4545,6 +4557,7 @@ fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
                 rows_in_having_beside: true,
                 one_in_agg: false,
                 one_in_having: true,
+                unless_met_by_an_aggregate: true,
             })
         }
         // What sorts a literal by the values of the group is as long as they are, not as it is,
@@ -4556,6 +4569,7 @@ fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
             rows_in_having_beside: false,
             one_in_agg: false,
             one_in_having: false,
+            unless_met_by_an_aggregate: true,
         }),
         // A replacement of a literal by values for each row is not yet implemented.
         ("Expr.replace" | "Expr.replace_strict", "old" | "new") => Some(Beside {
@@ -4565,6 +4579,7 @@ fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
             rows_in_having_beside: true,
             one_in_agg: true,
             one_in_having: true,
+            unless_met_by_an_aggregate: false,
         }),
         // What fills a literal replaced takes one value of an aggregate in `having` as the others
         // take it, and in `agg` takes the values of the group too.
@@ -4576,6 +4591,7 @@ fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
             rows_in_having_beside: true,
             one_in_agg: true,
             one_in_having: true,
+            unless_met_by_an_aggregate: true,
         }),
         _ => None,
     }
@@ -4589,10 +4605,11 @@ fn given_values_beside_a_literal<'a>(
     arguments: &'a [(String, Operand)],
     outer: Outer,
     alone: bool,
+    met_by_an_aggregate: bool,
 ) -> Option<(&'a str, &'static str)> {
     arguments.iter().find_map(|(name, operand)| {
         let refused = beside_a_literal(entry.id().as_str(), name)?;
-        if !operand.known {
+        if !operand.known || (refused.unless_met_by_an_aggregate && met_by_an_aggregate) {
             return None;
         }
         let having = outer == Outer::Having;
