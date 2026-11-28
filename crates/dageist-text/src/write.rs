@@ -55,6 +55,22 @@ pub fn write(document: &Document) -> Result<String, WriteError> {
             });
         }
         links.push(Link::call(arguments(step.call(), &place)?));
+        // The calls on a group by that a step that groups holds follow it, each a call of its own.
+        for (at, call) in step.links().iter().enumerate() {
+            let (_, attributes) = names::written(call.entry());
+            for name in attributes {
+                links.push(Link::Attribute {
+                    dot: dageist_syntax::Span::default(),
+                    name: name.to_owned(),
+                    name_span: dageist_syntax::Span::default(),
+                    comments: Vec::new(),
+                });
+            }
+            links.push(Link::call(arguments(
+                call,
+                &place.clone().then(Segment::Link(at)),
+            )?));
+        }
     }
     Ok(print(&Expr::chain(Expr::name(FRAME), links)))
 }
