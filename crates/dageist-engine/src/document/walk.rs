@@ -1161,12 +1161,41 @@ fn open_after(
     let result = allowance
         .and_then(allowed::Allowance::result)
         .and_then(allowed::ResultDtype::class);
-    let keeps_the_dtype =
-        matches!((result, receiver), (Some(given), Some(followed)) if given == followed);
+    let keeps_the_dtype = matches!((result, receiver), (Some(given), Some(followed)) if given == followed)
+        && gives_back_every_number(entry);
     let settled_by_a_typed_operand = arguments.iter().any(|(name, operand)| {
         operand_adapts(entry, name) && !(operand.open || operand.loose.is_some())
     });
     keeps_the_dtype && !settled_by_a_typed_operand
+}
+
+/// Whether the tables say that `entry`, given nothing, gives back the dtype of each number a number
+/// typed without a dtype may fall back to that it allows, and allows one: a call that does keeps the
+/// open number open, as the absolute value and the largest do, and one that gives a number with a
+/// fraction for a whole number, or for any, as a square root and the mean do, settles it to the dtype
+/// it gives.
+fn gives_back_every_number(entry: &'static Entry) -> bool {
+    let mut allowed_for_one = false;
+    for class in [
+        Representative::Int32,
+        Representative::Int64,
+        Representative::Float64,
+    ] {
+        let place = OfferPlace::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: class,
+                shape: Shape::Many,
+            },
+        );
+        if let Verdict::Allowed(allowance) = allowed::offer(entry, &place, &Chosen::default()) {
+            if allowance.result().and_then(allowed::ResultDtype::class) != Some(class) {
+                return false;
+            }
+            allowed_for_one = true;
+        }
+    }
+    allowed_for_one
 }
 
 /// Whether a method takes an operand besides what it follows, which a number
@@ -2768,10 +2797,12 @@ impl Walker<'_> {
                     meets_an_aggregate: expression.links().get(at + 1).is_some_and(is_one_value),
                 },
             );
-            // An aggregate of the literal that starts the chain is a value Polars settles as it
-            // folds the literal, as it settles the number that stands alone as a key. What
-            // gathers the values of a repeat or of a condition keeps them open as they were.
-            let settled_by_an_aggregate = is_one_value(link)
+            // An aggregate that directly follows the literal that starts the chain is a value
+            // Polars settles as it folds the literal, as it settles the number that stands alone
+            // as a key. An aggregate after a call that kept the number open keeps it open, as what
+            // gathers the values of a repeat or of a condition does.
+            let settled_by_an_aggregate = at == 0
+                && is_one_value(link)
                 && matches!(expression.start(), Start::Call(start)
                     if start.entry().id().as_str() == "polars.lit");
             open = open_after(
@@ -2870,7 +2901,10 @@ impl Walker<'_> {
                 && !expression.links().is_empty()
                 && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
                 && context.nested().is_none()
-                && matches!(ending, Some(Ending::Allowed) | None)
+                && matches!(
+                    ending,
+                    Some(Ending::Allowed | Ending::NotKnown(Unknown::TheResultsDtype)) | None
+                )
             {
                 ending = Some(Ending::NotKnown(Unknown::AnOpenNumberInAKey));
                 // What the key holds is the reason it is not told, rather than the dtype a call
