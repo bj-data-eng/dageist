@@ -633,13 +633,21 @@ check them, with the rest of the engine:
 cargo test --offline --locked -p dageist-engine
 ```
 
-To write them again, which takes a few seconds to ten, run the test with the
-variable set, then build and test again so that the engine embeds the new files:
+The tables are measured in the profile `measure`, which builds Polars as its release does,
+optimised and without debug assertions or overflow checks, so they are what Polars does in the
+application ([the explanation](explanation.md#how-dageist-is-built) says why). A debug build
+measures the same tables today and checks them with the engine's tests, and refuses to write them.
+To write them again, which takes a few seconds to twenty, run the test with the variable set in
+that profile, then build and test again so that the engine embeds the new files:
 
 ```sh
-DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts
+DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked --profile measure -p dageist-engine allowed::tests::artifacts
 cargo test --offline --locked -p dageist-engine
 ```
+
+A table that a debug build measures otherwise than `measure` fails the engine's tests there: that
+is a difference only a debug build of Polars makes, a candidate to report to Polars and not a fact
+for the tables.
 
 Never edit the files by hand. Read the diff and explain each changed line from
 its source: a line that was allowed and is refused, or was refused at the
@@ -669,12 +677,22 @@ The tables are measured one combination at a time. A property target in
 `crates/dageist-engine/tests/allowed_fuzz/` makes the combinations they were not
 measured as and checks them against Polars, as
 [the explanation](explanation.md#what-the-tables-are-checked-against) says. It runs
-with the engine's tests, from a fixed seed, on 1000 cases, which takes
-seconds in a debug build and longer when the machine is short of memory:
+with the engine's tests, from a fixed seed, on 1000 cases, with the replay of every kept case,
+which takes seconds. Campaigns run in the profile `measure`, as Polars' release runs, and the
+fixed seed and the kept cases are run there too, in the build the tables are measured in:
 
 ```sh
-cargo test --offline --locked -p dageist-engine --test allowed_fuzz
+cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz
 ```
+
+The engine's ordinary tests run the same target in a debug build, a stricter pass: a debug build
+of Polars checks overflows and its own assertions, which a release build does not. A finding only
+that build makes is a candidate to report to Polars, not a fact for the tables; the limit
+`an-overflow` excuses the overflows it panics on, and its kept case replays as one the tables and
+Polars agree on in `measure`. A case runs on the stack the application gives the engine there, two
+megabytes, so a chain that overflows it ends the process, and the case is `current.case` among the
+kept evidence; the bound is approximate, since the application is optimised further and its frames
+differ. A debug build, whose frames are far larger, runs a case on 256 megabytes.
 
 It is built on [dageist-fuzz](../crates/dageist-fuzz/README.md)'s `property`
 feature, which is a dev-dependency of the engine. A case is the dtypes of the
@@ -695,8 +713,8 @@ length>.case`, and prints them all at the end with how many cases ended each way
 alone, since a case that runs Polars is heavy:
 
 ```sh
-DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked -p dageist-engine \
-  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
+DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked --profile measure \
+  -p dageist-engine --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A campaign draws its methods evenly, so the more methods the catalogue holds, the
@@ -726,8 +744,8 @@ makes a moment is refused, and the refusal names it. A campaign focused on the m
 
 ```sh
 DAGEIST_FUZZ_FOCUS=dt.,replace_strict DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 \
-  cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
-  -- --ignored --nocapture --test-threads=1 --exact
+  cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz \
+  a_campaign -- --ignored --nocapture --test-threads=1 --exact
 ```
 
 A batch of new methods lands when focused campaigns on them agree: fresh seeds
@@ -785,7 +803,8 @@ This loop goes on until a campaign ends by itself. It runs in a subshell, so the
 do not stay in yours, and it follows `DAGEIST_FUZZ_KEEP` if that is set. It stops at any end
 that leaves no `timeout.env`, which is a campaign that ran to its last case or one that failed
 for another reason, such as a case that disagrees, and leaves every timeout in the kept
-directory:
+directory. A case that ends the process otherwise, as one that overflows the stack does, leaves
+no `timeout.env` and stops the loop, and is `current.case` in the directory:
 
 ```sh
 (
@@ -798,8 +817,8 @@ directory:
       set -a; . "$keep/timeout.env"; set +a
       mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
     fi
-    cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
-      -- --ignored --nocapture --test-threads=1 --exact
+    cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz \
+      a_campaign -- --ignored --nocapture --test-threads=1 --exact
     [ -f "$keep/timeout.env" ] || break
   done
 )
@@ -816,7 +835,7 @@ status:
 
 ```sh
 DAGEIST_FUZZ_REPLAY=$PWD/target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \
-  -p dageist-engine --test allowed_fuzz replay_a_case -- --ignored --nocapture
+  --profile measure -p dageist-engine --test allowed_fuzz replay_a_case -- --ignored --nocapture
 ```
 
 It prints the case, what the tables predicted of it and where, what Polars did and

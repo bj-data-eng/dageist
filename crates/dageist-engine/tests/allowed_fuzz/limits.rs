@@ -196,7 +196,8 @@ pub enum Limit {
     /// is undone.
     TheLengthsOfTheRows,
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
-    /// release build, on keys the tables did not measure.
+    /// release build, on keys the tables did not measure. A limit of a debug build
+    /// only: campaigns run as Polars' release runs, where the overflow wraps.
     AnOverflow,
     /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
     /// it refuses a negative whole number as the exponent of an integer when the rows
@@ -577,6 +578,13 @@ impl Limit {
         Self::AJoinKeyPolarsDoesNotRun,
         Self::AStructTakenForAPredicate,
     ];
+
+    /// Whether the limit is of what only a build with debug assertions does, which a
+    /// build as Polars' release is built does not: a case kept for it replays there as
+    /// one the tables and Polars agree on.
+    pub const fn is_of_a_debug_build(self) -> bool {
+        matches!(self, Self::AnOverflow)
+    }
 
     /// The name a kept case is filed under.
     pub const fn slug(self) -> &'static str {

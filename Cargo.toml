@@ -49,6 +49,14 @@ exclude = ["vendor"]
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+# A debug build is optimised lightly, dageist's crates and Polars alike, which runs the tests as
+# fast as a release build runs them and rebuilds an engine change faster than none did. Debug
+# assertions and overflow checks stay on, as in any debug build. A debugger that has to show
+# every variable wants `CARGO_PROFILE_DEV_OPT_LEVEL=0`. docs/explanation.md, "How Dageist Is
+# Built", gives the measurements.
+[profile.dev]
+opt-level = 1
+
 # A release build uses the settings Polars builds its Python wheels with (`dist-release` in
 # vendor/polars/Cargo.toml): fat link-time optimisation, one codegen unit and no debug
 # information. Its symbols are stripped. Panics still unwind: Polars' streaming executor catches
@@ -65,6 +73,19 @@ opt-level = "s"
 
 [profile.release.package.polars-sql]
 opt-level = "s"
+
+# The profile the tables of allowed combinations are measured in and the fuzz campaigns run in:
+# Polars as its release runs, optimised and without debug assertions or overflow checks. Its
+# link-time optimisation and codegen units are Cargo's defaults, thin local LTO and 16 units,
+# which change speed and not behaviour, so that it builds in minutes and rebuilds incrementally.
+[profile.measure]
+inherits = "release"
+opt-level = 1
+lto = false
+codegen-units = 16
+incremental = true
+debug = "line-tables-only"
+strip = "none"
 
 # The crate patches the Polars release in vendor/polars applies to the crates dageist builds,
 # at the same revisions. Polars' `color-backtrace` patch serves only its Python binding.
