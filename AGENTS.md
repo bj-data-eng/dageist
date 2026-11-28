@@ -126,8 +126,10 @@ A step document is configuration, kept in a workspace's git history, and holds
 no data: no sample values, expected results or cached rows. A short list typed
 into a step, such as the values of an `is_in`, is configuration; a reference
 table is a node connected to the step. Sample data stays out of code as well:
-no crate and no part of the view holds a sample's names, rows or steps, which
-belong in a sample workspace such as `samples/orders/` or in a test's corpus.
+code added to a crate or the view holds no sample's names, rows or steps, which
+belong in a sample workspace such as `samples/orders/` or in a test's corpus;
+[#194](https://github.com/bj-data-eng/dageist/issues/194) moves out what
+remains.
 
 The view is an npm workspace. The shell in `ui/apps/desktop` is the only place
 features are composed. `ui/packages/host` is the only package that knows Tauri
@@ -144,7 +146,7 @@ adapter where a later Surgeist adapter can replace it without core changes.
 A capability the view needs that Surgeist lacks is Surgeist's work; report it
 to that repository rather than implementing it here.
 
-Development and testing happen on macOS. Code that touches files, locks, paths,
+Dageist is developed and tested on macOS. Code that touches files, locks, paths,
 processes, dialogs or window chrome records any assumption that may not hold on
 Windows in the body of
 [#204](https://github.com/bj-data-eng/dageist/issues/204), for a later pass on
@@ -224,11 +226,10 @@ in every brief, whatever a brief leaves out.
   Polars where in doubt, and reruns a checkpoint only when its evidence is
   missing, stale or contradictory. A small fix after an accepted review gets a
   review of that fix alone.
-- **The engine stays strict where Polars skips a part.** Every part of an
-  expression is held to its types whether or not Polars evaluates it, as
+- **The engine stays strict where Polars skips a part.** A refusal of a part
+  Polars does not evaluate is stricter by design, not a gap to close;
   [the explanation](docs/explanation.md#what-the-tables-are-checked-against)
-  describes; a refusal of a part Polars skips is stricter by design, not a gap
-  to close.
+  gives the rule.
 
 ## Command Inventory
 

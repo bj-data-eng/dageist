@@ -126,9 +126,9 @@ tools and carry no "Generated with" lines or co-author trailers. The required
 check "No tool names in text, commits or files" also rejects a short list of
 banned words anywhere in them, test data and identifiers included;
 [pr-hygiene.yml](../../../.github/workflows/pr-hygiene.yml) holds both lists
-and the paths each exempts. Before creating the pull request, run the same
-case-insensitive `git grep` over the branch's files, paths and commit
-messages. Tracked files
+and the paths each exempts. Before creating the pull request, match the same
+patterns, case-insensitively, against the files (`git grep`), the paths
+(`git ls-files`) and the branch's commit messages (`git log`). Tracked files
 cite no branch commit SHAs, because a rebase replaces them; describe a
 measurement by its method and inputs, or cite a commit already on `main`.
 
