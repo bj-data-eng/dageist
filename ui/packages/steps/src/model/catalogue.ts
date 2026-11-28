@@ -174,13 +174,22 @@ export function optionParameters(
 }
 
 /** The step verbs, by their Polars names. */
-export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
+export type Verb =
+  | 'with_columns'
+  | 'filter'
+  | 'sort'
+  | 'group_by'
+  | 'select'
+  | 'rename'
+  | 'join'
+  | 'pivot';
 
 /** Every verb the editor offers, in the order it is offered. */
 export const VERBS: readonly Verb[] = [
   'with_columns',
   'filter',
   'sort',
+  'group_by',
   'select',
   'rename',
   'join',
@@ -197,6 +206,8 @@ export const HEAD = {
   with_columns: { named: 'named_exprs', exprs: 'exprs' },
   filter: { predicates: 'predicates' },
   sort: { by: 'by' },
+  // The keys, and the keys that are named. The calls after `group_by` are the step's links.
+  group_by: { by: 'by', named: 'named_by' },
   select: { exprs: 'exprs' },
   rename: { mapping: 'mapping' },
   join: { other: 'other', leftOn: 'left_on', rightOn: 'right_on' },
@@ -224,6 +235,7 @@ const NOT_OFFERED: Readonly<Record<Verb, readonly string[]>> = {
   with_columns: [],
   filter: [],
   sort: ['more_by'],
+  group_by: [],
   select: [],
   rename: [],
   join: ['on'],
@@ -249,4 +261,32 @@ export function stepOptionParameters(
   if (found === undefined) return [];
   const verb = verbOf(entry);
   return optionParameters(found, verb === null ? [] : coveredParameters(verb));
+}
+
+/**
+ * Returns the parameters of the call `entry` on a group by that the step's head draws itself: the
+ * ones that hold the expressions the engine evaluates on the values of each group, which the
+ * catalogue says by their position, as the predicates of a `having` and the aggregates of an
+ * `agg` are. The other parameters of such a call are drawn as the options of its name.
+ */
+export function groupedHeadOf(entry: EntryView): readonly ParameterView[] {
+  return entry.parameters.filter((parameter) => parameter.position !== null);
+}
+
+/** What a call on a group by is there, as the catalogue says: the predicate of the groups it keeps, or the call that finishes the grouping. */
+export type GroupedRole = NonNullable<EntryView['grouped']>;
+
+/** Returns the role of the entry `entry` on a group by, or `null` where it is not a call on one. */
+export function groupedRoleOf(catalogue: Catalogue, entry: string): GroupedRole | null {
+  return catalogue.entries.get(entry)?.grouped ?? null;
+}
+
+/** Returns the entries that finish a grouping, in the order the catalogue lists them. */
+export function finishingEntries(catalogue: Catalogue): readonly EntryView[] {
+  return catalogue.view.entries.filter((entry) => entry.grouped === 'finishes');
+}
+
+/** Returns the entry that keeps the groups a predicate keeps, or `null` where the catalogue has none. */
+export function havingEntry(catalogue: Catalogue): EntryView | null {
+  return catalogue.view.entries.find((entry) => entry.grouped === 'having') ?? null;
 }

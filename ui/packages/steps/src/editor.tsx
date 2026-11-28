@@ -218,6 +218,12 @@ export interface StepRequests {
   readonly swapLink: (path: Path, entry: string, standing: PlaceRequest | null) => EditRequest;
   readonly removeLink: (path: Path) => EditRequest;
   readonly moveLink: (path: Path, to: number) => EditRequest;
+  /** Puts a call of `entry` on the group by into the step, as the `at`th after the call that groups. */
+  readonly insertGroupCall: (at: number, entry: string) => EditRequest;
+  /** Makes the call after `group_by` at `path` a call of `entry`. */
+  readonly swapGroupCall: (path: Path, entry: string) => EditRequest;
+  /** Takes the call after `group_by` at `path` away. */
+  readonly removeGroupCall: (path: Path) => EditRequest;
 }
 
 /** Returns the requests of the edits inside the step `at`. */
@@ -266,6 +272,14 @@ function requestsOf(at: StepAt): StepRequests {
     }),
     removeLink: (path) => ({ kind: 'removeLink', link: placeOf(at, path) }),
     moveLink: (path, to) => ({ kind: 'moveLink', link: placeOf(at, path), to }),
+    insertGroupCall: (index, entry) => ({
+      kind: 'insertGroupCall',
+      step: placeOf(at, []),
+      at: index,
+      entry,
+    }),
+    swapGroupCall: (path, entry) => ({ kind: 'swapGroupCall', call: placeOf(at, path), entry }),
+    removeGroupCall: (path) => ({ kind: 'removeGroupCall', call: placeOf(at, path) }),
   };
 }
 
@@ -313,6 +327,9 @@ export function useStepEdits(): StepEdits {
       swapLink: async (path, entry, standing) => act(drawn, [make.swapLink(path, entry, standing)]),
       removeLink: async (path) => act(drawn, [make.removeLink(path)]),
       moveLink: async (path, to) => act(drawn, [make.moveLink(path, to)]),
+      insertGroupCall: async (index, entry) => act(drawn, [make.insertGroupCall(index, entry)]),
+      swapGroupCall: async (path, entry) => act(drawn, [make.swapGroupCall(path, entry)]),
+      removeGroupCall: async (path) => act(drawn, [make.removeGroupCall(path)]),
       together: async (build) => act(drawn, build(make)),
     };
   }, [act, drawn, step]);

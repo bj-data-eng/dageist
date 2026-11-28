@@ -533,6 +533,18 @@
       "statement": "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
     },
     {
+      "name": "grouped-names-are-distinct",
+      "statement": "the columns a group by gives must be named differently: a key is named by the column it reads or the name it is given, an aggregate by the column its chain reads or the name it is given, and Polars refuses two that are named alike, as a key and an aggregate of the same column are"
+    },
+    {
+      "name": "having-casts-to-boolean",
+      "statement": "a having's predicate must be a value Polars casts to a Boolean to keep a group or not: a Boolean, a number, or null where it stands alone, and not text, a date, a list or a struct, which it refuses when it runs the rows; beside another predicate, which Polars combines it with as the predicates of a filter are, it must be a Boolean"
+    },
+    {
+      "name": "having-gives-one-value",
+      "statement": "a having's predicate must give one value for each group: the values of the group, as a column or a method that keeps some of them gives, are a list that Polars cannot cast to a Boolean when it runs the rows, so give an aggregate such as the sum, the first value, whether all are true, or a count compared with a number"
+    },
+    {
       "name": "is-in-takes-a-list",
       "statement": "is_in must be given a list or an array to look the value up in, or a collection imploded, and not a collection nested as deeply as the value it follows, as a column of its own dtype is: Polars deprecates that form as ambiguous (pola-rs/polars#22149) and panics on one value looked up in another, so give a list, or the collection imploded"
     },
@@ -541,8 +553,16 @@
       "statement": "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
     },
     {
+      "name": "kept-order-needs-keys-of-the-rows",
+      "statement": "where `maintain_order` keeps the order of the groups, a key must give one value or as many as the table has rows: Polars refuses a key that takes some of the values, as head, filter and drop_nulls do, for lengths that differ where the arguments or the data make it fewer, so give the key as a column, or leave the order unset"
+    },
+    {
       "name": "key-is-elementwise",
-      "statement": "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+      "statement": "a join's key, and the key of a window in what a group by evaluates in `agg` or `having`, must be elementwise: an aggregate may not stand in it beside a column, nor a method that takes some of the values, as head and filter do, unless it goes on to an aggregate, nor a column be compared with a null, nor a column of whole numbers be compared for missing values with a literal that is a number with a fraction or a whole number its dtype cannot hold, as Polars reads the literal (a literal of 16 bit floats or of Boolean, and a float that does not cast exactly, are kept), nor a replacement take a value that reads a column"
+    },
+    {
+      "name": "literal-beside-values-in-a-group",
+      "statement": "in `agg` and `having`, a literal that dt.replace, str.splitn or str.split_exact maps may not be given the values of the group beside it (in a `having` only where it stands beside another value), nor one value that an aggregate gave in a `having`, a literal that sort_by sorts by them may not stand alone, and a literal that replace, replace_strict, str.replace or str.replace_all replaces may not be given either: Polars cannot replace a literal by values for each row, and refuses the map of one value beside many as of another length"
     },
     {
       "name": "moments-share-a-zone",
@@ -819,6 +839,7 @@
     "item",
     "entryPart",
     "link",
+    "groupCall",
     "expression",
     "list",
     "pairs",

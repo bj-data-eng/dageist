@@ -107,6 +107,9 @@ pub struct Chosen<'a> {
     /// How many other expressions stand beside this one in the list it is an item of: the other
     /// predicates of a filter.
     pub(super) among_others: usize,
+    /// The chain is a null literal, which a `having` casts to a `Boolean` whatever its dtype, as
+    /// every value of it is null.
+    pub(super) null_literal: bool,
     /// The names the call is given, each by the parameter that holds it: the name of a field to read
     /// or drop, the new names of the fields, the name of a count.
     pub(super) names: &'a [(&'a str, &'a str)],
@@ -201,6 +204,13 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following_width(mut self, width: Option<usize>) -> Self {
         self.width = width;
+        self
+    }
+
+    /// The chain is a null literal.
+    #[must_use]
+    pub const fn of_a_null_literal(mut self, null: bool) -> Self {
+        self.null_literal = null;
         self
     }
 
@@ -1254,6 +1264,11 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 "a step stands in the list of steps, not in an expression",
             ));
         }
+        (Applies::Grouped, _) => {
+            return Err(Refusal::structure(
+                "a call of a group by follows the call that groups, not an expression",
+            ));
+        }
         (Applies::Expression, After::Value { .. }) => {}
         (Applies::Expression, After::Start) => {
             return Err(Refusal::structure(
@@ -1710,6 +1725,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             }
         }
         ends = cell.ends.clone();
+        // A having needs one value for each group, which the table measured of an entry that gives
+        // one value for each row of a group as refused, whatever the receiver is: where what the
+        // entry follows is one value it gives one, and the rules of how the chain ends say what a
+        // predicate may be. What the entry may stand after is the line of the chain that continues.
+        if place.context.outer() == Outer::Having {
+            ends = Outcome::Allowed(None);
+        }
     }
     // A method that follows one value gives one: the aggregate of a value is that value, and a
     // method that takes some of the values of one keeps it. One that follows a count that the
@@ -1727,6 +1749,24 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // What the arguments given decide, which the tables, measured with columns, do not say.
     if let Some(given) = chosen.shape {
         shape = given;
+    }
+    // Where the values are evaluated on the rows of each group, a method that takes some of the
+    // values of one value, as `drop_nulls`, `unique`, `head` and `mode` do, gives a list of them for
+    // each group, which is many values and not the one value it takes them of: Polars keeps one value
+    // that a method keeps whole, as `sort` and `abs` do, and gathers what is taken into a list.
+    if matches!(place.context.outer(), Outer::Aggregate | Outer::Having)
+        && is_method(entry)
+        && matches!(
+            place.after,
+            After::Value {
+                shape: Shape::One,
+                ..
+            }
+        )
+        && (catalog::Counting::of(entry, chosen.options).is_some()
+            || matches!(id, "Expr.drop_nulls" | "Expr.drop_nans"))
+    {
+        shape = Shape::Many;
     }
     // What a method that takes some of the values says of how it ends is what the table of counts
     // says of the count it gives, which it is not where what it follows is one value: the first of
@@ -1749,7 +1789,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         .flatten()
         .and_then(|(read, _)| read);
     let judged = read.as_ref().or(result.as_ref());
-    let mut ending = if let Some(rule) = Rule::forbids_end(place.context, judged, shape) {
+    let mut ending = if let Some(rule) =
+        Rule::forbids_end(place.context, judged, shape, chosen.among_others).filter(|rule| {
+            // A null literal alone is cast to a `Boolean` by a `having`, as it is a null of
+            // every dtype; beside another predicate it is combined with it as a filter's are.
+            !(chosen.null_literal
+                && chosen.among_others == 0
+                && *rule == Rule::HavingCastsToBoolean)
+        }) {
         Ending::Refused(Refusal::rule(rule))
     } else if let Some(refusal) = Refusal::count(place.context, shape) {
         Ending::Refused(refusal)
@@ -2048,8 +2095,9 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
 
 /// The refusal of a key that the caller has already found is not elementwise, as
 /// it holds an aggregate beside a column, or a column compared with a null,
-/// where `context` holds one of a join's own keys, if the rule refuses it there.
-/// Polars accepts such a key in a window, so the rule is silent there. What a
+/// where `context` holds one of a join's own keys, or the key of a window in what a group by
+/// evaluates in `agg` or `having`, if the rule refuses it there. Polars accepts such a key in a
+/// window of a select, a filter or a sort key, so the rule is silent there. What a
 /// key holds is a matter of the whole expression, not of one entry, so the
 /// caller finds it, and this does not.
 ///
@@ -2070,6 +2118,23 @@ pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), 
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
+}
+
+/// The refusal of a literal that a method of a group maps or replaces the values of, given values
+/// beside it, which the caller has found: `given` says what the parameter was given, as `the values
+/// of the group` or `one value that an aggregate gave`.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words and what the parameter was given.
+pub fn rule_forbids_a_literal_beside_values_in_a_group(
+    parameter: &str,
+    given: &str,
+) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::LiteralBesideValuesInAGroup,
+        &format!("{parameter} was given {given}"),
+    ))
 }
 
 /// The refusal of a moment or a length of time made of numbers typed in, which the caller has found,
@@ -2129,6 +2194,16 @@ pub fn rule_forbids_a_range_that_cannot_be_made(said: &str) -> Result<(), Refusa
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_a_window_over_a_count() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::WindowInputIsNotCounted))
+}
+
+/// Whether a key of a group by that gives some of the values of a column may stand where the order
+/// of the groups is kept.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_key_that_takes_some_values_in_order() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::KeptOrderNeedsKeysOfTheRows))
 }
 
 /// The refusal of a call that meets values of other counts than it takes, which the caller has
@@ -2215,6 +2290,19 @@ pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
     ))
 }
 
+/// Whether a group by gives two columns of one name, which the caller found: its keys and its
+/// aggregates are named differently.
+///
+/// # Errors
+///
+/// Always: the caller asks it where it found a name given twice.
+pub fn rule_forbids_a_grouped_name_given_twice(name: &str) -> Result<(), Refusal> {
+    Err(Refusal::rule_because(
+        Rule::GroupedNamesAreDistinct,
+        &format!("two columns are named {name:?}"),
+    ))
+}
+
 /// Every entry that stands in an expression, offered or refused at `place`.
 /// A step is not offered: steps stand in a list.
 ///
@@ -2224,7 +2312,7 @@ pub fn rule_forbids_a_name_written_twice(name: &str) -> Result<(), Refusal> {
 pub fn offers(place: &Place) -> Vec<Offer> {
     catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .map(|entry| Offer {
             entry,
             verdict: offer(entry, place, &Chosen::default()),

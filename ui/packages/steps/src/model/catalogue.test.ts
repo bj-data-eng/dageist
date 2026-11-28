@@ -59,8 +59,8 @@ const names = (entry: string): string[] =>
   stepOptionParameters(catalogue, entry).map((parameter) => parameter.name);
 
 describe('the verbs of the steps the editor offers', () => {
-  it('are the seven, each with the parameters its own structure draws left out of its options', () => {
-    expect(VERBS).toHaveLength(7);
+  it('are the eight, each with the parameters its own structure draws left out of its options', () => {
+    expect(VERBS).toHaveLength(8);
     expect(verbOf('LazyFrame.sort')).toBe('sort');
     expect(verbOf('LazyFrame.head')).toBeNull();
     // A sort's keys are drawn by the step, so they are not an option; how each is ordered is.
@@ -106,6 +106,7 @@ describe('the names a step’s head gives its parameters', () => {
       exprs: true,
       predicates: true,
       by: true,
+      named_by: true,
       mapping: true,
       other: true,
       left_on: true,

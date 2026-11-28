@@ -303,3 +303,32 @@ fn the_names_of_a_list_are_separated_as_the_language_file_says() {
         "by document_id + timestamp"
     );
 }
+
+#[test]
+fn a_step_that_groups_is_the_fields_it_groups_by_whether_given_by_position_or_by_name() {
+    let by = |keys: Value, named_keys: Value| {
+        let text = document(vec![crate::support::grouping(
+            "g",
+            json!({ "by": keys, "named_by": named_keys }),
+            vec![call("LazyGroupBy.len", json!({}))],
+        )]);
+        let document = Document::read(&text).expect("a document");
+        document.steps()[0].summary(english())
+    };
+    assert_eq!(by(many(vec![field("owner")]), named(vec![])), "by owner");
+    assert_eq!(
+        by(
+            many(vec![field("owner"), field("status")]),
+            named(vec![("day", field("opened"))])
+        ),
+        "by owner, status, day"
+    );
+    // More than three keys are counted and not listed.
+    assert_eq!(
+        by(
+            many(vec![field("a"), field("b"), field("c"), field("d")]),
+            named(vec![])
+        ),
+        "by 4 fields"
+    );
+}

@@ -42,6 +42,8 @@ pub(crate) enum Owner<'a> {
     Function(&'static str),
     /// A method, after what gives the Python class: `Expr`, or a stage of a condition.
     Method(&'a str),
+    /// A call on a group by, after a step that groups: `LazyGroupBy`.
+    Grouped,
 }
 
 /// The qualified names to try for `path`, in order: the one its owner gives first, then where the
@@ -51,6 +53,7 @@ fn candidates(owner: Owner<'_>, path: &str) -> Vec<String> {
         Owner::Frame => format!("LazyFrame.{path}"),
         Owner::Function(module) => format!("{module}.{path}"),
         Owner::Method(class) => format!("{class}.{path}"),
+        Owner::Grouped => format!("LazyGroupBy.{path}"),
     };
     let mut names = vec![first];
     if matches!(owner, Owner::Function("dageist")) {
@@ -58,6 +61,7 @@ fn candidates(owner: Owner<'_>, path: &str) -> Vec<String> {
     }
     for class in [
         "LazyFrame",
+        "LazyGroupBy",
         "polars",
         "Expr",
         "When",

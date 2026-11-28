@@ -253,14 +253,21 @@ export function findGaps(
   };
   let cells = 0;
 
-  // A place no word of the editor stands at.
+  // A place no word of the editor stands at is one gap, which covers every entry the engine allows
+  // there: its cells are run and counted, and not asked entry by entry.
+  const undrawn = new Set<ContextView>();
   for (const context of contexts) {
     if (wordsAt(using, context, 'start').length === 0) {
       note({ kind: 'place', outer: context.outer, nested: context.nested });
+      undrawn.add(context);
     }
   }
 
   for (const [at, context] of over.contexts.entries()) {
+    if (undrawn.has(context)) {
+      cells += over.afters.length;
+      continue;
+    }
     const startsHere = allowedAt(over, at, 0);
     for (const [kind, after] of over.afters.entries()) {
       cells += 1;

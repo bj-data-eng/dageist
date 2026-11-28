@@ -161,7 +161,7 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
     // Every entry that is no step is offered or refused, once.
     let not_steps = dageist_engine::catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != dageist_engine::catalog::Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .count();
     assert_eq!(
         answer["entries"].as_array().expect("entries").len(),
@@ -909,6 +909,7 @@ fn every_step_of_the_list_that_can_be_added_is_named() {
         "filter",
         "first",
         "gather_every",
+        "group_by",
         "head",
         "join",
         "last",
@@ -1069,9 +1070,9 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
     let grid = grid();
     let contexts = grid["contexts"].as_array().expect("contexts").len();
     let afters = grid["afters"].as_array().expect("afters").len();
-    // Six positions of a step, each alone and with each of four positions inside an expression;
+    // Nine positions of a step, each alone and with each of four positions inside an expression;
     // nothing, sixty-seven classes of dtypes in three shapes, and four states of a condition.
-    assert_eq!((contexts, afters), (30, 206));
+    assert_eq!((contexts, afters), (45, 206));
     let rows = grid["allowed"].as_array().expect("rows");
     assert_eq!(rows.len(), contexts);
     assert!(

@@ -25,6 +25,7 @@ const VERB_COLOURS: Readonly<Record<Verb, string>> = {
   with_columns: '[--verb:var(--color-verb-add)]',
   filter: '[--verb:var(--color-verb-filter)]',
   sort: '[--verb:var(--color-verb-sort)]',
+  group_by: '[--verb:var(--color-verb-group)]',
   select: '[--verb:var(--color-verb-select)]',
   rename: '[--verb:var(--color-verb-rename)]',
   join: '[--verb:var(--color-verb-join)]',

@@ -23,8 +23,8 @@ use crate::catalog::{
 };
 
 use super::build::{
-    column, condition_with, element, entry, expression, expressions, flag, function, integer,
-    method, null_of, one_of, patterns, required_choices, required_values, step,
+    column, condition_with, element, entry, expression, expressions, flag, function, grouped,
+    integer, method, null_of, one_of, patterns, required_choices, required_values, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -387,7 +387,7 @@ fn has_dtype_lines(entry: &'static Entry) -> bool {
     match entry.applies() {
         Applies::Expression => true,
         Applies::Function => !expression_parameters(entry).is_empty(),
-        Applies::Frame | Applies::Condition => false,
+        Applies::Frame | Applies::Grouped | Applies::Condition => false,
     }
 }
 
@@ -881,6 +881,15 @@ fn continued_subject(
     // What gives a count of values that the data or the arguments decide goes on to one value, as
     // a count of its values or whether all of them are: no place takes the count itself, and what
     // is measured is whether the method may stand in the place at all.
+    // A predicate of a `having` is one value for each group, whatever the group gives.
+    // The key of a window is not a predicate, and is no aggregate: a window groups by the rows of
+    // its group, which an aggregate is not.
+    let aggregated = aggregated
+        || (context.outer() == Outer::Having
+            && !matches!(
+                context.nested(),
+                Some(Nested::PartitionBy | Nested::OrderBy)
+            ));
     match (aggregated, needs_boolean(context)) {
         (false, _) => Ok(tested),
         (true, true) => method(entry("Expr.all"), tested, Vec::new()),
@@ -896,7 +905,16 @@ fn continued_held(outer: Outer, held: Expr) -> Result<Expr, BuildError> {
     match outer {
         Outer::JoinLeft | Outer::JoinRight => Ok(held.cast(KEY)),
         Outer::PivotAggregate => method(entry("Expr.first"), held, Vec::new()),
-        Outer::Select | Outer::Filter | Outer::Sort => Ok(held),
+        // One value for each group, which a Boolean test of it is, so that what the predicate
+        // is made of is measured and not how it ends.
+        Outer::Having => method(
+            entry("Expr.all"),
+            method(entry("Expr.is_not_null"), held, Vec::new())?,
+            Vec::new(),
+        ),
+        Outer::Select | Outer::Filter | Outer::Sort | Outer::GroupKey | Outer::Aggregate => {
+            Ok(held)
+        }
     }
 }
 
@@ -1001,6 +1019,27 @@ fn host(outer: Outer, held: Expr, frames: &Frames, empty: bool) -> Result<LazyFr
                 ("left_on", expressions(vec![column("key")])),
                 ("right_on", expressions(vec![held])),
             ],
+        ),
+        Outer::GroupKey => grouped(
+            left,
+            vec![("by", expressions(vec![held]))],
+            Vec::new(),
+            ("LazyGroupBy.agg", Vec::new()),
+        ),
+        Outer::Aggregate => grouped(
+            left,
+            vec![("by", expressions(vec![column("k")]))],
+            Vec::new(),
+            ("LazyGroupBy.agg", vec![("aggs", expressions(vec![held]))]),
+        ),
+        Outer::Having => grouped(
+            left,
+            vec![("by", expressions(vec![column("k")]))],
+            vec![(
+                "LazyGroupBy.having",
+                vec![("predicates", expressions(vec![held]))],
+            )],
+            ("LazyGroupBy.agg", Vec::new()),
         ),
         Outer::PivotAggregate => step(
             "LazyFrame.pivot",
@@ -1197,7 +1236,7 @@ fn context_lines(
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
     {
         let forms = if entry.applies() == Applies::Expression {
             forms(entry)
@@ -1402,7 +1441,7 @@ fn context_line(
             }),
         ),
         Applies::Condition => (None, Box::new(move |_| condition_with(id))),
-        Applies::Frame => unreachable!("steps do not stand in a context"),
+        Applies::Frame | Applies::Grouped => unreachable!("steps do not stand in a context"),
     };
     let receiver = candidate.as_ref().map(|candidate| candidate.receiver);
     let argument = candidate
@@ -1688,6 +1727,18 @@ fn option_step(
     empty: bool,
     options: Vec<(&'static str, Argument)>,
 ) -> Result<LazyFrame, BuildError> {
+    // A group by is given the key it needs and finished by an aggregation of nothing, which gives
+    // the keys.
+    if id == "LazyFrame.group_by" {
+        let mut given = vec![("by", expressions(vec![column("a")]))];
+        given.extend(options);
+        return grouped(
+            frames.left(empty),
+            given,
+            Vec::new(),
+            ("LazyGroupBy.agg", Vec::new()),
+        );
+    }
     let mut given = match id {
         "LazyFrame.join" => vec![
             ("other", Argument::Table(frames.other(empty))),

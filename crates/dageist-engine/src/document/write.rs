@@ -45,7 +45,14 @@ impl Document {
 /// writes without building it, and stops as soon as the limit is passed, so
 /// it never recurses more than `limit` levels however deep the step is.
 pub(super) fn depth_within(step: &Step, limit: usize) -> Option<usize> {
-    nested(limit, |left| call_depth(step.call(), left))
+    nested(limit, |left| {
+        let call = call_depth(step.call(), left)?;
+        if step.links().is_empty() {
+            return Some(call);
+        }
+        let links = nested(left, |left| deepest(step.links(), left, call_depth))?;
+        Some(call.max(links))
+    })
 }
 
 /// The depth of one array or object whose contents are measured by `inner`
@@ -113,10 +120,18 @@ fn entry(name: &str, value: Json) -> (String, Json) {
 }
 
 fn step(step: &Step) -> Json {
-    Json::Object(vec![
+    let mut fields = vec![
         entry("id", Json::String(step.id().as_str().to_owned())),
         entry("call", call(step.call())),
-    ])
+    ];
+    // Only a step that groups has links after its call.
+    if !step.links().is_empty() {
+        fields.push(entry(
+            "then",
+            Json::Array(step.links().iter().map(call).collect()),
+        ));
+    }
+    Json::Object(fields)
 }
 
 fn call(call: &Call) -> Json {

@@ -135,7 +135,7 @@ pub fn first_line(text: &str) -> String {
 /// expressions; `None` for a step that cannot be asked.
 pub fn plan(step: &Step, index: usize, source: &DataFrame, tables: Tables) -> Option<Planned> {
     let mut asking = Asking::new(step, index, source, tables, true);
-    let built = match asking.step(step.call(), source.clone().lazy()) {
+    let built = match asking.step(step, source.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::CannotAsk) => return None,
         Err(Stop::Refused(refused)) => {
@@ -165,7 +165,7 @@ pub fn schema_of(
     tables: Tables,
 ) -> Option<Result<SchemaRef, Refused>> {
     let mut asking = Asking::new(step, index, source, tables, false);
-    let built = match asking.step(step.call(), source.clone().lazy()) {
+    let built = match asking.step(step, source.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::CannotAsk) => return None,
         Err(Stop::Refused(refused)) => return Some(Err(refused)),
@@ -200,7 +200,7 @@ pub fn collect_on(
     limit: usize,
 ) -> Result<DataFrame, String> {
     let mut asking = Asking::new(step, index, working, tables, true);
-    let frame = match asking.step(step.call(), working.clone().lazy()) {
+    let frame = match asking.step(step, working.clone().lazy()) {
         Ok(frame) => frame,
         Err(Stop::Refused(refused)) => return Err(refused.reason),
         Err(Stop::CannotAsk) => return Err("the step cannot be asked".to_owned()),
@@ -255,6 +255,9 @@ struct Asking<'a> {
     /// being built, outermost first.
     positions: Vec<Position>,
     traces: Vec<Traced>,
+    /// The keys of the group by the step makes, once its call is built: an aggregate and a predicate
+    /// after it are evaluated on the rows of each group.
+    grouping: Option<Vec<Expr>>,
 }
 
 impl<'a> Asking<'a> {
@@ -272,6 +275,7 @@ impl<'a> Asking<'a> {
             path: Vec::new(),
             positions: Vec::new(),
             traces: Vec::new(),
+            grouping: None,
         }
     }
 
@@ -359,10 +363,39 @@ impl<'a> Asking<'a> {
         }
     }
 
-    fn step(&mut self, call: &Call, input: LazyFrame) -> Result<LazyFrame, Stop> {
+    fn step(&mut self, step: &Step, input: LazyFrame) -> Result<LazyFrame, Stop> {
+        let call = step.call();
         let arguments = self.arguments(call)?;
         match call.entry().build() {
             Build::Frame(build) => self.built(build(input, &arguments)),
+            // The calls of a group by follow it, the last of which gives the table.
+            Build::Grouping(build) => {
+                // The keys by position, then those given by name, each named for its key.
+                let mut keys = self.built(arguments.expressions("by"))?;
+                for (name, key) in self.built(arguments.pairs("named_by"))? {
+                    if let Argument::Columns(names) = name
+                        && let [name] = names.as_slice()
+                        && let Argument::Expression(key) = key
+                    {
+                        keys.push(key.alias(name.as_str()));
+                    }
+                }
+                self.grouping = Some(keys);
+                let mut group = self.built(build(input, &arguments))?;
+                for (at, link) in step.links().iter().enumerate() {
+                    self.path.push(Segment::Link(at));
+                    let arguments = self.arguments(link)?;
+                    match link.entry().build() {
+                        Build::GroupedStep(build) => {
+                            group = self.built(build(group, &arguments))?
+                        }
+                        Build::GroupedEnd(build) => return self.built(build(group, &arguments)),
+                        _ => return self.refused("a call of a group by follows group_by"),
+                    }
+                    self.path.pop();
+                }
+                self.refused("a step that groups is finished by its last call")
+            }
             _ => self.refused("a step is built from a frame"),
         }
     }
@@ -489,7 +522,7 @@ impl<'a> Asking<'a> {
             Start::Hole => return Err(Stop::CannotAsk),
         };
         self.path.pop();
-        let start = self.resolve(&state, from_element);
+        let start = self.traced(&state, from_element);
         let mut links = Vec::with_capacity(expression.links().len());
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -527,7 +560,7 @@ impl<'a> Asking<'a> {
                 _ => return self.refused("a call that cannot stand here"),
             };
             self.path.pop();
-            links.push(self.resolve(&state, from_element));
+            links.push(self.traced(&state, from_element));
         }
         if let (Some(start), true) = (start, self.probe.is_some()) {
             self.traces.push(Traced {
@@ -540,6 +573,53 @@ impl<'a> Asking<'a> {
             Built::Expr(expr) => Ok(expr),
             Built::Condition(condition) => self.built(condition.into_expr()),
         }
+    }
+
+    /// What `state` has where a report says it: what it gives where it stands, which in an aggregate
+    /// or a predicate of a group by is what it gives for each group, a value for a chain that
+    /// aggregates and a list of the values of the group for one that does not.
+    fn traced(&self, state: &Built, from_element: bool) -> Option<Said> {
+        let in_a_group = matches!(
+            Context::from_positions(&self.positions).map(|context| context.outer()),
+            Some(allowed::Outer::Aggregate | allowed::Outer::Having)
+        );
+        let (Some(keys), Some(probe), true, false) =
+            (&self.grouping, &self.probe, in_a_group, from_element)
+        else {
+            return self.resolve(state, from_element);
+        };
+        let expr = match state {
+            Built::Expr(expr) => expr.clone(),
+            Built::Condition(condition) => match condition.clone().into_expr() {
+                Ok(expr) => expr,
+                Err(_) => return Some(Said::Unsaid),
+            },
+        };
+        let mut keyed = probe.clone().group_by(keys.clone()).agg(Vec::<Expr>::new());
+        let kept = match keyed.collect_schema() {
+            Ok(schema) => schema.len(),
+            Err(error) => return Some(Said::Refused(first_line(&error.to_string()))),
+        };
+        // Named apart from the keys, as a key that it reads would be named as the key is.
+        let mut frame = probe
+            .clone()
+            .group_by(keys.clone())
+            .agg([expr.name().prefix("traced ")]);
+        Some(match frame.collect_schema() {
+            Ok(schema) => {
+                let dtypes: Vec<&DataType> =
+                    schema.iter().skip(kept).map(|(_, dtype)| dtype).collect();
+                match dtypes.as_slice() {
+                    [dtype] => Said::Dtype(
+                        (*dtype).clone(),
+                        allowed::dtype_name(dtype),
+                        Representative::of(dtype),
+                    ),
+                    _ => Said::Unsaid,
+                }
+            }
+            Err(error) => Said::Refused(first_line(&error.to_string())),
+        })
     }
 
     /// What `state` has, when the dtypes are wanted: the dtype Polars gives it, or its refusal.

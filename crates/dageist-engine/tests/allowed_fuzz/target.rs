@@ -14,9 +14,13 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::counts;
 use super::generate::{Focus, generate};
-use super::limits::{Limit, excuses, excuses_a_refused_prefix, strict};
+use super::limits::{
+    Limit, a_key_drops_values, as_a_select, excuses, excuses_a_refused_prefix,
+    is_the_same_objection, keys_as_a_select, strict,
+};
 use super::observe::{
-    Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked, refused_in_memory,
+    NAMINGS, Observed, Refusal, Seen, Stage, is_the_targets_own, observe, observe_checked,
+    refused_in_memory,
 };
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{
@@ -26,7 +30,7 @@ use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
 /// rule that refuses what Polars allows and is not here is a disagreement.
-const STRICTER_BY_DESIGN: [(&str, &str); 7] = [
+const STRICTER_BY_DESIGN: [(&str, &str); 8] = [
     (
         "pivot-aggregate-gives-one-value",
         "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
@@ -50,6 +54,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 7] = [
     (
         "struct-is-filled-forward-or-backward",
         "a struct is filled only forward or backward, though Polars fills it by any strategy where it holds no null",
+    ),
+    (
+        "kept-order-needs-keys-of-the-rows",
+        "a key that takes some of the values gives as many as the arguments or the data decide, which Polars refuses where the order is kept unless by chance of the sample's rows they are the rows' or one value, as a filter that keeps one row, a drop that finds no null and the first rows that are all of them are",
     ),
     (
         "element-dtype-is-implemented",
@@ -701,7 +709,14 @@ impl CaseTarget for AllowedTarget {
             .expressions
             .iter()
             .any(|expected| expected.start.is_some() || expected.links.iter().any(Option::is_some));
-        if let Some(difference) = dtype_difference(case, &prediction, &observed) {
+        // A step that groups that Polars refuses, and that the tables refuse or cannot say, is no
+        // expression whose prefixes either gives the dtype of: the walk stops at the refusal and
+        // what stands after it was not asked, and a default of the values of a group that Polars
+        // refuses when it runs the rows is a list in its schema, which the walk does not widen.
+        let both_refuse = !case.document.steps()[0].links().is_empty()
+            && !matches!(prediction.verdict, Verdict::Allows)
+            && observed.refusal.is_some();
+        if !both_refuse && let Some(difference) = dtype_difference(case, &prediction, &observed) {
             // A prefix that Polars refuses where the tables allow it is the refusal of the case a
             // limit may explain: it is not a dtype the tables got wrong.
             if difference.contains(A_PREFIX_POLARS_REFUSES)
@@ -742,6 +757,29 @@ impl CaseTarget for AllowedTarget {
                     if let Some(outcome) = excused("allowed, Polars refuses") {
                         return outcome;
                     }
+                    // A step that groups may hold two refusals of the rows, which Polars names in
+                    // either order and with the values of either row it meets first, and a limit's
+                    // control, which asks again, is then of the one named when it asks. The case is
+                    // excused where a limit excuses a refusal that Polars names of it when it is
+                    // observed again (the issue 234 tracks naming one).
+                    if !case.document.steps()[0].links().is_empty()
+                        && observed
+                            .refusal
+                            .as_ref()
+                            .is_some_and(|refusal| refusal.stage == Stage::Rows)
+                    {
+                        for _ in 0..NAMINGS {
+                            let again = observe_checked(case);
+                            if again.refusal.is_some()
+                                && let Some(outcome) = excused_by(
+                                    "allowed, Polars refuses, named again",
+                                    excuses(case, &prediction, &again),
+                                )
+                            {
+                                return outcome;
+                            }
+                        }
+                    }
                     let why = observed
                         .refusal
                         .as_ref()
@@ -777,6 +815,31 @@ impl CaseTarget for AllowedTarget {
                     if let Some(outcome) = by_design(case, &refused, &why) {
                         return outcome;
                     }
+                    // What a step that groups is given is judged as a select judges it, and the
+                    // probes read the call of a step and not the calls after `group_by`: the
+                    // expression alone in a select, refused by the tables and allowed by Polars as
+                    // it is here, is excused as it is there.
+                    if let Some(selected) = as_a_select(case, Some(&refused.place))
+                        && case.document.steps()[0].call().entry().id().as_str()
+                            == "LazyFrame.group_by"
+                        && matches!(
+                            &predict(&selected).verdict,
+                            Verdict::Refuses(alone)
+                                if matches!(alone.source, Source::Polars)
+                                    && is_the_same_objection(
+                                        alone.stage.as_ref(),
+                                        &alone.reason,
+                                        refused.stage.as_ref(),
+                                        &refused.reason,
+                                    )
+                        )
+                        && observe_checked(&selected).refusal.is_none()
+                        && let Ok(outcome) = self.evaluate(&selected)
+                        && outcome.kind() == dageist_fuzz::OutcomeKind::ExpectedRejection
+                    {
+                        tally(format!("refused in a group, excused in a select: {why}"));
+                        return Ok(outcome);
+                    }
                     return failure(
                         ALLOWANCE,
                         &format!("refused-but-allowed-{why}"),
@@ -802,6 +865,58 @@ impl CaseTarget for AllowedTarget {
                         // limit names, as a rule is the tables' own.
                         if let Some(outcome) = excused("refused by a rule, Polars allows") {
                             return outcome;
+                        }
+                        // A rule that is no group's, as the predicate of a condition is, refuses
+                        // the expression alone in a select as it does here, where it is excused.
+                        if let Some(selected) = as_a_select(case, Some(&refused.place))
+                            && case.document.steps()[0].call().entry().id().as_str()
+                                == "LazyFrame.group_by"
+                            && matches!(
+                                &predict(&selected).verdict,
+                                Verdict::Refuses(alone)
+                                    if matches!(&alone.source, Source::Rule(same) if *same == rule)
+                            )
+                            && observe_checked(&selected).refusal.is_none()
+                            && let Ok(outcome) = self.evaluate(&selected)
+                            && outcome.kind() == dageist_fuzz::OutcomeKind::ExpectedRejection
+                        {
+                            tally(format!(
+                                "refused by a rule in a group, excused in a select: {rule}"
+                            ));
+                            return Ok(outcome);
+                        }
+                        // A count that a key of a group by is made, which its keys meet: asked as
+                        // the keys of a select are, with the control that makes the count another.
+                        if !case.document.steps()[0].links().is_empty()
+                            && let Some(selected) = keys_as_a_select(case)
+                            && let Verdict::Refuses(alone) = predict(&selected).verdict
+                            && matches!(&alone.source, Source::Rule(same) if *same == rule)
+                            && observe_checked(&selected).refusal.is_none()
+                            && let Some(outcome) = by_design(&selected, &alone, rule)
+                        {
+                            return outcome;
+                        }
+                        // A key that drops the nulls or the NaNs it reads gives as many values as the
+                        // data leave, which the sample's rows, that hold none to drop, make the rows'
+                        // by chance: the count is the data's, as a filter's is.
+                        if !case.document.steps()[0].links().is_empty()
+                            && ["values-meet-in-count", "window-input-is-not-counted"]
+                                .contains(&rule)
+                            && a_key_drops_values(case)
+                            && !strict()
+                        {
+                            tally(format!(
+                                "{}: {rule} of a key that drops",
+                                counts::STRICTER_BY_DESIGN
+                            ));
+                            return CaseOutcome::expected_rejection(
+                                Vec::new(),
+                                one_line(&format!(
+                                    "{}: a key that drops the nulls or the NaNs it reads gives as many values as the data leave, which a sample with none to drop makes the rows' by chance: {}",
+                                    counts::STRICTER_BY_DESIGN,
+                                    refused.reason
+                                )),
+                            );
                         }
                         // A predicate the rule refuses may hold a call Polars refuses first,
                         // or may not be evaluated, so it is asked on a column of its dtype.

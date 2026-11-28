@@ -113,7 +113,7 @@ describe('the corpus, rebuilt through the functions the components call', () => 
   });
 
   it('finds a step no list adds and a parameter of a step that is not offered, as the catalogue says', () => {
-    // The step list holds the seven steps with heads; the other thirteen are drawn by their parameters.
+    // The step list holds the eight steps with heads; thirteen more are drawn by their parameters.
     const steps = [...found.gaps.values()].flatMap((gap) =>
       gap.cover.kind === 'step' ? [gap.cover.entry] : [],
     );

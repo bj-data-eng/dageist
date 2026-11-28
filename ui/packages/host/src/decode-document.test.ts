@@ -209,6 +209,19 @@ describe('a document or an answer that is not what the host sends', () => {
     );
   });
 
+  it('is refused where a step has no links, links that are no list, or a link that is no call', () => {
+    const step = ['document', 'steps', 0];
+    expect(refusal(decodeDocumentState, without(state, step, 'links')).message).toBe(
+      '$.document.steps[0]: is missing the field "links"',
+    );
+    expect(refusal(decodeDocumentState, replaced(state, [...step, 'links'], 'sort')).path).toBe(
+      '$.document.steps[0].links',
+    );
+    expect(refusal(decodeDocumentState, replaced(state, [...step, 'links'], [3])).path).toBe(
+      '$.document.steps[0].links[0]',
+    );
+  });
+
   it('is refused where an answer has a status the host does not have', () => {
     expect(refusal(decodeEditAnswer, replaced(edited, ['status'], 'maybe')).message).toBe(
       '$.status: must be one of "edited", "refused", not "maybe"',

@@ -30,8 +30,23 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 90 combinations: 54 allowed; 18 refused when Polars resolved the schema, 18 when it ran the rows, 0 when it ran the empty table.
+# 135 combinations: 82 allowed; 18 refused when Polars resolved the schema, 35 when it ran the rows, 0 when it ran the empty table.
 #
+aggregate > condition.predicate | counted | allowed -
+aggregate > condition.predicate | many | allowed -
+aggregate > condition.predicate | one | allowed -
+aggregate > condition.value | counted | allowed -
+aggregate > condition.value | many | allowed -
+aggregate > condition.value | one | allowed -
+aggregate > over.order_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+aggregate > over.order_by | many | allowed -
+aggregate > over.order_by | one | allowed -
+aggregate > over.partition_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+aggregate > over.partition_by | many | allowed -
+aggregate > over.partition_by | one | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+aggregate | counted | allowed -
+aggregate | many | allowed -
+aggregate | one | allowed -
 filter > condition.predicate | counted | refused rows: lengths don't match: zip node received non-equal length inputs
 filter > condition.predicate | many | allowed -
 filter > condition.predicate | one | allowed -
@@ -47,6 +62,36 @@ filter > over.partition_by | one | allowed -
 filter | counted | refused rows: lengths don't match: zip node received non-equal length inputs
 filter | many | allowed -
 filter | one | allowed -
+group_key > condition.predicate | counted | allowed -
+group_key > condition.predicate | many | allowed -
+group_key > condition.predicate | one | allowed -
+group_key > condition.value | counted | allowed -
+group_key > condition.value | many | allowed -
+group_key > condition.value | one | allowed -
+group_key > over.order_by | counted | refused rows: lengths don't match: the order by expression evaluated to a length: 2 that doesn't match the input DataFrame: 3
+group_key > over.order_by | many | allowed -
+group_key > over.order_by | one | allowed -
+group_key > over.partition_by | counted | refused rows: lengths don't match: zip node received non-equal length inputs
+group_key > over.partition_by | many | allowed -
+group_key > over.partition_by | one | allowed -
+group_key | counted | allowed -
+group_key | many | allowed -
+group_key | one | allowed -
+having > condition.predicate | counted | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > condition.predicate | many | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > condition.predicate | one | allowed -
+having > condition.value | counted | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > condition.value | many | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > condition.value | one | allowed -
+having > over.order_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+having > over.order_by | many | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > over.order_by | one | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > over.partition_by | counted | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+having > over.partition_by | many | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having > over.partition_by | one | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+having | counted | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having | many | refused rows: cannot cast List type (inner: 'Boolean', to: 'Boolean')
+having | one | allowed -
 join_left > condition.predicate | counted | refused schema: all join key expressions must be elementwise.
 join_left > condition.predicate | many | allowed -
 join_left > condition.predicate | one | allowed -

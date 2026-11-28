@@ -702,6 +702,8 @@ export function heldBy(documents: readonly CorpusDocument[], inputs: readonly In
     for (const step of held.document.steps) {
       steps.add(step.call.entry);
       inCall(step.call);
+      // The calls on a group by that follow `group_by` hold what a step that groups is made of.
+      step.links.forEach(inCall);
     }
     for (const report of held.run.steps) {
       outcomes.add(report.outcome.status);

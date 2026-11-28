@@ -30,6 +30,7 @@ function named(run: RunView): DocumentStepView[] {
   return run.steps.map((step) => ({
     id: step.id,
     call: { entry: 'LazyFrame.select', arguments: [] },
+    links: [],
   }));
 }
 

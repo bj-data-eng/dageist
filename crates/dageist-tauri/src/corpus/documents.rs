@@ -96,6 +96,38 @@ pub(super) fn host(outer: Outer, values: Representative) -> Hosted {
                 ("left_on", one(&text)),
             ],
         ),
+        Outer::GroupKey => {
+            let document = added_group();
+            let at = the_step("LazyFrame.group_by")
+                .then(Segment::Parameter("by".to_owned()))
+                .then(Segment::Item(0));
+            Hosted { document, at }
+        }
+        Outer::Aggregate => {
+            let document = added_group();
+            let at = the_step("LazyFrame.group_by")
+                .then(Segment::Link(0))
+                .then(Segment::Parameter("named_aggs".to_owned()))
+                .then(Segment::Value(0));
+            Hosted { document, at }
+        }
+        Outer::Having => {
+            let added = added_group();
+            let step = the_step("LazyFrame.group_by");
+            let document = added
+                .insert_group_call(&step, 0, "LazyGroupBy.having")
+                .unwrap_or_else(|error| panic!("having is not added: {error}"));
+            let predicates = step
+                .then(Segment::Link(0))
+                .then(Segment::Parameter("predicates".to_owned()));
+            let document = document
+                .set_argument(&predicates, Value::Many(vec![hole()]))
+                .unwrap_or_else(|error| panic!("the predicate is not given: {error}"));
+            Hosted {
+                document,
+                at: predicates.then(Segment::Item(0)),
+            }
+        }
         Outer::PivotAggregate => {
             let given = vec![
                 ("on", Value::Columns(vec![text])),
@@ -110,6 +142,12 @@ pub(super) fn host(outer: Outer, values: Representative) -> Hosted {
             Hosted { document, at }
         }
     }
+}
+
+/// The document with a step that groups as the editor adds it: a key and an aggregate, each still to
+/// be picked.
+fn added_group() -> Document {
+    super::steps::added("LazyFrame.group_by")
 }
 
 /// A step `id` whose parameter `parameter` is a list of one expression with nothing picked, given
@@ -249,6 +287,18 @@ pub(super) fn with_start(document: &Document, at: &Place, start: &StartPlan) -> 
     }
 }
 
+/// The call a way through `step` starts from, and the way inside it: the call of a step that groups
+/// that the way's first segment names as a link, or the step's own.
+fn entry_of<'a, 'b>(
+    step: &'a dageist_engine::document::Step,
+    way: &'b [Segment],
+) -> Option<(&'a Call, &'b [Segment])> {
+    match way.split_first() {
+        Some((Segment::Link(at), rest)) => Some((step.links().get(*at)?, rest)),
+        _ => Some((step.call(), way)),
+    }
+}
+
 /// What a place in `document` holds.
 pub(super) enum Held<'a> {
     Call(&'a Call),
@@ -278,10 +328,8 @@ fn descend<'a>(held: Held<'a>, segment: &Segment) -> Option<Held<'a>> {
 /// What `place` of `document` holds, or `None` where it holds nothing.
 pub(super) fn held_at<'a>(document: &'a Document, place: &Place) -> Option<Held<'a>> {
     let step = document.steps().get(place.step_index()?)?;
-    place
-        .path()
-        .iter()
-        .try_fold(Held::Call(step.call()), descend)
+    let (call, way) = entry_of(step, place.path())?;
+    way.iter().try_fold(Held::Call(call), descend)
 }
 
 /// The call at `place` of `document`.
@@ -316,7 +364,8 @@ pub(super) fn with_link(
 /// the named positions the way passes through, outermost first.
 pub(super) fn context_of(document: &Document, step: usize, way: &[Segment]) -> Option<Context> {
     let mut positions: Vec<Position> = Vec::new();
-    let mut held = Held::Call(document.steps().get(step)?.call());
+    let (call, way) = entry_of(document.steps().get(step)?, way)?;
+    let mut held = Held::Call(call);
     for segment in way {
         if let (Held::Call(call), Segment::Parameter(name)) = (&held, segment)
             && let Some(position) = Position::of_parameter(call.entry().id().as_str(), name)

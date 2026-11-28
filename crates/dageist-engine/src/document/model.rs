@@ -471,7 +471,8 @@ impl Position {
     pub(super) fn check(self, entry: &'static Entry) -> Result<(), Cause> {
         let fits = matches!(
             (self, entry.build()),
-            (Self::Step, Build::Frame(_))
+            (Self::Step, Build::Frame(_) | Build::Grouping(_))
+                | (Self::Grouped, Build::GroupedStep(_) | Build::GroupedEnd(_))
                 | (Self::Start, Build::Function(_) | Build::Condition(_))
                 | (
                     Self::Link,
@@ -557,7 +558,17 @@ impl Step {
     #[must_use]
     pub fn first_hole(&self) -> Option<Vec<Segment>> {
         let mut path = Vec::new();
-        hole_in_call(self.call(), &mut path).then_some(path)
+        if hole_in_call(self.call(), &mut path) {
+            return Some(path);
+        }
+        for (at, link) in self.links().iter().enumerate() {
+            path.push(Segment::Link(at));
+            if hole_in_call(link, &mut path) {
+                return Some(path);
+            }
+            path.pop();
+        }
+        None
     }
 }
 
@@ -684,22 +695,101 @@ impl Expression {
     }
 }
 
-/// One step of the document: a method of a lazy frame, under a name.
+/// How far a chain of calls on a group by has come: grouped, grouped and kept only the groups a
+/// `having` holds for, or finished in a table.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Grouping {
+    Grouped,
+    Having,
+    Finished,
+}
+
+impl Grouping {
+    /// The stage as the words of a refusal name it.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Grouped => "a group by",
+            Self::Having => "a group by with its having",
+            Self::Finished => "a finished grouping",
+        }
+    }
+}
+
+/// One step of the document: a method of a lazy frame, under a name, and, where the method is
+/// `group_by`, which gives a group by and not a table, the calls on the group by that follow it:
+/// at most one `having`, then exactly one call that finishes the grouping in a table. A step is
+/// held as an expression is, a call that starts it and the links after it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Step {
     id: StepId,
     call: Call,
+    links: Vec<Call>,
 }
 
 impl Step {
-    /// The step `id` that makes `call`.
+    /// The step `id` that makes `call`, which is a method of a lazy frame that gives a table.
     ///
     /// # Errors
     ///
-    /// When the call's entry is not a method of a lazy frame.
+    /// When the call's entry is not a method of a lazy frame, or it is `group_by`, which needs
+    /// the calls that finish it: see [`chain`](Self::chain).
     pub fn new(id: StepId, call: Call) -> Result<Self, Refusal> {
+        Self::chain(id, call, Vec::new())
+    }
+
+    /// The step `id` that makes `call` and the `links` after it. The links are the calls on a group
+    /// by, which only `group_by` gives: none follow another method of a lazy frame.
+    ///
+    /// # Errors
+    ///
+    /// When the call's entry is not a method of a lazy frame, a link is not a call of a group by,
+    /// the links do not follow one another as Python's calls do, with at most one `having` and then
+    /// exactly one call that finishes the grouping, or `group_by` is not finished. The place is the
+    /// link, or the last link when the chain stops before it is finished.
+    pub fn chain(id: StepId, call: Call, links: Vec<Call>) -> Result<Self, Refusal> {
         Position::Step.check(call.entry()).map_err(Refusal::new)?;
-        Ok(Self { id, call })
+        let mut stage =
+            matches!(call.entry().build(), Build::Grouping(_)).then_some(Grouping::Grouped);
+        for (at, link) in links.iter().enumerate() {
+            let refused = |cause| Refusal::new(cause).under(Segment::Link(at));
+            let entry = link.entry();
+            Position::Grouped.check(entry).map_err(refused)?;
+            let out_of_order = |needs: Grouping, found: &'static str| Cause::OutOfOrder {
+                entry: entry.id().as_str(),
+                needs: needs.name(),
+                found,
+            };
+            stage = Some(match (stage, entry.build()) {
+                (None, _) => {
+                    return Err(refused(out_of_order(
+                        Grouping::Grouped,
+                        "a step that does not group",
+                    )));
+                }
+                (Some(Grouping::Grouped), Build::GroupedStep(_)) => Grouping::Having,
+                (Some(found @ (Grouping::Having | Grouping::Finished)), Build::GroupedStep(_)) => {
+                    return Err(refused(out_of_order(Grouping::Grouped, found.name())));
+                }
+                (Some(Grouping::Grouped | Grouping::Having), _) => Grouping::Finished,
+                (Some(Grouping::Finished), _) => {
+                    return Err(refused(out_of_order(
+                        Grouping::Having,
+                        Grouping::Finished.name(),
+                    )));
+                }
+            });
+        }
+        if let Some(stage @ (Grouping::Grouped | Grouping::Having)) = stage {
+            let last = links
+                .len()
+                .checked_sub(1)
+                .map_or_else(Vec::new, |at| vec![Segment::Link(at)]);
+            return Err(Refusal::new(Cause::UnfinishedGrouping {
+                found: stage.name(),
+            })
+            .under_all(last));
+        }
+        Ok(Self { id, call, links })
     }
 
     /// The step's name.
@@ -708,10 +798,22 @@ impl Step {
         &self.id
     }
 
-    /// What the step does.
+    /// What the step does, or, for a step that groups, what it starts with: `group_by`.
     #[must_use]
     pub const fn call(&self) -> &Call {
         &self.call
+    }
+
+    /// The calls on a group by that follow the call of a step that groups, in order, and none for
+    /// any other step.
+    #[must_use]
+    pub fn links(&self) -> &[Call] {
+        &self.links
+    }
+
+    /// The calls of the step, in the order they are made: the call that starts it and then its links.
+    pub fn calls(&self) -> impl Iterator<Item = &Call> {
+        std::iter::once(&self.call).chain(&self.links)
     }
 }
 

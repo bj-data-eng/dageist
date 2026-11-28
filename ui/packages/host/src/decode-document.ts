@@ -187,10 +187,14 @@ function readArgumentTagged(): Decode<ArgumentView> {
   });
 }
 
-const readDocumentStep: Decode<DocumentStepView> = readRecord(['id', 'call'], (fields, path) => ({
-  id: readField(fields, path, 'id', readString),
-  call: readField(fields, path, 'call', readCall),
-}));
+const readDocumentStep: Decode<DocumentStepView> = readRecord(
+  ['id', 'call', 'links'],
+  (fields, path) => ({
+    id: readField(fields, path, 'id', readString),
+    call: readField(fields, path, 'call', readCall),
+    links: readField(fields, path, 'links', readList(readCall)),
+  }),
+);
 
 export const readDocument: Decode<DocumentView> = readRecord(['steps'], (fields, path) => ({
   steps: readField(fields, path, 'steps', readList(readDocumentStep)),

@@ -145,14 +145,17 @@ fn alone_in(expression: &Expression) -> Option<&Value> {
 impl Step {
     /// The places of the arguments in the step that are what their parameter
     /// holds when it is not given: see [`Call::is_default`]. They are the
-    /// step's own arguments, and those of the calls inside the expressions it
-    /// holds, in the order the step is read. `index` is where the step is in
+    /// step's own arguments and those of its links, and those of the calls inside the
+    /// expressions it holds, in the order the step is read. `index` is where the step is in
     /// its document.
     #[must_use]
     pub fn at_default(&self, index: usize) -> Vec<Place> {
         let mut found = Vec::new();
         let base = Place::of_step(index, Some(self.id().clone()));
         in_call(self.call(), &base, &mut found);
+        for (at, link) in self.links().iter().enumerate() {
+            in_call(link, &base.clone().then(Segment::Link(at)), &mut found);
+        }
         found
     }
 }

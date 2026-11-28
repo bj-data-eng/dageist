@@ -347,6 +347,7 @@ describe('which steps can be added', () => {
       'LazyFrame.filter',
       'LazyFrame.first',
       'LazyFrame.gather_every',
+      'LazyFrame.group_by',
       'LazyFrame.head',
       'LazyFrame.join',
       'LazyFrame.last',

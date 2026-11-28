@@ -319,6 +319,9 @@ const fn starts_a_chain(build: Build) -> bool {
         Build::Function(_) | Build::Condition(_) => true,
         Build::Expression(_)
         | Build::Frame(_)
+        | Build::Grouping(_)
+        | Build::GroupedStep(_)
+        | Build::GroupedEnd(_)
         | Build::ConditionStep(_)
         | Build::ConditionEnd(_) => false,
     }
@@ -783,6 +786,7 @@ fn wanted() -> Vec<WantedView> {
         Item => [WantedView::Item],
         EntryPart => [WantedView::EntryPart],
         Link => [WantedView::Link],
+        GroupCall => [WantedView::GroupCall],
         Expression => [WantedView::Expression],
         List => [WantedView::List],
         Pairs => [WantedView::Pairs],
@@ -849,7 +853,10 @@ pub(crate) fn census() -> Value {
         "causes": words(&causes(), "kind"),
         "refusalSources": words(&sources(), "by"),
         "stages": plains(&Stage::ALL.map(stage_view)),
-        "rules": Rule::ALL.map(|rule| json!({ "name": rule.name(), "statement": rule.statement() })),
+        "rules": Rule::ALL
+            .iter()
+            .map(|rule| json!({ "name": rule.name(), "statement": rule.statement() }))
+            .collect::<Vec<_>>(),
         "notKnown": Unknown::ALL.map(|unknown| json!({ "name": unknown.name(), "because": unknown.to_string() })),
         "outcomes": words(&outcomes(), "status"),
         "rowsStates": words(&counts(), "kind"),

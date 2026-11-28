@@ -58,9 +58,9 @@ fn the_representative_dtypes_are_named_and_classed_consistently() {
 }
 
 #[test]
-fn the_contexts_are_six_positions_and_each_with_four_inside_it() {
+fn the_contexts_are_nine_positions_and_each_with_four_inside_it() {
     let contexts = Context::all();
-    assert_eq!(contexts.len(), 6 + 6 * 4);
+    assert_eq!(contexts.len(), 9 + 9 * 4);
     for context in &contexts {
         assert_eq!(Context::from_name(&context.name()).as_ref(), Some(context));
     }
@@ -181,7 +181,7 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
 fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_context() {
     let entries: Vec<_> = catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .collect();
     let tables = Tables::committed();
     // A method that takes an option in place of a parameter has a cell for each word of it, in
@@ -427,28 +427,96 @@ fn an_end_rule_about_a_dtype_does_not_refuse_what_it_does_not_know() {
             .find(|rule| rule.needs_boolean_end(context))
             .expect("a rule about the Boolean");
         assert_eq!(
-            Rule::forbids_end(context, Some(&number), Shape::Many),
+            Rule::forbids_end(context, Some(&number), Shape::Many, 0),
             Some(rule)
         );
         assert_eq!(
-            Rule::forbids_end(context, Some(&list), Shape::Many),
+            Rule::forbids_end(context, Some(&list), Shape::Many, 0),
             Some(rule)
         );
         assert_eq!(
-            Rule::forbids_end(context, Some(&boolean), Shape::Many),
+            Rule::forbids_end(context, Some(&boolean), Shape::Many, 0),
             None
         );
         // Not known: a start takes the dtype of a column, and an argument
         // decides what some methods give.
-        assert_eq!(Rule::forbids_end(context, None, Shape::Many), None);
+        assert_eq!(Rule::forbids_end(context, None, Shape::Many, 0), None);
     }
     // The rule about how many values is not about a dtype.
     let aggregate = Context::step(Outer::PivotAggregate);
     assert_eq!(
-        Rule::forbids_end(aggregate, None, Shape::Many),
+        Rule::forbids_end(aggregate, None, Shape::Many, 0),
         Some(Rule::PivotAggregateGivesOneValue)
     );
-    assert_eq!(Rule::forbids_end(aggregate, None, Shape::One), None);
+    assert_eq!(Rule::forbids_end(aggregate, None, Shape::One, 0), None);
+}
+
+#[test]
+fn a_having_predicate_gives_one_value_for_each_group_that_polars_casts_to_a_boolean() {
+    let having = Context::step(Outer::Having);
+    let value = |name: &str| ResultDtype::from_name(name);
+    // Polars keeps a group by a number as it does by a Boolean, and by null none.
+    for kept in [
+        "Boolean",
+        "Int64",
+        "UInt8",
+        "Float64",
+        "Null",
+        "Decimal(10, 2)",
+    ] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value(kept)), Shape::One, 0),
+            None,
+            "{kept}"
+        );
+    }
+    // And refuses to cast the rest when it runs the rows.
+    for refused in [
+        "String",
+        "Date",
+        "List(Int64)",
+        "Struct(x: Int64, y: String)",
+    ] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value(refused)), Shape::One, 0),
+            Some(Rule::HavingCastsToBoolean),
+            "{refused}"
+        );
+    }
+    // What is not known is not refused, but the values of a group are a list whatever dtype they
+    // have.
+    assert_eq!(Rule::forbids_end(having, None, Shape::One, 0), None);
+    for shape in [Shape::Many, Shape::Counted] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value("Boolean")), shape, 0),
+            Some(Rule::HavingGivesOneValue)
+        );
+        assert_eq!(
+            Rule::forbids_end(having, None, shape, 0),
+            Some(Rule::HavingGivesOneValue)
+        );
+    }
+    // Beside another predicate, which Polars combines it with as a filter's are, only a Boolean
+    // is kept.
+    for refused in ["Int64", "Float64", "Null", "Decimal(10, 2)", "String"] {
+        assert_eq!(
+            Rule::forbids_end(having, Some(&value(refused)), Shape::One, 1),
+            Some(Rule::HavingCastsToBoolean),
+            "{refused} beside another"
+        );
+    }
+    assert_eq!(
+        Rule::forbids_end(having, Some(&value("Boolean")), Shape::One, 1),
+        None
+    );
+    // An aggregate and a key stand in no such place: they end as a select's item does.
+    for outer in [Outer::Aggregate, Outer::GroupKey] {
+        let context = Context::step(outer);
+        assert_eq!(
+            Rule::forbids_end(context, Some(&value("String")), Shape::Many, 0),
+            None
+        );
+    }
 }
 
 #[test]

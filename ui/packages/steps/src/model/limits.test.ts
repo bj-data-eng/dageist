@@ -70,7 +70,10 @@ describe('the declared gaps', () => {
 
   it('name the issue that tracks the steps the list does not add and the parameters of a step that are not offered', () => {
     for (const gap of GAPS) {
-      if (gap.cover.kind === 'step' || gap.cover.kind === 'stepParameter') {
+      if (gap.cover.kind === 'stepParameter') {
+        expect(gap.reason, coverKey(gap.cover)).toContain('#137');
+      }
+      if (gap.cover.kind === 'step') {
         expect(gap.reason, coverKey(gap.cover)).toContain('#137');
       }
     }

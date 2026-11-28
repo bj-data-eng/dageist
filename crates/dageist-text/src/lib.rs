@@ -21,6 +21,12 @@
 //!   class its chain has come to, `Expr` or a stage of a condition, its namespace included:
 //!   `.str.contains(…)` is `Expr.str.contains`, and `.then(…)` after `pl.when(…)` is
 //!   `When.then`. A name the catalogue leaves out is refused with the reason it records.
+//! - **Groups.** A step that groups is `.group_by(…)` and the calls on the group by that follow it,
+//!   as Polars writes them: `.group_by(pl.col("k")).having(…).agg(total=pl.col("x").sum())`. The
+//!   calls that follow a group by and are calls on one, `LazyGroupBy.<name>`, are the step's, as far
+//!   as the one that finishes the grouping, an `agg`, a shortcut such as `len` or `sum`, `head` or
+//!   `tail`: Python gives a table again there, and what follows is a step. What follows a group by
+//!   and is no call on one leaves it unfinished, which is refused as the document refuses it.
 //! - **Arguments** bind to the entry's parameters as Python binds them: by position in order, by
 //!   name, the rest by position to a starred parameter, and names no parameter has to a
 //!   double-starred one. `*[…]` and `**{…}` give a starred parameter its items and a

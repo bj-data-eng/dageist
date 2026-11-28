@@ -1,5 +1,15 @@
 {
-  "outer": ["select", "filter", "sort", "join_left", "join_right", "pivot_aggregate"],
+  "outer": [
+    "select",
+    "filter",
+    "sort",
+    "join_left",
+    "join_right",
+    "pivot_aggregate",
+    "group_key",
+    "aggregate",
+    "having"
+  ],
   "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
   "rules": [
     "arrays-meet-at-one-width",
@@ -12,9 +22,14 @@
     "field-names-fit-the-struct",
     "filter-predicate-is-boolean",
     "folded-function-is-no-join-key",
+    "grouped-names-are-distinct",
+    "having-casts-to-boolean",
+    "having-gives-one-value",
     "is-in-takes-a-list",
     "join-key-names-are-not-repeated",
+    "kept-order-needs-keys-of-the-rows",
     "key-is-elementwise",
+    "literal-beside-values-in-a-group",
     "moments-share-a-zone",
     "one-column-is-needed",
     "parameter-takes-one-value",
@@ -36,7 +51,7 @@
   "valueShapes": ["one", "many", "counted"],
   "changes": ["added", "replaced"],
   "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "stale", "unknownName", "failed"],
-  "applies": ["expression", "frame", "function", "condition"],
+  "applies": ["expression", "frame", "grouped", "function", "condition"],
   "valueTypes": ["integer", "float", "string", "date", "any"],
   "settings": [
     "unset",
@@ -76,6 +91,7 @@
     "item",
     "entryPart",
     "link",
+    "groupCall",
     "expression",
     "list",
     "pairs",

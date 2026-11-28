@@ -13,6 +13,7 @@ use std::sync::Arc;
 use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::lazy::dsl::{date_range, time_range};
+use polars::lazy::frame::LazyGroupBy;
 use polars::prelude::{
     AnyValue, ApproxQuantileMethod, ClosedInterval, ClosedWindow, DataType, DatetimeArgs, Duration,
     DurationArgs, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation,
@@ -2146,6 +2147,147 @@ fn pivot(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildErro
         separator.into(),
         column_naming,
     ))
+}
+
+// ---------------------------------------------------------------------------
+// Groups
+
+/// Python's `group_by`: the keys given by position, then those given by name, each named for its
+/// name, grouped by in a stable order where `maintain_order` is true.
+fn group_by(frame: LazyFrame, arguments: &Arguments) -> Result<LazyGroupBy, BuildError> {
+    let keys = group_keys(arguments)?;
+    Ok(if arguments.flag("maintain_order", false)? {
+        frame.group_by_stable(keys)
+    } else {
+        frame.group_by(keys)
+    })
+}
+
+/// The keys a call of `group_by` groups by: those given by position, then those given by name.
+pub(crate) fn group_keys(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    positional_and_named_by(arguments, "by", "named_by")
+}
+
+/// The expressions of the starred parameter `positional` followed by those of the double-starred
+/// `named`, each of the latter named for its key.
+fn positional_and_named_by(
+    arguments: &Arguments,
+    positional: &'static str,
+    named: &'static str,
+) -> Result<Vec<Expr>, BuildError> {
+    let mut exprs = arguments.expressions(positional)?;
+    for (name, expr) in named_expressions(arguments, named)? {
+        exprs.push(expr.alias(name));
+    }
+    Ok(exprs)
+}
+
+/// Python's `having` adds each predicate to the group by in turn, and Polars keeps the groups that
+/// every one holds for.
+fn group_having(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyGroupBy, BuildError> {
+    Ok(arguments
+        .expressions("predicates")?
+        .into_iter()
+        .fold(grouped, LazyGroupBy::having))
+}
+
+fn group_agg(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(grouped.agg(positional_and_named_by(arguments, "aggs", "named_aggs")?))
+}
+
+/// What Python's shortcuts of a group by aggregate: every column that is not a key, by `agg` of
+/// `col("*")` with a method, which Polars expands to the columns the keys do not name.
+fn group_every_column(
+    grouped: LazyGroupBy,
+    method: impl FnOnce(Expr) -> Expr,
+) -> Result<LazyFrame, BuildError> {
+    Ok(grouped.agg([method(col("*"))]))
+}
+
+fn group_all(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, |every| every)
+}
+
+fn group_first(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let ignore_nulls = arguments.flag("ignore_nulls", false)?;
+    group_every_column(grouped, |every| {
+        if ignore_nulls {
+            every.first_non_null()
+        } else {
+            every.first()
+        }
+    })
+}
+
+fn group_last(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let ignore_nulls = arguments.flag("ignore_nulls", false)?;
+    group_every_column(grouped, |every| {
+        if ignore_nulls {
+            every.last_non_null()
+        } else {
+            every.last()
+        }
+    })
+}
+
+fn group_len(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let count = polars::prelude::len();
+    Ok(grouped.agg([match arguments.string("name")? {
+        Some(name) => count.alias(name),
+        None => count,
+    }]))
+}
+
+fn group_max(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::max)
+}
+
+fn group_mean(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::mean)
+}
+
+fn group_median(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::median)
+}
+
+fn group_min(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::min)
+}
+
+fn group_n_unique(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::n_unique)
+}
+
+fn group_sum(grouped: LazyGroupBy, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    group_every_column(grouped, Expr::sum)
+}
+
+fn group_quantile(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    if arguments.get("quantile").is_none() {
+        return Err(BuildError::Missing {
+            parameter: "quantile",
+        });
+    }
+    let quantile = float(arguments, "quantile", 0.0)?;
+    let method = match arguments.choice("interpolation", QUANTILE_METHOD, "nearest")? {
+        "higher" => QuantileMethod::Higher,
+        "lower" => QuantileMethod::Lower,
+        "midpoint" => QuantileMethod::Midpoint,
+        "linear" => QuantileMethod::Linear,
+        "equiprobable" => QuantileMethod::Equiprobable,
+        _ => QuantileMethod::Nearest,
+    };
+    group_every_column(grouped, |every| every.quantile(lit(quantile), method))
+}
+
+/// Python's binding takes the number of rows of `head` and `tail` as a whole number of the
+/// platform, so a negative one is refused.
+fn group_head(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(grouped.head(Some(index(arguments, "n", 5)?)))
+}
+
+fn group_tail(grouped: LazyGroupBy, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(grouped.tail(Some(index(arguments, "n", 5)?)))
 }
 
 // ---------------------------------------------------------------------------
@@ -4757,6 +4899,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Frame(frame_gather_every),
     },
     Entry {
+        id: EntryId("LazyFrame.group_by"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[
+            starred("by", EXPRESSION),
+            flag("maintain_order", "False").keyword_only(),
+            double_starred("named_by"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Grouping(group_by),
+    },
+    Entry {
         id: EntryId("LazyFrame.head"),
         family: Family::Steps,
         accepts: &[],
@@ -4960,6 +5114,149 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(frame_with_row_index),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.agg"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[starred("aggs", EXPRESSION), double_starred("named_aggs")],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_agg),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.all"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_all),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.first"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[flag("ignore_nulls", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_first),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.having"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[PREDICATES],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedStep(group_having),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.head"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[optional(
+            "n",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+            "5",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_head),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.last"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[flag("ignore_nulls", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_last),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.len"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[optional(
+            "name",
+            Kind::Value(ValueType::String),
+            Shape::One,
+            "None",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_len),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.max"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_max),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.mean"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_mean),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.median"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_median),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.min"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_min),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.n_unique"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_n_unique),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.quantile"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[
+            required("quantile", Kind::Value(ValueType::Float), Shape::One),
+            optional(
+                "interpolation",
+                Kind::Choice(QUANTILE_METHOD),
+                Shape::One,
+                "'nearest'",
+            ),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_quantile),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.sum"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_sum),
+    },
+    Entry {
+        id: EntryId("LazyGroupBy.tail"),
+        family: Family::Grouped,
+        accepts: &[],
+        parameters: &[optional(
+            "n",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+            "5",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::GroupedEnd(group_tail),
     },
     Entry {
         id: EntryId("Then.otherwise"),

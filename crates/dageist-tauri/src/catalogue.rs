@@ -14,8 +14,8 @@ use std::fmt;
 
 use dageist_engine::allowed::{Literal, Nested, Outer, Position};
 use dageist_engine::catalog::{
-    Applies, Comparison, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
-    Setting, Shape, ValueType, Words, english, entries,
+    Applies, Build, Comparison, DefaultValue, Entry, Family, Kind, Laziness, Parameter,
+    ParameterDefault, Setting, Shape, ValueType, Words, english, entries,
 };
 use dageist_engine::document::Dtype;
 use serde::Serialize;
@@ -282,9 +282,20 @@ struct ParameterView {
 enum AppliesView {
     Expression,
     Frame,
+    /// A call on a group by, after `group_by`: `having`, or one that finishes the grouping.
+    Grouped,
     Function,
     /// One link of `when`, `then` and `otherwise`.
     Condition,
+}
+
+/// What a call on a group by is there: the predicate of the groups it keeps, or the call that
+/// finishes the grouping and gives the table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum GroupedView {
+    Having,
+    Finishes,
 }
 
 /// One operation of the catalogue.
@@ -292,6 +303,8 @@ enum AppliesView {
 struct EntryView {
     id: &'static str,
     applies: AppliesView,
+    /// What the entry is on a group by, `null` for an entry that is not a call on one.
+    grouped: Option<GroupedView>,
     family: &'static str,
     name: String,
     hint: String,
@@ -358,6 +371,7 @@ const fn applies_view(applies: Applies) -> AppliesView {
     match applies {
         Applies::Expression => AppliesView::Expression,
         Applies::Frame => AppliesView::Frame,
+        Applies::Grouped => AppliesView::Grouped,
         Applies::Function => AppliesView::Function,
         Applies::Condition => AppliesView::Condition,
     }
@@ -493,6 +507,11 @@ fn entry_view(entry: &Entry, words: &Words) -> Result<EntryView, MissingWord> {
     Ok(EntryView {
         id: id.as_str(),
         applies: applies_view(entry.applies()),
+        grouped: match entry.build() {
+            Build::GroupedStep(_) => Some(GroupedView::Having),
+            Build::GroupedEnd(_) => Some(GroupedView::Finishes),
+            _ => None,
+        },
         family: entry.family().key(),
         name: given(words.entry_name(id), || format!("name of {}", id.as_str()))?,
         hint: given(words.entry_hint(id), || format!("hint of {}", id.as_str()))?,
@@ -638,6 +657,7 @@ mod tests {
             json!({
                 "id": "Expr.shift",
                 "applies": "expression",
+                "grouped": null,
                 "family": "rows",
                 "name": "shift",
                 "hint": "value n rows earlier",
@@ -751,6 +771,36 @@ mod tests {
         assert!(entry(&view, "LazyFrame.join")["head"].is_string());
         assert_eq!(entry(&view, "LazyFrame.join")["applies"], "frame");
         assert_eq!(entry(&view, "polars.col")["applies"], "function");
+    }
+
+    #[test]
+    fn a_call_on_a_group_by_says_whether_it_keeps_groups_or_finishes_the_grouping() {
+        let view = view();
+        assert_eq!(entry(&view, "LazyGroupBy.having")["grouped"], "having");
+        for finishing in [
+            "LazyGroupBy.agg",
+            "LazyGroupBy.len",
+            "LazyGroupBy.sum",
+            "LazyGroupBy.quantile",
+            "LazyGroupBy.head",
+            "LazyGroupBy.tail",
+        ] {
+            assert_eq!(
+                entry(&view, finishing)["grouped"],
+                "finishes",
+                "{finishing}"
+            );
+        }
+        // Only a call on a group by is either, and each says so: the calls that apply to a group
+        // by are those that are.
+        for entry in view["entries"].as_array().expect("entries") {
+            assert_eq!(
+                entry["grouped"].is_null(),
+                entry["applies"] != "grouped",
+                "{}",
+                entry["id"]
+            );
+        }
     }
 
     #[test]
@@ -995,6 +1045,7 @@ mod tests {
                 "pieces",
                 "search",
                 "window",
+                "grouped",
                 "compare",
                 "checks",
                 "logic",

@@ -115,6 +115,34 @@ pub(super) fn step(
     build(frame, &arguments(entry, given)?)
 }
 
+/// The chain that groups `frame` as `group_by` is given `given`, continues with the calls of
+/// `links` and is finished by `finish`, each given its arguments.
+pub(super) fn grouped(
+    frame: LazyFrame,
+    given: Vec<(&'static str, Argument)>,
+    links: Vec<(&str, Vec<(&'static str, Argument)>)>,
+    finish: (&str, Vec<(&'static str, Argument)>),
+) -> Result<LazyFrame, BuildError> {
+    let start = entry("LazyFrame.group_by");
+    let Build::Grouping(start_build) = start.build() else {
+        panic!("group_by starts a chain");
+    };
+    let mut group = start_build(frame, &arguments(start, given)?)?;
+    for (id, given) in links {
+        let link = entry(id);
+        let Build::GroupedStep(build) = link.build() else {
+            panic!("{id} does not continue a chain");
+        };
+        group = build(group, &arguments(link, given)?)?;
+    }
+    let (id, given) = finish;
+    let end = entry(id);
+    let Build::GroupedEnd(build) = end.build() else {
+        panic!("{id} does not finish a chain");
+    };
+    build(group, &arguments(end, given)?)
+}
+
 /// `col(name)`.
 pub(super) fn column(name: &str) -> Expr {
     function(

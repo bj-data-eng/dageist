@@ -58,6 +58,18 @@ impl Step {
                         .collect::<Vec<_>>(),
                 ),
             }),
+            "LazyFrame.group_by" => {
+                let named = match call.argument("named_by") {
+                    Some(Value::Pairs(pairs)) => {
+                        pairs.iter().map(|(name, _)| say.key(name)).collect()
+                    }
+                    _ => Vec::new(),
+                };
+                let listed = keys(&["by"]).into_iter().map(|key| say.key(key));
+                say.phrase(SummaryPhrase::GroupedBy {
+                    fields: &say.fields(&listed.chain(named).collect::<Vec<_>>()),
+                })
+            }
             "LazyFrame.rename" => say.renames(call.argument("mapping")),
             "LazyFrame.join" => {
                 let table = match call.argument("other") {

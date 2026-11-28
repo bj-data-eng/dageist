@@ -270,6 +270,11 @@ fn a_family_holds_the_entries_that_apply_to_what_it_is_for() {
             "{id}: the Steps family is the frame entries"
         );
         assert_eq!(
+            entry.family() == Family::Grouped,
+            entry.applies() == Applies::Grouped,
+            "{id}: the Grouped family is the methods of a lazy group by"
+        );
+        assert_eq!(
             entry.family() == Family::Start,
             entry.applies() == Applies::Function,
             "{id}: the Start family is the functions"

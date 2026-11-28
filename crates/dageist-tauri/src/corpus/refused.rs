@@ -478,6 +478,70 @@ pub(super) fn rule_cases(planner: &mut Planner<'_>) -> Vec<Case> {
             .expect("a key is given"),
     });
 
+    // A step that groups by a column and gives the count of its rows the name of that column gives
+    // two columns of one name.
+    let named = |text: &str| {
+        Document::read(text).unwrap_or_else(|error| panic!("a document of the corpus: {error}"))
+    };
+    let key = |name: &str| {
+        format!(
+            r#"{{"entry":"LazyFrame.group_by","arguments":{{"by":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}]}}}}}}"#
+        )
+    };
+    let step = |call: &str, then: &str| {
+        format!(r#"{{"version":1,"steps":[{{"id":"group_by","call":{call},"then":[{then}]}}]}}"#)
+    };
+    let having = |predicate: &str| {
+        format!(
+            r#"{{"entry":"LazyGroupBy.having","arguments":{{"predicates":{{"many":[{predicate}]}}}}}}"#
+        )
+    };
+    let column = |name: &str, then: &str| {
+        format!(
+            r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[{then}]}}}}"#
+        )
+    };
+    let len =
+        format!(r#"{{"entry":"LazyGroupBy.len","arguments":{{"name":{{"string":"{whole}"}}}}}}"#);
+    cases.push(Case {
+        name: "a group by that gives two columns of one name".to_owned(),
+        document: named(&step(&key(&whole), &len)),
+    });
+    // The values of a group are no one value to keep the group by.
+    let boolean = column_of(Representative::Boolean);
+    let finishing = r#"{"entry":"LazyGroupBy.len","arguments":{}}"#;
+    cases.push(Case {
+        name: "a having that gives the values of each group".to_owned(),
+        document: named(&step(
+            &key(&whole),
+            &format!("{},{finishing}", having(&column(&boolean, ""))),
+        )),
+    });
+    // Text is no value Polars casts to a Boolean to keep a group.
+    let first = r#"{"entry":"Expr.first","arguments":{}}"#;
+    cases.push(Case {
+        name: "a having that gives text".to_owned(),
+        document: named(&step(
+            &key(&whole),
+            &format!(
+                "{},{finishing}",
+                having(&column(&column_of(Representative::String), first))
+            ),
+        )),
+    });
+
+    // Where the order of the groups is kept, a key that takes some of the values is no key of the
+    // rows.
+    let head = r#"{"entry":"Expr.head","arguments":{"n":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":2}}},"then":[]}}}}"#;
+    let ordered = format!(
+        r#"{{"entry":"LazyFrame.group_by","arguments":{{"by":{{"many":[{}]}},"maintain_order":{{"flag":true}}}}}}"#,
+        column(&whole, head)
+    );
+    cases.push(Case {
+        name: "a group by that keeps its order and a key that takes the first values".to_owned(),
+        document: named(&step(&ordered, finishing)),
+    });
+
     // Two keys of each side that read the same columns pair the same two names twice.
     let right = right_column_of(Representative::Int64);
     cases.push(Case {

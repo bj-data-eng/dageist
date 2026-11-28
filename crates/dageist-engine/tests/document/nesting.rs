@@ -239,3 +239,60 @@ fn a_step_built_far_deeper_than_the_limit_is_refused_without_exhausting_the_stac
     let refusal = document(&levels).expect_err("far too deep to be a document");
     assert!(matches!(refusal.cause(), Cause::TooDeep), "{refusal}");
 }
+
+/// The JSON of a document of one step that groups by nothing and holds that expression as the
+/// aggregate of its `agg`, which the step holds as a link after its own call.
+fn grouped_text(levels: &[Level]) -> String {
+    format!(
+        r#"{{"version":1,"steps":[{{"id":"a","call":{{"entry":"LazyFrame.group_by","arguments":{{}}}},"then":[{{"entry":"LazyGroupBy.agg","arguments":{{"aggs":{{"many":[{}]}}}}}}]}}]}}"#,
+        expression_text(levels)
+    )
+}
+
+fn grouped(levels: &[Level]) -> Result<Document, dageist_engine::document::Refusal> {
+    let group_by = call("LazyFrame.group_by", vec![]);
+    let agg = call(
+        "LazyGroupBy.agg",
+        vec![(
+            "aggs",
+            Value::Many(vec![Value::Expression(expression(levels))]),
+        )],
+    );
+    Document::new(vec![
+        Step::chain(StepId::new("a").expect("an id"), group_by, vec![agg]).expect("a step"),
+    ])
+}
+
+#[test]
+fn a_step_that_groups_reads_and_is_made_exactly_when_it_nests_within_the_limit() {
+    let (mut accepted, mut refused) = (Vec::new(), Vec::new());
+    for links in 0..=30 {
+        for conditions in 0..=24 {
+            let mut levels = vec![Level::Link; links];
+            levels.extend(vec![Level::Condition; conditions]);
+            let text = grouped_text(&levels);
+            let (deepest, over) = measure(&text, MAX_NESTING);
+            if deepest > 150 {
+                continue;
+            }
+            let made = grouped(&levels);
+            let read = Document::read(&text);
+            if deepest <= MAX_NESTING {
+                let made = made.expect("a document within the limit");
+                assert_eq!(made, read.expect("text within the limit"));
+                assert_eq!(made.write(), text);
+                accepted.push(deepest);
+            } else {
+                let refusal = made.expect_err("a document beyond the limit");
+                assert!(matches!(refusal.cause(), Cause::TooDeep), "{refusal}");
+                let Err(ReadError::Syntax(error)) = read else {
+                    panic!("a syntax error for depth {deepest}");
+                };
+                assert_eq!(Some(error.column()), over);
+                refused.push(deepest);
+            }
+        }
+    }
+    assert_eq!(accepted.iter().max(), Some(&MAX_NESTING));
+    assert_eq!(refused.iter().min(), Some(&(MAX_NESTING + 1)));
+}

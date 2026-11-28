@@ -137,7 +137,7 @@ const FIELDS_LOST =
 
 /** Why a step the editor draws by its parameters alone is not added from the list of steps. */
 const NOT_A_STEP_OF_THE_LIST =
-  'the list of steps holds the seven steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
+  'the list of steps holds the eight steps the editor has heads for; this step is drawn by its parameters alone, so a document may hold it and no list adds it (#137)';
 
 /** Declares the step `entry`, which no list adds. */
 function stepGap(entry: string): Gap {
@@ -177,7 +177,7 @@ export const GAPS: readonly Gap[] = [
   // The names of a struct's fields, which are offered where the walk reports them.
   parameterGap('Expr.struct.drop', 'names', FIELDS_LOST),
   parameterGap('Expr.struct.field', 'name', FIELDS_LOST),
-  // The steps no list adds: the editor adds the seven it has heads for.
+  // The steps no list adds: the editor adds the eight it has heads for.
   stepGap('LazyFrame.drop'),
   stepGap('LazyFrame.drop_nans'),
   stepGap('LazyFrame.drop_nulls'),

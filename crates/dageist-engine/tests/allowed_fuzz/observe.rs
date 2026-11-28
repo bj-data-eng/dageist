@@ -142,19 +142,71 @@ fn seen(resolution: &Resolution) -> Seen {
 fn run_on(document: &Document, frames: &Frames, check: bool) -> Observed {
     let walked = asked::walked(document, frames);
     if walked == Walked::AskPolars
-        && let Some(observed) = asked::ask(document, frames)
+        && let Some(mut observed) = asked::ask(document, frames)
     {
+        name_one_refusal(document, &mut observed, &|| {
+            asked::ask(document, frames).and_then(|again| again.refusal)
+        });
         return observed;
     }
     let (mut observed, guarded) = run_on_engine(document, frames);
+    name_one_refusal(document, &mut observed, &|| {
+        run_on_engine(document, frames).0.refusal
+    });
     if check
         && walked == Walked::Allows
         && !guarded
-        && let Some(asked) = asked::ask(document, frames)
+        && let Some(mut asked) = asked::ask(document, frames)
     {
+        name_one_refusal(document, &mut asked, &|| {
+            asked::ask(document, frames).and_then(|again| again.refusal)
+        });
         observed.drift = drift_between(&observed, &asked);
     }
     observed
+}
+
+/// How often a step is run again to see which refusal Polars names of the rows. A run again is a
+/// sample, so what it settles is statistical: a refusal that Polars names in none of the runs is
+/// not seen (the issue 234).
+pub const NAMINGS: usize = 8;
+
+/// A step that groups may hold two refusals of the rows, as two parts of its keys that Polars
+/// evaluates at once, and it names either from run to run. The step is run again and the refusal
+/// it is said to give is the smallest in words of those it named, as its shape and then as it is written, so that the engine, the asker and
+/// the limits that ask again say the same of it (the issue 234).
+fn name_one_refusal(
+    document: &Document,
+    observed: &mut Observed,
+    again: &dyn Fn() -> Option<Refusal>,
+) {
+    if document.steps()[0].links().is_empty()
+        || !observed
+            .refusal
+            .as_ref()
+            .is_some_and(|refusal| refusal.stage == Stage::Rows)
+    {
+        return;
+    }
+    let named = observed.refusal.iter().cloned().chain(
+        (0..NAMINGS)
+            .filter_map(|_| again())
+            .filter(|refusal| refusal.stage == Stage::Rows),
+    );
+    observed.refusal =
+        named.min_by_key(|refusal| (shaped_refusal(refusal).reason, refusal.reason.clone()));
+}
+
+/// `refusal` with the words of a refusal of the rows compared by their shape.
+fn shaped_refusal(refusal: &Refusal) -> Refusal {
+    Refusal {
+        reason: if refusal.stage == Stage::Schema {
+            refusal.reason.clone()
+        } else {
+            one_wording_of_a_replacement(&shape_of_a_failure_of_rows(&refusal.reason))
+        },
+        ..refusal.clone()
+    }
 }
 
 /// How the answer of the step engine and the answer of [`asked`] to a step the walk allows
@@ -166,16 +218,7 @@ pub fn drift_between(engine: &Observed, asked: &Observed) -> Option<String> {
     // is between brackets, which is the values, left out, and every digit the same. A refusal of
     // the schema is compared exactly, for there a dtype or a width that differs by a digit is a
     // difference.
-    let shaped = |refusal: &Option<Refusal>| {
-        refusal.as_ref().map(|refusal| Refusal {
-            reason: if refusal.stage == Stage::Schema {
-                refusal.reason.clone()
-            } else {
-                one_wording_of_a_replacement(&shape_of_a_failure_of_rows(&refusal.reason))
-            },
-            ..refusal.clone()
-        })
-    };
+    let shaped = |refusal: &Option<Refusal>| refusal.as_ref().map(shaped_refusal);
     if shaped(&engine.refusal) != shaped(&asked.refusal) {
         return Some(format!(
             "the step engine says {:?} and the asker says {:?}",
@@ -620,6 +663,28 @@ mod tests {
             place: None,
             reason: reason.to_owned(),
         })
+    }
+
+    #[test]
+    fn a_group_by_key_that_holds_two_refusals_is_said_to_give_one_whichever_polars_names() {
+        // The year of a moment is out of range and the format of a moment with a time zone is
+        // refused: Polars names either, with the values of either row it meets first, so the
+        // engine and the asker are each run again and say the smallest of what they name.
+        let case = Case::decode(
+            br#"{"a":"Float64","b":"Float32","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.group_by","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.datetime","arguments":{"year":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":16777216.0}}},"then":[]}},"month":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}},"day":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":true}}},"then":[]}},"time_zone":{"time_zone":"EST"}}},"then":[{"entry":"Expr.dt.strftime","arguments":{"format":{"string":"%Q"}}}]}}]}}},"then":[{"entry":"LazyGroupBy.agg","arguments":{}}]}]}"#,
+        )
+        .expect("a case");
+        for _ in 0..6 {
+            let observed = observe_checked(&case);
+            assert_eq!(observed.drift, None);
+            assert!(
+                observed
+                    .refusal
+                    .as_ref()
+                    .is_some_and(|refusal| refusal.stage == Stage::Rows)
+            );
+        }
     }
 
     #[test]

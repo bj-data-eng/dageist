@@ -11,7 +11,7 @@
 //! there on, and a case that is only undetermined is compared for what was
 //! predicted before that.
 
-use dageist_engine::allowed::{self, RefusalSource, Representative};
+use dageist_engine::allowed::{self, Inner, Outer, RefusalSource, Representative, Shape};
 use dageist_engine::document::{Place, Walk, WalkRefusal, WalkedExpression};
 
 use super::case::{Case, STEP};
@@ -72,9 +72,15 @@ pub struct Prediction {
     pub expressions: Vec<Traced>,
 }
 
-/// The class of what a place follows, when it follows a value of one.
-fn class(place: Option<allowed::Place>) -> Option<Representative> {
+/// The class of what a place follows, when it follows a value of one. Where the values are
+/// evaluated on the rows of each group, which an aggregate and a predicate of a group by are, what
+/// is many values is a list of them for each group: a list of the scalar dtype the tables measured,
+/// and no class for a list of a dtype that is no scalar.
+fn class(place: Option<allowed::Place>, by_group: bool) -> Option<Representative> {
     match place?.after() {
+        allowed::After::Value { dtype, shape } if by_group && shape != Shape::One => {
+            Inner::of_class(dtype).map(Representative::List)
+        }
         allowed::After::Value { dtype, .. } => Some(dtype),
         _ => None,
     }
@@ -85,10 +91,21 @@ fn class(place: Option<allowed::Place>) -> Option<Representative> {
 /// argument's dtype says it gives.
 fn traced(expression: &WalkedExpression) -> Traced {
     let places = expression.places();
+    let by_group = expression
+        .context()
+        .is_some_and(|context| matches!(context.outer(), Outer::Aggregate | Outer::Having));
     Traced {
         place: expression.place().clone(),
-        start: places.first().copied().and_then(class),
-        links: places.iter().skip(1).copied().map(class).collect(),
+        start: places
+            .first()
+            .copied()
+            .and_then(|place| class(place, by_group)),
+        links: places
+            .iter()
+            .skip(1)
+            .copied()
+            .map(|place| class(place, by_group))
+            .collect(),
     }
 }
 

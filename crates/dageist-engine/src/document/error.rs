@@ -21,7 +21,10 @@ pub enum Segment {
     Value(usize),
     /// The start of an expression.
     Start,
-    /// A link of an expression, counted from the first after its start.
+    /// A link of an expression, counted from the first after its start, or a link of a step that
+    /// groups, counted from the first after the call that starts the step. A way that starts with
+    /// it, in a place of a step, goes into that link, and one that starts with anything else goes
+    /// into the step's own call.
     Link(usize),
 }
 
@@ -132,6 +135,8 @@ pub enum Position {
     /// A link of an expression, after its start: an expression method or a
     /// link of a condition.
     Link,
+    /// A link of a step that groups, after `group_by`: a call of the group by that gives.
+    Grouped,
 }
 
 impl Position {
@@ -140,6 +145,7 @@ impl Position {
             Self::Step => "a step",
             Self::Start => "the start of an expression",
             Self::Link => "a link after the start of an expression",
+            Self::Grouped => "a call after group_by in a step that groups",
         }
     }
 }
@@ -192,6 +198,11 @@ pub enum Cause {
         /// What the link needs before it, such as `then`.
         needs: &'static str,
         /// What is before it, such as `an expression`.
+        found: &'static str,
+    },
+    /// A step that groups and stops before a call finishes the grouping.
+    UnfinishedGrouping {
+        /// How far the chain came, such as `a group by`.
         found: &'static str,
     },
     /// An expression that ends where a condition still lacks its `then`.
@@ -252,6 +263,11 @@ impl fmt::Display for Cause {
             Self::UnfinishedCondition { needs } => {
                 write!(formatter, "the condition still needs its {needs}")
             }
+            Self::UnfinishedGrouping { found } => write!(
+                formatter,
+                "the grouping stops at {found}: it needs a call that finishes it, which is agg, a \
+                 shortcut such as len or sum, head or tail"
+            ),
             Self::EmptyStepId => formatter.write_str("a step needs an identifier"),
             Self::TooDeep => write!(
                 formatter,

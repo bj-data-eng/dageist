@@ -9,7 +9,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import type { DocumentView, ValueRequest } from '@dageist/host';
 
 import type { Path } from './model/doc';
-import { callAt, givenOf, stepNamed } from './model/doc';
+import { callInStep, givenOf, stepNamed } from './model/doc';
 
 /** The parameter a draft would give a value to: in the step called `step`, at the way `path`. */
 export interface DraftPlace {
@@ -94,7 +94,7 @@ export function stillWanted(document: DocumentView, draft: Draft): boolean {
   const { path } = draft.place;
   const last = path.at(-1);
   if (last?.kind !== 'parameter') return false;
-  const call = callAt(found.step.call, path.slice(0, -1));
+  const call = callInStep(found.step, path.slice(0, -1));
   if (call === null) return false;
   return draft.kind !== 'option' || givenOf(call, last.name) === undefined;
 }

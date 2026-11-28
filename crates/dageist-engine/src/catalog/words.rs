@@ -129,6 +129,8 @@ pub enum SummaryWord {
     Fields,
     /// What a sort orders by.
     SortedBy,
+    /// What a grouping groups by.
+    GroupedBy,
     /// A join: the table, and the fields that are matched.
     JoinedOn,
     /// A pivot: the field whose values become columns.
@@ -167,10 +169,11 @@ pub enum SummaryWord {
 
 impl SummaryWord {
     /// Every word, in the order a language file lists them.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 21] = [
         Self::NoFields,
         Self::Fields,
         Self::SortedBy,
+        Self::GroupedBy,
         Self::JoinedOn,
         Self::PivotedOn,
         Self::Renamed,
@@ -197,6 +200,7 @@ impl SummaryWord {
             Self::NoFields => "no_fields",
             Self::Fields => "fields",
             Self::SortedBy => "sorted_by",
+            Self::GroupedBy => "grouped_by",
             Self::JoinedOn => "joined_on",
             Self::PivotedOn => "pivoted_on",
             Self::Renamed => "renamed",
@@ -222,7 +226,7 @@ impl SummaryWord {
     pub const fn places(self) -> &'static [&'static str] {
         match self {
             Self::Fields | Self::AllOf => &["count"],
-            Self::SortedBy => &["fields"],
+            Self::SortedBy | Self::GroupedBy => &["fields"],
             Self::JoinedOn => &["table", "fields"],
             Self::PivotedOn => &["field"],
             Self::Renamed => &["from", "to"],
@@ -258,6 +262,11 @@ pub enum SummaryPhrase<'a> {
     },
     /// See [`SummaryWord::SortedBy`].
     SortedBy {
+        /// The fields, already listed.
+        fields: &'a str,
+    },
+    /// See [`SummaryWord::GroupedBy`].
+    GroupedBy {
         /// The fields, already listed.
         fields: &'a str,
     },
@@ -328,6 +337,7 @@ impl SummaryPhrase<'_> {
             Self::NoFields => SummaryWord::NoFields,
             Self::Fields { .. } => SummaryWord::Fields,
             Self::SortedBy { .. } => SummaryWord::SortedBy,
+            Self::GroupedBy { .. } => SummaryWord::GroupedBy,
             Self::JoinedOn { .. } => SummaryWord::JoinedOn,
             Self::PivotedOn { .. } => SummaryWord::PivotedOn,
             Self::Renamed { .. } => SummaryWord::Renamed,
@@ -354,7 +364,9 @@ impl SummaryPhrase<'_> {
             Self::Fields { count } | Self::AllOf { count } => {
                 vec![("count", count.to_string())]
             }
-            Self::SortedBy { fields } => vec![("fields", fields.to_owned())],
+            Self::SortedBy { fields } | Self::GroupedBy { fields } => {
+                vec![("fields", fields.to_owned())]
+            }
             Self::JoinedOn { table, fields } => {
                 vec![("table", table.to_owned()), ("fields", fields.to_owned())]
             }

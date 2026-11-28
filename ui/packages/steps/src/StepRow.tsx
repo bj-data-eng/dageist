@@ -11,13 +11,31 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import { useCallback, useContext, useMemo, useState } from 'react';
 
 import type { OfferGroup } from '@dageist/design';
-import type { ArgumentView, CallView, DocumentStepView, FrameRequest } from '@dageist/host';
-import { Hint, OfferList, Peek, Piece, Popover, Slot, TypedBlock, Word, cx } from '@dageist/design';
+import type {
+  ArgumentView,
+  CallView,
+  DocumentStepView,
+  EntryView,
+  FrameRequest,
+} from '@dageist/host';
+import {
+  Block,
+  Hint,
+  OfferList,
+  Peek,
+  Piece,
+  Popover,
+  Slot,
+  TypedBlock,
+  Word,
+  cx,
+} from '@dageist/design';
 
 import { StepProvider, useListEdits, useStepAt, useStepEdits } from './editor';
 import { useCatalogue, useNode } from './EngineProvider';
 import { listedGroups } from './engineLists';
 import { FreshContext } from './Lists';
+import type { Surroundings } from './Parameters';
 import {
   OptionRows,
   ParameterDrawing,
@@ -35,29 +53,37 @@ import type { Catalogue, HeadName } from './model/catalogue';
 import {
   HEAD,
   VERBS,
+  finishingEntries,
+  groupedHeadOf,
+  havingEntry,
+  optionParameters,
   positionOfParameter,
   stepOptionParameters,
   verbId,
   verbOf,
 } from './model/catalogue';
+import type { Path } from './model/doc';
 import {
   NO_PATH,
   expressionOf,
   givenOf,
   keySegment,
+  linkSegment,
   parameterSegment,
   shapeOf,
+  under,
   valueSegment,
 } from './model/doc';
+import { groupLayoutOf } from './model/group';
 import type { Frame } from './model/frame';
 import { findTable, tablesOf } from './model/inputs';
 import { chosenOptions } from './model/offers';
 import type { PreparedStep } from './model/report';
-import { rowEndOf, sayingOf } from './model/report';
+import { outputDtypeOf, rowEndOf, sayingOf } from './model/report';
 import { NO_POSITIONS, within } from './model/place';
 import { fieldArgument, listArgument } from './model/requests';
 import { actionsOf } from './model/words';
-import { PreparedStepProvider } from './engine';
+import { PreparedStepProvider, usePreparedStep } from './engine';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
@@ -168,15 +194,36 @@ function StepParameter({
   );
 }
 
-/** Draws one new column of an `Add column` step: its name, and what it holds. */
-function NamedColumn({
+/** What a named chain is called in a step, for the words that describe it. */
+interface NamedWords {
+  /** What its name names: the new column, or the key. */
+  readonly named: string;
+  /** What the chain holds, said of `name`, which is empty where it is not typed yet. */
+  readonly holds: (name: string) => string;
+  /** Whether the dtype the step gives the chain's column stands at the end of its line. */
+  readonly dtype: boolean;
+}
+
+/**
+ * Draws one named chain of a step: its name, and what it holds. An `Add column` step holds its new
+ * columns so, and a step that groups holds its named keys and its named aggregates so.
+ */
+function NamedChain({
   call,
+  callPath,
+  parameter,
+  words,
   frame,
   at,
   alias,
   value,
   fresh,
 }: HeadProps & {
+  /** The way to the call that holds the named chains. */
+  readonly callPath: Path;
+  /** The parameter of the call that holds them. */
+  readonly parameter: string;
+  readonly words: NamedWords;
   readonly at: number;
   readonly alias: ArgumentView | undefined;
   readonly value: ArgumentView | undefined;
@@ -185,23 +232,26 @@ function NamedColumn({
   const catalogue = useCatalogue();
   const edits = useStepEdits();
   const name = alias?.kind === 'columns' ? (alias.names[0] ?? '') : '';
-  // What the new column holds is an item of what the step selects.
-  const holds = positionOfParameter(
-    catalogue.entries.get(call.entry) ?? null,
-    HEAD.with_columns.named,
-  );
-  const valuePath = [parameterSegment(HEAD.with_columns.named), valueSegment(at)];
+  // What the chain holds is an item of what the step selects.
+  const holds = positionOfParameter(catalogue.entries.get(call.entry) ?? null, parameter);
+  const namedPath = under(callPath, parameterSegment(parameter));
+  const valuePath = under(namedPath, valueSegment(at));
+  // What the step gives the column, as the engine reports it: of an aggregate that does not
+  // aggregate it is a list of each group's values, which the hint of the call says.
+  const prepared = usePreparedStep();
+  const entry = catalogue.entries.get(call.entry);
+  const dtype = prepared === null || name === '' ? null : outputDtypeOf(prepared, name);
   return (
     <>
       <TypedBlock
         value={name}
         kind="name"
-        label="Name of the new column"
+        label={`Name of the ${words.named}`}
         wrong={name.trim() === ''}
         focusNow={fresh}
         accepts={(typed) => typed.trim() !== ''}
         onCommit={(typed) => {
-          void edits.setArgument([parameterSegment(HEAD.with_columns.named), keySegment(at)], {
+          void edits.setArgument(under(namedPath, keySegment(at)), {
             kind: 'columns',
             names: [typed.trim()],
           });
@@ -212,16 +262,28 @@ function NamedColumn({
         expression={expressionOf(value)}
         path={valuePath}
         frame={frame}
-        label={`What ${name === '' ? 'the column' : name} holds`}
+        label={words.holds(name)}
         positions={within(NO_POSITIONS, holds)}
         argument={null}
         onSet={(request) => {
           void edits.setArgument(valuePath, request);
         }}
       />
+      {words.dtype && dtype !== null && (
+        <Hint lines={entry?.hint === undefined ? [] : [entry.hint]} code={false}>
+          <span className="dg-dtype">{dtype}</span>
+        </Hint>
+      )}
     </>
   );
 }
+
+/** The words of the new columns of an `Add column` step. */
+const NEW_COLUMN: NamedWords = {
+  named: 'new column',
+  holds: (name) => `What ${name === '' ? 'the column' : name} holds`,
+  dtype: false,
+};
 
 function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
@@ -235,8 +297,11 @@ function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
         // No new column is in the document: the list of them is drawn with what adds one.
         <StepParameter call={call} name={HEAD.with_columns.named} frame={frame} />
       ) : (
-        <NamedColumn
+        <NamedChain
           call={call}
+          callPath={NO_PATH}
+          parameter={HEAD.with_columns.named}
+          words={NEW_COLUMN}
           frame={frame}
           at={0}
           alias={first.key}
@@ -246,8 +311,11 @@ function AddColumnHead({ call, frame }: HeadProps): React.JSX.Element {
       )}
       {more.map((entry, at) => (
         <span key={at + 1} className="dg-line">
-          <NamedColumn
+          <NamedChain
             call={call}
+            callPath={NO_PATH}
+            parameter={HEAD.with_columns.named}
+            words={NEW_COLUMN}
             frame={frame}
             at={at + 1}
             alias={entry.key}
@@ -346,8 +414,298 @@ function PivotHead({ call, frame }: HeadProps): React.JSX.Element {
   );
 }
 
+/** The words of the named keys of a step that groups. */
+const NAMED_KEY: NamedWords = {
+  named: 'key',
+  holds: (name) => `What the key ${name === '' ? '' : `${name} `}holds`,
+  dtype: false,
+};
+
+/** The words of the named aggregates of an `agg`. */
+const NAMED_AGGREGATE: NamedWords = {
+  named: 'column',
+  holds: (name) => `What ${name === '' ? 'the column' : name} aggregates`,
+  dtype: true,
+};
+
+/** Draws the named chains of the parameter `parameter` of the call at `callPath`, or what adds the first. */
+function NamedChains({
+  call,
+  callPath,
+  parameter,
+  words,
+  frame,
+}: HeadProps & {
+  readonly callPath: Path;
+  readonly parameter: string;
+  readonly words: NamedWords;
+}): React.JSX.Element {
+  const named = givenOf(call, parameter);
+  const entries = named?.kind === 'pairs' ? named.entries : [];
+  const catalogue = useCatalogue();
+  const found = catalogue.entries
+    .get(call.entry)
+    ?.parameters.find((candidate) => candidate.name === parameter);
+  return (
+    <>
+      {entries.map((entry, at) => (
+        <span key={at} className="dg-line">
+          <NamedChain
+            call={call}
+            callPath={callPath}
+            parameter={parameter}
+            words={words}
+            frame={frame}
+            at={at}
+            alias={entry.key}
+            value={entry.value}
+            fresh={false}
+          />
+        </span>
+      ))}
+      {entries.length === 0 && found !== undefined && (
+        // None is in the document: the list of them is drawn with what adds one, after its name,
+        // so that it is told from the one that adds a key.
+        <>
+          <Word>{found.shown}</Word>
+          <ParameterDrawing
+            parameter={found}
+            argument={named}
+            path={under(callPath, parameterSegment(parameter))}
+            around={{ frame, items: () => [] }}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** Draws the predicate of a `having` that keeps the groups it holds, and what takes it away. */
+function HavingLine({ call, at, frame }: HeadProps & { readonly at: number }): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const edits = useStepEdits();
+  const actions = actionsOf('step');
+  const callPath = [linkSegment(at)];
+  const entry = catalogue.entries.get(call.entry) ?? null;
+  // The parameter that holds the predicates, which the catalogue says by its position.
+  const predicates =
+    entry === null
+      ? null
+      : (groupedHeadOf(entry).find((parameter) => parameter.kind.kind === 'expression') ?? null);
+  return (
+    <span className="dg-line">
+      <Piece
+        remove={
+          actions.remove
+            ? {
+                label: 'Remove the having',
+                onPress: () => {
+                  void edits.removeGroupCall(callPath);
+                },
+              }
+            : null
+        }
+        add={null}
+      >
+        {/* The word opens a list that has nothing to offer but what takes it away. */}
+        <Slot
+          label={entry?.name ?? call.entry}
+          tone="verb"
+          look="verb"
+          names
+          describedAs="The predicates that keep groups. Take the having away"
+          placeholder="The having"
+          offers={() => []}
+          actionsOnly
+        />
+      </Piece>
+      {predicates !== null && (
+        <ConditionBlocks
+          path={under(callPath, parameterSegment(predicates.name))}
+          argument={givenOf(call, predicates.name)}
+          frame={frame}
+          positions={within(NO_POSITIONS, positionOfParameter(entry, predicates.name))}
+          tone="verb"
+        />
+      )}
+    </span>
+  );
+}
+
+/** Draws the call that finishes a grouping: its name, which a list changes, and what it takes. */
+function FinishingLine({
+  call,
+  at,
+  frame,
+}: HeadProps & { readonly at: number }): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const edits = useStepEdits();
+  const list = useListState();
+  const callPath = [linkSegment(at)];
+  const toggle = useOptionToggle(callPath);
+  const entry = catalogue.entries.get(call.entry) ?? null;
+  const optionsAsked = useOptions(
+    list.open && entry !== null
+      ? { entry: entry.id, chosen: chosenOptions(entry, call.arguments) }
+      : null,
+  );
+  // The parameters of the call that a list can add, which the call itself draws once they are set.
+  const head = entry === null ? [] : groupedHeadOf(entry);
+  const parameters =
+    entry === null
+      ? []
+      : optionParameters(
+          entry,
+          head.map((parameter) => parameter.name),
+        );
+  const given = new Set(call.arguments.map((held) => held.parameter));
+  const around = { frame, items: () => [] };
+  // The aggregates the call is given as a list, and as named ones, where it takes any.
+  const listed = head.find((parameter) => parameter.kind.kind === 'expression') ?? null;
+  const named = head.find((parameter) => parameter.kind.kind === 'pairs') ?? null;
+  return (
+    <span className="dg-line">
+      <Hint lines={entry === null ? [] : [entry.hint]} code={false}>
+        <Slot
+          label={entry?.name ?? call.entry}
+          tone="verb"
+          look="verb"
+          names
+          describedAs={`The call that finishes the grouping: ${entry?.name ?? call.entry}. Change what it does`}
+          placeholder="Search the calls"
+          offers={(typed) =>
+            listedGroups(
+              { word: 'step', options: parameters.length > 0 },
+              {
+                options: () => [optionOffers(parameters, given, typed, toggle, optionsAsked)],
+                steps: () => [
+                  titled(
+                    'Finish with',
+                    finishingEntries(catalogue)
+                      .filter((candidate) => matches(typed, candidate.name, candidate.hint))
+                      .map((candidate) =>
+                        offer(candidate.name, 'ink', candidate.hint, () => {
+                          if (candidate.id !== call.entry) {
+                            void edits.swapGroupCall(callPath, candidate.id);
+                          }
+                        }),
+                      ),
+                  ),
+                ],
+              },
+            )
+          }
+          onOpenChange={list.onOpenChange}
+        />
+      </Hint>
+      {entry !== null && listed !== null && (
+        <ParameterOf entry={entry} call={call} name={listed.name} path={callPath} around={around} />
+      )}
+      {named !== null && (
+        <NamedChains
+          call={call}
+          callPath={callPath}
+          parameter={named.name}
+          words={NAMED_AGGREGATE}
+          frame={frame}
+        />
+      )}
+      <OptionRows
+        entry={entry}
+        call={call}
+        callPath={callPath}
+        parameters={parameters}
+        around={around}
+        layout="inline"
+      />
+    </span>
+  );
+}
+
+/** Draws the parameter `name` of `call` by its kind. */
+function ParameterOf({
+  entry,
+  call,
+  name,
+  path,
+  around,
+}: {
+  readonly entry: EntryView;
+  readonly call: CallView;
+  readonly name: string;
+  readonly path: Path;
+  readonly around: Surroundings;
+}): React.JSX.Element {
+  const parameter = entry.parameters.find((candidate) => candidate.name === name);
+  if (parameter === undefined) return <></>;
+  return (
+    <ParameterDrawing
+      parameter={parameter}
+      argument={givenOf(call, name)}
+      path={under(path, parameterSegment(name))}
+      around={around}
+    />
+  );
+}
+
+/** Draws a step that groups: its keys, the predicate that keeps some groups, and the call that finishes it. */
+function GroupHead({
+  step,
+  frame,
+}: {
+  readonly step: DocumentStepView;
+  readonly frame: Frame;
+}): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const edits = useStepEdits();
+  const { call } = step;
+  const layout = groupLayoutOf(catalogue, step);
+  const having = havingEntry(catalogue);
+  return (
+    <>
+      <Word>by</Word>
+      <StepParameter call={call} name={HEAD.group_by.by} frame={frame} />
+      <NamedChains
+        call={call}
+        callPath={NO_PATH}
+        parameter={HEAD.group_by.named}
+        words={NAMED_KEY}
+        frame={frame}
+      />
+      {layout.having === null && having !== null && (
+        <span className="dg-line">
+          <Block
+            label="+ having"
+            tone="ink"
+            look="plain"
+            waits
+            describedAs="Keep only the groups that a predicate keeps"
+            onPress={() => {
+              // The having stands before the call that finishes the grouping, which is the last.
+              void edits.insertGroupCall(0, having.id);
+            }}
+          />
+        </span>
+      )}
+      {layout.having !== null && (
+        <HavingLine call={layout.having.call} at={layout.having.at} frame={frame} />
+      )}
+      {layout.finishing !== null && (
+        <FinishingLine call={layout.finishing.call} at={layout.finishing.at} frame={frame} />
+      )}
+    </>
+  );
+}
+
 /** Draws what a step takes, by the step it is. */
-function Head({ call, frame }: HeadProps): React.JSX.Element | null {
+function Head({
+  step,
+  frame,
+}: {
+  readonly step: DocumentStepView;
+  readonly frame: Frame;
+}): React.JSX.Element | null {
+  const { call } = step;
   const verb = verbOf(call.entry);
   switch (verb) {
     case 'with_columns':
@@ -356,6 +714,8 @@ function Head({ call, frame }: HeadProps): React.JSX.Element | null {
       return <FilterHead call={call} frame={frame} />;
     case 'sort':
       return <SortHead call={call} frame={frame} />;
+    case 'group_by':
+      return <GroupHead step={step} frame={frame} />;
     case 'select':
       return <StepParameter call={call} name={HEAD.select.exprs} frame={frame} />;
     case 'rename':
@@ -436,6 +796,15 @@ function Outcome({ call, result }: OutcomeProps): React.JSX.Element | null {
         <span className="text-xs text-muted">
           keeps{' '}
           <span className="dg-dtype">{`${String(end.kept)} of ${String(end.received)} rows`}</span>
+        </span>
+      );
+    case 'grouped':
+      return (
+        <span className="text-xs text-muted">
+          gives{' '}
+          <span className="dg-dtype">
+            {`${String(end.groups)} ${end.groups === 1 ? 'group' : 'groups'} of ${String(end.received)} rows`}
+          </span>
         </span>
       );
     default:
@@ -609,7 +978,7 @@ function Row({
               />
             </Hint>
           </Piece>
-          <Head call={call} frame={frame} />
+          <Head step={step} frame={frame} />
           <OptionRows
             entry={entry}
             call={call}

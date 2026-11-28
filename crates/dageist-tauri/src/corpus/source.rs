@@ -95,7 +95,9 @@ fn classes_named(document: &Document) -> (BTreeSet<Representative>, BTreeSet<Rep
     }
     let mut names = BTreeSet::new();
     for step in document.steps() {
-        in_call(step.call(), &mut names);
+        for call in step.calls() {
+            in_call(call, &mut names);
+        }
     }
     let named = |name: fn(Representative) -> String| -> BTreeSet<Representative> {
         Representative::ALL

@@ -319,6 +319,7 @@ fn one_phrase_of_each() -> Vec<SummaryPhrase<'static>> {
         SummaryPhrase::NoFields,
         SummaryPhrase::Fields { count: 4 },
         SummaryPhrase::SortedBy { fields: "a" },
+        SummaryPhrase::GroupedBy { fields: "a" },
         SummaryPhrase::JoinedOn {
             table: "t",
             fields: "a",

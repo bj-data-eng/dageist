@@ -356,7 +356,7 @@ step documents the engine made by its own edits and the report the host gives of
 `crates/dageist-tauri/src/corpus/`: a chain of methods that stands after each shape of value the
 engine allows each method after, each function that starts a chain, each kind of start, each step
 of the catalogue with each parameter it has, a refusal for each cause and for each rule and stage the
-tables give a call, and a chain in each of the 30 contexts. The other tests of the module hold what
+tables give a call, and a chain in each of the 45 contexts. The other tests of the module hold what
 it holds against the engine's own tables, so a catalogue entry, a step, a parameter, a context or a
 kind of start that no document holds fails there, naming it. Write the files, then run the view's
 tests, which rebuild every document:
@@ -585,6 +585,12 @@ A new step of a table also needs what a new step starts with, in `start_step` in
 of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.
 A step that holds no expression is drawn for itself by the fuzz target, where it is listed among the
 `Plain` steps of `allowed_fuzz/generate.rs` with the arguments Polars takes of it.
+A call of a group by, which follows `group_by` in [a step that groups](explanation.md#the-step-that-groups),
+is built by `Build::GroupedStep`, which continues the group by, or `Build::GroupedEnd`, which finishes it in a
+table, and is in the family `Grouped`. What it starts with when the editor adds it is `start_link` in
+`crates/dageist-engine/src/catalog/starting.rs`. A shortcut that aggregates every column that is not a key is
+asked of the tables for the method it stands for in `shortcut_columns` of
+`crates/dageist-engine/src/document/walk.rs`, and `tests/document/group_grid.rs` holds it to Polars.
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
@@ -694,8 +700,11 @@ the target draws for itself, as it holds no chain (`reverse`, `head`, `limit`, `
 `last`, `gather_every`, `drop`, `drop_nulls`, `drop_nans`, `fill_nan` and `with_row_index`), is named by
 its identifier, `LazyFrame.head`, and `LazyFrame.` names all of them, for a name such as `reverse` is that
 of the method of an expression. The pivot, whose aggregate is evaluated against the values of a group and so
-starts from `element` most of the time, is named by `LazyFrame.pivot` alone. A campaign focused on steps draws one
-of them for six cases of ten.
+starts from `element` most of the time, is named by `LazyFrame.pivot` alone. A step that groups, whose keys, aggregates
+and `having` predicates are chains and whose shortcuts are steps of their own, is named by `LazyFrame.group_by` alone:
+the target draws it only where it is named, for a campaign without a focus finds the disagreements that the
+[grids of the grouping](explanation.md#grids-settle-what-a-campaign-does-not-reach) and the limits do not settle. A
+campaign focused on steps draws one of them for six cases of ten.
 
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the
@@ -877,7 +886,13 @@ Polars by hand, and decide which it is:
   case that the limit does not excuse is for you to report, for the walk could know it.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
-  nulls that the sample's rows leave), which the probes do not show: add or
+  nulls that the sample's rows leave), which the probes do not show. A finding of a
+  campaign first becomes a cell or an axis of a grid on the shared helper, added in a commit
+  that fails, and is then settled by a fix of the walk in the next one or by a `Known`
+  line with a true reason; a kept case is no replacement for the cell. A limit is the answer
+  only where a grid cannot express the cause: the data decide the outcome on rows the grid's
+  sample cannot fix, Polars names refusals in a nondeterministic order, or the cause sits in the
+  harness itself, and it has a control that Polars runs, never a text match alone. Add or
   extend a `Limit` in `allowed_fuzz/limits.rs`, with the sentence that says what
   the tables were not measured on, and say it in
   [the explanation](explanation.md#what-the-tables-are-checked-against). A limit

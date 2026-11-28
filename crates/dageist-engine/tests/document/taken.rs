@@ -448,7 +448,7 @@ fn a_window_refuses_a_value_taken_of_one_value_as_polars_does_for_every_paramete
         let applies = entry.applies();
         // A window is the value under test, and a condition is built link by link, which the tests
         // of conditions above ask. The steps hold no expression of one value to meet.
-        if applies == Applies::Frame
+        if applies.is_of_a_step()
             || applies == Applies::Condition
             || entry.id().as_str() == "Expr.over"
             || (applies == Applies::Function

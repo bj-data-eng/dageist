@@ -10,6 +10,7 @@ mod dates;
 mod defaults;
 mod durations;
 mod every_variant;
+mod grouping;
 mod inventory;
 mod language;
 mod maths;

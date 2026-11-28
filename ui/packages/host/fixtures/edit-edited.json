@@ -48,14 +48,16 @@
               }
             }
           ]
-        }
+        },
+        "links": []
       },
       {
         "id": "head",
         "call": {
           "entry": "LazyFrame.head",
           "arguments": []
-        }
+        },
+        "links": []
       },
       {
         "id": "earlier",
@@ -124,7 +126,8 @@
               }
             }
           ]
-        }
+        },
+        "links": []
       }
     ]
   },

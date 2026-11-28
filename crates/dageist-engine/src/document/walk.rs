@@ -241,6 +241,7 @@ impl Step {
             selected: Vec::new(),
             of_lists: Vec::new(),
             step: self.call(),
+            links: self.links(),
             source,
             inputs,
             other,
@@ -252,6 +253,14 @@ impl Step {
             not_known: None,
         };
         walker.arguments(self.call(), false);
+        // The calls on a group by follow the call that groups, each in the place of its link.
+        for (at, link) in self.links().iter().enumerate() {
+            walker.path = vec![Segment::Link(at)];
+            walker.arguments(link, false);
+            walker.step_options(link);
+            walker.path.clear();
+        }
+        walker.grouping(self);
         walker.selected_items_meet();
         walker.written_names_are_distinct();
         walker.step_options(self.call());
@@ -311,6 +320,9 @@ struct Operand {
     /// the operand it is used with.
     loose: Option<Loose>,
     shape: Shape,
+    /// Whether it is made of literals alone: a value that no column and no aggregate of the table
+    /// is part of.
+    literal: bool,
     /// How many values it gives where its shape is [`Shape::Counted`], as far as the arguments
     /// fix it.
     count: Count,
@@ -380,6 +392,16 @@ struct Around<'a> {
     from_a_list: bool,
     /// The name the value the link follows is written under, where the chain knows it.
     output_name: Option<&'a str>,
+    /// The value the link gives is a null: the chain starts from a null literal, and the link and
+    /// each before it keep a null.
+    null_kept: bool,
+    /// Whether the value the link follows is made of literals alone.
+    literal: bool,
+    /// Whether the chain the link is part of stands alone where it is held, as what `agg` or
+    /// `having` is given, and is no operand of another call.
+    alone: bool,
+    /// Whether the link after it is an aggregate, which takes one value of what it gives.
+    meets_an_aggregate: bool,
 }
 
 /// What a chain has so far.
@@ -425,6 +447,8 @@ enum Cur {
 
 struct Walker<'a> {
     step: &'a Call,
+    /// The calls after `step`, where it is a call of `group_by`.
+    links: &'a [Call],
     source: &'a Schema,
     inputs: &'a Inputs,
     other: Option<SchemaRef>,
@@ -1212,6 +1236,229 @@ impl Walker<'_> {
         }
     }
 
+    /// The expressions that the items of the starred parameter `parameter` of the call at `path`
+    /// hold, each with where it is and the name it is written under, where the walk knows it.
+    fn items_named(
+        &self,
+        call: &Call,
+        path: &[Segment],
+        parameter: &str,
+    ) -> Vec<(Place, Option<String>)> {
+        let Some(Value::Many(items)) = call.argument(parameter) else {
+            return Vec::new();
+        };
+        items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| matches!(item, Value::Expression(_)))
+            .map(|(at, _)| {
+                let place = path
+                    .iter()
+                    .cloned()
+                    .chain([Segment::Parameter(parameter.to_owned()), Segment::Item(at)])
+                    .fold(self.base.clone(), Place::then);
+                let name = self
+                    .walked
+                    .iter()
+                    .find(|walked| walked.place == place)
+                    .and_then(|walked| walked.output_name.clone());
+                (place, name)
+            })
+            .collect()
+    }
+
+    /// The names the entries of the double-starred parameter `parameter` of the call at `path` are
+    /// given, each with where its expression is.
+    fn pairs_named(
+        &self,
+        call: &Call,
+        path: &[Segment],
+        parameter: &str,
+    ) -> Vec<(Place, Option<String>)> {
+        let Some(Value::Pairs(pairs)) = call.argument(parameter) else {
+            return Vec::new();
+        };
+        pairs
+            .iter()
+            .enumerate()
+            .map(|(at, (key, _))| {
+                let place = path
+                    .iter()
+                    .cloned()
+                    .chain([Segment::Parameter(parameter.to_owned()), Segment::Value(at)])
+                    .fold(self.base.clone(), Place::then);
+                let name = match key {
+                    Value::Columns(names) => match names.as_slice() {
+                        [name] => Some(name.clone()),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                (place, name)
+            })
+            .collect()
+    }
+
+    /// Whether the step groups by no key: the table is one group, and Polars evaluates what the
+    /// calls after the group by are given as it evaluates the items of a select, which it does
+    /// not for the groups of a key, as the grid of the kernels of a group shows.
+    fn has_no_key(&self) -> bool {
+        !self.links.is_empty()
+            && !matches!(self.step.argument("by"), Some(Value::Many(items)) if !items.is_empty())
+            && !matches!(self.step.argument("named_by"), Some(Value::Pairs(pairs)) if !pairs.is_empty())
+    }
+
+    /// The checks of a step that groups: the columns it gives are named differently, and a
+    /// shortcut that finishes it is asked of the tables for each column it aggregates.
+    fn grouping(&mut self, step: &Step) {
+        let Some(finish) = step.links().last() else {
+            return;
+        };
+        let finish_at = step.links().len() - 1;
+        let mut keys = self.items_named(step.call(), &[], "by");
+        keys.extend(self.pairs_named(step.call(), &[], "named_by"));
+        let mut given = keys.clone();
+        for (at, link) in step.links().iter().enumerate() {
+            if link.entry().id().as_str() == "LazyGroupBy.agg" {
+                let path = [Segment::Link(at)];
+                given.extend(self.items_named(link, &path, "aggs"));
+                given.extend(self.pairs_named(link, &path, "named_aggs"));
+            }
+        }
+        // `len` gives its count the name it is given, or `len`.
+        if finish.entry().id().as_str() == "LazyGroupBy.len" {
+            let name = match finish.argument("name") {
+                Some(Value::String(name)) => name.clone(),
+                _ => "len".to_owned(),
+            };
+            let place = self
+                .base
+                .clone()
+                .then(Segment::Link(finish_at))
+                .then(Segment::Parameter("name".to_owned()));
+            given.push((place, Some(name)));
+        }
+        // Where the order of the groups is kept a key is one value or as many as the rows, and a key
+        // that takes some of the values is not either, but by chance of the data.
+        if matches!(
+            step.call().argument("maintain_order"),
+            Some(Value::Flag(Some(true)))
+        ) {
+            let some = self
+                .selected
+                .iter()
+                .find(|(_, shape, count)| {
+                    *shape == Shape::Counted
+                        && !matches!(
+                            count,
+                            allowed::Count::Exactly(1) | allowed::Count::AtMost(1)
+                        )
+                })
+                .map(|(place, _, _)| place.clone());
+            if let Some(place) = some
+                && let Err(refusal) = allowed::rule_forbids_a_key_that_takes_some_values_in_order()
+            {
+                self.refusal.get_or_insert(WalkRefusal {
+                    place,
+                    refusal,
+                    at_end: true,
+                    argument_unknown: false,
+                });
+            }
+        }
+        let mut seen: Vec<&String> = Vec::new();
+        for (place, name) in &given {
+            let Some(name) = name else { continue };
+            if seen.contains(&name) {
+                if let Err(refusal) = allowed::rule_forbids_a_grouped_name_given_twice(name) {
+                    self.refusal.get_or_insert(WalkRefusal {
+                        place: place.clone(),
+                        refusal,
+                        at_end: true,
+                        argument_unknown: false,
+                    });
+                }
+                break;
+            }
+            seen.push(name);
+        }
+        self.shortcut_columns(finish, finish_at, &keys);
+    }
+
+    /// Asks the tables whether the method a shortcut aggregates every column with may stand in an
+    /// aggregate of each column that is not a key, as Polars expands it: it refuses the shortcut
+    /// where it refuses the method for one of them, with the method's words.
+    fn shortcut_columns(
+        &mut self,
+        finish: &Call,
+        finish_at: usize,
+        keys: &[(Place, Option<String>)],
+    ) {
+        let method = match finish.entry().id().as_str() {
+            "LazyGroupBy.sum" => "Expr.sum",
+            "LazyGroupBy.mean" => "Expr.mean",
+            "LazyGroupBy.median" => "Expr.median",
+            "LazyGroupBy.min" => "Expr.min",
+            "LazyGroupBy.max" => "Expr.max",
+            "LazyGroupBy.n_unique" => "Expr.n_unique",
+            "LazyGroupBy.first" => "Expr.first",
+            "LazyGroupBy.last" => "Expr.last",
+            "LazyGroupBy.quantile" => "Expr.quantile",
+            "LazyGroupBy.head" => "Expr.head",
+            "LazyGroupBy.tail" => "Expr.tail",
+            // The values of each group in a list, and a count, are what any dtype has.
+            _ => return,
+        };
+        let Some(entry) = catalog::entry(method) else {
+            return;
+        };
+        let names: Option<Vec<&str>> = keys.iter().map(|(_, name)| name.as_deref()).collect();
+        let Some(names) = names else {
+            self.path = vec![Segment::Link(finish_at)];
+            self.blind("the names of the keys are not known, so the columns it aggregates are not");
+            self.path.clear();
+            return;
+        };
+        let (words, _) = option_words(finish);
+        let options: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
+        let shares = [("quantile", Representative::Float64)];
+        let chosen = Chosen::default().with_options(&options);
+        let chosen = if method == "Expr.quantile" {
+            chosen.with_arguments(&shares)
+        } else {
+            chosen
+        };
+        for (name, dtype) in self.source.iter() {
+            if names.contains(&name.as_str()) {
+                continue;
+            }
+            let Some(class) = Representative::of(dtype) else {
+                self.path = vec![Segment::Link(finish_at)];
+                self.blind(format!(
+                    "the dtype of the column {name:?} is none the tables have a class of"
+                ));
+                self.path.clear();
+                continue;
+            };
+            let place = OfferPlace::new(
+                Context::step(Outer::Aggregate),
+                After::Value {
+                    dtype: class,
+                    shape: Shape::Many,
+                },
+            );
+            if let Verdict::Refused(refusal) = allowed::offer(entry, &place, &chosen) {
+                self.path = vec![Segment::Link(finish_at)];
+                self.refuse(&refusal, false);
+                self.path.clear();
+                return;
+            }
+        }
+    }
+
     /// Asks whether the columns that `drop_nans` is told to look at may each be tested for a NaN,
     /// which is what Polars makes of them: it refuses a column that `is_nan` refuses, such as text,
     /// when the rows run, with that method's words. The tables say which dtypes those are. The
@@ -1540,7 +1787,7 @@ impl Walker<'_> {
             // What an expression held here ends: a filter's predicate does, and
             // a value of a condition does when the condition does.
             let ends = match slot {
-                Some(Slot::Outer(Outer::Filter)) => true,
+                Some(Slot::Outer(Outer::Filter | Outer::Having)) => true,
                 Some(Slot::Nested(Nested::ConditionValue)) => values_end,
                 _ => false,
             };
@@ -1884,6 +2131,20 @@ impl Walker<'_> {
     /// How many other expressions stand beside the one being walked in the list of items it is one
     /// of: the other predicates and constraints of a filter, where it is an item of one.
     fn siblings_of_the_item(&self) -> usize {
+        // The predicates of a `having` are combined as a filter's are.
+        if let Some(Segment::Link(at)) = self.path.first()
+            && let Some(link) = self.links.get(*at)
+            && link.entry().id().as_str() == "LazyGroupBy.having"
+            && matches!(
+                self.path.get(1),
+                Some(Segment::Parameter(name)) if name == "predicates"
+            )
+        {
+            return match link.argument("predicates") {
+                Some(Value::Many(items)) => items.len().saturating_sub(1),
+                _ => 0,
+            };
+        }
         if self.step.entry().id().as_str() != "LazyFrame.filter" {
             return 0;
         }
@@ -1997,6 +2258,7 @@ impl Walker<'_> {
             dtype: None,
             loose: None,
             shape: Shape::Many,
+            literal: false,
             count: Count::NotKnown,
             taken: Taken::default(),
             known: false,
@@ -2103,6 +2365,11 @@ impl Walker<'_> {
                 let numbers = start.numbers();
                 let chosen = Chosen::default()
                     .following_fields(start_fields.as_ref())
+                    .among_others(self.siblings_of_the_item())
+                    .of_a_null_literal(
+                        start.entry().id().as_str() == "polars.lit"
+                            && matches!(start.argument("value"), Some(Value::Flag(None))),
+                    )
                     .with_names(&names)
                     .with_numbers(&numbers)
                     .with_inputs(&input_names);
@@ -2208,9 +2475,9 @@ impl Walker<'_> {
                                 zones: Vec::new(),
                                 widths: Vec::new(),
                                 structs: Vec::new(),
-                                single: start_arguments
-                                    .iter()
-                                    .all(|(_, operand)| operand.shape == Shape::One),
+                                single: start_arguments.iter().all(|(_, operand)| {
+                                    !operand.known || operand.shape == Shape::One
+                                }),
                                 values_single: true,
                                 known: start_arguments.iter().all(|(_, operand)| operand.known),
                             }
@@ -2274,7 +2541,11 @@ impl Walker<'_> {
         // Where both values are the same one value Polars may drop the predicate, which is then
         // met by it. Where they are the same rows or the same count it does not, and a predicate
         // that is not as many refuses the condition as it would two values that differ.
-        let mut branches_are_one = statements.len() > 1
+        // Where a group evaluates the chain it keeps the predicate, and what it gives is the rows
+        // of the group, a list for each group.
+        let by_group = matches!(context.outer(), Outer::Aggregate | Outer::Having);
+        let mut branches_are_one = !by_group
+            && statements.len() > 1
             && statements.windows(2).all(|pair| pair[0] == pair[1])
             && statements
                 .iter()
@@ -2318,6 +2589,16 @@ impl Walker<'_> {
         // Whether a link unnests a struct that has no field: it gives no expression, and what
         // follows it is none either.
         let mut gives_no_expression = false;
+        // Whether the value the chain has so far is a null: a null literal, a moment made with a
+        // null part, and a condition whose values are all nulls are, and what keeps a null keeps it.
+        let mut null_so_far = starts_from_a_null(expression)
+            || starts_from_a_moment_with_a_null_part(expression)
+            || (matches!(expression.start(), Start::Call(start)
+                if start.entry().id().as_str() == "polars.when")
+                && !statements.is_empty()
+                && statements.iter().all(|statement| {
+                    starts_from_a_null(statement) && statement.links().iter().all(keeps_a_null)
+                }));
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let none_before_the_arguments = self.gave_no_expression;
@@ -2370,6 +2651,12 @@ impl Walker<'_> {
             gives_no_expression |= link.entry().id().as_str() == "Expr.struct.unnest"
                 && fields_followed.as_ref().is_some_and(Fields::is_empty);
             let name_before = name.clone();
+            // The difference of one value is a null, as nothing comes before it.
+            let null_kept = (null_so_far
+                && (keeps_a_null(link) || link.entry().applies() == Applies::Condition))
+                || (link.entry().id().as_str() == "Expr.diff"
+                    && receiver_shape == Some(Shape::One));
+            null_so_far = null_kept;
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -2386,6 +2673,10 @@ impl Walker<'_> {
                     fields,
                     from_a_list,
                     output_name: name_before.as_deref(),
+                    null_kept,
+                    literal: is_made_of_literals(expression, at),
+                    alone: held.is_some(),
+                    meets_an_aggregate: expression.links().get(at + 1).is_some_and(is_one_value),
                 },
             );
             unit = unit_after(link, unit, &standing);
@@ -2464,7 +2755,8 @@ impl Walker<'_> {
             // A value of a condition in a filter need be a Boolean only where
             // the condition ends the predicate.
             let asked = held == Some(true)
-                || context != Context::inside(Outer::Filter, Nested::ConditionValue);
+                || (context != Context::inside(Outer::Filter, Nested::ConditionValue)
+                    && context != Context::inside(Outer::Having, Nested::ConditionValue));
             if asked {
                 ending = last_end;
             }
@@ -2505,6 +2797,7 @@ impl Walker<'_> {
                     as_read.as_ref().unwrap_or(expression),
                     comparisons,
                 ) || repeats)
+                && !(context.is_a_group_window_key() && self.has_no_key())
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -2533,7 +2826,10 @@ impl Walker<'_> {
             _ => None,
         };
         let held_here = held.is_some() && context == Context::step(Outer::Select);
-        let held_place = held_here.then(|| place.clone());
+        // The keys of a group by are as many as one another as the items of a select are.
+        let held_place = (held_here
+            || (held.is_some() && context == Context::step(Outer::GroupKey)))
+        .then(|| place.clone());
         if held_here {
             let names = self.names_written(expression, &calls, name.as_ref());
             let by_a_field = expression.links().iter().any(|link| {
@@ -2581,6 +2877,7 @@ impl Walker<'_> {
                     _ => None,
                 },
                 shape,
+                literal: is_made_of_literals(expression, expression.links().len()),
                 count,
                 taken,
                 // What was not asked has no shape that can be counted on.
@@ -2596,15 +2893,26 @@ impl Walker<'_> {
                 meeting,
                 taken,
                 widths,
+                single,
+                values_single,
                 ..
             } => Operand {
                 dtype: unify(&values),
                 loose: None,
+                // A condition that is given one value for each group, and gives one for each, as
+                // its predicates and its values are one value, is one value in a group; elsewhere
+                // it is the rows, as what is made of one value and rows is.
                 shape: if meeting.0 == Shape::Counted {
                     Shape::Counted
+                } else if matches!(context.outer(), Outer::Aggregate | Outer::Having)
+                    && single
+                    && values_single
+                {
+                    Shape::One
                 } else {
                     Shape::Many
                 },
+                literal: false,
                 count: meeting.1,
                 taken,
                 known: true,
@@ -2702,6 +3010,10 @@ impl Walker<'_> {
             fields,
             from_a_list,
             output_name,
+            null_kept,
+            literal: receiver_is_literal,
+            alone,
+            meets_an_aggregate,
         } = around;
         // What the call says of a struct: the fields it follows, the names and numbers it is given.
         let fields_followed: Option<Fields> = fields.map(|at| self.fieldsets[at.0].clone());
@@ -2765,6 +3077,31 @@ impl Walker<'_> {
                 Some(Value::Choice(word)) if word == "join" || word == "explode"
             )
             && let Err(refusal) = allowed::rule_forbids_a_window_over_a_count()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // A group evaluates what maps a literal, and what replaces the values of one, with kernels
+        // that take no values beside it.
+        if matches!(cur, Cur::Value { .. })
+            && receiver_is_literal
+            && matches!(context.outer(), Outer::Aggregate | Outer::Having)
+            && !self.has_no_key()
+            && let Some((parameter, given)) = given_values_beside_a_literal(
+                entry,
+                arguments,
+                context.outer(),
+                alone,
+                meets_an_aggregate,
+            )
+            && let Err(refusal) =
+                allowed::rule_forbids_a_literal_beside_values_in_a_group(parameter, given)
         {
             self.refuse(&refusal, false);
             return (
@@ -3059,6 +3396,7 @@ impl Walker<'_> {
                     .with_open_numbers(&open_numbers)
                     .following_an_open_number(receiver_loose.is_some())
                     .among_others(self.siblings_of_the_item())
+                    .of_a_null_literal(null_kept)
                     .with_argument_fields(&argument_fields)
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
@@ -3121,6 +3459,14 @@ impl Walker<'_> {
                 Some((result, shape)) => (result.class(), shape),
                 None => (None, Shape::Many),
             };
+            // One value is met by each of the values of an operand of many, whatever dtype the
+            // operand that is not known has.
+            let shape = broadcast(
+                link,
+                arguments,
+                shape,
+                matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+            );
             // What a method that takes some of the values gives of how many is the arguments' to
             // say, whether or not the dtype of one of them is known.
             let (option_words, _) = option_words(link);
@@ -3134,8 +3480,14 @@ impl Walker<'_> {
                         Cur::Value { shape, count, .. } => (*shape, *count),
                         _ => (Shape::Many, Count::NotKnown),
                     };
-                    self.counted_after(link, receiver, arguments, allowance)
-                        .unwrap_or((shape, Count::NotKnown))
+                    self.counted_after(
+                        link,
+                        receiver,
+                        arguments,
+                        allowance,
+                        matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+                    )
+                    .unwrap_or((shape, Count::NotKnown))
                 }
                 _ => (shape, Count::NotKnown),
             };
@@ -3168,14 +3520,16 @@ impl Walker<'_> {
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
             .all(|(_, operand)| operand.known);
+        // What the walk has no dtype for has no shape it can count on either, and is not taken for
+        // many: the condition it stands in is then not told, and not refused.
         let given_values_single = arguments
             .iter()
             .filter(|(name, _)| name == "statement")
-            .all(|(_, operand)| operand.shape == Shape::One);
+            .all(|(_, operand)| !operand.known || operand.shape == Shape::One);
         let given_single = arguments
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
-            .all(|(_, operand)| operand.shape == Shape::One);
+            .all(|(_, operand)| !operand.known || operand.shape == Shape::One);
         // A condition that ends gives the dtype its values have, when they
         // have one.
         let gives = match (&cur, entry.id().as_str()) {
@@ -3210,6 +3564,7 @@ impl Walker<'_> {
             .with_open_numbers(&open_numbers)
             .following_an_open_number(receiver_loose.is_some())
             .among_others(self.siblings_of_the_item())
+            .of_a_null_literal(null_kept)
             .with_argument_fields(&argument_fields)
             .with_arguments(&given)
             .with_unclassed(&unclassed)
@@ -3352,8 +3707,24 @@ impl Walker<'_> {
         };
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => {
-                let (shape, count) = match self.counted_after(link, receiver, arguments, allowance)
-                {
+                let (shape, count) = match self.counted_after(
+                    link,
+                    receiver,
+                    arguments,
+                    allowance,
+                    matches!(place.context().outer(), Outer::Aggregate | Outer::Having),
+                ) {
+                    // What a key drops of the values it reads is how many the data decide, as what
+                    // a filter keeps is, where a group by meets it with the other keys and the rows.
+                    Ok(_)
+                        if place.context() == Context::step(Outer::GroupKey)
+                            && matches!(
+                                entry.id().as_str(),
+                                "Expr.drop_nulls" | "Expr.drop_nans"
+                            ) =>
+                    {
+                        (Shape::Counted, Count::NotKnown)
+                    }
                     Ok(found) => found,
                     Err(refusal) => {
                         let refusal = if involves_a_list {
@@ -3522,6 +3893,23 @@ impl Walker<'_> {
                         );
                     }
                 };
+                // Where a group evaluates it, a condition whose predicates and values are each one
+                // value is one value where it ends, with no `otherwise` to say so.
+                if matches!(
+                    entry.id().as_str(),
+                    "When.then" | "ChainedWhen.then" | "Then.when" | "ChainedThen.when"
+                ) && matches!(place.context().outer(), Outer::Aggregate | Outer::Having)
+                    && single
+                    && values_single
+                    && meeting.0 != Shape::Counted
+                    && allowance.shape() != Shape::One
+                {
+                    let again = allowed::offer(entry, &place, &chosen.giving_shape(Shape::One));
+                    if let Verdict::Allowed(refreshed) = &again {
+                        *last_end = Some(refreshed.can_end().clone());
+                    }
+                    standing.verdict = Some(again);
+                }
                 Cur::Condition {
                     state,
                     values,
@@ -3550,6 +3938,7 @@ impl Walker<'_> {
         receiver: (Shape, Count),
         arguments: &[(String, Operand)],
         offered: &allowed::Allowance,
+        in_group: bool,
     ) -> Result<(Shape, Count), Refusal> {
         let entry = link.entry();
         let (words, _) = option_words(link);
@@ -3632,7 +4021,7 @@ impl Walker<'_> {
             (Shape::Counted, _) => return Ok((Shape::Counted, Count::NotKnown)),
             (shape, _) => shape,
         };
-        let widened = broadcast(link, arguments, table);
+        let widened = broadcast(link, arguments, table, in_group);
         // An aggregate reduces what it follows, wherever the tables measured it, and a method that
         // gives a value for each of the values it follows keeps them, which one value met by many
         // widens, and one value met by a count is.
@@ -3917,7 +4306,7 @@ fn counted_by(link: &Call, counting: Counting, held: Option<Count>) -> Count {
 /// The number of values a method gives, which is many where it gives one value of the value it
 /// follows and is given an operand of many: the one value is met by each of them, as the count of
 /// nulls is by the base of a logarithm that is a column.
-fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape, in_group: bool) -> Shape {
     let entry = link.entry();
     // A window gives each row of its group the value it gives the group, so one value over a
     // window is as many values as the table has rows, unless the window explodes, which gives
@@ -3933,7 +4322,13 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
             matches!(link.argument(name), Some(Value::Many(items)) if !items.is_empty())
                 || matches!(link.argument(name), Some(Value::Expression(_)))
         });
-        return if explodes && !partitions {
+        // Where a group evaluates it, what is ordered is the rows of the group, which it explodes
+        // to a list of them for each group.
+        let ordered = in_group
+            && arguments
+                .iter()
+                .any(|(name, operand)| name == "order_by" && operand.shape == Shape::Many);
+        return if explodes && !partitions && !ordered {
             shape
         } else {
             Shape::Many
@@ -4119,6 +4514,133 @@ fn imploded(values: Operand) -> Operand {
         fields: None,
         ..values
     }
+}
+
+/// Whether the start of `expression` and its first `upto` links are made of literals alone: a
+/// literal, or a function of literals, that no aggregate, no count of values and no column is
+/// part of.
+fn is_made_of_literals(expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    let Start::Call(start) = expression.start() else {
+        return false;
+    };
+    let of_literals = |call: &Call| {
+        operands(call)
+            .into_iter()
+            .all(|inside| is_made_of_literals(inside, inside.links().len()))
+    };
+    (start.entry().id().as_str() == "polars.lit"
+        || (takes_expressions(start) && of_literals(start)))
+        && links
+            .iter()
+            .all(|link| !is_one_value(link) && !is_counting(link) && of_literals(link))
+}
+
+/// Where Polars refuses values beside a literal in what a group by evaluates, as a method maps the
+/// literal or replaces the values of it: the values of the group, where the call stands alone as
+/// what `agg` or `having` is given and where it stands beside others as an operand, and one value
+/// that an aggregate gave.
+#[allow(clippy::struct_excessive_bools)]
+struct Beside {
+    rows_in_agg_alone: bool,
+    rows_in_agg_beside: bool,
+    rows_in_having_alone: bool,
+    rows_in_having_beside: bool,
+    one_in_agg: bool,
+    one_in_having: bool,
+    /// Whether the refusal is of the call where it ends, and is not the one that Polars makes
+    /// where an aggregate takes one value of what the call gives.
+    unless_met_by_an_aggregate: bool,
+}
+
+/// What Polars refuses of what a literal receiver of `entry` is given for `parameter`, as the grid
+/// of the methods that are given values beside what they follow shows.
+fn beside_a_literal(entry: &str, parameter: &str) -> Option<Beside> {
+    match (entry, parameter) {
+        // The methods that map a literal take the values of a group beside it as a map of one
+        // value beside many, in `agg` and, beside another, in a `having`, and one value that an
+        // aggregate gave in a `having` only.
+        ("Expr.dt.replace", _) | ("Expr.str.splitn" | "Expr.str.split_exact", "by") => {
+            Some(Beside {
+                rows_in_agg_alone: true,
+                rows_in_agg_beside: true,
+                rows_in_having_alone: false,
+                rows_in_having_beside: true,
+                one_in_agg: false,
+                one_in_having: true,
+                unless_met_by_an_aggregate: true,
+            })
+        }
+        // What sorts a literal by the values of the group is as long as they are, not as it is,
+        // where it stands alone and not where it stands beside another.
+        ("Expr.sort_by", "by") => Some(Beside {
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: false,
+            rows_in_having_alone: false,
+            rows_in_having_beside: false,
+            one_in_agg: false,
+            one_in_having: false,
+            unless_met_by_an_aggregate: true,
+        }),
+        // A replacement of a literal by values for each row is not yet implemented.
+        ("Expr.replace" | "Expr.replace_strict", "old" | "new") => Some(Beside {
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: true,
+            rows_in_having_alone: true,
+            rows_in_having_beside: true,
+            one_in_agg: true,
+            one_in_having: true,
+            unless_met_by_an_aggregate: false,
+        }),
+        // What fills a literal replaced takes one value of an aggregate in `having` as the others
+        // take it, and in `agg` takes the values of the group too.
+        ("Expr.replace_strict", "default")
+        | ("Expr.str.replace" | "Expr.str.replace_all", "value") => Some(Beside {
+            rows_in_agg_alone: true,
+            rows_in_agg_beside: true,
+            rows_in_having_alone: false,
+            rows_in_having_beside: true,
+            one_in_agg: true,
+            one_in_having: true,
+            unless_met_by_an_aggregate: true,
+        }),
+        _ => None,
+    }
+}
+
+/// The first parameter of `entry` that a literal receiver is given values beside, in what a group by
+/// evaluates in `outer`, standing alone or not, which Polars refuses, with what it was given: the
+/// values of the group, or one value that an aggregate gave.
+fn given_values_beside_a_literal<'a>(
+    entry: &Entry,
+    arguments: &'a [(String, Operand)],
+    outer: Outer,
+    alone: bool,
+    met_by_an_aggregate: bool,
+) -> Option<(&'a str, &'static str)> {
+    arguments.iter().find_map(|(name, operand)| {
+        let refused = beside_a_literal(entry.id().as_str(), name)?;
+        if !operand.known || (refused.unless_met_by_an_aggregate && met_by_an_aggregate) {
+            return None;
+        }
+        let having = outer == Outer::Having;
+        let rows = match (having, alone) {
+            (false, true) => refused.rows_in_agg_alone,
+            (false, false) => refused.rows_in_agg_beside,
+            (true, true) => refused.rows_in_having_alone,
+            (true, false) => refused.rows_in_having_beside,
+        };
+        match operand.shape {
+            Shape::Many if rows => Some((name.as_str(), "the values of the group")),
+            Shape::One
+                if !operand.literal
+                    && ((refused.one_in_having && having) || (refused.one_in_agg && !having)) =>
+            {
+                Some((name.as_str(), "one value that an aggregate gave"))
+            }
+            _ => None,
+        }
+    })
 }
 
 fn is_one_value(call: &Call) -> bool {
@@ -4398,6 +4920,42 @@ fn reads_a_column(expression: &Expression) -> bool {
 /// other.
 fn is_a_null(expression: &Expression) -> bool {
     follows_the_start(expression, expression.links().len()) && starts_from_a_null(expression)
+}
+
+/// Whether a call gives a null where it follows one: it takes one of the values, or all of them in
+/// order.
+fn keeps_a_null(link: &Call) -> bool {
+    matches!(
+        link.entry().id().as_str(),
+        "Expr.first"
+            | "Expr.last"
+            | "Expr.max"
+            | "Expr.min"
+            | "Expr.mean"
+            | "Expr.median"
+            | "Expr.quantile"
+            | "Expr.approx_quantile"
+            | "Expr.std"
+            | "Expr.var"
+            | "Expr.skew"
+            | "Expr.kurtosis"
+            | "Expr.nan_min"
+            | "Expr.nan_max"
+            | "Expr.sort"
+            | "Expr.reverse"
+            | "Expr.diff"
+    )
+}
+
+/// Whether an expression starts from a function that makes a moment of parts, one of which is a
+/// null literal: the moment is a null.
+fn starts_from_a_moment_with_a_null_part(expression: &Expression) -> bool {
+    matches!(
+        expression.start(),
+        Start::Call(start)
+            if matches!(start.entry().id().as_str(), "polars.date" | "polars.datetime" | "polars.time")
+                && operands(start).into_iter().any(is_a_null)
+    )
 }
 
 /// Whether an expression starts from a null literal.

@@ -1,4 +1,4 @@
-//! What the engine says of every entry at every place: the offers of all 30 contexts, each at
+//! What the engine says of every entry at every place: the offers of all 45 contexts, each at
 //! nothing, at every class of dtype in each shape, and at each state of a condition.
 //!
 //! The corpus plans from it, which is the engine's own answer, and its tests hold the corpus
@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 use dageist_engine::allowed::{
     self, After, ConditionState, Context, Place, RefusalSource, Representative, Shape,
 };
-use dageist_engine::catalog::{self, Applies, Entry};
+use dageist_engine::catalog::{self, Entry};
 
 /// What the engine says of one entry at one place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,7 +107,7 @@ fn build() -> Grid {
     let afters = afters();
     let entries: Vec<&'static Entry> = catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() != Applies::Frame)
+        .filter(|entry| !entry.applies().is_of_a_step())
         .collect();
     let cells = std::thread::scope(|scope| {
         let workers: Vec<_> = contexts

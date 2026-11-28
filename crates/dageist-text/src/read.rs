@@ -3,9 +3,11 @@
 use std::str::FromStr;
 
 use dageist_engine::allowed::Literal as Typed;
-use dageist_engine::catalog::{self, Entry, Kind, Parameter, Shape, ValueType, Variadic};
+use dageist_engine::catalog::{
+    self, Applies, Build, Entry, Kind, Parameter, Shape, ValueType, Variadic,
+};
 use dageist_engine::document::{
-    Call, Document, Dtype, Expression, Refusal, Start, Step, StepId, Value,
+    Call, Document, Dtype, Expression, Refusal, Segment, Start, Step, StepId, Value,
 };
 use dageist_syntax::{
     Argument, ArgumentKind, Chain, Comment, Expr, ExprKind, Link, LiteralValue, Span,
@@ -47,7 +49,10 @@ pub fn read(text: &str) -> Result<Document, ReadError> {
     }
     let groups = groups(links)?;
     let mut made = Vec::with_capacity(groups.len());
-    for group in &groups {
+    let mut at = 0;
+    while at < groups.len() {
+        let group = &groups[at];
+        let first = at;
         let (arguments, _) = group.called()?;
         let given = step_name(group)?;
         let entry = resolve(Owner::Frame, group)?;
@@ -56,24 +61,51 @@ pub fn read(text: &str) -> Result<Document, ReadError> {
         // step's entry and given name are.
         let placeholder = StepId::new(names::stem(entry))
             .map_err(|_| ReadError::new(group.name_span(), Problem::EmptyStepName))?;
-        let step =
-            Step::new(placeholder, call).map_err(|refusal| refused(group.name_span(), refusal))?;
-        made.push((step, given));
+        // The calls on a group by that follow a step that groups are the step's, as far as the
+        // call that finishes the grouping: Python gives a table again there, and what follows is
+        // a step. What follows and is no call on a group by leaves the grouping unfinished.
+        let mut linked = Vec::new();
+        if matches!(entry.build(), Build::Grouping(_)) {
+            while let Some(next) = groups.get(at + 1) {
+                let Some(called) = grouped_call(next) else {
+                    break;
+                };
+                next.no_step_name()?;
+                let (arguments, _) = next.called()?;
+                let (link, _) = bind(called, arguments, next.name_span())?;
+                linked.push(link);
+                at += 1;
+                if matches!(called.build(), Build::GroupedEnd(_)) {
+                    break;
+                }
+            }
+        }
+        let step = Step::chain(placeholder, call, linked).map_err(|refusal| {
+            let span = match refusal.place().path().first() {
+                Some(Segment::Link(link)) => groups
+                    .get(first + 1 + link)
+                    .map_or_else(|| group.name_span(), Group::name_span),
+                _ => group.name_span(),
+            };
+            refused(span, refusal)
+        })?;
+        made.push((step, given, first));
+        at += 1;
     }
     let stems: Vec<&str> = made
         .iter()
-        .map(|(step, _)| names::stem(step.call().entry()))
+        .map(|(step, _, _)| names::stem(step.call().entry()))
         .collect();
     let given: Vec<Option<&str>> = made
         .iter()
-        .map(|(_, given)| given.as_ref().map(|(name, _)| name.as_str()))
+        .map(|(_, given, _)| given.as_ref().map(|(name, _)| name.as_str()))
         .collect();
     let chosen = names::default_names(&stems, &given);
     let mut steps = Vec::with_capacity(made.len());
-    for ((step, _), name) in made.iter().zip(chosen) {
+    for ((step, _, _), name) in made.iter().zip(chosen) {
         let id = StepId::new(name)
             .map_err(|_| ReadError::new(Span::default(), Problem::EmptyStepName))?;
-        let step = Step::new(id, step.call().clone())
+        let step = Step::chain(id, step.call().clone(), step.links().to_vec())
             .map_err(|refusal| refused(Span::default(), refusal))?;
         steps.push(step);
     }
@@ -82,10 +114,10 @@ pub fn read(text: &str) -> Result<Document, ReadError> {
             .place()
             .step_index()
             .and_then(|at| {
-                made.get(at).map(|(_, given)| {
+                made.get(at).map(|(_, given, first)| {
                     given
                         .as_ref()
-                        .map_or_else(|| groups[at].name_span(), |(_, span)| *span)
+                        .map_or_else(|| groups[*first].name_span(), |(_, span)| *span)
                 })
             })
             .unwrap_or_default();
@@ -173,6 +205,13 @@ fn groups(links: &[Link]) -> Result<Vec<Group<'_>>, ReadError> {
     Ok(groups)
 }
 
+/// The entry the group names as a call on a group by, if it names one.
+fn grouped_call(group: &Group<'_>) -> Option<&'static Entry> {
+    names::resolve(Owner::Grouped, &group.path())
+        .ok()
+        .filter(|entry| entry.applies() == Applies::Grouped)
+}
+
 /// The name a `# step:` comment before a step's dot gives it, with the comment's span.
 fn step_name(group: &Group<'_>) -> Result<Option<(String, Span)>, ReadError> {
     let mut found = None;
@@ -229,7 +268,7 @@ fn resolve(owner: Owner<'_>, group: &Group<'_>) -> Result<&'static Entry, ReadEr
                 Owner::Frame => format!("{FRAME}.{path}"),
                 Owner::Function("dageist") => format!("{DAGEIST}.{path}"),
                 Owner::Function(_) => format!("{POLARS}.{path}"),
-                Owner::Method(_) => format!(".{path}"),
+                Owner::Method(_) | Owner::Grouped => format!(".{path}"),
             }),
         };
         ReadError::new(group.name_span(), problem)
