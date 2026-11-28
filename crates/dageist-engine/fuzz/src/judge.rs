@@ -153,6 +153,10 @@ pub struct Question {
     /// Whether the class the walk gives at each place of a step that both allow is held to the
     /// dtype Polars gives there: at the start of each expression and after each of its links.
     pub dtypes: bool,
+    /// Whether the words of what the walk cannot tell of a step are the ones that answer the
+    /// question: a walk that refuses nothing and cannot tell a step for them does not allow it, as
+    /// one that refuses nothing and tells nothing does.
+    pub cannot_tell_counts: fn(&str) -> bool,
 }
 
 impl Question {
@@ -164,6 +168,7 @@ impl Question {
             polars_counts: |_| true,
             depth: Depth::Plan,
             dtypes: false,
+            cannot_tell_counts: |_| false,
         }
     }
 
@@ -182,6 +187,14 @@ impl Question {
         self
     }
 
+    /// The same question, where a walk that cannot tell a step for words that `counts` holds is
+    /// not taken to allow it.
+    #[must_use]
+    pub const fn cannot_tell(mut self, counts: fn(&str) -> bool) -> Self {
+        self.cannot_tell_counts = counts;
+        self
+    }
+
     /// Judges the case a cell built, or names the cell unbuildable with why it could not be.
     #[must_use]
     pub fn judge(&self, built: Result<Case, String>) -> Judged<Outcome> {
@@ -197,6 +210,14 @@ impl Question {
 pub enum Outcome {
     BothAllow,
     BothRefuse,
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars refuses it: the step is not allowed as the walk's answer, which is what Polars says.
+    CannotTellPolarsRefuses,
+    /// The walk refuses nothing but cannot tell the step, for the words the question counts, and
+    /// Polars allows it.
+    CannotTellPolarsAllows {
+        walk: String,
+    },
     /// The walk refuses and Polars allows the step.
     WalkRefusesOnly {
         walk: String,
@@ -224,6 +245,8 @@ pub enum Outcome {
 pub enum Kind {
     BothAllow,
     BothRefuse,
+    CannotTellPolarsRefuses,
+    CannotTellPolarsAllows,
     WalkRefusesOnly,
     PolarsRefusesOnly,
     WalkPanicked,
@@ -237,6 +260,8 @@ impl grid::Kind for Kind {
     const ALL: &'static [Self] = &[
         Self::BothAllow,
         Self::BothRefuse,
+        Self::CannotTellPolarsRefuses,
+        Self::CannotTellPolarsAllows,
         Self::WalkRefusesOnly,
         Self::PolarsRefusesOnly,
         Self::WalkPanicked,
@@ -250,6 +275,8 @@ impl grid::Kind for Kind {
         match self {
             Self::BothAllow => "both allow",
             Self::BothRefuse => "both refuse",
+            Self::CannotTellPolarsRefuses => "the walk cannot tell, Polars refuses",
+            Self::CannotTellPolarsAllows => "the walk cannot tell, Polars allows",
             Self::WalkRefusesOnly => "the walk refuses only",
             Self::PolarsRefusesOnly => "Polars refuses only",
             Self::WalkPanicked => "the walk panicked",
@@ -261,7 +288,10 @@ impl grid::Kind for Kind {
     }
 
     fn is_agreed(self) -> bool {
-        matches!(self, Self::BothAllow | Self::BothRefuse)
+        matches!(
+            self,
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses
+        )
     }
 
     fn is_judged(self) -> bool {
@@ -269,6 +299,8 @@ impl grid::Kind for Kind {
             self,
             Self::BothAllow
                 | Self::BothRefuse
+                | Self::CannotTellPolarsRefuses
+                | Self::CannotTellPolarsAllows
                 | Self::WalkRefusesOnly
                 | Self::PolarsRefusesOnly
                 | Self::DtypeDiffers
@@ -283,6 +315,8 @@ impl grid::Outcome for Outcome {
         match self {
             Self::BothAllow => Kind::BothAllow,
             Self::BothRefuse => Kind::BothRefuse,
+            Self::CannotTellPolarsRefuses => Kind::CannotTellPolarsRefuses,
+            Self::CannotTellPolarsAllows { .. } => Kind::CannotTellPolarsAllows,
             Self::WalkRefusesOnly { .. } => Kind::WalkRefusesOnly,
             Self::PolarsRefusesOnly { .. } => Kind::PolarsRefusesOnly,
             Self::WalkPanicked(_) => Kind::WalkPanicked,
@@ -295,7 +329,10 @@ impl grid::Outcome for Outcome {
 
     fn said(&self) -> String {
         match self {
-            Self::BothAllow | Self::BothRefuse => String::new(),
+            Self::BothAllow | Self::BothRefuse | Self::CannotTellPolarsRefuses => String::new(),
+            Self::CannotTellPolarsAllows { walk } => {
+                format!("walk cannot tell: {walk}; Polars allows it")
+            }
             Self::WalkRefusesOnly { walk } => format!("walk: {walk}; Polars allows it"),
             Self::PolarsRefusesOnly { polars } => format!("Polars: {polars}; the walk allows it"),
             Self::WalkPanicked(reason) => format!("the walk panicked: {reason}"),
@@ -347,7 +384,7 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
     }));
     let walk_spent = walk_started.elapsed();
     // The walk says Polars refuses it on rows, so the rows are what to ask.
-    let (walk_said, walk_said_rows, walk) = match walked {
+    let (walk_said, walk_said_rows, cannot_tell, walk) = match walked {
         Ok(walk) => {
             let rows = walk.refusal().is_some_and(|refusal| {
                 matches!(
@@ -359,7 +396,11 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
                 .refusal()
                 .filter(|refusal| (question.walk_counts)(refusal))
                 .map(walk_words);
-            (said, rows, walk)
+            let cannot_tell = walk
+                .not_known()
+                .filter(|words| (question.cannot_tell_counts)(words))
+                .map(first_line);
+            (said, rows, cannot_tell, walk)
         }
         Err(payload) => {
             return Judged::new(Outcome::WalkPanicked(panic_words(&*payload)))
@@ -430,6 +471,10 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
         (Some(_), Some(_)) if at_build => Outcome::BothRefuse,
         (None, Some(reason)) if at_build => Outcome::BuildRefusesOnly(reason),
         (_, Some(reason)) if !(question.polars_counts)(&reason) => Outcome::SetAside(reason),
+        (None, None) if cannot_tell.is_some() => Outcome::CannotTellPolarsAllows {
+            walk: cannot_tell.unwrap_or_default(),
+        },
+        (None, Some(_)) if cannot_tell.is_some() => Outcome::CannotTellPolarsRefuses,
         (None, None)
             if question.dtypes && walk.refusal().is_none() && walk.not_known().is_none() =>
         {
@@ -453,62 +498,6 @@ fn judge_case(case: &Case, question: &Question) -> Judged<Outcome> {
     }
 }
 
-/// Whether `expression` starts from a number typed without a dtype, which Polars gives the dtype
-/// it falls back to alone and the dtype of what it meets beside an operand: no start of it alone
-/// is held to a dtype.
-fn starts_from_an_open_number(expression: &dageist_engine::document::Expression) -> bool {
-    use dageist_engine::document::{Start, Value as Argument};
-    matches!(expression.start(), Start::Call(call)
-        if call.entry().id().as_str() == "polars.lit"
-            && call.argument("dtype").is_none()
-            && matches!(call.argument("value"), Some(Argument::Integer(_) | Argument::Float(_))))
-}
-
-/// The expression `step` holds at `place`.
-fn expression_at<'a>(
-    step: &'a dageist_engine::document::Step,
-    place: &dageist_engine::document::Place,
-) -> Option<&'a dageist_engine::document::Expression> {
-    use dageist_engine::document::{Call, Expression, Segment, Start, Value as Argument};
-    enum Node<'a> {
-        Call(&'a Call),
-        Value(&'a Argument),
-        Expression(&'a Expression),
-    }
-    fn enter(value: &Argument) -> Node<'_> {
-        match value {
-            Argument::Expression(expression) => Node::Expression(expression),
-            other => Node::Value(other),
-        }
-    }
-    let mut node = Node::Call(step.call());
-    for (at, segment) in place.path().iter().enumerate() {
-        node = match (node, segment) {
-            (Node::Call(call), Segment::Parameter(name)) => enter(call.argument(name)?),
-            (Node::Call(_), Segment::Link(link)) if at == 0 => Node::Call(step.links().get(*link)?),
-            (Node::Value(Argument::Many(items)), Segment::Item(item)) => enter(items.get(*item)?),
-            (Node::Value(Argument::Pairs(pairs)), Segment::Key(item)) => {
-                enter(&pairs.get(*item)?.0)
-            }
-            (Node::Value(Argument::Pairs(pairs)), Segment::Value(item)) => {
-                enter(&pairs.get(*item)?.1)
-            }
-            (Node::Expression(expression), Segment::Start) => match expression.start() {
-                Start::Call(call) => Node::Call(call),
-                Start::Input(_) | Start::Hole => return None,
-            },
-            (Node::Expression(expression), Segment::Link(link)) => {
-                Node::Call(expression.links().get(*link)?)
-            }
-            _ => return None,
-        };
-    }
-    match node {
-        Node::Expression(expression) => Some(expression),
-        _ => None,
-    }
-}
-
 /// The class the walk gives an expression at the `at`th of its places.
 fn claimed_at(
     expression: &dageist_engine::document::WalkedExpression,
@@ -521,8 +510,9 @@ fn claimed_at(
 }
 
 /// Where the class the walk gives at the start of an expression or after a link is not the dtype
-/// Polars gives there: the words of the first place that differs. A place the walk gives no class
-/// of, or Polars no dtype of, is not compared.
+/// Polars gives there, as the fuzz harness compares them: the words of the first place that
+/// differs. A place the walk gives no class of, or Polars no dtype of, is not compared, and the
+/// start of an expression is held to what [`ask::class_at_start`] says it is held to.
 fn dtype_difference(
     step: &dageist_engine::document::Step,
     walk: &dageist_engine::document::Walk,
@@ -552,14 +542,11 @@ fn dtype_difference(
                 _ => None,
             }
         };
-        let open = expression_at(step, expression.place()).is_some_and(starts_from_an_open_number);
-        if !open
-            && let Some(difference) = differs(
-                "at the start".to_owned(),
-                claimed_at(expression, 0),
-                &trace.start,
-            )
-        {
+        if let Some(difference) = differs(
+            "at the start".to_owned(),
+            ask::class_at_start(step, expression, claimed_at(expression, 0)),
+            &trace.start,
+        ) {
             return Some(difference);
         }
         for (at, said) in trace.links.iter().enumerate() {

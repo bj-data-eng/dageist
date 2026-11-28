@@ -63,6 +63,7 @@ fn verdicts(scale: Scale) -> dageist_fuzz::grid::Verdicts<dageist_engine_fuzz::j
         polars_counts: |reason| reason.contains("elementwise"),
         depth: Depth::Plan,
         dtypes: false,
+        cannot_tell_counts: |_| false,
     };
     grid(scale).judge(|point| {
         let column = point.column.as_ref().expect("a column");
@@ -102,7 +103,7 @@ fn known() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().is("value", "null").one_of(
                 "method",
-                &[
+                [
                     "Expr.eq(other)",
                     "Expr.ne(other)",
                     "Expr.gt(other)",

@@ -166,6 +166,26 @@ pub fn null_of(class: Representative) -> Option<Literal> {
     })
 }
 
+/// The classes Polars gives a number typed without a dtype where it stands alone: `Int32` for a
+/// whole number it holds, `Int64` for one past it, and `Float64` for a number with a fraction.
+pub const FALLBACKS: [Representative; 3] = [
+    Representative::Int32,
+    Representative::Int64,
+    Representative::Float64,
+];
+
+/// The class Polars gives `number`, typed without a dtype, where it stands alone, or none for a
+/// value that is no number.
+#[must_use]
+pub fn falls_back_to(number: &Written) -> Option<Representative> {
+    match number {
+        Written::Integer(value) if i32::try_from(*value).is_ok() => Some(Representative::Int32),
+        Written::Integer(_) => Some(Representative::Int64),
+        Written::Float(_) => Some(Representative::Float64),
+        _ => None,
+    }
+}
+
 /// The lowest and the highest value of a class of whole numbers, and none for another class.
 #[must_use]
 pub const fn whole_bounds(class: Representative) -> Option<(i128, u128)> {

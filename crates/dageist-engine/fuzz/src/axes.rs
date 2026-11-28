@@ -359,3 +359,105 @@ pub fn calls_that(
         })
         .map(|(entry, _)| entry)
 }
+
+/// What the tables say a call given nothing does with a number of each of a few classes, as a
+/// grid of an open number crosses the calls by it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Does {
+    /// It gives back the class it follows, for each of them, and as many values: a call Polars may
+    /// leave an open number open through.
+    Keeps,
+    /// It gives back the class it follows, for each of them, and one value of the many.
+    Aggregates,
+    /// It gives back the class it follows for some of them and another number for the rest, and as
+    /// many values, as a logarithm turns whole numbers into numbers with a fraction.
+    KeepsSome,
+    /// It gives another number for each of them.
+    Changes,
+}
+
+/// Whether `class` is a signed whole number or a float, which a call that keeps the class it
+/// follows can follow in turn.
+const fn is_a_signed_number(class: Representative) -> bool {
+    matches!(
+        class,
+        Representative::Int8
+            | Representative::Int16
+            | Representative::Int32
+            | Representative::Int64
+            | Representative::Int128
+            | Representative::Float16
+            | Representative::Float32
+            | Representative::Float64
+    )
+}
+
+/// What the tables say `entry`, given nothing, does after each of `classes` in a select, or why it
+/// is none of the four: a class refuses it, or it gives what is no signed number.
+///
+/// # Errors
+///
+/// The words of why the call does none of the four.
+pub fn does(entry: &'static Entry, classes: &[Representative]) -> Result<Does, String> {
+    let mut seen = Vec::with_capacity(classes.len());
+    for class in classes {
+        let place = Place::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: *class,
+                shape: Shape::Many,
+            },
+        );
+        match allowed::offer(entry, &place, &Chosen::default()) {
+            allowed::Verdict::Allowed(allowance) => {
+                let given = allowance.result().and_then(allowed::ResultDtype::class);
+                seen.push((
+                    given == Some(*class),
+                    allowance.shape() == Shape::One,
+                    given.is_some_and(is_a_signed_number),
+                ));
+            }
+            allowed::Verdict::Refused(_) => {
+                return Err(format!("the tables refuse it after {class}"));
+            }
+        }
+    }
+    let one = seen.iter().all(|(_, one, _)| *one);
+    let keeps = seen.iter().all(|(keeps, _, _)| *keeps);
+    let some = seen.iter().any(|(keeps, _, _)| *keeps);
+    let numbers = seen.iter().all(|(_, _, number)| *number);
+    match (keeps, some, numbers) {
+        (true, _, _) if one => Ok(Does::Aggregates),
+        (true, _, _) => Ok(Does::Keeps),
+        (false, true, true) if !one => Ok(Does::KeepsSome),
+        (_, _, true) => Ok(Does::Changes),
+        _ => Err("it gives what is no signed number".to_owned()),
+    }
+}
+
+/// The methods of an expression that need nothing and that [`does`] says do `wanted` after each of
+/// `classes`, as an axis named `name`, with every other method left out and why.
+#[must_use]
+pub fn calls_that_do(
+    name: &'static str,
+    wanted: Does,
+    classes: &[Representative],
+) -> Choices<&'static Entry> {
+    entries(name, Applies::Expression).keep_unless(|_, entry| {
+        if let Some(parameter) = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.is_needed())
+        {
+            return Some(format!(
+                "it needs {}, which a chain gives it none of",
+                parameter.name()
+            ));
+        }
+        match does(entry, classes) {
+            Ok(done) if done == wanted => None,
+            Ok(done) => Some(format!("it {done:?}")),
+            Err(why) => Some(why),
+        }
+    })
+}

@@ -498,7 +498,7 @@ fn known_function_parts() -> Vec<Known<Kind>> {
         .saying("'alias' is not allowed in a join key"),
         Known::new(
             Kind::WalkPanicked,
-            Pattern::new().contains_one_of("part", &["_range("]),
+            Pattern::new().contains_one_of("part", ["_range("]),
             "the walk panics in a debug build where it works out the count of a range of dates, \
              moments or times whose bound is a number with a fraction past what a whole number of \
              64 bits holds, which overflows its arithmetic (candidate to file)",
@@ -601,7 +601,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Pattern::new()
                 .one_of(
                     "column",
-                    &[
+                    [
                         "Date",
                         "Datetime(us)",
                         "Datetime(us, UTC)",
@@ -619,7 +619,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().one_of(
                 "parameter",
-                &[
+                [
                     "Expr.clip(lower_bound)",
                     "Expr.clip(upper_bound)",
                     "Expr.replace(old)",
@@ -636,7 +636,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().one_of(
                 "parameter",
-                &["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
+                ["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
             ),
             "a share outside 0 to 1 is refused by Polars, and the walk does not read the value of \
              a share (candidate to file)",
@@ -647,7 +647,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Pattern::new()
                 .one_of(
                     "parameter",
-                    &["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
+                    ["Expr.quantile(quantile)", "Expr.approx_quantile(quantile)"],
                 )
                 .is("order", "the literal first"),
             "Polars reads a share of numbers only, and refuses a date, a moment, a length of time \
@@ -659,7 +659,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Pattern::new()
                 .one_of(
                     "parameter",
-                    &["Expr.replace(new)", "Expr.replace_strict(new)"],
+                    ["Expr.replace(new)", "Expr.replace_strict(new)"],
                 )
                 .is("order", "the literal first"),
             "a replacement that follows a literal and is given the column as its new values, of \
@@ -672,7 +672,7 @@ fn known_moments() -> Vec<Known<Kind>> {
             Kind::PolarsRefusesOnly,
             Pattern::new().one_of(
                 "parameter",
-                &["Expr.is_close(other)", "Expr.fill_null(value)"],
+                ["Expr.is_close(other)", "Expr.fill_null(value)"],
             ),
             "Polars finds no dtype for a number typed without a dtype beside a date, a moment, a \
              length of time or a time of day in is_close on either side, or in fill_null of the \
@@ -774,7 +774,7 @@ fn known_ambiguous_dtypes() -> Known<Kind> {
         Pattern::new()
             .one_of(
                 "parameter",
-                &["Expr.is_close(other)", "Expr.fill_null(value)"],
+                ["Expr.is_close(other)", "Expr.fill_null(value)"],
             )
             .is("dtype", "none"),
         "Polars finds no dtype for a number typed without a dtype beside a value that is no \
@@ -827,7 +827,7 @@ fn known_padding_lengths() -> Known<Kind> {
         Pattern::new()
             .one_of(
                 "parameter",
-                &[
+                [
                     "Expr.str.pad_start(length)",
                     "Expr.str.pad_end(length)",
                     "Expr.str.zfill(length)",
