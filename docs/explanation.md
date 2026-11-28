@@ -3287,102 +3287,90 @@ is always given one.
 
 ### Grids Settle What A Campaign Does Not Reach
 
-A campaign draws a literal from a few values, so a rule that reads a literal's value or dtype is
-reached only by the values the generator happens to write: the disagreements of #207 were found by
-grids built by hand, in three rounds, and not by a campaign. A grid is the product of named axes,
-the dtype of the column, the kind of value and the dtype a literal is given, which parameter or
-method, the order of the operands, and Polars judges every cell. The helper is
-`tests/document/grid.rs`: it makes the cells from their number, so a grid of millions never lies in
-memory, judges them on every core the host gives, and keeps only the cells that are not agreed on. A
-cell is judged from the schema Polars works out of the step on the table's schema, with no row read,
-and the rows of a table of three are run only where a grid asks for them (a strict cast of a value, a
-length, a panic) or where the walk says Polars refuses the step on rows; the tally says how many cells
-each decided and how many cells a second the grid ran at, which is a few hundred to a few thousand in a
-debug build, the walk being most of the time. A panic of Polars is the cell's outcome, and a cell that
-does not end names itself and ends the run.
+A campaign draws a literal from a few values and a call from many, so a rule that reads a literal's value or
+dtype, or a place that holds every call, is reached only by what the generator happens to write: the
+disagreements of #207 were found by grids built by hand, in three rounds, and not by a campaign. A grid is the
+product of named axes, and Polars judges every cell of it.
 
-Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk cannot
-tell (where a grid asks about the words that say a step is not told, and a walk that refuses nothing and
-cannot tell it is told apart from one that allows it) and Polars refuses, which is agreement, or allows,
-the dtype differs (where a grid asks, and both allow the step, the dtype the walk gives at the start of
-each expression and after each call is the one Polars gives there, as the fuzz harness compares them), the walk
-panicked, unbuildable (the case cannot be made, such as a text of a length no memory holds, or a step
-Polars cannot be asked of), the catalogue refuses only (the catalogue cannot build the step, so the
-step engine refuses it before the walk is asked, and the walk allows it: a value that does not cast to
-the dtype it is given, a count below nothing), or set aside (Polars refuses it for another reason than
-the grid asks about). The walk must take what Polars takes and refuse what Polars refuses. A cell where
-it does not is fixed, with the failing grid committed first, or named in the test by the pattern of its
-axes with a reason; a cell that two lines name is counted by the more specific, and a line that
+The grids are one framework with two layers, as campaigns are. `dageist_fuzz::grid` owns the mechanics: an axis
+of labelled choices that names what it leaves out and why and how it thins at normal scale, the product of the
+axes, which makes each cell from its number so a grid of millions never lies in memory, the threads that judge
+the cells on every core the host gives, each bounded by a deadline that ends the run naming a cell that does not
+end, the lines that name the cells not agreed on, and the tally. `dageist-engine-fuzz` owns what the grids are
+about: the one judge of a cell, the one table every grid runs on (a column of every class the tables know and of
+every dtype they have no class of, three rows with a null between), the literals at the edges of every class,
+worked out from its bounds and precision, every place an expression stands, and the axes the catalogue and the
+tables give, from which every grid is built: the entries by what they apply to, the parameters by their role, the
+calls by what the tables say they do after a class, the aggregates, the options of a call and the order of two
+operands. No grid lists a method, a class or a literal by hand, so a class or an entry the catalogue gains is in
+every grid that crosses its kind, and a census test holds that every class, place and parameter is on its axis or
+named as left out.
+
+A cell is judged from the schema Polars works out of the step on the table's schema, with no row read, and the
+rows of the table are run where a grid asks for them (a strict cast of a value, a length, a panic), where the walk
+says Polars refuses the step on rows, and where the walk refuses a step whose plan Polars allows: a rule may say
+what Polars refuses only when it runs, so such a cell is a disagreement only where the rows run too. The tally says
+how many cells each decided and how many cells a second the grid ran at, a few hundred to ten thousand in a debug
+build. A panic of Polars is the cell's outcome.
+
+Each cell ends as both allow, both refuse, the walk refuses only, Polars refuses only, the walk cannot tell (where a
+grid asks about the words that say a step is not told, and a walk that refuses nothing and cannot tell it is told
+apart from one that allows it) and Polars refuses, which is agreement, or allows, the dtype differs (where a grid
+asks, and both allow the step, the class the walk claims at the start of each expression and after each call is
+held to the dtype Polars gives there, as the campaign holds it, which in an aggregate or a predicate of a group by is
+a list of the values of each group), the walk panicked, unbuildable (the case cannot be made, such as a text of a
+length that takes longer than a cell may, or a step Polars cannot be asked of), the catalogue refuses only (the
+catalogue cannot build the step, so the step engine refuses it before the walk is asked, and the walk allows it: a
+value that does not cast to the dtype it is given, a count outside the range Python's binding takes), or set aside
+(Polars refuses it for another reason than the grid asks about). The walk must take what Polars takes and refuse
+what Polars refuses. A cell where it does not is fixed, with the failing grid committed first, or named in the test
+by the pattern of its axes with a reason; a cell that two lines name is counted by the more specific, and a line that
 matches no cell fails as stale, so a limit that has gone does not stay.
 
-`tests/document/literal_grid.rs` holds the grids of every rule that reads a literal, which is each
-role the catalogue gives a parameter: what a number is added to, subtracted from, multiplied, divided
-by, raised to, a logarithm is taken to, a bound it is cut to, a share, a count, a length, a value that
-fills (`fill_null`, `fill_nan`, `shift`), the operands of `and_` and `or_`; the values `replace` and
-`replace_strict` list; the counts and places that `head`, `tail`, `slice`, `top_k`, `diff`,
-`pct_change` and `gather_every` cut or look back by, as methods and as steps; and the comparisons with a
-number in a filter and in a condition. The operands are crossed in both orders, the column first and the
-literal first. The grid of #207's missing comparisons in `nulls.rs` is judged by it too. The grids found
-differences that are fixed: a number typed without a dtype beside a date, a moment, a length of time
-or a time of day, which `fill_null` and the arithmetic refuse, on either side, and the walk allowed; a
-count or a place with a fraction, and a length below nothing written as a float or a text given a
-dtype of whole numbers; every 0th row, and a slice that is given a length and runs past row 2^63 - 1,
-where one given none runs to the end of the table, as Python builds it, and the count `head` and
-`limit` take, a whole number of the platform where the catalogue took 32 bits; and a part of a moment
-or of a length of time that a float or a text of a number given a dtype of numbers makes, which Polars
-folds into a literal that a join's key may not hold. What they leave is named in the tests, each with
-its reason, and is not settled here: the value of a share outside 0 to 1, a length of padding or an
-exponent below nothing or beyond 32 bits, a bound or a listed value that its dtype cannot hold when
-the rows run, a text of a number where Polars casts it to the dtype it meets, a typed null that meets a
-date, text and a number typed without a dtype where the rows run, a Boolean and a number typed without
-a dtype in a bitwise call, a literal that does not cast to its dtype, which the walk could foretell by
-casting the value as the catalogue does, and what Polars panics on in a debug build or never ends on
-(a text padded to a length no memory holds). The grid of `is_in` is in `membership_grid.rs`, on the same
-helper: a receiver of every dtype crossed with every form of what it looks up in, in a `select` and as a join's
-key.
+The grids are in `crates/dageist-engine/fuzz/tests/grids/`:
 
-`tests/document/group_grid.rs` holds the grids of [a step that groups](#the-step-that-groups), on the same
-helper, over a table with a column of every class and two to group by: a key of every class in eighteen
-forms (a column, a named key, an expression, an aggregate, a literal, a window, two of one name, what takes some of the values and two keys of other lengths) with
-`maintain_order` unset, true and false; every method of the family of aggregates, and the first, the last
-and the gathering of the values, in `agg`, over every class, by position and by name; what does not aggregate
-in `agg`, over every class; every shortcut with each of its options over every class, grouped by another
-column and by the one it aggregates; a `having` predicate of every class in thirty-five forms (the values
-of the group, an aggregate, a literal, what takes some of the values of one value, a condition, a null of each
-kind of dtype and what keeps it null), none, one or two of them; a group by of no key, one and two, finished by a
-count, an empty `agg`, an aggregate of a count and `head`; and the chains
-that do not end in one finishing call, which the document refuses before Polars is asked. What the grids
-leave is named in the test with its reason: the reverse of an array whose element Polars panics on, on a
-thread of its own that no test can catch, the element dtypes the tables do not measure, what a select refuses
-that a group by gives, and the range of a quantile's share, which Polars reads as it builds the step.
+- `literal.rs` holds every rule that reads a literal, which is every expression parameter whose role is not plain,
+  and the other expression parameters of the same methods, given every value at the edges of every class with every
+  dtype, on either side of a column of every class the tables measure: in a select, where a predicate stands (a
+  filter, a group's `having` and a condition's predicate), where a count or a length is read when the rows run, and
+  beside a date, a moment, a length of time or a time of day. It holds too every whole number typed into a parameter
+  of a step or a method, and every part of every function as a join's key.
+- `nulls.rs` holds every comparison with a literal, missing values compared too, as a join's key on both sides.
+- `membership.rs` holds `is_in` of a value of every column of the world in every form of what it looks up in (a
+  column of every class and dtype, imploded once and twice, a literal and a null of every class, a literal followed by
+  each call that keeps it, a connected list), with `nulls_equal` both ways, as a value and as a join's key, and
+  `implode` of every column with the dtype it gives at each place.
+- `group.rs` holds [a step that groups](#the-step-that-groups): a key of every class in every form, with
+  `maintain_order` unset, true and false; every aggregate, by position and by name, with its dtype; every call that
+  does not aggregate, alone and around the first value, which gives a list of its dtype for each group; every
+  finishing call with every setting of its options; a `having` predicate of every class, started from the values,
+  the first, a null or a literal of a class and followed by every call, given once and twice; no key or no aggregate;
+  and the chains that do not end in one finishing call, which the document refuses before Polars is asked.
+- `kernels.rs` holds what a group evaluates on the values of each group, in `agg` and in `having`, with a key and with
+  none, beside a select of the same as the control: the key of a window in every form, every expression parameter of
+  every method with a receiver of the class the method first accepts and an argument that are each a column, an
+  aggregate, a literal or a null, and a condition whose predicate the tables refuse.
+- `open.rs` holds a number typed without a dtype, below.
 
-`tests/document/group_kernels_grid.rs` holds three grids of what a group evaluates on the values of each group, in
-`agg` and in `having`, with a key and with none. One crosses the key of a window, what it groups by and what it orders
-by, in thirty forms that are elementwise or are not. One crosses every parameter of every method of the catalogue that
-is given an expression with a receiver and an argument that are each a column, an aggregate, a literal, a null literal
-or text multiplied by text (the argument), whether the call stands alone or beside another operand and whether an
-aggregate follows it, with a `select` of the same expression as the control of every cell. One crosses a condition whose
-predicate the tables refuse with values that are one expression or differ. The cells that are the group's by design or
-by data, and the cells that a select shows are no group's, are named in the test with their reason: an index beyond a
-group, a strict replacement that lists too few values, a share that the column's values are not, one value beside the
-values of a group that Polars takes for a group of one row, a null literal Polars takes or refuses as a value, a part it
-does not evaluate, and the kernels that still refuse where there is no key.
+What the grids leave is named in each test with its reason, as the walk refusing by design what the data decide, a
+limit of the tables measured as columns where a cell gives a literal, a check of a debug build, or a difference to
+settle, which says so.
 
-`tests/document/open_grid.rs` holds the grids of a number typed without a dtype, which Polars keeps open as
-`dyn int` or `dyn float`, on the same helper. They cross a number, at the edges of the dtypes it falls back to and
+`grids/open.rs` holds the grids of a number typed without a dtype, which Polars keeps open as `dyn int` or
+`dyn float`. They cross a number, at the edges of the dtypes it falls back to and
 past them, with how it stands (alone, repeated, the values of a condition, one value of it open, a struct's field,
 a struct of its absolute value or of a repeat, the structs or the counts of it as the values of a condition) and the
 calls that follow it, which are every method of the catalogue that is given nothing, by what the tables say it does
-with a number of each dtype: it gives back the dtype it follows, it aggregates and gives it back, it gives it back for
-some, or it changes it. They are crossed as chains of one to three, with every pair of the first two kinds, one of each
-of them with every call that changes the dtype, and every chain that a few of them make, beside a few given an
-operand or a value. One grid puts the chains as a join's key, open on either side against the key of the number typed,
+with a number of each class it falls back to (`axes::does`): it gives back the class it follows, it aggregates and
+gives it back, it gives it back for some, or it changes it. They are crossed as chains of one to three, with every pair
+of the first two kinds, the first of each family of them with every call that changes the class, and every chain of
+three of the first of each family, beside a few given an operand or a value, which are named cases. One grid puts the chains as a join's key, open on either side against the key of the number typed,
 open on both and typed on both: where Polars refuses the key the walk must say that it cannot tell it, in the words of
 an open number in a key, and where Polars takes the key typed on both sides it must tell it; the other puts them in a
 select, a filter and a sort key, open and typed, where none is refused for the number and the dtypes at each place are
 Polars'. A key that the walk cannot tell for another reason is not counted as agreeing, and is named where Polars
-refuses it. What the grid of the keys leaves is named in the test: a key that holds a call that is no elementwise one, or
-one that drops values, which the walk refuses even where an aggregate follows, where Polars takes a key of one value
+refuses it. What the grid of the keys leaves is named in the test: a key that holds a call that is no elementwise one by the
+tables of contexts, which the walk refuses even where an aggregate follows, where Polars takes a key of one value
 whole; two keys that are open numbers, which the walk judges apart where Polars matches them; the fields of the counts
 that a condition of open numbers gives and of a condition of structs, which the walk does not carry; a logarithm,
 whose base the walk reads as an operand it is not given; a sum of two open numbers; and the product of a number with a
@@ -3394,15 +3382,14 @@ dtype for every number the call allows, whatever follows it, aggregates included
 `repeat` and of the values of a condition; it settles it through a call that gives a number with a fraction for a whole
 number, as a square root and the mean do. The walk follows that by what starts the chain and by what the tables say the
 call after it gives. Calls that only whole numbers take are crossed with whole numbers alone, in a grid of their own.
-`tests/document/missing_start_grid.rs` crosses a column of every whole number dtype with `eq_missing` and
-`ne_missing`, in both orders, with the numbers the dtype holds and does not hold, as a join's key and in a select, and
-holds the dtype at the start and after the call to Polars'.
+`open.rs` also crosses a column of every whole number class with the comparisons that compare missing values,
+in both orders, with the numbers at the edges, as a join's key and in a select, and holds the dtype at the start
+and after the call to Polars'.
 
-A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
-the campaigns explore how calls compose, in the background, and a finding that is about the value of a
-literal becomes a new choice or a new axis of a grid, as [the how-to](how-to.md#check-a-rule-that-reads-a-literal-with-a-grid)
-says. The grids of the normal tests run in seconds to a minute each; the large ones cross every value
-with every dtype, ask the rows of every cell, and run on request.
+A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change: the
+campaigns explore how calls compose, in the background, and a finding becomes a new choice or a new axis of a grid,
+as [the how-to](how-to.md#hold-a-rule-to-polars-with-a-grid) says. The grids of the normal tests run in seconds to a
+few minutes each; the large ones cross every value with every dtype, ask the rows of every cell, and run on request.
 
 ## What The Step Editor Storyboard Has Settled
 

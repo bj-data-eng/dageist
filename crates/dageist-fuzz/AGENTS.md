@@ -4,12 +4,13 @@ Read the [repository guide](../../AGENTS.md) for shared policy and workflow.
 [Cargo.toml](Cargo.toml), [src/lib.rs](src/lib.rs) and [README.md](README.md)
 own package facts, the public front door and capability/verification guidance.
 
-This crate owns shared fuzz contracts, bounded generation mechanics, safe
-process execution, immutable evidence, same-failure reduction and local campaign
-control. Semantic cases, expectations, codecs, domain reductions and requirement
-references stay with the consumer: fuzz-campaign cases in its `fuzz/` package,
-and property cases built on the `property` feature in its ordinary tests through
-a dev-dependency. Generic forests here are fixture topology, not a pipeline
+This crate owns shared fuzz contracts, bounded generation mechanics, exhaustive
+grids, safe process execution, immutable evidence, same-failure reduction and
+local campaign control. Semantic cases, expectations, codecs, domain reductions and requirement
+references stay with the consumer: fuzz-campaign cases and grids in its `fuzz/`
+package, and property cases built on the `property` feature in its ordinary
+tests through a dev-dependency. A grid's axes, judge and outcome kinds are the
+consumer's; the grid module knows no product. Generic forests here are fixture topology, not a pipeline
 graph or a table model. Benchmarking is outside the current boundary.
 
 Production crates do not depend on this crate. Its optional property and

@@ -601,7 +601,7 @@ is built by `Build::GroupedStep`, which continues the group by, or `Build::Group
 table, and is in the family `Grouped`. What it starts with when the editor adds it is `start_link` in
 `crates/dageist-engine/src/catalog/starting.rs`. A shortcut that aggregates every column that is not a key is
 asked of the tables for the method it stands for in `shortcut_columns` of
-`crates/dageist-engine/src/document/walk.rs`, and `tests/document/group_grid.rs` holds it to Polars.
+`crates/dageist-engine/src/document/walk.rs`, and `crates/dageist-engine/fuzz/tests/grids/group.rs` holds it to Polars.
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
@@ -964,80 +964,88 @@ another reason is no finding: the allowance is right, but Polars never judged wh
 the tables refused, so it is not counted as agreement, and its outcome names both
 reasons.
 
-## Check A Rule That Reads A Literal With A Grid
+## Hold A Rule To Polars With A Grid
 
-A random campaign draws a literal from a few values, so it does not reach the ones a rule is about:
-the edges of a dtype, a value written as another kind than its dtype, a text that is a number. A
-grid crosses them all at once and has Polars judge every cell, so a gap is one named cell and not one
-review round later. The helper is `tests/document/grid.rs`, and the grids of the rules that read a
-literal, which the [explanation](explanation.md#grids-settle-what-a-campaign-does-not-reach) lists,
-are in `tests/document/literal_grid.rs`. The grids of the normal tests take seconds to a minute each:
+A random campaign draws a literal from a few values and a call from many, so it does not reach every
+combination a rule is about: the edges of a dtype, a value written as another kind than its dtype, every
+call a key may hold. A grid crosses them all at once and has Polars judge every cell, so a gap is one named
+cell and not one review round later. The
+[explanation](explanation.md#grids-settle-what-a-campaign-does-not-reach) says what the grids hold.
+
+A grid is built from two layers. The framework's mechanics are `dageist_fuzz::grid`, in
+[`crates/dageist-fuzz/src/grid/`](../crates/dageist-fuzz/src/grid/mod.rs): axes of labelled choices, the
+product of them, the threads that judge every cell, the `Known` lines and the tally. The engine's half is the
+package `dageist-engine-fuzz`, in [`crates/dageist-engine/fuzz/`](../crates/dageist-engine/fuzz/src/lib.rs):
+the judge of a cell (`judge`), the one table every grid runs on (`world`), the literals at the edges of every
+class (`literals`), every place an expression stands (`places`), and the axes the catalogue and the tables
+give (`axes`). The grids are in `crates/dageist-engine/fuzz/tests/grids/`. The grids of the normal tests
+take seconds to a few minutes each:
 
 ```sh
-cargo test --offline --locked -p dageist-engine --test document literal_grid
+cargo test --offline --locked -p dageist-engine-fuzz --test grids
+cargo test --offline --locked -p dageist-engine-fuzz --test grids literal::
 ```
 
-The large grids cross every value with every dtype and ask Polars the rows of every cell. They are
-ignored in the normal run, as a campaign is, and take minutes each; run them alone:
+The large grids cross every value with every dtype and ask Polars the rows of every cell. They are ignored
+in the normal run, as a campaign is, and take minutes to an hour each; run them alone:
 
 ```sh
-cargo test --offline --locked -p dageist-engine --test document the_large_grid \
+cargo test --offline --locked -p dageist-engine-fuzz --test grids the_large \
   -- --ignored --nocapture --test-threads 1
 ```
 
 `DAGEIST_GRID_THREADS` sets how many threads judge the cells (the cores the host has, up to 8),
 `DAGEIST_GRID_DEADLINE_SECS` how long a cell may take before the run ends naming it (60), and
-`DAGEIST_GRID_ALL=1` names every cell of a failure and not the first 80. With `--nocapture` each grid
-prints its tally, how many cells the schema decided and how many the rows, and how many cells a second it
-was judged at.
+`DAGEIST_GRID_ALL=1` names every cell of a failure and not the first 80. With `--nocapture` each grid prints
+its tally: the cells of each kind, what decided them, how many cells a second it was judged at, what each
+axis leaves out and why, how it was thinned at normal scale, and how many cells each line names.
+`DAGEIST_GRID_TALLY_DIR` writes the same as `<grid>.json` in that folder, which is how a change shows that a
+grid keeps or widens its coverage: run the grid before and after, and compare the two files.
 
-To write the grid of a new rule:
+### Write a grid
 
-1. Write a struct that holds what varies and derives `Default`, the point: the dtype of the column,
-   the literal as a `Chosen`, which parameter or method, the order of the operands. Implement
-   `HoldsLiteral` and `HoldsColumn` for it if it holds them, so that `literal_axes` and `column_axis`
-   add their axes.
-2. Add an axis for each thing that varies with `Grid::axis(name, labelled choices, set)`. Any axes
-   work: a membership grid is the dtype of the receiver crossed with the forms a parameter is given in
-   (a column, an imploded list, a list column, an array column, a typed literal, a list typed in, a
-   null). The values to cross are in `grid::literals`: `edge_integers`, `edge_floats` and `edge_texts`.
-3. Give `judge` the `Question` the grid asks and a function that builds the `Case` of a point through
-   `Case::of_step`, or says why it cannot, which makes the cell unbuildable. Ask only the schema of
-   Polars unless the outcome depends on execution, a strict cast of a value, a length, a panic: then
-   ask `Depth::Rows`. A cell that the walk
-   refuses on rows is asked them whatever the depth is.
-4. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of
-   its axes, the words of what was said (`saying`, or `saying_one_of`) and a reason written for a
-   reader: the walk refuses only, Polars refuses only, the catalogue refuses only, and every
-   unbuildable cell and every cell set aside. A line that several grids hold is `shared`. A line that matches no cell fails as stale, so a limit
-   that has gone is found. A disagreement is fixed, with a failing grid test committed first, or it is
-   listed with its reason and filed.
+No grid lists a method, a parameter, a class, a table or a literal by hand. Each axis comes from the
+framework, and what an axis leaves out it names, with why:
 
-A grid whose rule is that the walk does not tell a step, as it does not tell a join's key that holds an open
-number, asks `Question::cannot_tell` which words of what the walk cannot tell answer it: a walk that refuses
-nothing and cannot tell a step for them is then not taken to allow it, and a cell where it cannot tell and
-Polars refuses is agreement, where one that Polars allows is a `Known` line to write. `Question::with_dtypes`
-also compares, in each cell that both allow, the dtype the walk gives at the start of each expression and after
-each call with the dtype Polars gives there, as the fuzz harness does. `Pattern::contains_one_of` names the cells
-whose label on an axis holds one of several calls, which a label that is a chain of them needs.
+| What varies | Where it comes from |
+| --- | --- |
+| The column a step runs on | `World::get().classes(name)` (one column of each class) or `columns(name)` (with the dtypes no class stands for); a cell's table is `World::of(&[labels])` |
+| A literal | `literals::every_value()` (or `edge_integers`, `edge_floats`, `edge_texts`) and `literals::dtype_words()`; `literals::one_of(class)` and `null_of(class)` for one of a class |
+| A method, a parameter, a call | `axes::entries`, `expression_parameters`, `literal_parameters` (by role), `aggregates`, `not_aggregating`, `calls_that_do` (by what the tables say a call does), `calls_on`; `axes::call_of`, `filler` and `method_given` build them |
+| Where an expression stands | `places::places(name)` or `step_places(name)`, and `places::at(context, expression, table)` |
+| The options of a call | `axes::settings(entry, column, scale)` |
+| The order of two operands | `axes::orders(name)` |
 
-A cell that Polars panics on or never ends is no crash of the run: a panic is Polars' answer, and a
-cell that does not end names itself and ends the run, so build it as unbuildable with the reason
-`Polars never ends` and list it.
+1. Write a struct that derives `Default`, the point: what each axis sets.
+2. Make a `Grid::new(name)` and add each axis with `.axis(choices, set)`. Narrow an axis with
+   `keep_unless`, which names each choice it drops with the reason, never by building a shorter list. A
+   form the catalogue holds no axis of, such as how a number stands in a condition or a struct, is a named
+   case: a `Choices::of` of its own labelled shapes, each with what makes it a shape and not a call.
+3. Thin an axis at normal scale with `thin(scale, every)` or `one_of_each(scale, rule, kind)`, which keep
+   every choice at large scale and say in the tally how they thinned. A grid of normal scale keeps the cells
+   of the grid it replaces, or more.
+4. Judge every cell with `grid.judge(|point| question.judge(build(point)))`, where `build` returns the
+   `Case` of the point or the words of why it cannot be built. The `Question` says which refusals answer
+   it; ask `Depth::Rows` where the outcome depends on the rows (a strict cast of a value, a length, a
+   panic). A cell the walk refuses is asked the rows before it is called a disagreement, so a rule that
+   says what Polars refuses only when it runs is not a disagreement of the plan. `Question::with_dtypes`
+   also holds the class the walk gives at each place of a step both allow to Polars' dtype there, and
+   `Question::cannot_tell` says which words of what the walk cannot tell answer the question.
+5. Give `assert_agree` the cells that are known to differ, each as a `Known` line with the pattern of its
+   axes (`is`, `starts`, `one_of`, `contains_one_of`, `has_one_of`), the words of what was said
+   (`saying` or `saying_one_of`) and a reason written for a reader: the walk refuses only, Polars refuses
+   only, the catalogue refuses only, the dtype differs, and every unbuildable cell and every cell set
+   aside. A line that several grids hold is `shared`. A line that names no cell fails as stale, and a line
+   that names an axis the grid does not have fails too. A disagreement is fixed, with a failing grid test
+   committed first, or listed with its reason and filed.
 
-When a campaign finds a case that a rule that reads a literal disagrees on, reduce it as described
-above and then add it to the grid. The value of its literal is a new choice on the axis of the values; a
-kind of literal, a place the literal stands or a parameter the grid does not vary is a new axis or a
-new value of the axis that names it. The grid then holds the finding and every neighbour of it, and the
-campaign need not find the next one.
+A cell that Polars panics on is no crash of the run: a panic is Polars' answer. A cell that does not end
+names itself and ends the run, so build it as unbuildable with the reason `Polars never ends` and list it.
 
-The grid of `is_in` is in `tests/document/membership_grid.rs`, on this helper. It crosses a receiver of
-every dtype (the lists and arrays of every element dtype, the units of a duration and a moment, a dtype the
-tables have no class of) with every form of what it looks up in (a column of every class, imploded once and
-twice, a typed literal and a typed null of every class, a connected list), with `nulls_equal` both ways, in a
-`select` and as a join's key. It excuses the deprecated form, which the rule `is-in-takes-a-list` refuses where
-what is looked up in is nested as the value is, and names what the walk leaves to Polars: a dtype that no class
-of the tables is, a list of lists, a list of structs, a binary, a categorical, an enum.
+When a campaign finds a case that disagrees, reduce it as described above and then add it to a grid. The
+value of its literal is a choice on the axis of the values; a call, a class or a place the grid does not
+cross widens the axis that names it, which comes from the framework, so the grid holds the finding and every
+neighbour of it, and the campaign need not find the next one.
 
 ## Check The Build Against The Polars Release
 

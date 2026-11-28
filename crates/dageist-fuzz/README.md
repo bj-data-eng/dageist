@@ -2,9 +2,10 @@
 
 `dageist-fuzz` runs bounded verification and retains reproducible evidence.
 Each consuming crate owns its cases and semantic expectations. This framework
-supplies common generation helpers, engine adapters, process execution,
-evidence storage, replay, reduction and campaign control. It does not decide
-whether a catalogue rule, a pipeline step or a Polars result is correct.
+supplies common generation helpers, exhaustive grids, engine adapters, process
+execution, evidence storage, replay, reduction and campaign control. It does
+not decide whether a catalogue rule, a pipeline step or a Polars result is
+correct.
 Benchmarking is outside the current scope.
 
 ## Provenance
@@ -100,6 +101,32 @@ plus proptest-state-machine authoring support. The `coverage` feature supplies
 Arbitrary helpers and the coverage adapter. Numeric helpers preserve exceptional
 floating-point bit patterns and integer boundary values. UTF-16 helpers preserve
 unpaired code units; UTF-8 helpers reject invalid input instead of rewriting it.
+
+## Enumerate a grid
+
+A campaign samples a space and keeps what fails; a grid, in `grid`, enumerates
+a space and accounts for every cell of it. Build `Choices` for each axis, each
+choice labelled, with what the axis leaves out named by `leave_out` or
+`keep_unless` and its reason, and with `thin` or `one_of_each` saying how a grid
+of normal `Scale` keeps fewer choices than a large one. A `Grid` is the product
+of its axes: each cell is made from its number when a thread takes it, so a
+grid of millions holds none of them, and `Grid::judge` gives every cell to the
+consumer's judge on several threads, ending the process with the cell's name
+where one passes `DAGEIST_GRID_DEADLINE_SECS`.
+
+The judge returns a `Judged` outcome whose `Kind` the consumer defines: which
+kinds are agreement, counted and not kept, and which count as judged.
+`Verdicts::assert_agree` takes `Known` lines, each a kind, a `Pattern` of the
+cells' labels, the words said of them and a reason, and fails on a cell no line
+names, on a line that names no cell or an axis the grid lacks, and on fewer
+judged cells than the grid must judge. `Verdicts::tally` gives what became of
+every cell, by kind, line, what decided it and what each axis left out and
+thinned; `assert_agree` prints it and writes it as JSON where
+`DAGEIST_GRID_TALLY_DIR` is set. `Grid::draw` picks a cell from `Entropy`, so a
+campaign can sample the space a grid enumerates.
+
+The engine's grids are in `crates/dageist-engine/fuzz/`, whose judge, axes and
+world are the consumer's side of this contract.
 
 ## Evidence and replay
 

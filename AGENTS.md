@@ -28,14 +28,18 @@ independent integration review.
 
 This repository owns the host-independent `dageist` core in `src/`, the
 graph model, the dataframe engine, the step document's text form and its
-notation, the delta packs, the workspace on disk, the fuzz framework and the
-host adapters under `crates/`,
+notation, the delta packs, the workspace on disk, the fuzz and grid framework,
+the grids and campaign that hold the engine to Polars, and the host adapters
+under `crates/`,
 the React view in `ui/`, their contracts, manifests, tests, documentation and
 shared tooling. Root owns workspace wiring and the core. The Tauri host owns
 its window, webview configuration, IPC commands, the bridge that serves the
 same commands to a browser and the view it serves. The
-fuzz framework owns bounded generation, reduction, replay and failure
-evidence; the domain cases stay with their consumers.
+fuzz framework owns bounded generation, exhaustive grids, reduction, replay
+and failure evidence; the domain cases stay with their consumers. The engine's
+are in `dageist-engine-fuzz`, which owns the one way Polars is asked of a
+step, the judge of a grid's cell, the world table, the axes derived from the
+catalogue and the tables, the grids and the campaign target.
 
 `vendor/polars` is the Polars project's source, pinned to a Python Polars
 release tag. This repository owns which release it is pinned to, not its
@@ -66,6 +70,8 @@ and current source establishes behavior.
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | Engine identity, dependencies and Polars features | [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) |
 | Fuzz framework identity, features and dependencies | [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml) |
+| The mechanics of a grid: axes, cells, judging on threads, `Known` lines and the tally | [crates/dageist-fuzz/src/grid/](crates/dageist-fuzz/src/grid/mod.rs) |
+| What holds the engine to Polars: the asker, the judge, the world, the literals, the places and the axes; the grids and the campaign target | [crates/dageist-engine/fuzz/](crates/dageist-engine/fuzz/src/lib.rs), [tests/grids/](crates/dageist-engine/fuzz/tests/grids/main.rs), [tests/allowed_fuzz/](crates/dageist-engine/fuzz/tests/allowed_fuzz/main.rs) |
 | Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading, its edits and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
@@ -179,13 +185,19 @@ These hold for every change to what the engine allows, refuses or reports,
 in every brief, whatever a brief leaves out.
 
 - **A grid judged by Polars is the evidence.** Every rule, and every context
-  in which the walk judges a call, is held by a grid on the shared helper,
-  [`tests/document/grid.rs`](crates/dageist-engine/tests/document/grid.rs),
-  asserted both ways. Build or extend it before the fix: the grid's failing
+  in which the walk judges a call, is held by a grid in
+  [`crates/dageist-engine/fuzz/tests/grids/`](crates/dageist-engine/fuzz/tests/grids/main.rs),
+  asserted both ways. A grid is built only from the framework's axes: the
+  catalogue's entries, parameters and calls, the classes and the table of
+  the world, the literals at the edges of every class and the places an
+  expression stands, in `dageist-engine-fuzz`, on the mechanics of
+  `dageist_fuzz::grid`. What a grid leaves out of an axis is named on the
+  axis with why. Build or extend it before the fix: the grid's failing
   cells are the test-only commit, and the fix follows. Every outcome other
   than agreement is a `Known` line with a true reason, scoped no wider than
-  what it names. How to write one is in
-  [the how-to](docs/how-to.md#check-a-rule-that-reads-a-literal-with-a-grid).
+  what it names. A change to a grid keeps or widens its coverage, shown by
+  its tally before and after. How to write one is in
+  [the how-to](docs/how-to.md#hold-a-rule-to-polars-with-a-grid).
 - **Campaigns feed the grid.** A fuzz campaign explores how calls combine. Each
   disagreement it finds becomes a grid axis or cell first, then a walk fix or
   a `Known` line. A fuzz limit is only for what a grid cannot hold (what the
@@ -283,6 +295,19 @@ which builds Polars as its release does; the debug run is a stricter pass, as
 cargo test --offline --locked -p dageist-engine
 cargo test --offline --locked --profile measure -p dageist-engine --test allowed_fuzz
 cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F unsafe-code -D warnings
+```
+
+The engine's grids and campaign, from the repository root. The package
+`dageist-engine-fuzz` is a workspace member outside `default-members`, so name
+it; it builds Polars. Its tests are the framework's contracts (`framework`),
+the grids (`grids`, a few minutes) and the campaign target's fixed seed and
+kept cases (`allowed_fuzz`); the large grids and campaigns are ignored and run
+on request, as [the how-to](docs/how-to.md#hold-a-rule-to-polars-with-a-grid)
+says:
+
+```sh
+cargo test --offline --locked -p dageist-engine-fuzz
+cargo clippy --offline --locked -p dageist-engine-fuzz --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 View checks from the repository root. `npm --prefix ui ci --offline` restores
