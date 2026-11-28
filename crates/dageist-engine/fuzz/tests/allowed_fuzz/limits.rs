@@ -7665,6 +7665,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_count_of_top_k_excuses_only_the_refusal_of_its_own_value() {
+        // What Polars 2.2.0 says of a count below zero: of a plain column, that the value of `k`
+        // is invalid; in a group or after a literal, that its conversion to `u32` failed.
+        const INVALID: &str = "invalid value of 'k' in top_k: Int32(-1)";
+        const CONVERTED: &str =
+            "conversion from `i32` to `u32` failed in column '' for 1 out of 1 values: [-1]";
+        const ANOTHER: &str = "conversion from `i64` to `u32` failed in column 'literal' for 1 out of 1 values: [4294967296]";
+        let top_k = |count: i64, method: &str| {
+            select(vec![chain_of(
+                column("a"),
+                vec![call(method, vec![("k", Value::Expression(whole(count)))])],
+            )])
+        };
+        for method in ["Expr.top_k", "Expr.bottom_k"] {
+            for reason in [INVALID, CONVERTED] {
+                assert_eq!(
+                    polars_refuses(&top_k(-1, method), None, Stage::Rows, reason, Vec::new()),
+                    vec![Limit::ACountNoIndexHolds],
+                    "{method} {reason}"
+                );
+            }
+            // The refusal of another value than the count, or of another count, is not its own.
+            for (count, reason) in [(-1, ANOTHER), (-2, INVALID), (-2, CONVERTED)] {
+                assert_eq!(
+                    polars_refuses(&top_k(count, method), None, Stage::Rows, reason, Vec::new()),
+                    Vec::<Limit>::new(),
+                    "{method} {count} {reason}"
+                );
+            }
+        }
+    }
+
     fn literal_of(value: Value, dtype: polars::prelude::DataType) -> Call {
         call(
             "polars.lit",
