@@ -2299,30 +2299,41 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
 - An expression of a group by that disagrees as it does alone in a `select`, at the same stage and for the
   same reason, is excused by the limits that excuse it there.
 - What Polars does with the values of each group, where it runs a pivot's aggregate and the aggregate and
-  the `having` of a group by with kernels of its own, is one limit, `a-group-aggregate`: the empty table has no
-  groups and an operation on the values of none is refused for a dtype; a replacement that lists the values of a group
-  is not yet implemented by Polars for each row, which its own message says, and a strict one finds its mapping
-  incomplete as it runs them; a part of a moment or a replacement given the values of a group is refused for
-  the output length of the map, for a function that should apply element-wise or for a scalar that was expected;
-  a count a call takes of them is converted for each group; a window partitioned by a column and a comparison that
-  the tables measured with the rows' columns are accepted. What it refuses of a null literal or a column of `Null` there, the empty table's
-  refusals and the kernels' dtypes against the plan, is #245; its cause is where the expression is evaluated, not
-  the typing of a null literal that #228 tracks.
+  the `having` of a group by with kernels of its own, is held to Polars in the grids first, and what the form of a
+  call decides is the walk's: the key of a window in `agg` and `having` is elementwise, as a join's is, and a literal
+  that a method maps or whose values it replaces is given no values beside it. A finding of a campaign becomes a cell
+  of a grid before it is anything else, and is settled by a fix of the walk or by a line of the grid with its reason.
+  What stays is one limit, `a-group-aggregate`, whose causes each have a control or are the empty table's: the empty
+  table has no groups and an operation on the values of none is refused for a dtype, which no grid can hold for it has
+  no rows to say (#245, as is what Polars refuses of a null literal or a column of `Null` there, the kernels' dtypes against
+  the plan, whose cause is where the expression is evaluated and not the typing of a null literal that #228 tracks);
+  a replacement that is given a pattern for each row that Polars does not yet implement in the kernels of a group, a count
+  or a place that a call takes of the values of a group and converts for each group, and a replacement of text given the
+  values of a group as its value, which Polars refuses for the lengths it meets, are excused where Polars does not refuse
+  the same aggregates and predicates as the items of a `select` of the same table for that objection, which the limit asks
+  of Polars; and what the tables measured with a column and Polars allows of the aggregate of a group, where a call after
+  the group by holds it, which is the group's alone, for the keys are evaluated as the items of a `select` are. A strict
+  replacement that lists the values of a group is the limit for a strict replacement given no default, which the calls
+  after the group by now reach, and a window of one value that expects a scalar of a replacement of columns is a reason of the limit for a replacement of columns in a window.
 - A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
 - A method of the tables' measure of many values, applied to one value inside a condition that stands in the
   predicate of another or beside a comparison, was one value that the walk gave a list (#244): what the walk has
   no dtype for is no longer taken for many in a condition, which settles the cases a campaign found.
 - A key that holds two refusals of the rows, which Polars names in either order and with the values of either row
   it meets first, is said to give the smallest in words that the engine and the asker name when each is run
-  again, and a case that a limit excuses of a refusal it names when observed again is excused (#234).
+  again, and a case that a limit excuses of a refusal it names when observed again is excused (#234). The
+  settlement samples: a step is run again up to eight times, so a refusal that Polars names in none of the runs is
+  not seen, and what it settles is statistical, not exact.
 - A key that drops values, and the keys a count of which is the data's, are stricter by design, as counts are.
 - A having predicate that the rule of the cast refuses and Polars casts, because it is null in every group, is
   `a-having-predicate-of-nulls` where the group by run with the predicate, tested for being no null, finds none that
   is. The walk itself follows the nulls it can see: a null literal, a moment made with a null part, the difference of
   one value and a condition whose values are nulls, through the calls that keep a null.
 
-Focused campaigns of 8000 cases end with no disagreement at the seeds 7, 11, 13, 99991, 271828, 555555, 1140027,
-2718281, 3141592 and 5772156.
+Focused campaigns of 8000 cases end with no disagreement at the seeds 11, 99991, 3141592, 777777, 1618033,
+2024061 and 8675309, run at the head that holds the last change of the walk. The seeds 777777 and 1618033 each found
+a case on the way, which became a cell of the grids of the keys of a window and of the methods that are given values
+beside what they follow before it was a fix, and the other seeds are those that ended with none.
 
 A shortcut aggregates every column that is not a key, as Python's does with `all()`, which Polars expands to
 the columns the keys do not name. The walk asks the tables of the method it stands for, such as `sum`, in the

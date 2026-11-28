@@ -886,7 +886,13 @@ Polars by hand, and decide which it is:
   case that the limit does not excuse is for you to report, for the walk could know it.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
-  nulls that the sample's rows leave), which the probes do not show: add or
+  nulls that the sample's rows leave), which the probes do not show. A finding of a
+  campaign first becomes a cell or an axis of a grid on the shared helper, added in a commit
+  that fails, and is then settled by a fix of the walk in the next one or by a `Known`
+  line with a true reason; a kept case is no replacement for the cell. A limit is the answer
+  only where a grid cannot express the cause: the data decide the outcome on rows the grid's
+  sample cannot fix, Polars names refusals in a nondeterministic order, or the cause sits in the
+  harness itself, and it has a control that Polars runs, never a text match alone. Add or
   extend a `Limit` in `allowed_fuzz/limits.rs`, with the sentence that says what
   the tables were not measured on, and say it in
   [the explanation](explanation.md#what-the-tables-are-checked-against). A limit
