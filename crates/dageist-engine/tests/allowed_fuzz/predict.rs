@@ -14,6 +14,7 @@
 use dageist_engine::allowed::{self, Inner, Outer, RefusalSource, Representative, Shape};
 use dageist_engine::document::{Place, Walk, WalkRefusal, WalkedExpression};
 
+use super::ask_polars;
 use super::case::{Case, STEP};
 use super::frames::Frames;
 
@@ -89,17 +90,30 @@ fn class(place: Option<allowed::Place>, by_group: bool) -> Option<Representative
 /// What the walk found the expression to have after its start and each link:
 /// what the next call follows, which is not what a call offered without an
 /// argument's dtype says it gives.
-fn traced(expression: &WalkedExpression) -> Traced {
+fn traced(case: &Case, expression: &WalkedExpression) -> Traced {
     let places = expression.places();
     let by_group = expression
         .context()
         .is_some_and(|context| matches!(context.outer(), Outer::Aggregate | Outer::Having));
+    let followed = places
+        .first()
+        .copied()
+        .and_then(|place| class(place, by_group));
+    // What the first link follows is where the tables are asked of it, and is the dtype of a number
+    // typed without a dtype beside the operand the link is given, where the walk adapted it. What
+    // Polars gives the start alone is the dtype the number falls back to, so the start is held to
+    // what the walk says the start gives itself.
+    let given = if by_group || !opens(case, expression) {
+        None
+    } else {
+        start_gives(expression)
+    };
     Traced {
         place: expression.place().clone(),
-        start: places
-            .first()
-            .copied()
-            .and_then(|place| class(place, by_group)),
+        start: match (given, followed) {
+            (Some(given), Some(followed)) if given != followed => Some(given),
+            _ => followed,
+        },
         links: places
             .iter()
             .skip(1)
@@ -107,6 +121,23 @@ fn traced(expression: &WalkedExpression) -> Traced {
             .map(|place| class(place, by_group))
             .collect(),
     }
+}
+
+/// Whether the expression starts from a number typed without a dtype.
+fn opens(case: &Case, expression: &WalkedExpression) -> bool {
+    ask_polars::expression_at(&case.document.steps()[0], expression.place())
+        .is_some_and(ask_polars::starts_from_an_open_number)
+}
+
+/// The class the walk says the start of an expression gives, as the tables were asked of it.
+fn start_gives(expression: &WalkedExpression) -> Option<Representative> {
+    expression
+        .calls()
+        .first()?
+        .verdict()?
+        .allowance()?
+        .result()?
+        .class()
 }
 
 fn refused(found: &WalkRefusal) -> Refused {
@@ -148,6 +179,10 @@ pub fn predict(case: &Case) -> Prediction {
     };
     Prediction {
         verdict,
-        expressions: walk.expressions().iter().map(traced).collect(),
+        expressions: walk
+            .expressions()
+            .iter()
+            .map(|expression| traced(case, expression))
+            .collect(),
     }
 }

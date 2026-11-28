@@ -131,6 +131,54 @@ pub fn first_line(text: &str) -> String {
         .join(" ")
 }
 
+/// The expression `step` holds at `place`, the way down from the step to the expression: the
+/// arguments of its call, or of a call that follows it, and the items of the lists and the
+/// expressions that they hold.
+pub fn expression_at<'a>(step: &'a Step, place: &Place) -> Option<&'a Expression> {
+    enum Node<'a> {
+        Call(&'a Call),
+        Value(&'a Value),
+        Expression(&'a Expression),
+    }
+    fn enter(value: &Value) -> Node<'_> {
+        match value {
+            Value::Expression(expression) => Node::Expression(expression),
+            other => Node::Value(other),
+        }
+    }
+    let mut node = Node::Call(step.call());
+    for (at, segment) in place.path().iter().enumerate() {
+        node = match (node, segment) {
+            (Node::Call(call), Segment::Parameter(name)) => enter(call.argument(name)?),
+            (Node::Call(_), Segment::Link(link)) if at == 0 => Node::Call(step.links().get(*link)?),
+            (Node::Value(Value::Many(items)), Segment::Item(item)) => enter(items.get(*item)?),
+            (Node::Value(Value::Pairs(pairs)), Segment::Key(item)) => enter(&pairs.get(*item)?.0),
+            (Node::Value(Value::Pairs(pairs)), Segment::Value(item)) => enter(&pairs.get(*item)?.1),
+            (Node::Expression(expression), Segment::Start) => match expression.start() {
+                Start::Call(call) => Node::Call(call),
+                Start::Input(_) | Start::Hole => return None,
+            },
+            (Node::Expression(expression), Segment::Link(link)) => {
+                Node::Call(expression.links().get(*link)?)
+            }
+            _ => return None,
+        };
+    }
+    match node {
+        Node::Expression(expression) => Some(expression),
+        _ => None,
+    }
+}
+
+/// Whether `expression` starts from a number typed without a dtype: a literal of a whole number
+/// or of a number with a fraction that is given none.
+pub fn starts_from_an_open_number(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(call)
+        if call.entry().id().as_str() == "polars.lit"
+            && call.argument("dtype").is_none()
+            && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+}
+
 /// Plans `step`, the `index`th of a document, on `source`, and works out the dtypes of its
 /// expressions; `None` for a step that cannot be asked.
 pub fn plan(step: &Step, index: usize, source: &DataFrame, tables: Tables) -> Option<Planned> {
