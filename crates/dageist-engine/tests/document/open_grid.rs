@@ -265,6 +265,7 @@ fn struct_calls() -> Vec<(String, Vec<Value>)> {
         one("last", vec![named("Expr.last")]),
         one("max", vec![named("Expr.max")]),
         one("min", vec![named("Expr.min")]),
+        one("json_encode", vec![named("Expr.struct.json_encode")]),
         one("field literal", vec![the_literal_field()]),
         one(
             "field literal, abs",
