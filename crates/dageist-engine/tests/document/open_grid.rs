@@ -527,7 +527,7 @@ fn keys(normal: bool) -> Verdicts {
 }
 
 fn elsewhere(normal: bool) -> Verdicts {
-    grid(normal, false, &Place::ELSEWHERE).judge(&Question::any_refusal(), case_of)
+    grid(normal, false, &Place::ELSEWHERE).judge(&Question::any_refusal().with_dtypes(), case_of)
 }
 
 /// What the grid of the keys leaves, with the reason.
