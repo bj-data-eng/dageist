@@ -527,18 +527,13 @@ The view holds one host for each way it is reached. `@dageist/host` has the
 Tauri host and the bridge host beside each other, and the shell uses the
 bridge host when Tauri is absent.
 
-## Tauri Now, Surgeist Later
+## Built For Tauri
 
-Tauri 2 is the interim host. The intended eventual host is
-[Surgeist](https://github.com/bj-data-eng/surgeist), a Rust UI framework for
-retained, CSS-styled document interfaces. Moving to it means writing a Surgeist
-host beside or in place of `dageist-tauri` and porting the view; the core does
-not change. Keeping Tauri-specific code inside the host is what makes that move
-possible.
-
-Building the view on web standards first also shows which capabilities a real
-application needs from Surgeist. Those findings belong to Surgeist's own
-repository.
+Tauri 2 is the host, and dageist is designed to be the best application it can
+be on Tauri: a choice is made for this application, not for how it would move to
+another host. The core does not depend on the host because Rust owns the
+application's behavior, so the host stays a thin adapter that translates the
+core's contracts into commands, windows and serializable views.
 
 ## How The View Is Divided
 
