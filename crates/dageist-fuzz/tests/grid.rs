@@ -355,6 +355,16 @@ fn a_grid_of_normal_scale_keeps_the_first_choice_of_each_kind_and_a_large_one_ke
 }
 
 #[test]
+fn an_axis_relabelled_keeps_its_values_and_what_it_leaves_out() {
+    let axis = numbers("n", &[1, 2])
+        .leave_out("0", "zero")
+        .relabel(|label, value| format!("{label} is {}", value * 10));
+    assert_eq!(axis.labels().collect::<Vec<_>>(), ["1 is 10", "2 is 20"]);
+    assert_eq!(axis.get("2 is 20"), Some(&2));
+    assert_eq!(axis.left_out()[0].label, "0");
+}
+
+#[test]
 fn two_axes_join_with_what_each_leaves_out() {
     let joined = numbers("n", &[1])
         .leave_out("0", "zero")

@@ -230,6 +230,24 @@ impl<V> Choices<V> {
         }
     }
 
+    /// The same axis with each choice labelled by `label`, and what it leaves out as it was.
+    ///
+    /// # Panics
+    ///
+    /// When two choices are given one label.
+    #[must_use]
+    pub fn relabel(self, label: impl Fn(&str, &V) -> String) -> Self {
+        let mut axis = Self::new(self.name);
+        axis.thinned = self.thinned;
+        for (old, value) in self.choices {
+            axis = axis.with(label(&old, &value), value);
+        }
+        for left in self.left_out {
+            axis = axis.leave_out(left.label, left.reason);
+        }
+        axis
+    }
+
     /// The same choices on an axis of another name.
     #[must_use]
     pub fn named(mut self, name: &'static str) -> Self {
