@@ -319,6 +319,12 @@ struct Operand {
     /// Whether it is a number typed without a dtype and alone, which adapts to
     /// the operand it is used with.
     loose: Option<Loose>,
+    /// Whether it is a number that Polars keeps open, as `dyn int` or `dyn float`: a number typed
+    /// without a dtype, alone or through the calls that give back the dtype they follow, `repeat`
+    /// of one, and a condition whose values are all open. Polars settles it where it ends a
+    /// select, a filter or a sort, and does not match it with the typed dtype of the other table's
+    /// key where it ends a join's key.
+    open: bool,
     shape: Shape,
     /// Whether it is made of literals alone: a value that no column and no aggregate of the table
     /// is part of.
@@ -377,6 +383,9 @@ struct Around<'a> {
     /// What the chain starts from, when that is a number typed without a dtype and the
     /// link follows it.
     receiver_loose: Option<Loose>,
+    /// Whether the value the link follows is a number that Polars keeps open, as the number typed
+    /// without a dtype that starts the chain, or what the calls before the link keep of it.
+    follows_open: bool,
     /// The unit the moment or the length of time the link follows is counted in, where it is known.
     unit: Option<TimeUnit>,
     /// The width of the array the link follows, where it is known.
@@ -1109,6 +1118,52 @@ fn loose_number(call: &Call) -> Option<Loose> {
         Some(Value::Float(number)) => Loose::of(&Literal::Float(*number)),
         _ => None,
     }
+}
+
+/// Whether the value after `link` is a number that Polars keeps open, given whether the value it
+/// follows was, the class that value has, what the link was given and what the tables said of it.
+///
+/// A call keeps the number open where the tables give back the dtype it follows: Polars keeps the
+/// open number through a call as it keeps its dtype, and a call that turns a whole number into a
+/// number with a fraction settles it, as one that turns it into text does. An operand the number
+/// adapts to settles it where that is typed, and leaves it open where it is open too. The last
+/// value of a condition is open where every value of the condition is. A field read from a struct
+/// that holds an open number is open, which the call's own words say where it stands in a key.
+fn open_after(
+    link: &Call,
+    arguments: &[(String, Operand)],
+    follows_open: bool,
+    receiver: Option<Representative>,
+    standing: &Standing,
+    values_open: &[bool],
+) -> bool {
+    let entry = link.entry();
+    let allowance = standing.verdict().and_then(Verdict::allowance);
+    if matches!(
+        allowance.map(allowed::Allowance::can_end),
+        Some(Ending::NotKnown(Unknown::AnOpenNumberInAKey))
+    ) {
+        return true;
+    }
+    match entry.id().as_str() {
+        "Then.otherwise" | "ChainedThen.otherwise" => {
+            return !values_open.is_empty() && values_open.iter().all(|open| *open);
+        }
+        _ if entry.applies() == Applies::Condition => return false,
+        _ => {}
+    }
+    if !follows_open {
+        return false;
+    }
+    let result = allowance
+        .and_then(allowed::Allowance::result)
+        .and_then(allowed::ResultDtype::class);
+    let keeps_the_dtype =
+        matches!((result, receiver), (Some(given), Some(followed)) if given == followed);
+    let settled_by_a_typed_operand = arguments.iter().any(|(name, operand)| {
+        operand_adapts(entry, name) && !(operand.open || operand.loose.is_some())
+    });
+    keeps_the_dtype && !settled_by_a_typed_operand
 }
 
 /// Whether a method takes an operand besides what it follows, which a number
@@ -2122,7 +2177,7 @@ impl Walker<'_> {
                 name: name.or_else(|| operand.name.map(|at| self.names[at.0].clone())),
                 class: operand.dtype,
                 fields: operand.fields.map(|at| self.fieldsets[at.0].clone()),
-                loose: operand.loose.is_some(),
+                loose: operand.loose.is_some() || operand.open,
                 width: operand.width,
             })
             .collect()
@@ -2241,6 +2296,7 @@ impl Walker<'_> {
     /// the predicate there, and which is an argument of a call otherwise.
     fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
         let none_before = self.gave_no_expression;
+        let not_known_before = self.not_known.is_some();
         let undecided_before = self.undecided_folds;
         let repeated_before = self.repeated_comparisons;
         let keyed_before = self.keyed_unnests;
@@ -2257,6 +2313,7 @@ impl Walker<'_> {
         let unsaid = Operand {
             dtype: None,
             loose: None,
+            open: false,
             shape: Shape::Many,
             literal: false,
             count: Count::NotKnown,
@@ -2599,6 +2656,20 @@ impl Walker<'_> {
                 && statements.iter().all(|statement| {
                     starts_from_a_null(statement) && statement.links().iter().all(keeps_a_null)
                 }));
+        // Whether the value the chain has so far is a number that Polars keeps open: a number typed
+        // without a dtype, or `repeat` of one, and what the calls that keep it so leave of it.
+        let mut open = match expression.start() {
+            Start::Call(start) => {
+                loose_number(start).is_some()
+                    || (start.entry().id().as_str() == "polars.repeat"
+                        && start_arguments
+                            .iter()
+                            .any(|(name, operand)| name == "value" && operand.open))
+            }
+            _ => false,
+        };
+        // Whether each value of the condition the chain holds is a number that Polars keeps open.
+        let mut values_open: Vec<bool> = Vec::new();
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let none_before_the_arguments = self.gave_no_expression;
@@ -2613,6 +2684,20 @@ impl Walker<'_> {
                 self.path.pop();
                 continue;
             }
+            if let Some((_, operand)) = arguments.iter().find(|(name, _)| name == "statement") {
+                values_open.push(
+                    operand.loose.is_some()
+                        || operand.open
+                        || operand
+                            .fields
+                            .is_some_and(|at| self.fieldsets[at.0].has_a_loose_field()),
+                );
+            }
+            let follows_open = open;
+            let receiver_class = match &cur {
+                Cur::Value { dtype, .. } => *dtype,
+                _ => None,
+            };
             // The first link follows the start, which is a number typed without a dtype when
             // it is one.
             let receiver_loose = match expression.start() {
@@ -2666,6 +2751,7 @@ impl Walker<'_> {
                 Around {
                     branches_are_one,
                     receiver_loose,
+                    follows_open,
                     unit,
                     width,
                     widened,
@@ -2678,6 +2764,20 @@ impl Walker<'_> {
                     alone: held.is_some(),
                     meets_an_aggregate: expression.links().get(at + 1).is_some_and(is_one_value),
                 },
+            );
+            // An aggregate of the literal that starts the chain is a value Polars settles as it
+            // folds the literal, as it settles the number that stands alone as a key. What
+            // gathers the values of a repeat or of a condition keeps them open as they were.
+            let settled_by_an_aggregate = is_one_value(link)
+                && matches!(expression.start(), Start::Call(start)
+                    if start.entry().id().as_str() == "polars.lit");
+            open = open_after(
+                link,
+                &arguments,
+                follows_open && !settled_by_an_aggregate,
+                receiver_class,
+                &standing,
+                &values_open,
             );
             unit = unit_after(link, unit, &standing);
             // A field read of an array has the width the field holds.
@@ -2759,6 +2859,22 @@ impl Walker<'_> {
                     && context != Context::inside(Outer::Having, Nested::ConditionValue));
             if asked {
                 ending = last_end;
+            }
+            // Polars keeps a number typed without a dtype open through the calls that keep it so,
+            // as `dyn float` in the dtype of a join's key, which it does not match with the dtype
+            // the other table's key resolves to: such a key is not told.
+            if open
+                && !expression.links().is_empty()
+                && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
+                && context.nested().is_none()
+                && matches!(ending, Some(Ending::Allowed) | None)
+            {
+                ending = Some(Ending::NotKnown(Unknown::AnOpenNumberInAKey));
+                // What the key holds is the reason it is not told, rather than the dtype a call
+                // after a condition of open numbers lacks, which it is the first of to say.
+                if !not_known_before {
+                    self.not_known = None;
+                }
             }
             if let Some(Ending::Refused(refusal)) = &ending {
                 let refusal = if of_a_list {
@@ -2876,6 +2992,7 @@ impl Walker<'_> {
                     Start::Call(start) if expression.links().is_empty() => loose_number(start),
                     _ => None,
                 },
+                open,
                 shape,
                 literal: is_made_of_literals(expression, expression.links().len()),
                 count,
@@ -2899,6 +3016,7 @@ impl Walker<'_> {
             } => Operand {
                 dtype: unify(&values),
                 loose: None,
+                open,
                 // A condition that is given one value for each group, and gives one for each, as
                 // its predicates and its values are one value, is one value in a group; elsewhere
                 // it is the rows, as what is made of one value and rows is.
@@ -3003,6 +3121,7 @@ impl Walker<'_> {
         let Around {
             branches_are_one,
             receiver_loose,
+            follows_open,
             unit,
             width,
             widened,
@@ -3394,7 +3513,7 @@ impl Walker<'_> {
                 &place,
                 &Chosen::default()
                     .with_open_numbers(&open_numbers)
-                    .following_an_open_number(receiver_loose.is_some())
+                    .following_an_open_number(follows_open)
                     .among_others(self.siblings_of_the_item())
                     .of_a_null_literal(null_kept)
                     .with_argument_fields(&argument_fields)
@@ -3562,7 +3681,7 @@ impl Walker<'_> {
             .collect();
         let chosen = Chosen::default()
             .with_open_numbers(&open_numbers)
-            .following_an_open_number(receiver_loose.is_some())
+            .following_an_open_number(follows_open)
             .among_others(self.siblings_of_the_item())
             .of_a_null_literal(null_kept)
             .with_argument_fields(&argument_fields)
@@ -4505,6 +4624,7 @@ fn imploded(values: Operand) -> Operand {
     Operand {
         dtype: listed,
         loose: None,
+        open: false,
         shape: Shape::One,
         count: Count::NotKnown,
         known: values.known && listed.is_some(),
