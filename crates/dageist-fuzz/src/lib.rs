@@ -7,6 +7,7 @@ pub mod artifact;
 mod contract;
 mod error;
 pub mod generation;
+pub mod grid;
 mod identity;
 pub mod registry;
 mod source;
