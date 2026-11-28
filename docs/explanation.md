@@ -2322,8 +2322,12 @@ without a focus does. What it finds is settled, by a fix or by a limit that name
   or a place that a call takes of the values of a group and converts for each group, and a replacement of text given the
   values of a group as its value, which Polars refuses for the lengths it meets, are excused where Polars does not refuse
   the same aggregates and predicates as the items of a `select` of the same table for that objection, which the limit asks
-  of Polars; and what the tables measured with a column and Polars allows of the aggregate of a group, where a call after
-  the group by holds it, which is the group's alone, for the keys are evaluated as the items of a `select` are. A strict
+  of Polars; and what the tables refuse of the aggregate or the predicate of a group where Polars allows it, in a call
+  after the group by (the keys are evaluated as the items of a `select` are), where Polars refuses the same expression as
+  the item of a `select` for that objection, which the limit asks of it. A group by with no key is one group that Polars
+  evaluates as a select does, which accepts a window key that is not elementwise and a literal beside the values of the
+  group, so the rules for them hold only where there is a key; what is refused of its aggregates by the tables alone is a
+  null literal, which the limit for a literal holds, or a part Polars does not evaluate, which a probe settles. A strict
   replacement that lists the values of a group is the limit for a strict replacement given no default, which the calls
   after the group by now reach, and a window of one value that expects a scalar of a replacement of columns is a reason of the limit for a replacement of columns in a window.
 - A share of `quantile` outside 0 to 1 is `a-share-outside-zero-to-one`, which no table holds (#224).
@@ -3241,13 +3245,17 @@ leave is named in the test with its reason: the reverse of an array whose elemen
 thread of its own that no test can catch, the element dtypes the tables do not measure, what a select refuses
 that a group by gives, and the range of a quantile's share, which Polars reads as it builds the step.
 
-`tests/document/group_kernels_grid.rs` holds two grids of what a group evaluates on the values of each group, in
-`agg` and in `having`. One crosses the key of a window, what it groups by and what it orders by, in thirty forms
-that are elementwise or are not. The other crosses every parameter of every method of the catalogue that is given an
-expression with a receiver and an argument that are each a column, an aggregate or a literal. The cells that are
-group by design or by data are named in the test with their reason: an index beyond a group, a strict replacement
-that lists too few values, a share that the column's values are not, one value beside the values of a group that
-Polars takes for a group of one row, and what a select refuses as well, which is no cause of the group's.
+`tests/document/group_kernels_grid.rs` holds three grids of what a group evaluates on the values of each group, in
+`agg` and in `having`, with a key and with none. One crosses the key of a window, what it groups by and what it orders
+by, in thirty forms that are elementwise or are not. One crosses every parameter of every method of the catalogue that
+is given an expression with a receiver and an argument that are each a column, an aggregate, a literal, a null literal
+or text multiplied by text (the argument), whether the call stands alone or beside another operand and whether an
+aggregate follows it, with a `select` of the same expression as the control of every cell. One crosses a condition whose
+predicate the tables refuse with values that are one expression or differ. The cells that are the group's by design or
+by data, and the cells that a select shows are no group's, are named in the test with their reason: an index beyond a
+group, a strict replacement that lists too few values, a share that the column's values are not, one value beside the
+values of a group that Polars takes for a group of one row, a null literal Polars takes or refuses as a value, a part it
+does not evaluate, and the kernels that still refuse where there is no key.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change:
 the campaigns explore how calls compose, in the background, and a finding that is about the value of a

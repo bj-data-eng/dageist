@@ -105,13 +105,15 @@ pub enum Limit {
     ///   predicates as the items of a `select` of the same frames for that objection: the control
     ///   is the select, which Polars runs, and what no rule of the walk reaches is what the data
     ///   decide in a group of more than one row, which the grid's sample cannot fix;
-    /// - the tables refusing, which Polars allows, in a call after the group by or in a pivot's
-    ///   aggregate, with a reason that says a dtype an operation does not support or a function that
-    ///   makes a length of time expects numbers, a comparison, an operation, an evaluation, a cast, a
-    ///   struct field, the lengths of a window over a group, a replacement pattern per row, duplicates
-    ///   in what a replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype,
-    ///   or the plan saying another dtype than the rows give; and the cumulative sum of a literal that
-    ///   orders a window, which Polars reads as a literal;
+    /// - the tables refusing, which Polars allows, in a call after the group by, where Polars
+    ///   refuses the same expression for what the tables say as the item of a select of the same
+    ///   frames, which is the control, and no match of the words of the reason: the group is then why
+    ///   the refusal does not stand. The same, in a pivot's aggregate, which reads no column to stand
+    ///   in a select, is the reasons the gate accepts: a dtype an operation does not support or a
+    ///   function that makes a length of time expects numbers, a comparison, an operation, an
+    ///   evaluation, a cast, a struct field, the lengths of a window over a group, a replacement
+    ///   pattern per row, duplicates in what a replacement replaces, no supertype of two dtypes, a
+    ///   fill by a strategy for a dtype, or the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, in a pivot's aggregate, of the
     ///   values a replacement lists, of a cast of a literal, or of a cast that follows a comparison or
     ///   an arithmetic with a null or a bitwise call of whole numbers given a null, and of a skew or a
