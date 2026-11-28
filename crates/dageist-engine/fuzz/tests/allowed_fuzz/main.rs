@@ -73,7 +73,8 @@ fn keep_directory() -> PathBuf {
     std::env::var_os("DAGEIST_FUZZ_KEEP").map_or_else(
         || PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("allowed-fuzz"),
         |path| {
-            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+            // The package is `crates/dageist-engine/fuzz`, three folders below the root.
+            let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
             from_the_root(&root, PathBuf::from(path))
         },
     )

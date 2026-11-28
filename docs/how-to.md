@@ -793,7 +793,7 @@ when it starts, so one that is there after a timed run is that run's. A campaign
 than a million cases again, as one focused on very few methods does, ends as insufficient coverage, which it says, and still tells
 what it found. A relative `DAGEIST_FUZZ_KEEP` is
 from the root of the repository, which is where these commands are run, and not from the
-engine's directory that the tests run in.
+package's directory, `crates/dageist-engine/fuzz`, that the tests run in.
 
 A timeout that happens while a case that disagrees is being reduced is kept as
 `<seed>-<place>-reduction-timeout.case`, with the case that disagreed kept as it was,
