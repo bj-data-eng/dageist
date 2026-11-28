@@ -125,6 +125,47 @@ impl Literal {
     }
 }
 
+/// One value of `class` as the editor types a literal of it in: a whole number of the classes that
+/// are counted, a number with a fraction of the floats, each given the class's dtype, a text and a
+/// flag as they are written, and a null given the dtype Null. None for a nested class or a struct,
+/// which the editor types in no literal of, or a class whose dtype a document cannot write.
+#[must_use]
+pub fn one_of(class: Representative) -> Option<Literal> {
+    if class.is_nested() || class == Representative::Struct {
+        return None;
+    }
+    let word = || {
+        Dtype::new(class.dtype())
+            .ok()
+            .map(|dtype| dtype.to_string())
+    };
+    let (value, word) = match class {
+        Representative::Float16 | Representative::Float32 | Representative::Float64 => {
+            (Written::Float(1.0), Some(word()?))
+        }
+        Representative::String => (Written::Text("1".to_owned()), None),
+        Representative::Boolean => (Written::Flag(true), None),
+        Representative::Null => (Written::Null, Some(word()?)),
+        _ => (Written::Integer(1), Some(word()?)),
+    };
+    Some(Literal {
+        value: Some(value),
+        word,
+    })
+}
+
+/// A null given the dtype of `class`, where a document can write one.
+#[must_use]
+pub fn null_of(class: Representative) -> Option<Literal> {
+    if class.is_nested() || class == Representative::Struct {
+        return None;
+    }
+    Some(Literal {
+        value: Some(Written::Null),
+        word: Some(Dtype::new(class.dtype()).ok()?.to_string()),
+    })
+}
+
 /// The lowest and the highest value of a class of whole numbers, and none for another class.
 #[must_use]
 pub const fn whole_bounds(class: Representative) -> Option<(i128, u128)> {

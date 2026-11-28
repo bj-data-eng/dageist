@@ -325,6 +325,19 @@ impl World {
         axis
     }
 
+    /// A list of the values of `class` connected as an input, as the run builds it, named
+    /// `list_of_` and the name of its column: none for a struct, which no list is connected of,
+    /// or a class whose values cannot be made.
+    #[must_use]
+    pub fn list_of(&self, class: Representative) -> Option<(String, Series)> {
+        if class == Representative::Struct {
+            return None;
+        }
+        let values = values_of(class, "list")?;
+        (values.dtype() == &class.dtype())
+            .then(|| (format!("list_of_{}", name_of(class.name())), values))
+    }
+
     /// One column of each class, as an axis named `name`. The dtypes without a class of their own,
     /// the column of empty lists and the classes no column could be made of are left out.
     #[must_use]

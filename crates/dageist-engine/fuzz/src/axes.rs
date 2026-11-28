@@ -4,11 +4,11 @@
 
 use dageist_engine::allowed::{self, After, Chosen, Context, Outer, Place, Representative, Shape};
 use dageist_engine::catalog::{self, Applies, Entry, Kind, Parameter, Role, ValueType};
-use dageist_fuzz::grid::{Choices, Scale};
+use dageist_fuzz::grid::Choices;
 use serde_json::Value;
 
 use crate::doc;
-use crate::literals::Written;
+use crate::literals::{Literal, Written};
 use crate::world::Column;
 
 /// Every entry of the catalogue that applies as `applies`, labelled by its identifier.
@@ -75,18 +75,38 @@ pub fn expression_parameters(name: &'static str) -> Choices<Param> {
 /// The parameters of a method of an expression that the walk reads a literal of by the role it
 /// stands in, which is every expression parameter whose role is not plain: what a number is added
 /// to, divided by, raised to, a logarithm is taken to, a bound it is cut to, a share, a count or a
-/// length, a value that fills, the values a replacement lists. A grid of normal scale keeps the
-/// first parameter of each role and family, the large one every one.
+/// length, a value that fills, the values a replacement lists; and the other expression
+/// parameters of the same methods, which meet the literal beside them, as the new values and the
+/// default of a strict replacement do. The rest are left out, each with why.
 #[must_use]
-pub fn parameters_read_by_role(name: &'static str, scale: Scale) -> Choices<Param> {
-    expression_parameters(name)
-        .keep_unless(|_, param| {
-            (param.role() == Role::Plain)
-                .then(|| "the walk reads no literal by the role of a plain parameter".to_owned())
+pub fn literal_parameters(name: &'static str) -> Choices<Param> {
+    let reads = |entry: &Entry| {
+        entry.parameters().iter().any(|parameter| {
+            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Plain
         })
-        .one_of_each(scale, "role and family", |_, param| {
-            (format!("{:?}", param.role()), param.entry.family())
-        })
+    };
+    expression_parameters(name).keep_unless(|_, param| {
+        (!reads(param.entry))
+            .then(|| "its method reads no literal by the role of a parameter".to_owned())
+    })
+}
+
+/// The kind of a class a literal's dtype is grouped by where a grid of normal scale keeps one of
+/// each: signed and unsigned whole numbers, floats, flags, text, moments and the rest.
+#[must_use]
+pub fn kind_of_class(class: Representative) -> &'static str {
+    use Representative as R;
+    match class {
+        R::Int8 | R::Int16 | R::Int32 | R::Int64 | R::Int128 => "signed whole number",
+        R::UInt8 | R::UInt16 | R::UInt32 | R::UInt64 | R::UInt128 => "unsigned whole number",
+        R::Float16 | R::Float32 | R::Float64 => "float",
+        R::Boolean => "flag",
+        R::String => "text",
+        R::Date | R::Datetime | R::DatetimeZoned | R::Time | R::Duration => "moment",
+        R::Decimal => "decimal",
+        R::Null => "null",
+        R::Struct | R::List(_) | R::Array(_) => "nested",
+    }
 }
 
 /// What a method's needed parameter is given where a grid does not vary it, so that the one a grid
@@ -141,6 +161,70 @@ pub fn filler(param: &Parameter, column: Option<&Column>) -> Result<Value, Strin
     })
 }
 
+/// The arguments of `param`'s method where the parameter is given `varied`: each other expression
+/// parameter of the method is given a literal of the kind of the column, and each other needed
+/// parameter what [`filler`] gives it.
+///
+/// # Errors
+///
+/// When a needed parameter is of a kind no grid gives a value of.
+pub fn arguments(param: &Param, varied: &Value, column: &Column) -> Result<Value, String> {
+    let mut arguments = serde_json::Map::new();
+    for parameter in param.entry.parameters() {
+        let value = if parameter.name() == param.name() {
+            match parameter.shape() {
+                catalog::Shape::Many => doc::many(vec![varied.clone()]),
+                catalog::Shape::One | catalog::Shape::PerItem(_) => varied.clone(),
+            }
+        } else if matches!(parameter.kind(), Kind::Expression(_)) || parameter.is_needed() {
+            filler(parameter, Some(column))?
+        } else {
+            continue;
+        };
+        arguments.insert(parameter.name().to_owned(), value);
+    }
+    Ok(Value::Object(arguments))
+}
+
+/// The expression of `param`'s method given `literal`: with the column first, the method following
+/// the column and given the literal as the parameter; or with the literal first, the method
+/// following the literal and given the column.
+///
+/// # Errors
+///
+/// When a needed parameter is of a kind no grid gives a value of, and for a text padded to a length
+/// above what memory holds, which Polars never ends making.
+pub fn method_given(
+    param: &Param,
+    literal: &Literal,
+    column: &Column,
+    literal_first: bool,
+) -> Result<Value, String> {
+    if param.role() == Role::Length
+        && param.entry.family() == catalog::Family::Text
+        && literal.written().is_at_least(f64::from(1_u32 << 31))
+    {
+        return Err("Polars never ends: it pads a text to the length it is given".to_owned());
+    }
+    Ok(if literal_first {
+        doc::chain(
+            literal.call(),
+            vec![doc::call(
+                param.method(),
+                arguments(param, &doc::column(&column.name), column)?,
+            )],
+        )
+    } else {
+        doc::column_then(
+            &column.name,
+            vec![doc::call(
+                param.method(),
+                arguments(param, &literal.expression(), column)?,
+            )],
+        )
+    })
+}
+
 /// A literal of the kind of the values of `column`: a flag for flags, a text of a number for
 /// text, a number with a fraction for floats, and a whole number for the rest.
 #[must_use]
@@ -183,6 +267,25 @@ pub enum Effect {
     NotKnown,
 }
 
+/// The class the tables say `entry` gives after a column of `class` in a select, where they allow
+/// it and know it.
+#[must_use]
+pub fn gives_after(entry: &'static Entry, class: Representative) -> Option<Representative> {
+    let place = Place::new(
+        Context::step(Outer::Select),
+        After::Value {
+            dtype: class,
+            shape: Shape::Many,
+        },
+    );
+    match allowed::offer(entry, &place, &Chosen::default()) {
+        allowed::Verdict::Allowed(allowance) => {
+            allowance.result().and_then(allowed::ResultDtype::class)
+        }
+        allowed::Verdict::Refused(_) => None,
+    }
+}
+
 /// What the tables say `entry`, given what [`filler`] gives its needed parameters, does after a
 /// column of `class` in a select.
 #[must_use]
@@ -210,25 +313,31 @@ pub fn effect(entry: &'static Entry, class: Representative) -> Effect {
     }
 }
 
-/// The methods of an expression that are given nothing they need, which a chain may follow a
-/// value with, each with what the tables say it does after `class`, as an axis named `name`. A
-/// method that needs a parameter is left out: a chain gives it nothing.
+/// The methods of an expression, which a chain may follow a value with, each with what the tables
+/// say it does after `class`, as an axis named `name`. A method that needs a parameter of a kind
+/// [`filler`] gives no value of is left out.
 #[must_use]
 pub fn calls_on(name: &'static str, class: Representative) -> Choices<(&'static Entry, Effect)> {
     entries(name, Applies::Expression)
-        .keep_unless(|_, entry| {
-            entry
-                .parameters()
-                .iter()
-                .find(|parameter| parameter.is_needed())
-                .map(|parameter| {
-                    format!(
-                        "it needs {}, which a chain gives it none of",
-                        parameter.name()
-                    )
-                })
-        })
+        .keep_unless(|_, entry| call_of(entry, None).err())
         .map(|entry| (entry, effect(entry, class)))
+}
+
+/// The call of `entry`, each needed parameter given what [`filler`] gives it beside `column`.
+///
+/// # Errors
+///
+/// When a needed parameter is of a kind no grid gives a value of.
+pub fn call_of(entry: &'static Entry, column: Option<&Column>) -> Result<Value, String> {
+    let mut arguments = serde_json::Map::new();
+    for parameter in entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.is_needed())
+    {
+        arguments.insert(parameter.name().to_owned(), filler(parameter, column)?);
+    }
+    Ok(doc::call(entry.id().as_str(), Value::Object(arguments)))
 }
 
 /// The calls of [`calls_on`] whose effect after each of `classes` is `wanted`, as an axis named

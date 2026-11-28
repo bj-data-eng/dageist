@@ -4,7 +4,9 @@
 //! An expression stands at a position of a step, and may stand inside another expression there:
 //! what a window groups or orders by, a condition's predicate or value. A nested place is built
 //! around the expression by a host of the world's columns that fits the position: a flag where the
-//! position takes a predicate (a filter, a group's `having`), a whole number elsewhere.
+//! position takes a predicate (a filter, a group's `having`), a whole number elsewhere. The branches
+//! of a condition always differ, for Polars drops the predicate of one whose branches are the same
+//! without reading it.
 
 use dageist_engine::allowed::{Context, Nested, Outer};
 use dageist_fuzz::grid::Choices;
@@ -60,6 +62,15 @@ const fn host_column(outer: Outer) -> &'static str {
     }
 }
 
+/// The other branch of a condition whose predicate is judged: another column of the host's kind,
+/// so that the branches differ.
+fn other_branch(outer: Outer) -> Value {
+    match outer {
+        Outer::Filter | Outer::Having => column_then("f", vec![call("Expr.not_", json!({}))]),
+        _ => column("m"),
+    }
+}
+
 /// The expression that holds `expression` at the nested place `nested`.
 fn host(nested: Nested, outer: Outer, expression: Value) -> Value {
     let hosted = host_column(outer);
@@ -78,6 +89,8 @@ fn host(nested: Nested, outer: Outer, expression: Value) -> Value {
                 json!({ "order_by": many(vec![expression]) }),
             )],
         ),
+        // The branches differ, for Polars drops the predicate of a condition whose branches are
+        // one, without reading it.
         Nested::ConditionPredicate => chain(
             call(
                 "polars.when",
@@ -85,7 +98,10 @@ fn host(nested: Nested, outer: Outer, expression: Value) -> Value {
             ),
             vec![
                 call("When.then", json!({ "statement": column(hosted) })),
-                call("Then.otherwise", json!({ "statement": column(hosted) })),
+                call(
+                    "Then.otherwise",
+                    json!({ "statement": other_branch(outer) }),
+                ),
             ],
         ),
         Nested::ConditionValue => chain(
@@ -94,8 +110,14 @@ fn host(nested: Nested, outer: Outer, expression: Value) -> Value {
                 json!({ "predicates": many(vec![column("f")]) }),
             ),
             vec![
-                call("When.then", json!({ "statement": expression.clone() })),
-                call("Then.otherwise", json!({ "statement": expression })),
+                call("When.then", json!({ "statement": expression })),
+                call(
+                    "Then.otherwise",
+                    json!({ "statement": chain(
+                        call("polars.lit", json!({ "value": { "flag": null } })),
+                        Vec::new(),
+                    ) }),
+                ),
             ],
         ),
     }

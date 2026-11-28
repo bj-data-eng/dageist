@@ -10,7 +10,7 @@ use dageist_engine_fuzz::judge::{Case, Connections, Depth, Outcome, Question};
 use dageist_engine_fuzz::literals::{self, Written};
 use dageist_engine_fuzz::places;
 use dageist_engine_fuzz::world::{World, dtypes_without_a_class};
-use dageist_fuzz::grid::{Choices, Outcome as _, Scale};
+use dageist_fuzz::grid::{Choices, Outcome as _};
 use serde_json::json;
 
 /// Whether `label` is on `axis` or named as left out of it.
@@ -225,35 +225,35 @@ fn the_judge_sorts_a_cell_both_allow_both_refuse_and_unbuildable_as_polars_says(
 }
 
 #[test]
-fn every_parameter_the_walk_reads_by_its_role_is_on_the_large_axis_and_each_role_on_the_normal_one()
-{
-    let large = axes::parameters_read_by_role("parameter", Scale::Large);
-    let normal = axes::parameters_read_by_role("parameter", Scale::Normal);
-    let mut roles = std::collections::BTreeSet::new();
+fn every_parameter_the_walk_reads_by_its_role_and_its_siblings_are_on_the_axis_of_literals() {
+    let axis = axes::literal_parameters("parameter");
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() == Applies::Expression)
     {
+        let reads = entry.parameters().iter().any(|parameter| {
+            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Plain
+        });
         for parameter in entry.parameters() {
-            if matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Plain {
-                let label = format!("{}({})", entry.id().as_str(), parameter.name());
-                assert!(large.get(&label).is_some(), "{label}");
-                roles.insert(format!("{:?}", parameter.role()));
+            if !matches!(parameter.kind(), Kind::Expression(_)) {
+                continue;
+            }
+            let label = format!("{}({})", entry.id().as_str(), parameter.name());
+            if reads {
+                assert!(axis.get(&label).is_some(), "{label} is not on the axis");
+            } else {
+                assert!(accounted(&axis, &label), "{label} is not accounted for");
             }
         }
     }
-    let normal_roles: std::collections::BTreeSet<String> = normal
-        .iter()
-        .map(|(_, param)| format!("{:?}", param.role()))
-        .collect();
-    assert_eq!(normal_roles, roles);
-    assert!(normal.thinned().is_some());
-    for (label, _) in [
-        ("Expr.add(other)", ()),
-        ("Expr.clip(lower_bound)", ()),
-        ("Expr.replace(old)", ()),
+    for label in [
+        "Expr.add(other)",
+        "Expr.clip(upper_bound)",
+        "Expr.replace_strict(new)",
+        "Expr.replace_strict(default)",
+        "Expr.str.pad_start(length)",
     ] {
-        assert!(large.get(label).is_some(), "{label}");
+        assert!(axis.get(label).is_some(), "{label}");
     }
 }
 
@@ -312,10 +312,16 @@ fn what_a_call_does_after_a_class_is_what_the_tables_say_polars_does() {
     assert!(keeps.get("Expr.abs").is_some());
     assert!(keeps.get("Expr.sum").is_none());
     assert!(keeps.left_out().iter().any(|left| left.label == "Expr.sum"));
-    assert!(
-        keeps
-            .left_out()
-            .iter()
-            .any(|left| left.label == "Expr.shift" || left.label == "Expr.cast")
-    );
+    // A shift keeps the dtype and the number of the values it follows.
+    assert!(keeps.get("Expr.shift").is_some());
+    for entry in catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == Applies::Expression)
+    {
+        assert!(
+            accounted(&keeps, entry.id().as_str()),
+            "{}",
+            entry.id().as_str()
+        );
+    }
 }
