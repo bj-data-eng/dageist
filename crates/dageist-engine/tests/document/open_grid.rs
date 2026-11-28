@@ -295,6 +295,14 @@ fn calls() -> Vec<(String, Vec<Value>)> {
             }
         }
     }
+    // A call that keeps the dtype, an aggregate that does, and then a call that changes it.
+    for keeper in ["Expr.abs", "Expr.neg"] {
+        for aggregate in ["Expr.max", "Expr.sum"] {
+            for changing in &changes {
+                chains.push(vec![keeper, aggregate, changing]);
+            }
+        }
+    }
     let mut calls: Vec<(String, Vec<Value>)> = chains
         .into_iter()
         .map(|names| {
@@ -326,6 +334,19 @@ fn calls() -> Vec<(String, Vec<Value>)> {
     calls.push((
         "fill_null with an open number".to_owned(),
         vec![with("Expr.fill_null", "value", open_float())],
+    ));
+    let cast = || call("Expr.cast", json!({ "dtype": { "dtype": "Float64" } }));
+    calls.push((
+        "Expr.abs, Expr.max, cast to Float64".to_owned(),
+        vec![named("Expr.abs"), named("Expr.max"), cast()],
+    ));
+    calls.push((
+        "Expr.abs, Expr.sum, cast to Float64".to_owned(),
+        vec![named("Expr.abs"), named("Expr.sum"), cast()],
+    ));
+    calls.push((
+        "cast to Float64, Expr.abs, Expr.max".to_owned(),
+        vec![cast(), named("Expr.abs"), named("Expr.max")],
     ));
     calls.push((
         "Expr.abs, Expr.value_counts, Expr.max".to_owned(),
@@ -379,8 +400,30 @@ fn struct_calls() -> Vec<(String, Vec<Value>)> {
 
 /// The chains a grid puts in its places, each by its form and its calls. A repeated number stands
 /// in a key only: Polars takes its length for the rows of the other table, which the walk cannot.
-fn chains(repeated: bool) -> Vec<(String, Chain)> {
+fn chains(repeated: bool, whole: bool) -> Vec<(String, Chain)> {
     let mut chains = Vec::new();
+    if whole {
+        // What only whole numbers take, which a number with a fraction makes both refuse, so it
+        // is crossed with whole numbers alone.
+        for form in [Form::Alone, Form::BothValues, Form::OneValue] {
+            for names in [
+                vec!["Expr.not_"],
+                vec!["Expr.abs", "Expr.not_"],
+                vec!["Expr.not_", "Expr.abs"],
+                vec!["Expr.not_", "Expr.max"],
+                vec!["Expr.max", "Expr.not_"],
+            ] {
+                chains.push((
+                    format!("{}, {}", form.label(), names.join(", ")),
+                    Chain {
+                        form,
+                        calls: names.into_iter().map(named).collect(),
+                    },
+                ));
+            }
+        }
+        return chains;
+    }
     for form in [
         Form::Alone,
         Form::Repeated,
@@ -588,16 +631,22 @@ fn case_of(point: &Point) -> Result<Case, String> {
     Case::of_step(entry, arguments, table(), connections)
 }
 
-fn grid(normal: bool, repeated: bool, places: &[(&'static str, Place)]) -> Grid<Point> {
+fn grid(
+    normal: bool,
+    repeated: bool,
+    whole: bool,
+    places: &[(&'static str, Place)],
+) -> Grid<Point> {
     let values = numbers(normal)
         .into_iter()
+        .filter(|written| !whole || matches!(written, Written::Integer(_)))
         .map(|written| (written.label(), written))
         .collect();
     Grid::<Point>::new()
         .axis("number", values, |point, written| {
             point.number = Some(written.clone());
         })
-        .axis("chain", chains(repeated), |point, chain| {
+        .axis("chain", chains(repeated, whole), |point, chain| {
             point.chain = Some(chain.clone());
         })
         .axis(
@@ -616,27 +665,37 @@ fn question() -> Question {
 }
 
 fn keys(normal: bool) -> Verdicts {
-    grid(normal, true, &Place::KEYS).judge(&question(), case_of)
+    grid(normal, true, false, &Place::KEYS).judge(&question(), case_of)
 }
 
 fn elsewhere(normal: bool) -> Verdicts {
-    grid(normal, false, &Place::ELSEWHERE).judge(&Question::any_refusal().with_dtypes(), case_of)
+    grid(normal, false, false, &Place::ELSEWHERE)
+        .judge(&Question::any_refusal().with_dtypes(), case_of)
+}
+
+fn whole_numbers(normal: bool) -> Verdicts {
+    let places: Vec<(&'static str, Place)> = Place::KEYS
+        .iter()
+        .chain(&Place::ELSEWHERE)
+        .copied()
+        .collect();
+    grid(normal, false, true, &places).judge(&question().with_dtypes(), case_of)
 }
 
 /// The calls that are no elementwise ones, which the walk refuses in a key.
 const NOT_ELEMENTWISE: &[&str] = &[
-    ", Expr.backward_fill",
-    ", Expr.cum_max",
-    ", Expr.cum_min",
-    ", Expr.cum_prod",
-    ", Expr.cum_sum",
-    ", Expr.diff",
-    ", Expr.forward_fill",
-    ", Expr.pct_change",
-    ", Expr.rank",
-    ", Expr.reverse",
-    ", Expr.shift",
-    ", Expr.sort",
+    "Expr.backward_fill",
+    "Expr.cum_max",
+    "Expr.cum_min",
+    "Expr.cum_prod",
+    "Expr.cum_sum",
+    "Expr.diff",
+    "Expr.forward_fill",
+    "Expr.pct_change",
+    "Expr.rank",
+    "Expr.reverse",
+    "Expr.shift",
+    "Expr.sort",
 ];
 
 /// What the grid of the keys leaves, with the reason. A key the walk cannot tell for another
@@ -649,7 +708,7 @@ fn known_keys() -> Vec<Known> {
     vec![
         Known::new(
             Kind::WalkRefusesOnly,
-            Pattern::new().contains_one_of("chain", NOT_ELEMENTWISE),
+            Pattern::new().has_one_of("chain", NOT_ELEMENTWISE),
             "a key made wholly of one value, a number or a condition of numbers, is one value that \
              Polars takes whole whatever calls it holds, and the walk refuses the calls that are no \
              elementwise ones, a running value, a difference, a rank, a fill, a shift, a reverse and a \
@@ -658,7 +717,7 @@ fn known_keys() -> Vec<Known> {
         .saying("must be elementwise"),
         Known::new(
             Kind::WalkRefusesOnly,
-            Pattern::new().contains_one_of("chain", &[", Expr.drop_nans", ", Expr.drop_nulls"]),
+            Pattern::new().has_one_of("chain", &["Expr.drop_nans", "Expr.drop_nulls"]),
             "the walk refuses a method that drops values from a number, a repeat of one or a \
              condition of numbers as not elementwise even where an aggregate follows it, which \
              Polars takes as one value",
@@ -672,15 +731,6 @@ fn known_keys() -> Vec<Known> {
              `dyn float` on both sides",
         )
         .saying("stays open"),
-        Known::new(
-            Kind::PolarsRefusesOnly,
-            Pattern::new()
-                .is("place", "both keys open")
-                .contains_one_of("chain", &[", Expr.drop_nans", ", Expr.drop_nulls"]),
-            "Polars refuses a key that drops values of an open number as not elementwise, where it \
-             takes the number typed, and the walk, which takes a key of one value whole, allows it",
-        )
-        .saying("elementwise"),
         refused_for_the_number(
             Pattern::new().starts("chain", "a condition with both values open"),
             "the walk gives a condition whose values are all open numbers no dtype, so the calls \
@@ -708,7 +758,7 @@ fn known_keys() -> Vec<Known> {
              number is",
         ),
         refused_for_the_number(
-            Pattern::new().contains_one_of("chain", &[", Expr.log"]),
+            Pattern::new().has_one_of("chain", &["Expr.log"]),
             "a logarithm takes a base that the walk reads as an operand it is not given, so it has \
              no dtype for the number to go on from after it, and the key is not said to be open, \
              though Polars keeps a number with a fraction open through it",
@@ -719,10 +769,11 @@ fn known_keys() -> Vec<Known> {
              not said to be open, though Polars keeps the sum of two open numbers open",
         ),
         refused_for_the_number(
-            Pattern::new().contains_one_of("chain", &[", Expr.product"]),
-            "Polars gives the product of a number with a fraction typed without a dtype the dtype \
-             Int64, where the number typed gives Float64 as the tables do, so the keys differ in \
-             dtype for the number and not for being open (candidate to file)",
+            Pattern::new().has_one_of("chain", &["Expr.product"]),
+            "Polars plans the product of a number with a fraction typed without a dtype as Int64 and \
+             runs it as Float64, a mismatch of its own between the planned and the executed dtype \
+             (for the number typed both are Float64), so the keys differ in the planned dtype for the \
+             number and not for being open",
         ),
     ]
 }
@@ -732,10 +783,11 @@ fn known_elsewhere() -> Vec<Known> {
     vec![
         Known::new(
             Kind::DtypeDiffers,
-            Pattern::new().contains_one_of("chain", &[", Expr.product", ", Expr.cum_prod"]),
-            "the Polars the engine builds gives the product, and the running product, of a number \
-             with a fraction typed without a dtype the dtype Int64, where it gives Float64 for the \
-             number typed, as the tables and Python's Polars do for either (candidate to file)",
+            Pattern::new().has_one_of("chain", &["Expr.product", "Expr.cum_prod"]),
+            "Polars plans the product, and the running product, of a number with a fraction typed \
+             without a dtype as Int64 and runs it as Float64, a mismatch of its own between the \
+             planned and the executed dtype (for the number typed both are Float64), so the dtype \
+             the tables give, Float64, is the one the rows have",
         )
         .saying("the tables give Float"),
     ]
@@ -749,6 +801,12 @@ fn a_number_typed_without_a_dtype_stays_open_through_the_calls_that_keep_it_as_a
 #[test]
 fn a_number_typed_without_a_dtype_is_judged_as_before_in_a_select_a_filter_and_a_sort_key() {
     elsewhere(true).assert_agree(&known_elsewhere(), 90_000);
+}
+
+#[test]
+fn a_whole_number_stays_open_through_the_calls_only_whole_numbers_take() {
+    let known: Vec<Known> = known_keys().into_iter().map(Known::shared).collect();
+    whole_numbers(true).assert_agree(&known, 100);
 }
 
 #[test]

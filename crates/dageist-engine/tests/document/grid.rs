@@ -987,6 +987,7 @@ enum Matcher {
     Is(&'static str),
     Starts(&'static str),
     ContainsOneOf(&'static [&'static str]),
+    HasOneOf(&'static [&'static str]),
     OneOf(&'static [&'static str]),
 }
 
@@ -996,6 +997,7 @@ impl Matcher {
             Self::Is(word) => label == word,
             Self::Starts(prefix) => label.starts_with(prefix),
             Self::ContainsOneOf(words) => words.iter().any(|word| label.contains(word)),
+            Self::HasOneOf(parts) => label.split(", ").any(|part| parts.contains(&part)),
             Self::OneOf(words) => words.contains(&label),
         }
     }
@@ -1025,6 +1027,14 @@ impl Pattern {
     #[must_use]
     pub fn starts(mut self, axis: &'static str, prefix: &'static str) -> Self {
         self.parts.push((axis, Matcher::Starts(prefix)));
+        self
+    }
+
+    /// The label of `axis`, a list whose parts are told apart by a comma and a space, has one of
+    /// `parts` as a part: `Expr.log` names a chain with that call and not one with `Expr.log1p`.
+    #[must_use]
+    pub fn has_one_of(mut self, axis: &'static str, parts: &'static [&'static str]) -> Self {
+        self.parts.push((axis, Matcher::HasOneOf(parts)));
         self
     }
 
