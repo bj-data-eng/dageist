@@ -23,7 +23,7 @@ use dageist_engine_fuzz::judge::{Case, Connections, Depth, Kind, Question};
 use dageist_engine_fuzz::literals;
 use dageist_engine_fuzz::places;
 use dageist_engine_fuzz::world::{Column, World};
-use dageist_fuzz::grid::{Choices, Grid, Known, Pattern, Scale};
+use dageist_fuzz::grid::{Choices, Grid, Known, Pattern};
 use polars::prelude::{DataType, Series};
 use serde_json::{Value, json};
 
@@ -61,7 +61,7 @@ impl Form {
 }
 
 /// Every form `other` is given in.
-fn forms(scale: Scale) -> Choices<Form> {
+fn forms() -> Choices<Form> {
     let world = World::get();
     let mut axis = Choices::new("form");
     for (label, column) in world.columns("column").iter() {
@@ -143,11 +143,11 @@ fn forms(scale: Scale) -> Choices<Form> {
     // literal, which a join's key may hold, and not others.
     let whole = literals::one_of(Representative::Int64).expect("a whole number typed in");
     let int64 = world.column("Int64");
-    let calls = axes::calls_that("call", Effect::Keeps, &[Representative::Int64]).one_of_each(
-        scale,
-        "family",
-        |_, entry| entry.family(),
-    );
+    let calls = axes::calls_of_run(axes::calls_that(
+        "call",
+        Effect::Keeps,
+        &[Representative::Int64],
+    ));
     for (label, entry) in calls.iter() {
         if let Ok(called) = axes::call_of(entry, Some(int64)) {
             axis = axis.with(
@@ -314,9 +314,7 @@ fn is_in_given_each_form_of_other_is_what_polars_says_as_a_value_and_as_a_key() 
         .axis(receivers("receiver"), |point, receiver| {
             point.receiver = Some(receiver.clone());
         })
-        .axis(forms(Scale::Normal), |point, form| {
-            point.form = Some(form.clone())
-        })
+        .axis(forms(), |point, form| point.form = Some(form.clone()))
         .axis(flags("nulls_equal"), |point, equal| {
             point.nulls_equal = *equal
         })

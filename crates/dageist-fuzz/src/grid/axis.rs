@@ -1,11 +1,42 @@
 //! The choices of one axis.
 
-/// How large a grid is run. A grid of normal scale runs with the ordinary tests, in seconds to a
-/// minute; a large grid runs on request.
+/// How much of a grid a run judges. A run judges every cell of a grid unless it asks for a quick
+/// one, which keeps of each thinned axis the choices its rule keeps; a grid says by [`Choices::thin`]
+/// and [`Choices::one_of_each`] how an axis is thinned, and the tally says how it was.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scale {
-    Normal,
-    Large,
+    /// Every choice of every axis.
+    Full,
+    /// The choices each thinned axis keeps.
+    Quick,
+}
+
+impl Scale {
+    /// The scale `DAGEIST_GRID_SCALE` asks for: `quick`, or `full` where it is unset.
+    ///
+    /// # Panics
+    ///
+    /// When it is set to another word, which no run should mistake for either.
+    #[must_use]
+    pub fn of_run() -> Self {
+        let words = std::env::var("DAGEIST_GRID_SCALE").ok();
+        Self::from_words(words.as_deref()).unwrap_or_else(|why| panic!("{why}"))
+    }
+
+    /// The scale `words` name: `quick`, or `full` where they are none.
+    ///
+    /// # Errors
+    ///
+    /// When the words name neither.
+    pub fn from_words(words: Option<&str>) -> Result<Self, String> {
+        match words.map(str::trim) {
+            None | Some("" | "full") => Ok(Self::Full),
+            Some("quick") => Ok(Self::Quick),
+            Some(other) => Err(format!(
+                "DAGEIST_GRID_SCALE is `full` or `quick`, not {other:?}"
+            )),
+        }
+    }
 }
 
 /// An axis taken apart: its name, choices, what it leaves out and how it was thinned.
@@ -23,7 +54,7 @@ pub struct LeftOut {
     pub reason: String,
 }
 
-/// How a grid of normal scale thinned an axis: by `rule`, keeping `kept` of `of` choices.
+/// How a quick run thinned an axis: by `rule`, keeping `kept` of `of` choices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Thinned {
     pub rule: String,
@@ -124,8 +155,8 @@ impl<V> Choices<V> {
         self
     }
 
-    /// The same axis, which at normal scale keeps every `every`th choice, the first among them,
-    /// and at large scale keeps every choice. A tally says how it was thinned.
+    /// The same axis, which at quick scale keeps every `every`th choice, the first among them,
+    /// and at full scale keeps every choice. A tally says how it was thinned.
     ///
     /// # Panics
     ///
@@ -144,8 +175,8 @@ impl<V> Choices<V> {
         })
     }
 
-    /// The same axis, which at normal scale keeps the first choice of each kind that `kind` says,
-    /// such as one parameter of each role, and at large scale keeps every choice. `rule` says
+    /// The same axis, which at quick scale keeps the first choice of each kind that `kind` says,
+    /// such as one parameter of each role, and at full scale keeps every choice. `rule` says
     /// in words what a kind is, which the tally says.
     ///
     /// # Panics
@@ -175,7 +206,7 @@ impl<V> Choices<V> {
             "the axis {} is thinned twice",
             self.name
         );
-        if scale == Scale::Large {
+        if scale == Scale::Full {
             return self;
         }
         let of = self.choices.len();
@@ -306,7 +337,7 @@ impl<V> Choices<V> {
         &self.left_out
     }
 
-    /// How a grid of normal scale thinned the axis, if it did.
+    /// How a quick run thinned the axis, if it did.
     #[must_use]
     pub const fn thinned(&self) -> Option<&Thinned> {
         self.thinned.as_ref()

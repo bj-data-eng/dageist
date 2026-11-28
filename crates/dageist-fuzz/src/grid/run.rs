@@ -28,6 +28,7 @@ pub struct Grid<P> {
     name: &'static str,
     axes: Vec<Axis<P>>,
     stack: usize,
+    sample: Option<usize>,
 }
 
 /// The cells a thread takes at once.
@@ -45,6 +46,25 @@ fn deadline() -> Duration {
             .filter(|seconds| *seconds > 0)
             .unwrap_or(60),
     )
+}
+
+/// How many cells a run judges of each grid to project the time of all of them:
+/// `DAGEIST_GRID_SAMPLE`, or every cell where it is unset.
+fn sample_of_run() -> Option<usize> {
+    std::env::var("DAGEIST_GRID_SAMPLE")
+        .ok()
+        .and_then(|text| text.trim().parse().ok())
+        .filter(|cells| *cells > 0)
+}
+
+/// The cell a sample takes as its `ordinal`th, of a grid of `size` cells taken every `stride`:
+/// one in each stretch of `stride` cells, at a place that moves from stretch to stretch, so that
+/// a sample does not keep to one choice of the axis that changes fastest.
+fn sampled_cell(ordinal: usize, stride: usize, size: usize) -> usize {
+    // A multiplicative hash of the ordinal, whose high bits do not repeat with the stride.
+    let spread = (ordinal as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 32;
+    let within = usize::try_from(spread % stride as u64).unwrap_or(0);
+    (ordinal * stride + within).min(size - 1)
 }
 
 /// How many threads judge a grid: `DAGEIST_GRID_THREADS`, or the cores the host gives, up to 8.
@@ -68,6 +88,7 @@ impl<P: Default + 'static> Grid<P> {
             name,
             axes: Vec::new(),
             stack: STACK,
+            sample: None,
         }
     }
 
@@ -75,6 +96,15 @@ impl<P: Default + 'static> Grid<P> {
     #[must_use]
     pub const fn stack(mut self, bytes: usize) -> Self {
         self.stack = bytes;
+        self
+    }
+
+    /// The same grid, of which [`Grid::judge`] judges about `cells` cells spread over every axis
+    /// and projects how long every cell would take, as `DAGEIST_GRID_SAMPLE` asks of every grid of
+    /// a run. A grid of no more cells is judged whole.
+    #[must_use]
+    pub const fn sample(mut self, cells: usize) -> Self {
+        self.sample = Some(cells);
         self
     }
 
@@ -199,8 +229,9 @@ impl<P: Default + 'static> Grid<P> {
             .collect()
     }
 
-    /// Judges every cell with `judge`, on several threads, each taking the next cells when it is
-    /// free. A cell that has not been judged within the deadline ends the process with exit
+    /// Judges every cell with `judge`, or a sample of them where [`Grid::sample`] or
+    /// `DAGEIST_GRID_SAMPLE` asks for one, on several threads, each taking the next cells when it
+    /// is free. A cell that has not been judged within the deadline ends the process with exit
     /// status 124, naming the cell: the judge may call into code that never returns, and a thread
     /// cannot be stopped.
     ///
@@ -209,7 +240,14 @@ impl<P: Default + 'static> Grid<P> {
     /// When `judge` panics: a judge catches the panics that are a cell's outcome itself.
     pub fn judge<O: Outcome>(&self, judge: impl Fn(&P) -> Judged<O> + Sync) -> Verdicts<O> {
         let size = self.size();
-        let threads = thread_count().min(size.div_ceil(CHUNK).max(1));
+        // A sample takes one cell of each stretch of `stride`; the whole grid is a stride of one.
+        let stride = self
+            .sample
+            .or_else(sample_of_run)
+            .filter(|cells| *cells < size)
+            .map_or(1, |cells| size / cells);
+        let taken = size.div_ceil(stride);
+        let threads = thread_count().min(taken.div_ceil(CHUNK).max(1));
         let next = AtomicUsize::new(0);
         let started = Instant::now();
         // The cell each thread is on, and since when, which a watchdog reads.
@@ -220,10 +258,11 @@ impl<P: Default + 'static> Grid<P> {
             let mut partial = Partial::default();
             loop {
                 let from = next.fetch_add(CHUNK, Ordering::Relaxed);
-                if from >= size {
+                if from >= taken {
                     return partial;
                 }
-                for index in from..(from + CHUNK).min(size) {
+                for ordinal in from..(from + CHUNK).min(taken) {
+                    let index = sampled_cell(ordinal, stride, size);
                     *on[thread].lock().expect("the watchdog holds no lock") =
                         Some((index, Instant::now()));
                     partial.record(index, judge(&self.point(index)));
@@ -290,6 +329,7 @@ impl<P: Default + 'static> Grid<P> {
             whole.listed,
             started.elapsed(),
             threads,
+            (stride > 1).then_some(taken),
         )
     }
 }

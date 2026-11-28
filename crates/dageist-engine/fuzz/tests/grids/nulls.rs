@@ -12,7 +12,7 @@ use dageist_engine_fuzz::judge::{Depth, Kind, Question};
 use dageist_engine_fuzz::literals::{self, Literal};
 use dageist_engine_fuzz::places;
 use dageist_engine_fuzz::world::{Column, World};
-use dageist_fuzz::grid::{Grid, Known, Pattern, Scale};
+use dageist_fuzz::grid::{Grid, Known, Pattern};
 use serde_json::json;
 
 #[derive(Default)]
@@ -23,7 +23,7 @@ struct Point {
     literal: Literal,
 }
 
-fn grid(scale: Scale) -> Grid<Point> {
+fn grid() -> Grid<Point> {
     let whole = World::get().classes("column").keep_unless(|_, column| {
         let kind = axes::kind_of_class(column.class.expect("a class"));
         (!kind.ends_with("whole number")).then(|| "no whole number".to_owned())
@@ -32,27 +32,19 @@ fn grid(scale: Scale) -> Grid<Point> {
         (param.entry.family() != dageist_engine::catalog::Family::Compare)
             .then(|| "it is no comparison".to_owned())
     });
-    Grid::<Point>::new(if scale == Scale::Normal {
-        "missing-comparisons"
-    } else {
-        "missing-comparisons-large"
-    })
-    .axis(whole, |point, column| point.column = Some(column.clone()))
-    .axis(comparisons, |point, param| point.param = Some(*param))
-    .axis(axes::orders("order"), |point, first| point.first = *first)
-    .axis(literals::every_value().thin(scale, 4), |point, value| {
-        point.literal.value = Some(value.clone());
-    })
-    .axis(
-        literals::dtype_words().one_of_each(scale, "kind of class", |label, _| {
-            dageist_engine::allowed::Representative::from_name(label)
-                .map_or("none", axes::kind_of_class)
-        }),
-        |point, word| point.literal.word.clone_from(word),
-    )
+    Grid::<Point>::new("missing-comparisons")
+        .axis(whole, |point, column| point.column = Some(column.clone()))
+        .axis(comparisons, |point, param| point.param = Some(*param))
+        .axis(axes::orders("order"), |point, first| point.first = *first)
+        .axis(literals::values_of_run(4), |point, value| {
+            point.literal.value = Some(value.clone());
+        })
+        .axis(literals::dtype_words_of_run(), |point, word| {
+            point.literal.word.clone_from(word);
+        })
 }
 
-fn verdicts(scale: Scale) -> dageist_fuzz::grid::Verdicts<dageist_engine_fuzz::judge::Outcome> {
+fn verdicts() -> dageist_fuzz::grid::Verdicts<dageist_engine_fuzz::judge::Outcome> {
     let question = Question {
         walk_counts: |refusal| {
             matches!(
@@ -65,7 +57,7 @@ fn verdicts(scale: Scale) -> dageist_fuzz::grid::Verdicts<dageist_engine_fuzz::j
         dtypes: false,
         cannot_tell_counts: |_| false,
     };
-    grid(scale).judge(|point| {
+    grid().judge(|point| {
         let column = point.column.as_ref().expect("a column");
         let key = axes::method_given(
             point.param.as_ref().expect("a comparison"),
@@ -139,11 +131,5 @@ fn known() -> Vec<Known<Kind>> {
 #[test]
 fn the_walk_refuses_a_missing_comparison_with_a_literal_for_the_columns_polars_refuses_it_for() {
     // The grid this replaces judged 15,760 cells; it judges at least as many.
-    verdicts(Scale::Normal).assert_agree(&known(), 15_760);
-}
-
-#[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_a_comparison_with_a_literal_as_a_join_key_is_taken_as_polars_does() {
-    verdicts(Scale::Large).assert_agree(&known(), 200_000);
+    verdicts().assert_agree(&known(), 15_760);
 }

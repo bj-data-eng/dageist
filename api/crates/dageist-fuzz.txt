@@ -373,8 +373,11 @@ pub fn dageist_fuzz::generation::bounded_vector<T>(count: usize, item_charge: da
 pub fn dageist_fuzz::generation::forest_from_choices(choices: &[u64], budget: &mut dageist_fuzz::generation::Budget) -> dageist_fuzz::Result<dageist_fuzz::generation::OrderedForest>
 pub mod dageist_fuzz::grid
 pub enum dageist_fuzz::grid::Scale
-pub dageist_fuzz::grid::Scale::Large
-pub dageist_fuzz::grid::Scale::Normal
+pub dageist_fuzz::grid::Scale::Full
+pub dageist_fuzz::grid::Scale::Quick
+impl dageist_fuzz::grid::Scale
+pub fn dageist_fuzz::grid::Scale::from_words(words: core::option::Option<&str>) -> core::result::Result<Self, alloc::string::String>
+pub fn dageist_fuzz::grid::Scale::of_run() -> Self
 pub struct dageist_fuzz::grid::AxisRecord
 pub dageist_fuzz::grid::AxisRecord::choices: usize
 pub dageist_fuzz::grid::AxisRecord::left_out: alloc::vec::Vec<dageist_fuzz::grid::LeftOutRecord>
@@ -421,6 +424,7 @@ pub fn dageist_fuzz::grid::Grid<P>::labels(&self, index: usize) -> alloc::vec::V
 pub const fn dageist_fuzz::grid::Grid<P>::name(&self) -> &'static str
 pub const fn dageist_fuzz::grid::Grid<P>::new(name: &'static str) -> Self
 pub fn dageist_fuzz::grid::Grid<P>::point(&self, index: usize) -> P
+pub const fn dageist_fuzz::grid::Grid<P>::sample(self, cells: usize) -> Self
 pub fn dageist_fuzz::grid::Grid<P>::size(&self) -> usize
 pub const fn dageist_fuzz::grid::Grid<P>::stack(self, bytes: usize) -> Self
 pub struct dageist_fuzz::grid::Judged<O>
@@ -466,7 +470,11 @@ pub dageist_fuzz::grid::Tally::judged: usize
 pub dageist_fuzz::grid::Tally::kinds: alloc::collections::btree::map::BTreeMap<&'static str, usize>
 pub dageist_fuzz::grid::Tally::known: alloc::vec::Vec<dageist_fuzz::grid::KnownTally>
 pub dageist_fuzz::grid::Tally::notes: alloc::collections::btree::map::BTreeMap<&'static str, usize>
+pub dageist_fuzz::grid::Tally::projected_seconds: f64
+pub dageist_fuzz::grid::Tally::sampled: core::option::Option<usize>
+pub dageist_fuzz::grid::Tally::seconds: f64
 pub dageist_fuzz::grid::Tally::stale: alloc::vec::Vec<&'static str>
+pub dageist_fuzz::grid::Tally::threads: usize
 pub dageist_fuzz::grid::Tally::unnamed: usize
 impl dageist_fuzz::grid::Tally
 pub fn dageist_fuzz::grid::Tally::write_to(&self, folder: &std::path::Path) -> core::io::error::Result<std::path::PathBuf>
@@ -484,8 +492,11 @@ pub fn dageist_fuzz::grid::Verdicts<O>::assert_agree(&self, known: &[dageist_fuz
 pub fn dageist_fuzz::grid::Verdicts<O>::axes(&self) -> &[dageist_fuzz::grid::AxisTally]
 pub fn dageist_fuzz::grid::Verdicts<O>::cells_a_second(&self) -> f64
 pub fn dageist_fuzz::grid::Verdicts<O>::count(&self, kind: <O as dageist_fuzz::grid::Outcome>::Kind) -> usize
+pub const fn dageist_fuzz::grid::Verdicts<O>::elapsed(&self) -> (core::time::Duration, usize)
 pub fn dageist_fuzz::grid::Verdicts<O>::judged(&self) -> usize
 pub fn dageist_fuzz::grid::Verdicts<O>::listed(&self) -> impl core::iter::traits::iterator::Iterator<Item = dageist_fuzz::grid::Cell<O>> + '_
+pub fn dageist_fuzz::grid::Verdicts<O>::projected(&self) -> core::time::Duration
+pub const fn dageist_fuzz::grid::Verdicts<O>::sampled(&self) -> core::option::Option<usize>
 pub const fn dageist_fuzz::grid::Verdicts<O>::size(&self) -> usize
 pub fn dageist_fuzz::grid::Verdicts<O>::tally(&self, known: &[dageist_fuzz::grid::Known<<O as dageist_fuzz::grid::Outcome>::Kind>]) -> dageist_fuzz::grid::Tally
 pub trait dageist_fuzz::grid::Kind: core::marker::Copy + core::cmp::Ord + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static

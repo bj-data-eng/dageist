@@ -325,30 +325,43 @@ fn an_axis_given_twice_is_refused() {
 }
 
 #[test]
-fn a_grid_of_normal_scale_keeps_every_nth_choice_and_a_large_one_keeps_them_all() {
+fn a_quick_run_keeps_every_nth_choice_and_a_full_one_keeps_them_all() {
     let values: Vec<u32> = (0..10).collect();
-    let normal = numbers("n", &values).thin(Scale::Normal, 3);
-    assert_eq!(normal.labels().collect::<Vec<_>>(), ["0", "3", "6", "9"]);
-    let thinned = normal.thinned().expect("thinned");
+    let quick = numbers("n", &values).thin(Scale::Quick, 3);
+    assert_eq!(quick.labels().collect::<Vec<_>>(), ["0", "3", "6", "9"]);
+    let thinned = quick.thinned().expect("thinned");
     assert_eq!(
         (thinned.rule.as_str(), thinned.kept, thinned.of),
         ("one choice in every 3", 4, 10)
     );
-    let large = numbers("n", &values).thin(Scale::Large, 3);
-    assert_eq!(large.len(), 10);
-    assert!(large.thinned().is_none());
+    let full = numbers("n", &values).thin(Scale::Full, 3);
+    assert_eq!(full.len(), 10);
+    assert!(full.thinned().is_none());
 }
 
 #[test]
-fn a_grid_of_normal_scale_keeps_the_first_choice_of_each_kind_and_a_large_one_keeps_them_all() {
+fn a_quick_run_keeps_the_first_choice_of_each_kind_and_a_full_one_keeps_them_all() {
     let values: Vec<u32> = (0..10).collect();
     let parity = |_: &str, value: &u32| value % 3;
-    let normal = numbers("n", &values).one_of_each(Scale::Normal, "remainder of three", parity);
-    assert_eq!(normal.labels().collect::<Vec<_>>(), ["0", "1", "2"]);
-    let thinned = normal.thinned().expect("thinned");
+    let quick = numbers("n", &values).one_of_each(Scale::Quick, "remainder of three", parity);
+    assert_eq!(quick.labels().collect::<Vec<_>>(), ["0", "1", "2"]);
+    let thinned = quick.thinned().expect("thinned");
     assert_eq!(thinned.rule, "one of each remainder of three");
-    let large = numbers("n", &values).one_of_each(Scale::Large, "remainder of three", parity);
-    assert_eq!(large.len(), 10);
+    let full = numbers("n", &values).one_of_each(Scale::Full, "remainder of three", parity);
+    assert_eq!(full.len(), 10);
+}
+
+#[test]
+fn a_run_is_full_unless_it_asks_for_a_quick_one() {
+    assert_eq!(Scale::from_words(None), Ok(Scale::Full));
+    assert_eq!(Scale::from_words(Some("")), Ok(Scale::Full));
+    assert_eq!(Scale::from_words(Some("full")), Ok(Scale::Full));
+    assert_eq!(Scale::from_words(Some("quick")), Ok(Scale::Quick));
+    assert!(
+        Scale::from_words(Some("large"))
+            .expect_err("no such scale")
+            .contains("`full` or `quick`")
+    );
 }
 
 #[test]
@@ -424,4 +437,67 @@ fn a_campaign_draws_a_cell_of_the_grid_from_its_entropy() {
     assert!(!drawn.is_empty());
     let empty: Grid<Point> = Grid::new("empty").axis(Choices::new("none"), |_, _: &u32| {});
     assert!(empty.draw(&mut Entropy::new(&bytes)).is_err());
+}
+
+#[test]
+fn a_sample_judges_about_the_cells_asked_spread_over_every_axis_and_projects_the_whole() {
+    let values: Vec<u32> = (0..100).collect();
+    let seen = Mutex::new(BTreeSet::new());
+    let verdicts = grid(&values, &values).sample(500).judge(|point| {
+        seen.lock()
+            .expect("no judge panics")
+            .insert((point.left, point.right));
+        toy(point)
+    });
+    let seen = seen.into_inner().expect("no judge panics");
+    // Each cell of the sample is another, and about as many as were asked are judged.
+    assert_eq!(verdicts.sampled(), Some(seen.len()));
+    assert!((500..=510).contains(&seen.len()), "{}", seen.len());
+    // The sample reaches every choice of the axis that changes slowly and many of the fast one.
+    let lefts: BTreeSet<u32> = seen.iter().map(|(left, _)| *left).collect();
+    let rights: BTreeSet<u32> = seen.iter().map(|(_, right)| *right).collect();
+    assert_eq!(lefts.len(), 100);
+    assert!(rights.len() > 50, "{}", rights.len());
+    // The whole grid is 20 times the sample, and so is the time it is projected to take.
+    let (elapsed, _) = verdicts.elapsed();
+    let ratio = verdicts.projected().as_secs_f64() / elapsed.as_secs_f64();
+    assert!(
+        (ratio - 10_000.0 / seen.len() as f64).abs() < 1e-6,
+        "{ratio}"
+    );
+    let tally = verdicts.tally(&[]);
+    assert_eq!(tally.sampled, Some(seen.len()));
+    assert_eq!(tally.cells, 10_000);
+}
+
+#[test]
+fn a_sample_fails_on_a_cell_no_line_names_and_not_on_a_line_it_does_not_meet() {
+    let values: Vec<u32> = (0..100).collect();
+    let odd = Known::new(Toy::Differ, Pattern::new(), "an odd sum differs");
+    let nine = Known::new(Toy::Unbuildable, Pattern::new(), "nine cannot be built");
+    let never = Known::new(
+        Toy::Differ,
+        Pattern::new().is("left", "1000"),
+        "no such left",
+    );
+    // The line of no cell and a floor beyond the sample do not fail a sample.
+    grid(&values, &values)
+        .sample(400)
+        .judge(toy)
+        .assert_agree(&[odd, nine, never], 10_000);
+    // The cells no line names do.
+    let failure = failure_of(|| {
+        grid(&values, &values)
+            .sample(400)
+            .judge(toy)
+            .assert_agree(&[], 1)
+    });
+    assert!(failure.contains("cells that no line names"), "{failure}");
+}
+
+#[test]
+fn a_grid_no_larger_than_the_sample_asked_is_judged_whole() {
+    let verdicts = grid(&[1, 2, 3], &[1, 2]).sample(100).judge(toy);
+    assert_eq!(verdicts.sampled(), None);
+    assert_eq!(verdicts.projected(), verdicts.elapsed().0);
 }

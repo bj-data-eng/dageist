@@ -38,18 +38,26 @@ use dageist_fuzz::grid::{Choices, Grid, Known, Pattern, Scale, Verdicts};
 use serde_json::{Value, json};
 
 /// The numbers a grid writes: whole numbers and numbers with a fraction at the edges of every class.
-/// At normal scale one of each kind: a whole number of `Int32`, one past it, a fraction a `Float32`
-/// holds and one past what it holds.
-fn numbers(scale: Scale) -> Choices<Written> {
+/// A quick run keeps one of each kind: a whole number of `Int32`, one past it, a fraction a
+/// `Float32` holds and one past what it holds.
+fn numbers() -> Choices<Written> {
     literals::edge_integers()
         .and(literals::edge_floats())
         .named("number")
-        .one_of_each(scale, "kind of number", |_, written| match written {
-            Written::Integer(value) if i32::try_from(*value).is_ok() => "a whole number of Int32",
-            Written::Integer(_) => "a whole number past Int32",
-            Written::Float(value) if value.abs() <= f64::from(f32::MAX) => "a fraction of Float32",
-            _ => "a fraction past Float32",
-        })
+        .one_of_each(
+            Scale::of_run(),
+            "kind of number",
+            |_, written| match written {
+                Written::Integer(value) if i32::try_from(*value).is_ok() => {
+                    "a whole number of Int32"
+                }
+                Written::Integer(_) => "a whole number past Int32",
+                Written::Float(value) if value.abs() <= f64::from(f32::MAX) => {
+                    "a fraction of Float32"
+                }
+                _ => "a fraction past Float32",
+            },
+        )
 }
 
 /// How a number stands: a named case of the shapes Polars keeps an open number open through.
@@ -138,11 +146,14 @@ fn kept() -> (Vec<&'static Entry>, Vec<&'static Entry>) {
         .iter()
         .map(|(_, entry)| *entry)
         .collect();
+    // The chains of three take one call of each family: every call three deep is the cube of
+    // them, which no grid can run.
+    let mut families = std::collections::BTreeSet::new();
     let few = axes::calls_that_do("call", Does::Keeps, &literals::FALLBACKS)
         .and(axes::calls_that_do("call", Does::Aggregates, &literals::FALLBACKS).named("call"))
-        .one_of_each(Scale::Normal, "family", |_, entry| entry.family())
         .iter()
         .map(|(_, entry)| *entry)
+        .filter(|entry| families.insert(format!("{:?}", entry.family())))
         .collect();
     (kept, few)
 }
@@ -252,9 +263,9 @@ fn calls() -> Vec<(String, Vec<Value>)> {
 }
 
 /// The calls that follow a struct of a number: every call given nothing that the tables allow
-/// after a struct, the first of each family of them at normal scale, and the field of the number
+/// after a struct, and the field of the number
 /// read and followed by its absolute value or by the counts of it.
-fn struct_calls(scale: Scale) -> Vec<(String, Vec<Value>)> {
+fn struct_calls() -> Vec<(String, Vec<Value>)> {
     let reads: Vec<(String, Vec<Value>)> = axes::calls_on("call", Representative::Struct)
         .keep_unless(|_, (entry, effect)| {
             (entry
@@ -264,7 +275,7 @@ fn struct_calls(scale: Scale) -> Vec<(String, Vec<Value>)> {
                 || matches!(effect, axes::Effect::Refused | axes::Effect::NotKnown))
             .then(|| "the tables allow it after no struct, or it needs a parameter".to_owned())
         })
-        .one_of_each(scale, "family", |_, (entry, _)| entry.family())
+        .one_of_each(Scale::of_run(), "family", |_, (entry, _)| entry.family())
         .iter()
         .map(|(_, (entry, _))| (entry.id().as_str().to_owned(), vec![named(entry)]))
         .collect();
@@ -319,7 +330,7 @@ fn whole_calls() -> Vec<(String, Vec<Value>)> {
 
 /// The chains a grid puts in its places, each by its form and its calls. A repeated number stands
 /// in a key only: Polars takes its length for the rows of the other table, which the walk cannot.
-fn chains(scale: Scale, repeated: bool, whole: bool) -> Choices<Chain> {
+fn chains(repeated: bool, whole: bool) -> Choices<Chain> {
     let mut axis = Choices::new("chain");
     let mut add = |form: Form, label: &str, calls: Vec<Value>| {
         axis = std::mem::replace(&mut axis, Choices::new("chain"))
@@ -356,7 +367,7 @@ fn chains(scale: Scale, repeated: bool, whole: bool) -> Choices<Chain> {
         Form::CountedValues,
     ] {
         debug_assert!(form.is_a_struct());
-        for (label, calls) in struct_calls(scale) {
+        for (label, calls) in struct_calls() {
             add(form, &label, calls);
         }
     }
@@ -522,14 +533,8 @@ fn case_of(point: &Point) -> Result<Case, String> {
     )
 }
 
-fn grid(
-    name: &'static str,
-    scale: Scale,
-    repeated: bool,
-    whole: bool,
-    places: Choices<Place>,
-) -> Grid<Point> {
-    let numbers = numbers(scale).keep_unless(|_, written| {
+fn grid(name: &'static str, repeated: bool, whole: bool, places: Choices<Place>) -> Grid<Point> {
+    let numbers = numbers().keep_unless(|_, written| {
         (whole && !matches!(written, Written::Integer(_)))
             .then(|| "a call only whole numbers take is crossed with whole numbers".to_owned())
     });
@@ -537,7 +542,7 @@ fn grid(
         .axis(numbers, |point, written| {
             point.number = Some(written.clone());
         })
-        .axis(chains(scale, repeated, whole), |point, chain| {
+        .axis(chains(repeated, whole), |point, chain| {
             point.chain = Some(chain.clone());
         })
         .axis(places, |point, place| point.place = Some(*place))
@@ -548,36 +553,20 @@ fn question() -> Question {
         .cannot_tell(|words| words.contains(&Unknown::AnOpenNumberInAKey.to_string()))
 }
 
-fn keys_verdicts(scale: Scale) -> Verdicts<Outcome> {
+fn keys_verdicts() -> Verdicts<Outcome> {
     let question = question();
-    let name = if scale == Scale::Normal {
-        "open-keys"
-    } else {
-        "open-keys-large"
-    };
-    grid(name, scale, true, false, keys()).judge(|point| question.judge(case_of(point)))
+    grid("open-keys", true, false, keys()).judge(|point| question.judge(case_of(point)))
 }
 
-fn elsewhere_verdicts(scale: Scale) -> Verdicts<Outcome> {
+fn elsewhere_verdicts() -> Verdicts<Outcome> {
     let question = Question::any_refusal().with_dtypes();
-    let name = if scale == Scale::Normal {
-        "open-elsewhere"
-    } else {
-        "open-elsewhere-large"
-    };
-    grid(name, scale, false, false, elsewhere()).judge(|point| question.judge(case_of(point)))
+    grid("open-elsewhere", false, false, elsewhere()).judge(|point| question.judge(case_of(point)))
 }
 
 fn whole_number_verdicts() -> Verdicts<Outcome> {
     let question = question().with_dtypes();
-    grid(
-        "open-whole-numbers",
-        Scale::Normal,
-        false,
-        true,
-        keys().and(elsewhere()),
-    )
-    .judge(|point| question.judge(case_of(point)))
+    grid("open-whole-numbers", false, true, keys().and(elsewhere()))
+        .judge(|point| question.judge(case_of(point)))
 }
 
 /// The calls that are no elementwise ones by the tables of contexts: a key of a join refuses them
@@ -692,12 +681,12 @@ fn known_elsewhere() -> Vec<Known<Kind>> {
 
 #[test]
 fn a_number_typed_without_a_dtype_stays_open_through_the_calls_that_keep_it_as_a_key() {
-    keys_verdicts(Scale::Normal).assert_agree(&known_keys(), 80_000);
+    keys_verdicts().assert_agree(&known_keys(), 80_000);
 }
 
 #[test]
 fn a_number_typed_without_a_dtype_is_judged_as_before_in_a_select_a_filter_and_a_sort_key() {
-    elsewhere_verdicts(Scale::Normal).assert_agree(&known_elsewhere(), 90_000);
+    elsewhere_verdicts().assert_agree(&known_elsewhere(), 90_000);
 }
 
 #[test]
@@ -720,18 +709,6 @@ fn a_whole_number_stays_open_through_the_calls_only_whole_numbers_take() {
     whole_number_verdicts().assert_agree(&known, 1_000);
 }
 
-#[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_an_open_number_in_a_key_is_taken_as_polars_does() {
-    keys_verdicts(Scale::Large).assert_agree(&known_keys(), 400_000);
-}
-
-#[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_an_open_number_elsewhere_is_taken_as_polars_does() {
-    elsewhere_verdicts(Scale::Large).assert_agree(&known_elsewhere(), 400_000);
-}
-
 // ---------------------------------------------------------------------------
 // A number that starts a comparison for missing values
 
@@ -752,7 +729,7 @@ fn missing_comparisons() -> Choices<Param> {
     })
 }
 
-fn missing_verdicts(scale: Scale) -> Verdicts<Outcome> {
+fn missing_verdicts() -> Verdicts<Outcome> {
     let whole = World::get().classes("column").keep_unless(|_, column| {
         let kind = axes::kind_of_class(column.class.expect("a class"));
         (!kind.ends_with("whole number")).then(|| "no whole number".to_owned())
@@ -760,30 +737,26 @@ fn missing_verdicts(scale: Scale) -> Verdicts<Outcome> {
     let numbers = literals::edge_integers()
         .and(literals::edge_floats())
         .named("number")
-        .thin(scale, 2);
-    let grid = Grid::<Missing>::new(if scale == Scale::Normal {
-        "missing-start"
-    } else {
-        "missing-start-large"
-    })
-    .axis(whole, |point, column| point.column = Some(column.clone()))
-    .axis(numbers, |point, number| {
-        point.literal.value = Some(number.clone());
-    })
-    .axis(missing_comparisons(), |point, param| {
-        point.param = Some(*param)
-    })
-    .axis(
-        Choices::of(
-            "order",
-            [("the column first", false), ("the number first", true)],
-        ),
-        |point, first| point.first = *first,
-    )
-    .axis(
-        Choices::of("place", [("a select", false), ("a join's key", true)]),
-        |point, key| point.key = *key,
-    );
+        .thin(Scale::of_run(), 2);
+    let grid = Grid::<Missing>::new("missing-start")
+        .axis(whole, |point, column| point.column = Some(column.clone()))
+        .axis(numbers, |point, number| {
+            point.literal.value = Some(number.clone());
+        })
+        .axis(missing_comparisons(), |point, param| {
+            point.param = Some(*param)
+        })
+        .axis(
+            Choices::of(
+                "order",
+                [("the column first", false), ("the number first", true)],
+            ),
+            |point, first| point.first = *first,
+        )
+        .axis(
+            Choices::of("place", [("a select", false), ("a join's key", true)]),
+            |point, key| point.key = *key,
+        );
     let question = Question::any_refusal().with_dtypes();
     grid.judge(|point| {
         question.judge((|| {
@@ -819,11 +792,5 @@ fn missing_verdicts(scale: Scale) -> Verdicts<Outcome> {
 
 #[test]
 fn the_dtype_of_a_number_that_starts_a_missing_comparison_is_the_dtype_polars_gives() {
-    missing_verdicts(Scale::Normal).assert_agree(&[], 2_000);
-}
-
-#[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_a_number_that_starts_a_missing_comparison_is_taken_as_polars_does() {
-    missing_verdicts(Scale::Large).assert_agree(&[], 4_000);
+    missing_verdicts().assert_agree(&[], 2_000);
 }

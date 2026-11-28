@@ -4,7 +4,7 @@
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::document::Dtype;
-use dageist_fuzz::grid::Choices;
+use dageist_fuzz::grid::{Choices, Scale};
 use serde_json::{Value, json};
 
 use crate::doc;
@@ -441,6 +441,40 @@ pub fn every_value() -> Choices<Written> {
         .and(edge_floats())
         .and(edge_texts())
         .and(flags_and_null())
+}
+
+/// Every value of [`every_value`] at the run's [`Scale`]: a quick run keeps one value in `every`
+/// of each kind, the first of each among them, so that no kind is skipped.
+#[must_use]
+pub fn values_of_run(every: usize) -> Choices<Written> {
+    let seen = std::cell::RefCell::new(std::collections::BTreeMap::<&str, usize>::new());
+    every_value().one_of_each(
+        Scale::of_run(),
+        &format!("one value in every {every} of each kind"),
+        |_, written| {
+            let kind = match written {
+                Written::Integer(_) => "a whole number",
+                Written::Float(_) => "a number with a fraction",
+                Written::Text(_) => "a text",
+                Written::Flag(_) => "a flag",
+                Written::Null => "a null",
+            };
+            let mut seen = seen.borrow_mut();
+            let at = seen.entry(kind).or_default();
+            let place = *at;
+            *at += 1;
+            (kind, place / every.max(1))
+        },
+    )
+}
+
+/// Every word of [`dtype_words`] at the run's [`Scale`]: a quick run keeps none and one of each
+/// kind of class.
+#[must_use]
+pub fn dtype_words_of_run() -> Choices<Option<String>> {
+    dtype_words().one_of_each(Scale::of_run(), "kind of class", |label, _| {
+        Representative::from_name(label).map_or("none", crate::axes::kind_of_class)
+    })
 }
 
 /// The words of the dtypes a literal can be given in a document, each a scalar class whose dtype

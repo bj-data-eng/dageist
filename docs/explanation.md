@@ -3293,7 +3293,7 @@ disagreements of #207 were found by grids built by hand, in three rounds, and no
 product of named axes, and Polars judges every cell of it.
 
 The grids are one framework with two layers, as campaigns are. `dageist_fuzz::grid` owns the mechanics: an axis
-of labelled choices that names what it leaves out and why and how it thins at normal scale, the product of the
+of labelled choices that names what it leaves out and why and how a quick run thins it, the product of the
 axes, which makes each cell from its number so a grid of millions never lies in memory, the threads that judge
 the cells on every core the host gives, each bounded by a deadline that ends the run naming a cell that does not
 end, the lines that name the cells not agreed on, and the tally. `dageist-engine-fuzz` owns what the grids are
@@ -3388,8 +3388,9 @@ and after the call to Polars'.
 
 A grid is cheap to run, so it is a gate of the engine's tests and a campaign is not one for each change: the
 campaigns explore how calls compose, in the background, and a finding becomes a new choice or a new axis of a grid,
-as [the how-to](how-to.md#hold-a-rule-to-polars-with-a-grid) says. The grids of the normal tests run in seconds to a
-few minutes each; the large ones cross every value with every dtype, ask the rows of every cell, and run on request.
+as [the how-to](how-to.md#hold-a-rule-to-polars-with-a-grid) says. A run judges every choice of every axis unless it asks for a quick one, and a sample of each grid projects
+how long the whole would take; the grids of a literal by its role and of a comparison with a literal are asked
+the rows of every cell too, on request.
 
 ## What The Step Editor Storyboard Has Settled
 

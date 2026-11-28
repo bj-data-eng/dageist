@@ -300,9 +300,11 @@ cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F 
 The engine's grids and campaign, from the repository root. The package
 `dageist-engine-fuzz` is a workspace member outside `default-members`, so name
 it; it builds Polars. Its tests are the framework's contracts (`framework`),
-the grids (`grids`, a few minutes) and the campaign target's fixed seed and
-kept cases (`allowed_fuzz`); the large grids and campaigns are ignored and run
-on request, as [the how-to](docs/how-to.md#hold-a-rule-to-polars-with-a-grid)
+the grids (`grids`, which run every choice of every axis and take the longest;
+`DAGEIST_GRID_SAMPLE` projects their time, `DAGEIST_GRID_SCALE=quick` thins them)
+and the campaign target's fixed seed and kept cases (`allowed_fuzz`); the
+grids that ask the rows of every cell and the campaigns are ignored and run on
+request, as [the how-to](docs/how-to.md#hold-a-rule-to-polars-with-a-grid)
 says:
 
 ```sh

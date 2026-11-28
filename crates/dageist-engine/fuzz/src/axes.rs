@@ -4,7 +4,7 @@
 
 use dageist_engine::allowed::{self, After, Chosen, Context, Outer, Place, Representative, Shape};
 use dageist_engine::catalog::{self, Applies, Entry, Kind, Parameter, Role, ValueType};
-use dageist_fuzz::grid::Choices;
+use dageist_fuzz::grid::{Choices, Scale};
 use serde_json::Value;
 
 use crate::doc;
@@ -287,6 +287,27 @@ pub fn gives_after(entry: &'static Entry, class: Representative) -> Option<Repre
     }
 }
 
+/// The family of `entry` and what the tables say it does after a column of each measured class:
+/// two calls of one family that the tables measured alike stand for each other in a quick run.
+#[must_use]
+pub fn behaviour(entry: &'static Entry) -> String {
+    let effects: Vec<Effect> = Representative::MEASURED
+        .iter()
+        .map(|class| effect(entry, *class))
+        .collect();
+    format!("{:?} {effects:?}", entry.family())
+}
+
+/// `calls` at the run's [`Scale`]: a quick run keeps one call of each [`behaviour`].
+#[must_use]
+pub fn calls_of_run(calls: Choices<&'static Entry>) -> Choices<&'static Entry> {
+    calls.one_of_each(
+        Scale::of_run(),
+        "family and what the tables say it does after each class",
+        |_, entry| behaviour(entry),
+    )
+}
+
 /// What the tables say `entry`, given what [`filler`] gives its needed parameters, does after a
 /// column of `class` in a select.
 #[must_use]
@@ -494,17 +515,14 @@ pub fn not_aggregating(name: &'static str, class: Representative) -> Choices<&'s
 }
 
 /// The values a parameter is given where a grid crosses its options: a flag set each way, every
-/// word of a choice, whole numbers and numbers with a fraction at the edges, which a grid of normal
-/// scale thins, and a name that is new and one a column of the world has. A parameter of another
-/// kind has none.
+/// word of a choice, whole numbers and numbers with a fraction at every edge, of which a quick run
+/// keeps one in four, and a name that is new and one a column of the world has. A parameter of
+/// another kind has none.
 #[must_use]
-pub fn option_values(
-    parameter: &Parameter,
-    scale: dageist_fuzz::grid::Scale,
-) -> Vec<(String, Value)> {
+pub fn option_values(parameter: &Parameter) -> Vec<(String, Value)> {
     let edges = |values: Choices<Written>| -> Vec<(String, Value)> {
         values
-            .thin(scale, 4)
+            .thin(Scale::of_run(), 4)
             .iter()
             .map(|(label, written)| (label.to_owned(), written.json()))
             .collect()
@@ -521,7 +539,7 @@ pub fn option_values(
         Kind::Value(ValueType::Integer) => edges(crate::literals::edge_integers()),
         Kind::Value(ValueType::Float) => edges(crate::literals::edge_floats()),
         Kind::Expression(_) if parameter.role() == Role::Share => crate::literals::edge_floats()
-            .thin(scale, 4)
+            .thin(Scale::of_run(), 4)
             .iter()
             .map(|(label, written)| (label.to_owned(), written.expression(None)))
             .collect(),
@@ -543,7 +561,6 @@ pub fn option_values(
 pub fn settings(
     entry: &'static Entry,
     column: Option<&Column>,
-    scale: dageist_fuzz::grid::Scale,
 ) -> Result<Vec<(String, Value)>, String> {
     let mut base = serde_json::Map::new();
     for parameter in entry
@@ -555,7 +572,7 @@ pub fn settings(
     }
     let mut settings = vec![("defaults".to_owned(), Value::Object(base.clone()))];
     for parameter in entry.parameters() {
-        for (label, value) in option_values(parameter, scale) {
+        for (label, value) in option_values(parameter) {
             let mut given = base.clone();
             given.insert(parameter.name().to_owned(), value);
             settings.push((

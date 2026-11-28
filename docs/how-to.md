@@ -978,27 +978,41 @@ product of them, the threads that judge every cell, the `Known` lines and the ta
 package `dageist-engine-fuzz`, in [`crates/dageist-engine/fuzz/`](../crates/dageist-engine/fuzz/src/lib.rs):
 the judge of a cell (`judge`), the one table every grid runs on (`world`), the literals at the edges of every
 class (`literals`), every place an expression stands (`places`), and the axes the catalogue and the tables
-give (`axes`). The grids are in `crates/dageist-engine/fuzz/tests/grids/`. The grids of the normal tests
-take seconds to a few minutes each:
+give (`axes`). The grids are in `crates/dageist-engine/fuzz/tests/grids/`. A run judges every cell of
+every grid:
 
 ```sh
 cargo test --offline --locked -p dageist-engine-fuzz --test grids
 cargo test --offline --locked -p dageist-engine-fuzz --test grids literal::
 ```
 
-The large grids cross every value with every dtype and ask Polars the rows of every cell. They are ignored
-in the normal run, as a campaign is, and take minutes to an hour each; run them alone:
+The grids of a literal by its role and of a comparison with a literal are asked the rows of every cell as
+well, where the normal run asks the schema and the rows only where the walk refuses. Those two are ignored in
+the normal run, as a campaign is; run them alone:
 
 ```sh
-cargo test --offline --locked -p dageist-engine-fuzz --test grids the_large \
+cargo test --offline --locked -p dageist-engine-fuzz --test grids literal::at_the_rows \
   -- --ignored --nocapture --test-threads 1
+```
+
+A run can be smaller where a full one is not needed. `DAGEIST_GRID_SCALE=quick` keeps of each thinned axis the
+choices its rule keeps, one value in several of each kind, one dtype of each kind of class, one call of each family
+and behaviour the tables measure, and the tally says how each axis was thinned. `DAGEIST_GRID_SAMPLE=<cells>`
+judges about that many cells of each grid, spread over every axis, and says how long the whole grid would take
+on the same threads, so a grid's cost is known before it is run whole; a sample fails only on a cell no line
+names. To project every grid on a build:
+
+```sh
+DAGEIST_GRID_SAMPLE=20000 cargo test --offline --locked -p dageist-engine-fuzz --test grids \
+  -- --include-ignored --nocapture --test-threads 1
 ```
 
 `DAGEIST_GRID_THREADS` sets how many threads judge the cells (the cores the host has, up to 8),
 `DAGEIST_GRID_DEADLINE_SECS` how long a cell may take before the run ends naming it (60), and
 `DAGEIST_GRID_ALL=1` names every cell of a failure and not the first 80. With `--nocapture` each grid prints
 its tally: the cells of each kind, what decided them, how many cells a second it was judged at, what each
-axis leaves out and why, how it was thinned at normal scale, and how many cells each line names.
+axis leaves out and why, how a quick run thinned it, how long the run took or a sample projects, and how
+many cells each line names.
 `DAGEIST_GRID_TALLY_DIR` writes the same as `<grid>.json` in that folder, which is how a change shows that a
 grid keeps or widens its coverage: run the grid before and after, and compare the two files.
 
@@ -1013,7 +1027,7 @@ framework, and what an axis leaves out it names, with why:
 | A literal | `literals::every_value()` (or `edge_integers`, `edge_floats`, `edge_texts`) and `literals::dtype_words()`; `literals::one_of(class)` and `null_of(class)` for one of a class |
 | A method, a parameter, a call | `axes::entries`, `expression_parameters`, `literal_parameters` (by role), `aggregates`, `not_aggregating`, `calls_that_do` (by what the tables say a call does), `calls_on`; `axes::call_of`, `filler` and `method_given` build them |
 | Where an expression stands | `places::places(name)` or `step_places(name)`, and `places::at(context, expression, table)` |
-| The options of a call | `axes::settings(entry, column, scale)` |
+| The options of a call | `axes::settings(entry, column)` |
 | The order of two operands | `axes::orders(name)` |
 
 1. Write a struct that derives `Default`, the point: what each axis sets.
@@ -1021,9 +1035,11 @@ framework, and what an axis leaves out it names, with why:
    `keep_unless`, which names each choice it drops with the reason, never by building a shorter list. A
    form the catalogue holds no axis of, such as how a number stands in a condition or a struct, is a named
    case: a `Choices::of` of its own labelled shapes, each with what makes it a shape and not a call.
-3. Thin an axis at normal scale with `thin(scale, every)` or `one_of_each(scale, rule, kind)`, which keep
-   every choice at large scale and say in the tally how they thinned. A grid of normal scale keeps the cells
-   of the grid it replaces, or more.
+3. Keep every choice: a full run keeps every cell of the grid it replaces, or more, and a grid that grows
+   takes longer to run, which is what its coverage costs. Say how a quick run thins a large axis with
+   `thin(Scale::of_run(), every)` or `one_of_each(Scale::of_run(), rule, kind)`, or the run-scale axes
+   `literals::values_of_run`, `literals::dtype_words_of_run` and `axes::calls_of_run`, so that a quick run
+   still meets every kind of choice.
 4. Judge every cell with `grid.judge(|point| question.judge(build(point)))`, where `build` returns the
    `Case` of the point or the words of why it cannot be built. The `Question` says which refusals answer
    it; ask `Depth::Rows` where the outcome depends on the rows (a strict cast of a value, a length, a

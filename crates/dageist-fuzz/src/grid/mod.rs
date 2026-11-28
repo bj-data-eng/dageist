@@ -6,7 +6,8 @@
 //! owns the mechanics and knows nothing of what a cell is about.
 //!
 //! - [`Choices`] are the labelled values of one axis, with what the axis leaves out and why, and
-//!   the rule by which a grid of normal [`Scale`] thins it.
+//!   the rule by which a quick run thins it: a run is of full [`Scale`], every cell, unless
+//!   `DAGEIST_GRID_SCALE=quick` asks for the choices each thinned axis keeps.
 //! - [`Grid`] is the product of axes. Each cell is made from its number when a thread takes it,
 //!   so a grid of millions of cells holds none of them in memory. [`Grid::judge`] judges every
 //!   cell on several threads, each cell bounded by a deadline that ends the process with the
@@ -22,13 +23,19 @@
 //!   each axis left out and thinned. It is printed, and written as JSON to the folder named by
 //!   `DAGEIST_GRID_TALLY_DIR` where that is set, which is how a grid is shown to keep or widen
 //!   its coverage across a change.
+//! - [`Grid::sample`] judges about as many cells as it is given, spread over every axis, and the
+//!   verdicts project how long the whole grid takes, which the tally records: a grid's cost is
+//!   known before it is run whole.
 //! - [`Grid::draw`] picks a cell from campaign entropy, so a campaign can sample the space a grid
 //!   enumerates, and a finding it reduces is a cell with labels.
 //!
 //! Environment: `DAGEIST_GRID_THREADS` sets the number of threads (by default the cores the host
 //! gives, at most 8), `DAGEIST_GRID_DEADLINE_SECS` the deadline of a cell (60 seconds),
-//! `DAGEIST_GRID_ALL` names every unnamed cell of a failure rather than the first 80, and
-//! `DAGEIST_GRID_TALLY_DIR` the folder tallies are written to.
+//! `DAGEIST_GRID_ALL` names every unnamed cell of a failure rather than the first 80,
+//! `DAGEIST_GRID_TALLY_DIR` the folder tallies are written to, `DAGEIST_GRID_SCALE=quick` a run
+//! that thins the axes a grid says how to thin, and `DAGEIST_GRID_SAMPLE=<cells>` a run that
+//! judges about that many cells of each grid, spread over every axis, and projects how long every
+//! cell takes.
 
 mod axis;
 mod known;

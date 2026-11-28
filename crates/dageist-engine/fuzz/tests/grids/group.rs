@@ -16,7 +16,9 @@
 //!   every class, followed by every call, given once and twice;
 //! - no key or no aggregate, and chains that do not end in one finishing call.
 //!
-//! At normal scale the calls keep the first of each family, the classes every one.
+//! A run judges every choice of every axis; what one leaves out it names, with why. A quick run
+//! keeps one call of each family and behaviour the tables measure, and one class of each kind for
+//! the nulls and the literals a predicate starts from.
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::catalog::{Applies, Entry};
@@ -142,10 +144,8 @@ enum KeyForm {
     CalledAndN(&'static Entry),
 }
 
-fn key_forms(scale: Scale) -> Choices<KeyForm> {
-    let calls =
-        axes::entries("form", Applies::Expression)
-            .one_of_each(scale, "family", |_, entry| entry.family());
+fn key_forms() -> Choices<KeyForm> {
+    let calls = axes::calls_of_run(axes::entries("form", Applies::Expression));
     let mut axis = Choices::of(
         "form",
         [
@@ -219,9 +219,7 @@ fn keys_verdicts() -> Verdicts<Outcome> {
         .axis(classes(), |point, column| {
             point.column = Some(column.clone())
         })
-        .axis(key_forms(Scale::Normal), |point, form| {
-            point.form = Some(form.clone())
-        })
+        .axis(key_forms(), |point, form| point.form = Some(form.clone()))
         .axis(maintain_order(), |point, order| point.order = *order)
         .judge(|point| question.judge(key_case(point)))
 }
@@ -341,12 +339,8 @@ enum Listed {
     ThenFirst(&'static Entry),
 }
 
-fn listed_forms(scale: Scale) -> Choices<Listed> {
-    let calls = axes::not_aggregating("then", Representative::Int64).one_of_each(
-        scale,
-        "family",
-        |_, entry| entry.family(),
-    );
+fn listed_forms() -> Choices<Listed> {
+    let calls = axes::calls_of_run(axes::not_aggregating("then", Representative::Int64));
     let mut axis = Choices::of("then", [("the column", Listed::TheColumn)]);
     for (label, entry) in calls.iter() {
         axis = axis
@@ -389,7 +383,7 @@ fn listed_verdicts() -> Verdicts<Outcome> {
         .axis(classes(), |point, column| {
             point.column = Some(column.clone())
         })
-        .axis(listed_forms(Scale::Normal), |point, then| {
+        .axis(listed_forms(), |point, then| {
             point.then = Some(then.clone())
         })
         .judge(|point| question.judge(listed_case(point)))
@@ -425,14 +419,14 @@ struct Shortcut {
 
 /// Every call that finishes a group by but `agg` and `having`, which the other grids cross, with
 /// every setting of its options.
-fn shortcuts(scale: Scale) -> Choices<(&'static Entry, Value)> {
+fn shortcuts() -> Choices<(&'static Entry, Value)> {
     let mut axis = Choices::new("shortcut");
     for (label, entry) in axes::entries("shortcut", Applies::Grouped).iter() {
         if matches!(label, "LazyGroupBy.agg" | "LazyGroupBy.having") {
             axis = axis.leave_out(label, "the grids of aggregates and of predicates cross it");
             continue;
         }
-        match axes::settings(entry, None, scale) {
+        match axes::settings(entry, None) {
             Ok(settings) => {
                 for (setting, arguments) in settings {
                     axis = axis.with(format!("{label} {setting}"), (*entry, arguments));
@@ -465,7 +459,7 @@ fn shortcut_case(point: &Shortcut) -> Result<Case, String> {
 fn shortcuts_verdicts() -> Verdicts<Outcome> {
     let question = question();
     Grid::<Shortcut>::new("group-shortcuts")
-        .axis(shortcuts(Scale::Normal), |point, (entry, arguments)| {
+        .axis(shortcuts(), |point, (entry, arguments)| {
             point.entry = Some(entry);
             point.arguments = arguments.clone();
         })
@@ -524,12 +518,12 @@ struct Predicate {
     then: Option<&'static Entry>,
 }
 
-fn predicates(scale: Scale) -> Choices<Predicate> {
-    let calls: Vec<(String, &'static Entry)> = axes::entries("predicate", Applies::Expression)
-        .one_of_each(scale, "family", |_, entry| entry.family())
-        .iter()
-        .map(|(label, entry)| (label.to_owned(), *entry))
-        .collect();
+fn predicates() -> Choices<Predicate> {
+    let calls: Vec<(String, &'static Entry)> =
+        axes::calls_of_run(axes::entries("predicate", Applies::Expression))
+            .iter()
+            .map(|(label, entry)| (label.to_owned(), *entry))
+            .collect();
     let mut starts = vec![
         ("the values".to_owned(), Start::TheColumn),
         ("the first".to_owned(), Start::TheFirst),
@@ -540,7 +534,7 @@ fn predicates(scale: Scale) -> Choices<Predicate> {
             .iter()
             .map(|class| (class.name(), *class)),
     )
-    .one_of_each(scale, "kind of class", |_, class| {
+    .one_of_each(Scale::of_run(), "kind of class", |_, class| {
         axes::kind_of_class(*class)
     });
     for (label, class) in classes.iter() {
@@ -581,6 +575,16 @@ struct Predicated {
 }
 
 fn predicate_value(held: &Column, predicate: &Predicate) -> Result<Value, String> {
+    // Polars looks a null of no dtype up in what it is given for ever.
+    if matches!(
+        predicate.start,
+        Start::Null(Representative::Null) | Start::Literal(Representative::Null)
+    ) && predicate
+        .then
+        .is_some_and(|entry| entry.id().as_str() == "Expr.is_in")
+    {
+        return Err("Polars never ends on a null of no dtype looked up in a value".to_owned());
+    }
     let start = match &predicate.start {
         Start::TheColumn => column(&held.name),
         Start::TheFirst => column_then(&held.name, vec![call("Expr.first", json!({}))]),
@@ -616,7 +620,7 @@ fn predicates_verdicts() -> Verdicts<Outcome> {
         .axis(classes(), |point, column| {
             point.column = Some(column.clone())
         })
-        .axis(predicates(Scale::Normal), |point, predicate| {
+        .axis(predicates(), |point, predicate| {
             point.predicate = Some(predicate.clone());
         })
         .axis(
@@ -657,6 +661,15 @@ fn a_having_predicate_of_every_class_is_what_polars_says() {
              walk allows it (#257)",
         )
         .saying("cannot cast List type"),
+        Known::new(
+            Kind::Unbuildable,
+            Pattern::new().one_of(
+                "predicate",
+                ["a null of Null, Expr.is_in", "a literal of Null, Expr.is_in"],
+            ),
+            "Polars never ends on a null of no dtype looked up in a value, so no cell can ask it",
+        )
+        .saying("Polars never ends"),
     ];
     predicates_verdicts().assert_agree(&known, 3_000);
 }
@@ -777,6 +790,18 @@ fn a_chain_that_does_not_end_in_one_finishing_call_is_refused_before_polars_is_a
             ),
             "the document refuses a chain that does not end in exactly one finishing call, with \
              the reason, before Polars is asked",
+        )
+        .saying("not a document"),
+        Known::new(
+            Kind::Unbuildable,
+            Pattern::new().is("calls", "an expression method"),
+            "a method of an expression is no call of a group by, which the document refuses where \
+             it stands",
+        )
+        .saying("cannot be"),
+    ];
+    verdicts.assert_agree(&known, 2);
+}
 
 // ---------------------------------------------------------------------------
 // What the engine reports a group gives
@@ -839,16 +864,4 @@ fn a_column_that_is_not_aggregated_is_a_list_of_its_dtype_for_each_group_and_an_
         checked += 1;
     }
     assert!(checked > 40, "{checked} columns were checked");
-}
-        )
-        .saying("not a document"),
-        Known::new(
-            Kind::Unbuildable,
-            Pattern::new().is("calls", "an expression method"),
-            "a method of an expression is no call of a group by, which the document refuses where \
-             it stands",
-        )
-        .saying("cannot be"),
-    ];
-    verdicts.assert_agree(&known, 2);
 }

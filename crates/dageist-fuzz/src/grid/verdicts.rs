@@ -75,6 +75,14 @@ pub struct Tally {
     /// The lines that name no cell and are not shared.
     pub stale: Vec<&'static str>,
     pub axes: Vec<AxisRecord>,
+    /// How long the run took, in seconds, on how many threads.
+    pub seconds: f64,
+    pub threads: usize,
+    /// How many cells were judged where the run took a sample, and none where it judged every cell.
+    pub sampled: Option<usize>,
+    /// How long judging every cell takes, in seconds on the same threads: the run's own time, or a
+    /// sample's projected to the whole grid.
+    pub projected_seconds: f64,
 }
 
 /// An axis as a tally records it.
@@ -111,6 +119,7 @@ pub struct Verdicts<O: Outcome> {
     listed: Vec<(usize, O)>,
     elapsed: Duration,
     threads: usize,
+    sampled: Option<usize>,
 }
 
 impl<O: Outcome> Verdicts<O> {
@@ -129,6 +138,7 @@ impl<O: Outcome> Verdicts<O> {
         listed: Vec<(usize, O)>,
         elapsed: Duration,
         threads: usize,
+        sampled: Option<usize>,
     ) -> Self {
         Self {
             grid,
@@ -141,6 +151,30 @@ impl<O: Outcome> Verdicts<O> {
             listed,
             elapsed,
             threads,
+            sampled,
+        }
+    }
+
+    /// How many cells were judged where a run took a sample of the grid, and none where it judged
+    /// every cell.
+    #[must_use]
+    pub const fn sampled(&self) -> Option<usize> {
+        self.sampled
+    }
+
+    /// How long the run took, on how many threads.
+    #[must_use]
+    pub const fn elapsed(&self) -> (Duration, usize) {
+        (self.elapsed, self.threads)
+    }
+
+    /// How long judging every cell takes on the same threads: the time the run took, and for a
+    /// sample that time for each cell judged times the cells of the grid.
+    #[must_use]
+    pub fn projected(&self) -> Duration {
+        match self.sampled {
+            Some(taken) if taken > 0 => self.elapsed.mul_f64(self.size as f64 / taken as f64),
+            _ => self.elapsed,
         }
     }
 
@@ -191,7 +225,7 @@ impl<O: Outcome> Verdicts<O> {
     /// How many cells were judged in a second.
     #[must_use]
     pub fn cells_a_second(&self) -> f64 {
-        self.size as f64 / self.elapsed.as_secs_f64().max(1e-9)
+        self.sampled.unwrap_or(self.size) as f64 / self.elapsed.as_secs_f64().max(1e-9)
     }
 
     /// The axes, with what each left out and how it was thinned.
@@ -240,11 +274,21 @@ impl<O: Outcome> Verdicts<O> {
                 format!("; of the threads' time {}", spent.join(", "))
             }
         );
+        if let Some(taken) = self.sampled {
+            let _ = write!(
+                text,
+                "\n  a sample of {taken} of the {} cells, spread over every axis: every cell would take \
+                 {:.0?} on {} threads",
+                self.size,
+                self.projected(),
+                self.threads
+            );
+        }
         for axis in &self.axes {
             if let Some(thinned) = &axis.thinned {
                 let _ = write!(
                     text,
-                    "\n  the axis {} keeps {} at normal scale, {} of {}",
+                    "\n  the axis {} keeps {} at quick scale, {} of {}",
                     axis.name, thinned.rule, thinned.kept, thinned.of
                 );
             }
@@ -265,7 +309,9 @@ impl<O: Outcome> Verdicts<O> {
     /// pass. A cell named by several lines is counted by the most specific.
     ///
     /// The tally and every line are printed, and written as JSON where `DAGEIST_GRID_TALLY_DIR`
-    /// is set. A failure lists every cell no line names at once, grouped by what was said.
+    /// is set. A failure lists every cell no line names at once, grouped by what was said. Of a
+    /// sample only the cells no line names fail: a sample need not meet every line's cells, nor
+    /// judge as many cells as the whole grid must.
     ///
     /// # Panics
     ///
@@ -292,6 +338,10 @@ impl<O: Outcome> Verdicts<O> {
             if line.is_shared() {
                 continue;
             }
+            // A sample need not meet the cells of a line, so it holds no line stale.
+            if self.sampled.is_some() && *count == 0 {
+                continue;
+            }
             if let Some(axis) = line.pattern().axes().find(|axis| !axes.contains(axis)) {
                 let _ = write!(
                     failures,
@@ -309,7 +359,7 @@ impl<O: Outcome> Verdicts<O> {
             }
         }
         let judged = self.judged();
-        if judged < judged_at_least {
+        if self.sampled.is_none() && judged < judged_at_least {
             let _ = write!(
                 failures,
                 "\nonly {judged} cells were judged, fewer than {judged_at_least}"
@@ -378,6 +428,10 @@ impl<O: Outcome> Verdicts<O> {
                 })
                 .collect(),
             unnamed,
+            seconds: self.elapsed.as_secs_f64(),
+            threads: self.threads,
+            sampled: self.sampled,
+            projected_seconds: self.projected().as_secs_f64(),
             stale: known
                 .iter()
                 .zip(used)

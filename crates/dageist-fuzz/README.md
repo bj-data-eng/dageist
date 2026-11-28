@@ -107,8 +107,10 @@ unpaired code units; UTF-8 helpers reject invalid input instead of rewriting it.
 A campaign samples a space and keeps what fails; a grid, in `grid`, enumerates
 a space and accounts for every cell of it. Build `Choices` for each axis, each
 choice labelled, with what the axis leaves out named by `leave_out` or
-`keep_unless` and its reason, and with `thin` or `one_of_each` saying how a grid
-of normal `Scale` keeps fewer choices than a large one. A `Grid` is the product
+`keep_unless` and its reason, and with `thin` or `one_of_each` saying how a
+quick run keeps fewer choices. A run judges every cell unless
+`DAGEIST_GRID_SCALE=quick` asks for the choices each thinned axis keeps
+(`Scale::of_run`). A `Grid` is the product
 of its axes: each cell is made from its number when a thread takes it, so a
 grid of millions holds none of them, and `Grid::judge` gives every cell to the
 consumer's judge on several threads, ending the process with the cell's name
@@ -120,9 +122,13 @@ kinds are agreement, counted and not kept, and which count as judged.
 cells' labels, the words said of them and a reason, and fails on a cell no line
 names, on a line that names no cell or an axis the grid lacks, and on fewer
 judged cells than the grid must judge. `Verdicts::tally` gives what became of
-every cell, by kind, line, what decided it and what each axis left out and
-thinned; `assert_agree` prints it and writes it as JSON where
-`DAGEIST_GRID_TALLY_DIR` is set. `Grid::draw` picks a cell from `Entropy`, so a
+every cell, by kind, line, what decided it, what each axis left out and how a
+quick run thinned it, and how long the run took; `assert_agree` prints it and writes it as JSON where
+`DAGEIST_GRID_TALLY_DIR` is set. `Grid::sample(cells)`, or
+`DAGEIST_GRID_SAMPLE=<cells>` for every grid of a run, judges about that many
+cells spread over every axis and projects how long the whole grid takes on the
+same threads; a sample fails only on a cell no line names, since it need not
+meet every line's cells. `Grid::draw` picks a cell from `Entropy`, so a
 campaign can sample the space a grid enumerates.
 
 The engine's grids are in `crates/dageist-engine/fuzz/`, whose judge, axes and

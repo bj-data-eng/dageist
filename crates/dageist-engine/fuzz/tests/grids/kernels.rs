@@ -20,7 +20,7 @@ use dageist_engine_fuzz::doc::{call, chain, column, column_then, many, named, th
 use dageist_engine_fuzz::judge::{Case, Connections, Depth, Kind, Question};
 use dageist_engine_fuzz::literals::{self, Written};
 use dageist_engine_fuzz::world::World;
-use dageist_fuzz::grid::{Choices, Grid, Known, Pattern, Scale};
+use dageist_fuzz::grid::{Choices, Grid, Known, Pattern};
 use serde_json::{Value, json};
 
 /// Where a value is evaluated: the aggregates of a group, its `having`, or a select, the control.
@@ -102,7 +102,7 @@ enum Key {
     Called(&'static Entry),
 }
 
-fn window_keys(scale: Scale) -> Choices<Key> {
+fn window_keys() -> Choices<Key> {
     let mut axis = Choices::of(
         "key",
         [
@@ -114,15 +114,16 @@ fn window_keys(scale: Scale) -> Choices<Key> {
             ("n and an aggregate", Key::AggregateAndN),
         ],
     );
-    let calls =
-        axes::entries("key", Applies::Expression)
-            .one_of_each(scale, "family", |_, entry| entry.family());
+    let calls = axes::calls_of_run(axes::entries("key", Applies::Expression));
     for (label, entry) in calls.iter() {
         axis = axis.with(format!("n {label}"), Key::Called(entry));
     }
-    for (label, entry) in axes::calls_that_do("key", axes::Does::Keeps, &literals::FALLBACKS)
-        .one_of_each(scale, "family", |_, entry| entry.family())
-        .iter()
+    for (label, entry) in axes::calls_of_run(axes::calls_that_do(
+        "key",
+        axes::Does::Keeps,
+        &literals::FALLBACKS,
+    ))
+    .iter()
     {
         axis = axis.with(format!("literal {label}"), Key::LiteralThen(entry));
     }
@@ -230,9 +231,7 @@ fn the_key_of_a_window_in_agg_and_in_having_is_what_polars_says() {
             Choices::of("part", [("partition_by", false), ("order_by", true)]),
             |point, order| point.order = *order,
         )
-        .axis(window_keys(Scale::Normal), |point, key| {
-            point.key = Some(key.clone())
-        })
+        .axis(window_keys(), |point, key| point.key = Some(key.clone()))
         .judge(|point| question.judge(windowed_case(point)))
         .assert_agree(&windowed_known(), 200);
 }

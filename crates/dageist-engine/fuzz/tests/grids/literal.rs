@@ -11,14 +11,15 @@
 //! a method that reads one by its role ([`axes::literal_parameters`]), each given the literal on
 //! either side of the column ([`axes::orders`]); the columns are one of each class the tables
 //! measure; the literals are every value at the edges of every class ([`literals::every_value`])
-//! with every dtype a literal is given ([`literals::dtype_words`]). A grid of normal scale keeps one
-//! value in eight and one dtype of each kind, and asks Polars of the schema, and of the rows where
-//! the walk says it refuses on them; two more grids of normal scale ask the rows of every cell,
-//! where a count or a length is read and where a number meets a moment. The large grids cross every
-//! value with every dtype, ask the rows of every cell, and run on request:
+//! with every dtype a literal is given ([`literals::dtype_words`]); a quick run keeps one value in
+//! several of each kind and one dtype of each kind of class. The grids of the literals by
+//! their role and of the comparisons ask Polars of the schema, and of the rows where the walk
+//! refuses; two more grids ask the rows of every cell, where a count or a length is read and where
+//! a number meets a moment. The grids of the literals by their role and of the comparisons are
+//! asked the rows of every cell too, on request:
 //!
 //! ```sh
-//! cargo test --offline --locked -p dageist-engine-fuzz --test grids literal::the_large \
+//! cargo test --offline --locked -p dageist-engine-fuzz --test grids literal::at_the_rows \
 //!     -- --ignored --nocapture --test-threads 1
 //! ```
 //!
@@ -54,27 +55,6 @@ fn columns() -> Choices<Column> {
 /// The kind of class of a column.
 fn kind_of(column: &Column) -> &'static str {
     axes::kind_of_class(column.class.expect("a column of a class"))
-}
-
-/// The values the literals are written as: at normal scale one in `every`, of every kind.
-fn values(scale: Scale, every: usize) -> Choices<Written> {
-    literals::every_value().thin(scale, every)
-}
-
-/// The dtypes a literal is given: at normal scale none and one of each kind of class.
-fn words(scale: Scale) -> Choices<Option<String>> {
-    literals::dtype_words().one_of_each(scale, "kind of class", |label, _| {
-        Representative::from_name(label).map_or("none", axes::kind_of_class)
-    })
-}
-
-/// How far Polars is asked: the normal grids ask the schema, and the rows where the walk says it
-/// refuses on them; the large ones ask the rows of every cell.
-const fn depth(scale: Scale) -> Depth {
-    match scale {
-        Scale::Normal => Depth::Plan,
-        Scale::Large => Depth::Rows,
-    }
 }
 
 /// A cell of a method given a literal: the column, which parameter the literal is given as, on
@@ -125,19 +105,20 @@ fn given_grid(
         .axis(words, |point, word| point.literal.word.clone_from(word))
 }
 
-fn literal_grid(scale: Scale) -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
+/// The grid of the literals by their role, asked Polars as far as `depth`.
+fn literal_grid(depth: Depth) -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
     let grid = given_grid(
-        if scale == Scale::Normal {
-            "literal"
+        if depth == Depth::Rows {
+            "literal-at-the-rows"
         } else {
-            "literal-large"
+            "literal"
         },
         columns(),
         axes::literal_parameters("parameter"),
-        values(scale, 8),
-        words(scale),
+        literals::values_of_run(8),
+        literals::dtype_words_of_run(),
     );
-    let question = Question::any_refusal().at(depth(scale));
+    let question = Question::any_refusal().at(depth);
     grid.judge(|point| question.judge(given_case(point)))
 }
 
@@ -160,8 +141,8 @@ fn count_grid() -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
         "literal-counts",
         columns,
         counts(),
-        literals::every_value().thin(Scale::Normal, 4),
-        words(Scale::Normal),
+        literals::values_of_run(4),
+        literals::dtype_words_of_run(),
     );
     let question = Question::any_refusal().at(Depth::Rows);
     grid.judge(|point| question.judge(given_case(point)))
@@ -186,7 +167,7 @@ fn moment_grid() -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
         axes::literal_parameters("parameter"),
         literals::edge_integers()
             .and(literals::edge_floats())
-            .thin(Scale::Normal, 8),
+            .thin(Scale::of_run(), 8),
         words,
     );
     let question = Question::any_refusal().at(Depth::Rows);
@@ -223,11 +204,12 @@ fn comparisons() -> Choices<Param> {
     })
 }
 
-fn comparison_grid(scale: Scale) -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
-    let grid = Grid::<Compared>::new(if scale == Scale::Normal {
-        "literal-comparisons"
+/// The grid of the comparisons with a literal, asked Polars as far as `depth`.
+fn comparison_grid(depth: Depth) -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
+    let grid = Grid::<Compared>::new(if depth == Depth::Rows {
+        "literal-comparisons-at-the-rows"
     } else {
-        "literal-comparisons-large"
+        "literal-comparisons"
     })
     .axis(predicate_places(), |point, place| {
         point.place = Some(*place)
@@ -241,13 +223,13 @@ fn comparison_grid(scale: Scale) -> Verdicts<dageist_engine_fuzz::judge::Outcome
     .axis(axes::orders("order"), |point, first| {
         point.given.first = *first
     })
-    .axis(values(scale, 12), |point, value| {
+    .axis(literals::values_of_run(12), |point, value| {
         point.given.literal.value = Some(value.clone());
     })
-    .axis(words(scale), |point, word| {
+    .axis(literals::dtype_words_of_run(), |point, word| {
         point.given.literal.word.clone_from(word)
     });
-    let question = Question::any_refusal().at(depth(scale));
+    let question = Question::any_refusal().at(depth);
     grid.judge(|point| {
         let column = point.given.column.as_ref().expect("a column");
         question.judge(given_item(&point.given).and_then(|item| {
@@ -396,13 +378,13 @@ fn made_case(point: &Made) -> Result<Case, String> {
     places::at(Context::step(Outer::JoinLeft), made, World::get().of(&[]))
 }
 
-fn function_parts_grid(scale: Scale) -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
+fn function_parts_grid() -> Verdicts<dageist_engine_fuzz::judge::Outcome> {
     let grid = Grid::<Made>::new("literal-function-parts")
         .axis(function_parts(), |point, param| point.param = Some(*param))
-        .axis(values(scale, 6), |point, value| {
+        .axis(literals::values_of_run(6), |point, value| {
             point.literal.value = Some(value.clone())
         })
-        .axis(words(scale), |point, word| {
+        .axis(literals::dtype_words_of_run(), |point, word| {
             point.literal.word.clone_from(word)
         });
     let question = Question::any_refusal();
@@ -1015,7 +997,7 @@ fn known_numbers_beside_what_is_no_number() -> Vec<Known<Kind>> {
 
 #[test]
 fn the_walk_takes_a_literal_by_the_role_of_its_parameter_as_polars_does() {
-    literal_grid(Scale::Normal).assert_agree(&known_literal_grid(), 100_000);
+    literal_grid(Depth::Plan).assert_agree(&known_literal_grid(), 100_000);
 }
 
 /// Every line of the grid of the literals by their role.
@@ -1025,14 +1007,14 @@ fn known_literal_grid() -> Vec<Known<Kind>> {
     known.extend(known_counts().into_iter().map(Known::shared));
     known.extend(known_overflows().into_iter().map(Known::shared));
     known.push(known_exponents().shared());
-    // The large grid asks the rows of every cell, where Polars refuses these too.
+    // The grid asked the rows of every cell meets Polars' refusal of these, and both refuse.
     known.extend(known_stages().into_iter().map(Known::shared));
     known.push(known_one_value_given_the_column());
     known.extend(known_literals_are_one_value());
     known.extend(known_shares());
     known.extend(known_numbers_beside_what_is_no_number());
     known.extend(known_moments().into_iter().map(Known::shared));
-    // Only the values one in eight keeps meet these.
+    // The grid asked the rows of every cell may judge these otherwise, so the lines are shared.
     known.push(known_date_past_its_range().shared());
     known.push(known_typed_null_folded().shared());
     known.push(known_typed_null_of_another_dtype().shared());
@@ -1059,7 +1041,7 @@ fn a_number_typed_without_a_dtype_beside_a_moment_is_taken_as_polars_takes_it_wh
 
 #[test]
 fn the_walk_takes_a_comparison_with_a_literal_where_a_predicate_stands_as_polars_does() {
-    comparison_grid(Scale::Normal).assert_agree(&known_comparison_grid(), 50_000);
+    comparison_grid(Depth::Plan).assert_agree(&known_comparison_grid(), 50_000);
 }
 
 /// Every line of the grid of the comparisons with a literal.
@@ -1070,7 +1052,7 @@ fn known_comparison_grid() -> Vec<Known<Kind>> {
         known_ambiguous_dtypes(),
         known_interval_of_structs(),
         known_text_bounded_by_a_date(),
-        // Only the values one in twelve keeps meet these.
+        // The grid asked the rows of every cell may judge these otherwise, so they are shared.
         known_date_past_its_range().shared(),
         known_typed_null_folded().shared(),
     ]);
@@ -1086,17 +1068,18 @@ fn a_step_or_a_method_given_a_whole_number_typed_in_is_taken_as_polars_takes_it(
 fn a_function_of_numbers_typed_in_is_a_join_key_as_polars_takes_it_however_they_are_written() {
     let mut known = known_casts();
     known.extend(known_function_parts());
-    function_parts_grid(Scale::Normal).assert_agree(&known, 2_000);
+    function_parts_grid().assert_agree(&known, 2_000);
 }
 
 #[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_a_literal_by_the_role_of_its_parameter_is_taken_as_polars_does() {
-    literal_grid(Scale::Large).assert_agree(&known_literal_grid(), 1_000_000);
+#[ignore = "asks the rows of every cell, run on request"]
+fn at_the_rows_of_every_cell_the_walk_takes_a_literal_by_the_role_of_its_parameter_as_polars_does()
+{
+    literal_grid(Depth::Rows).assert_agree(&known_literal_grid(), 1_000_000);
 }
 
 #[test]
-#[ignore = "the large grid, run on request"]
-fn the_large_grid_of_a_comparison_with_a_literal_is_taken_as_polars_does() {
-    comparison_grid(Scale::Large).assert_agree(&known_comparison_grid(), 200_000);
+#[ignore = "asks the rows of every cell, run on request"]
+fn at_the_rows_of_every_cell_the_walk_takes_a_comparison_with_a_literal_as_polars_does() {
+    comparison_grid(Depth::Rows).assert_agree(&known_comparison_grid(), 200_000);
 }
