@@ -3268,20 +3268,28 @@ does not evaluate, and the kernels that still refuse where there is no key.
 `tests/document/open_grid.rs` holds the grids of a number typed without a dtype, which Polars keeps open as
 `dyn int` or `dyn float`, on the same helper. They cross a number, at the edges of the dtypes it falls back to and
 past them, with how it stands (alone, repeated, the values of a condition, one value of it open, a struct's field,
-a struct of its absolute value or of a repeat, the structs or the counts of it as the values of a condition), each
-call of the catalogue that is given nothing and gives back the dtype it follows for each dtype the number falls
-back to, a few that are given an operand or a value and chains of two or three. One puts them as a join's key,
-open on either side against the key of the number typed, open on both and typed on both: where Polars refuses the key
-the walk must say that it cannot tell it, in the words of an open number in a key, and where Polars takes the key typed on
-both sides it must tell it; the other puts
-them in a select, a filter and a sort key, open and typed, where none is refused for the number and the dtypes at
-each place are Polars'. What the grid of the keys leaves is named in the test: a key that holds a call that is no
-elementwise one, which the walk refuses where Polars takes a key of one value whole, two keys that are open
-numbers, which the walk judges apart where Polars matches them, a condition of open numbers whose dtype the walk
-does not give and the fields of a condition of structs, and a number filled with another. Polars settles the number
-that stands alone as a key and an aggregate of the literal that starts a chain, and keeps open the aggregate of a
-`repeat` and of the values of a condition, which the walk follows by what starts the chain and what the call after
-it is; the calls of a `repeat` that are no aggregate are refused by it as not elementwise. `tests/document/missing_start_grid.rs` crosses a column of every whole number dtype with `eq_missing` and
+a struct of its absolute value or of a repeat, the structs or the counts of it as the values of a condition) and the
+calls that follow it, which are every method of the catalogue that is given nothing, by what the tables say it does
+with a number of each dtype: it gives back the dtype it follows, it aggregates and gives it back, it gives it back for
+some, or it changes it. They are crossed as chains of one to three, with every pair of the first two kinds, one of each
+of them with every call that changes the dtype, and every chain that a few of them make, beside a few given an
+operand or a value. One grid puts the chains as a join's key, open on either side against the key of the number typed,
+open on both and typed on both: where Polars refuses the key the walk must say that it cannot tell it, in the words of
+an open number in a key, and where Polars takes the key typed on both sides it must tell it; the other puts them in a
+select, a filter and a sort key, open and typed, where none is refused for the number and the dtypes at each place are
+Polars'. A key that the walk cannot tell for another reason is not counted as agreeing, and is named where Polars
+refuses it. What the grid of the keys leaves is named in the test: a key that holds a call that is no elementwise one,
+which the walk refuses where Polars takes a key of one value whole; two keys that are open numbers, which the walk
+judges apart where Polars matches them; a condition of open numbers whose dtype the walk does not give, a field read
+from a struct of one and the fields of a condition of structs, which leave the calls after them not asked; a logarithm,
+whose base the walk reads as an operand it is not given; a sum of two open numbers; and the product of a number with a
+fraction, which the Polars the engine builds gives as `Int64`. Polars settles the number that stands alone as a key and
+an aggregate that directly follows the literal that starts a chain, and keeps it open through a call that gives back the
+dtype for every number the call allows, whatever follows it, aggregates included, and through the same calls of a
+`repeat` and of the values of a condition; it settles it through a call that gives a number with a fraction for a whole
+number, as a square root and the mean do. The walk follows that by what starts the chain and by what the tables say the
+call after it gives. Calls that only whole numbers take are not crossed.
+`tests/document/missing_start_grid.rs` crosses a column of every whole number dtype with `eq_missing` and
 `ne_missing`, in both orders, with the numbers the dtype holds and does not hold, as a join's key and in a select, and
 holds the dtype at the start and after the call to Polars'.
 
