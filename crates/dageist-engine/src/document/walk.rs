@@ -1299,6 +1299,15 @@ impl Walker<'_> {
             .collect()
     }
 
+    /// Whether the step groups by no key: the table is one group, and Polars evaluates what the
+    /// calls after the group by are given as it evaluates the items of a select, which it does
+    /// not for the groups of a key, as the grid of the kernels of a group shows.
+    fn has_no_key(&self) -> bool {
+        !self.links.is_empty()
+            && !matches!(self.step.argument("by"), Some(Value::Many(items)) if !items.is_empty())
+            && !matches!(self.step.argument("named_by"), Some(Value::Pairs(pairs)) if !pairs.is_empty())
+    }
+
     /// The checks of a step that groups: the columns it gives are named differently, and a
     /// shortcut that finishes it is asked of the tables for each column it aggregates.
     fn grouping(&mut self, step: &Step) {
@@ -2788,6 +2797,7 @@ impl Walker<'_> {
                     as_read.as_ref().unwrap_or(expression),
                     comparisons,
                 ) || repeats)
+                && !(context.is_a_group_window_key() && self.has_no_key())
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -3082,6 +3092,7 @@ impl Walker<'_> {
         if matches!(cur, Cur::Value { .. })
             && receiver_is_literal
             && matches!(context.outer(), Outer::Aggregate | Outer::Having)
+            && !self.has_no_key()
             && let Some((parameter, given)) = given_values_beside_a_literal(
                 entry,
                 arguments,
