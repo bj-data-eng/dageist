@@ -732,15 +732,11 @@ fn known_keys() -> Vec<Known> {
         )
         .saying("stays open"),
         refused_for_the_number(
-            Pattern::new().starts("chain", "a condition with both values open"),
-            "the walk gives a condition whose values are all open numbers no dtype, so the calls \
-             after it are not asked and the key is not said to be open, though Polars keeps it so",
-        ),
-        refused_for_the_number(
-            Pattern::new().contains_one_of("chain", &[", field literal, "]),
-            "the walk gives a field read from a struct that holds an open number no dtype, as it \
-             gives the number none where it is read, so the calls after it are not asked and the \
-             key is not said to be open, though Polars keeps it so",
+            Pattern::new()
+                .starts("chain", "a condition with both values open")
+                .has_one_of("chain", &["Expr.value_counts"]),
+            "the walk does not carry the fields of the counts that a condition of open numbers \
+             gives, so the key is not said to be open, though Polars keeps the number open in them",
         ),
         refused_for_the_number(
             Pattern::new()
@@ -750,21 +746,13 @@ fn known_keys() -> Vec<Known> {
              cannot tell a field read from it, though the field is as open as the structs are",
         ),
         refused_for_the_number(
-            Pattern::new()
-                .starts("chain", "a condition with both values the counts of the number")
-                .contains_one_of("chain", &[", field literal"]),
-            "the walk does not carry the fields of a condition whose values are the counts of a \
-             number, so it cannot tell a field read from it, though the field is as open as the \
-             number is",
-        ),
-        refused_for_the_number(
             Pattern::new().has_one_of("chain", &["Expr.log"]),
             "a logarithm takes a base that the walk reads as an operand it is not given, so it has \
              no dtype for the number to go on from after it, and the key is not said to be open, \
              though Polars keeps a number with a fraction open through it",
         ),
         refused_for_the_number(
-            Pattern::new().is("chain", "the number, add an open number"),
+            Pattern::new().contains_one_of("chain", &["add an open number"]),
             "the walk gives no dtype to two numbers typed without a dtype that meet, so the key is \
              not said to be open, though Polars keeps the sum of two open numbers open",
         ),

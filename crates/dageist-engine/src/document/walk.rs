@@ -1161,8 +1161,14 @@ fn open_after(
     let result = allowance
         .and_then(allowed::Allowance::result)
         .and_then(allowed::ResultDtype::class);
-    let keeps_the_dtype = matches!((result, receiver), (Some(given), Some(followed)) if given == followed)
-        && gives_back_every_number(entry);
+    // Where the walk cannot ask the call, because the dtype of what it follows or of what it gives
+    // is not known, as it does not know that of a condition of open numbers or of a field read from
+    // a struct that holds one, what the tables say of the call for every number says whether it
+    // keeps the number open.
+    let keeps_the_dtype = match (result, receiver) {
+        (Some(given), Some(followed)) => given == followed,
+        _ => true,
+    } && gives_back_every_number(entry);
     let settled_by_a_typed_operand = arguments.iter().any(|(name, operand)| {
         operand_adapts(entry, name) && !(operand.open || operand.loose.is_some())
     });
@@ -4805,9 +4811,16 @@ fn is_one_value(call: &Call) -> bool {
 }
 
 /// Whether the call takes some of the values it follows, so that how many it gives is for the data
-/// and the arguments to say: `head`, `filter`, `unique` and the rest that the catalogue says count.
-/// Such a call is not elementwise, whatever it follows.
+/// and the arguments to say: `head`, `filter`, `unique` and the rest that the catalogue says count,
+/// and what drops the nulls or the not-a-numbers, whose count the data decide, as a key refuses it
+/// where the walk cannot ask the call. Such a call is not elementwise, whatever it follows.
 fn is_counting(call: &Call) -> bool {
+    if matches!(
+        call.entry().id().as_str(),
+        "Expr.drop_nulls" | "Expr.drop_nans"
+    ) {
+        return true;
+    }
     let (words, _) = option_words(call);
     let words: Vec<(&str, &str)> = words
         .iter()
