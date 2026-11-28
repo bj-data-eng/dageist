@@ -99,20 +99,13 @@ fn traced(case: &Case, expression: &WalkedExpression) -> Traced {
         .first()
         .copied()
         .and_then(|place| class(place, by_group));
-    // What the first link follows is where the tables are asked of it, and is the dtype of a number
-    // typed without a dtype beside the operand the link is given, where the walk adapted it. What
-    // Polars gives the start alone is the dtype the number falls back to, so the start is held to
-    // what the walk says the start gives itself.
-    let given = if by_group || !opens(case, expression) {
-        None
-    } else {
-        start_gives(expression)
-    };
+    let step = &case.document.steps()[0];
     Traced {
         place: expression.place().clone(),
-        start: match (given, followed) {
-            (Some(given), Some(followed)) if given != followed => Some(given),
-            _ => followed,
+        start: if by_group {
+            followed
+        } else {
+            ask_polars::class_at_start(step, expression, followed)
         },
         links: places
             .iter()
@@ -121,23 +114,6 @@ fn traced(case: &Case, expression: &WalkedExpression) -> Traced {
             .map(|place| class(place, by_group))
             .collect(),
     }
-}
-
-/// Whether the expression starts from a number typed without a dtype.
-fn opens(case: &Case, expression: &WalkedExpression) -> bool {
-    ask_polars::expression_at(&case.document.steps()[0], expression.place())
-        .is_some_and(ask_polars::starts_from_an_open_number)
-}
-
-/// The class the walk says the start of an expression gives, as the tables were asked of it.
-fn start_gives(expression: &WalkedExpression) -> Option<Representative> {
-    expression
-        .calls()
-        .first()?
-        .verdict()?
-        .allowance()?
-        .result()?
-        .class()
 }
 
 fn refused(found: &WalkRefusal) -> Refused {

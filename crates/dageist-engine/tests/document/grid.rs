@@ -807,31 +807,6 @@ fn judge_case(case: &Case, question: &Question) -> Judged {
     }
 }
 
-/// The class the walk says an expression has at its start, which the fuzz harness compares with
-/// the dtype Polars gives the start alone. What the first link follows is where the tables are
-/// asked of it, and is the dtype of a number typed without a dtype beside the operand the link is
-/// given, where the walk adapted it, which Polars does not give the start alone: for an expression
-/// that starts from such a number the start is held to what the walk says the start gives itself.
-fn claimed_at_start(
-    step: &Step,
-    expression: &dageist_engine::document::WalkedExpression,
-) -> Option<Representative> {
-    let opens = ask_polars::expression_at(step, expression.place())
-        .is_some_and(ask_polars::starts_from_an_open_number);
-    let given = expression
-        .calls()
-        .first()
-        .and_then(|start| start.verdict())
-        .and_then(|verdict| verdict.allowance())
-        .and_then(|allowance| allowance.result())
-        .and_then(|result| result.class())
-        .filter(|_| opens);
-    match (given, claimed_at(expression, 0)) {
-        (Some(given), Some(followed)) if given != followed => Some(given),
-        (_, followed) => followed,
-    }
-}
-
 /// The class the walk says an expression has at the `at`th of the places its links stand in.
 fn claimed_at(
     expression: &dageist_engine::document::WalkedExpression,
@@ -877,7 +852,7 @@ fn dtype_difference(
             };
         if let Some(difference) = differs(
             "at the start".to_owned(),
-            claimed_at_start(step, expression),
+            ask_polars::class_at_start(step, expression, claimed_at(expression, 0)),
             &trace.start,
         ) {
             return Some(difference);

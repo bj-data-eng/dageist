@@ -24,7 +24,9 @@ use dageist_engine::catalog::{
     Argument, Arguments, Build, BuildError, Conditional, DefaultValue, DurationUse, Kind,
     any_moment, check_duration, check_pattern,
 };
-use dageist_engine::document::{Call, Expression, Place, Segment, Start, Step, Value};
+use dageist_engine::document::{
+    Call, Expression, Place, Segment, Start, Step, Value, WalkedExpression,
+};
 use polars::prelude::{
     DataFrame, DataType, Engine, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
@@ -177,6 +179,36 @@ pub fn starts_from_an_open_number(expression: &Expression) -> bool {
         if call.entry().id().as_str() == "polars.lit"
             && call.argument("dtype").is_none()
             && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+}
+
+/// The class the tables are held to at the start of `expression`, given `followed`, the class of
+/// the place the first call of it follows, which is where the tables are asked of that call.
+///
+/// Where the start is a number typed without a dtype and the call is given an operand, the walk
+/// adapts the number to the operand there, as Polars does when it coerces the two, so `followed`
+/// is the dtype the number takes beside the operand, which no schema of the start alone gives:
+/// Polars gives the start alone the dtype the number falls back to. The start of such an expression
+/// is held to what the walk says the start gives itself, where that differs from `followed`; any
+/// other start is held to `followed`, for what a function says it gives is not what its arguments
+/// make of it.
+pub fn class_at_start(
+    step: &Step,
+    expression: &WalkedExpression,
+    followed: Option<Representative>,
+) -> Option<Representative> {
+    let opens = expression_at(step, expression.place()).is_some_and(starts_from_an_open_number);
+    let given = expression
+        .calls()
+        .first()
+        .and_then(|start| start.verdict())
+        .and_then(|verdict| verdict.allowance())
+        .and_then(|allowance| allowance.result())
+        .and_then(|result| result.class())
+        .filter(|_| opens);
+    match (given, followed) {
+        (Some(given), Some(followed)) if given != followed => Some(given),
+        (_, followed) => followed,
+    }
 }
 
 /// Plans `step`, the `index`th of a document, on `source`, and works out the dtypes of its
