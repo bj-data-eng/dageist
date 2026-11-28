@@ -240,7 +240,11 @@ fn keys_are_given_by_position_by_name_and_with_the_order_kept() {
             r#"group_by(pl.col("k"), maintain_order=True)"#,
         ),
     ] {
-        let held = document(&[grouping("group_by", &arguments, &[finishing.clone()])]);
+        let held = document(&[grouping(
+            "group_by",
+            &arguments,
+            std::slice::from_ref(&finishing),
+        )]);
         written_as(&held, &[text, "len()"]);
     }
 }
