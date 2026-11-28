@@ -461,3 +461,129 @@ pub fn calls_that_do(
         }
     })
 }
+
+/// The methods of an expression that aggregate, as an axis named `name`: the catalogue's family of
+/// aggregates, and every other method the tables say gives one value after some class they
+/// measure, as the first and the last values do. The others are left out.
+#[must_use]
+pub fn aggregates(name: &'static str) -> Choices<&'static Entry> {
+    entries(name, Applies::Expression).keep_unless(|_, entry| {
+        let one = entry.family() == catalog::Family::Aggregate
+            || Representative::MEASURED.iter().any(|class| {
+                matches!(
+                    effect(entry, *class),
+                    Effect::Aggregates | Effect::ChangesToOne
+                )
+            });
+        (!one).then(|| {
+            "it is no aggregate, and the tables say it gives one value after no class".to_owned()
+        })
+    })
+}
+
+/// The methods of an expression that give as many values as they follow, or a number the data
+/// decide, after `class`, as an axis named `name`. The others are left out with what they do.
+#[must_use]
+pub fn not_aggregating(name: &'static str, class: Representative) -> Choices<&'static Entry> {
+    calls_on(name, class)
+        .keep_unless(|_, (_, effect)| {
+            (!matches!(effect, Effect::Keeps | Effect::Changes | Effect::Counts))
+                .then(|| format!("after {class} the tables say it {effect:?}"))
+        })
+        .map(|(entry, _)| entry)
+}
+
+/// The values a parameter is given where a grid crosses its options: a flag set each way, every
+/// word of a choice, whole numbers and numbers with a fraction at the edges, which a grid of normal
+/// scale thins, and a name that is new and one a column of the world has. A parameter of another
+/// kind has none.
+#[must_use]
+pub fn option_values(
+    parameter: &Parameter,
+    scale: dageist_fuzz::grid::Scale,
+) -> Vec<(String, Value)> {
+    let edges = |values: Choices<Written>| -> Vec<(String, Value)> {
+        values
+            .thin(scale, 4)
+            .iter()
+            .map(|(label, written)| (label.to_owned(), written.json()))
+            .collect()
+    };
+    match parameter.kind() {
+        Kind::Flag => vec![
+            ("true".to_owned(), doc::flag(true)),
+            ("false".to_owned(), doc::flag(false)),
+        ],
+        Kind::Choice(words) => words
+            .iter()
+            .map(|word| ((*word).to_owned(), doc::choice(word)))
+            .collect(),
+        Kind::Value(ValueType::Integer) => edges(crate::literals::edge_integers()),
+        Kind::Value(ValueType::Float) => edges(crate::literals::edge_floats()),
+        Kind::Expression(_) if parameter.role() == Role::Share => crate::literals::edge_floats()
+            .thin(scale, 4)
+            .iter()
+            .map(|(label, written)| (label.to_owned(), written.expression(None)))
+            .collect(),
+        Kind::Value(ValueType::String | ValueType::Any) => vec![
+            ("a new name".to_owned(), doc::string("rows")),
+            ("the name of a column".to_owned(), doc::string("n")),
+        ],
+        _ => Vec::new(),
+    }
+}
+
+/// Every setting of the options of `entry`: its needed parameters given what [`filler`] gives
+/// them, and each other parameter left to its default or given each of its [`option_values`], one
+/// parameter at a time. Labelled by the options given.
+///
+/// # Errors
+///
+/// When a needed parameter is of a kind no grid gives a value of.
+pub fn settings(
+    entry: &'static Entry,
+    column: Option<&Column>,
+    scale: dageist_fuzz::grid::Scale,
+) -> Result<Vec<(String, Value)>, String> {
+    let mut base = serde_json::Map::new();
+    for parameter in entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.is_needed())
+    {
+        base.insert(parameter.name().to_owned(), filler(parameter, column)?);
+    }
+    let mut settings = vec![("defaults".to_owned(), Value::Object(base.clone()))];
+    for parameter in entry.parameters() {
+        for (label, value) in option_values(parameter, scale) {
+            let mut given = base.clone();
+            given.insert(parameter.name().to_owned(), value);
+            settings.push((
+                format!("{} {label}", parameter.name()),
+                Value::Object(given),
+            ));
+        }
+    }
+    Ok(settings)
+}
+
+/// The class a method is first said to accept, which a grid gives it a receiver of: the class that
+/// stands for the first group of dtypes [`Entry::accepts`] lists, a 64-bit whole number for any
+/// number or any dtype.
+#[must_use]
+pub fn accepted_class(entry: &Entry) -> Representative {
+    use dageist_engine::allowed::Inner;
+    use dageist_engine::catalog::Dtypes;
+    match entry.accepts().first() {
+        Some(Dtypes::Temporal | Dtypes::Date) => Representative::Date,
+        Some(Dtypes::Datetime) => Representative::Datetime,
+        Some(Dtypes::Time) => Representative::Time,
+        Some(Dtypes::Duration) => Representative::Duration,
+        Some(Dtypes::String) => Representative::String,
+        Some(Dtypes::Boolean) => Representative::Boolean,
+        Some(Dtypes::List) => Representative::List(Inner::Int64),
+        Some(Dtypes::Array) => Representative::Array(Inner::Int64),
+        Some(Dtypes::Struct) => Representative::Struct,
+        Some(Dtypes::Any | Dtypes::Numeric | Dtypes::Integer) | None => Representative::Int64,
+    }
+}

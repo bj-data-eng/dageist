@@ -281,19 +281,24 @@ impl World {
         &self.other
     }
 
-    /// The table of the helpers and the columns `labels`, which a grid that asks of one column at
-    /// a time runs on, so that Polars is not given what a cell does not read.
+    /// The table of the helpers and the columns `labels`, each once, which a grid that asks of one
+    /// column at a time runs on, so that Polars is not given what a cell does not read.
     ///
     /// # Panics
     ///
     /// When a label is no column of the world.
     #[must_use]
     pub fn of(&self, labels: &[&str]) -> DataFrame {
-        let names: Vec<String> = labels
+        let mut names: Vec<String> = Vec::new();
+        for name in labels
             .iter()
             .map(|label| self.column(label).name.clone())
             .chain(HELPERS.iter().map(|name| (*name).to_owned()))
-            .collect();
+        {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
         self.frame
             .select(names)
             .expect("the world holds every column it names")
