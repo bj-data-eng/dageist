@@ -173,6 +173,36 @@ traces the Python API of that release through its binding to those crates, in
 separate workspace with its own lock file. API auditing is explicit
 maintenance, separate from normal product checks.
 
+## Verifying A Change
+
+These hold for every change to what the engine allows, refuses or reports,
+in every brief, whatever a brief leaves out.
+
+- **A grid judged by Polars is the evidence.** Every rule, and every context
+  in which the walk judges a call, is held by a grid on the shared helper,
+  [`tests/document/grid.rs`](crates/dageist-engine/tests/document/grid.rs),
+  asserted both ways. Build or extend it before the fix: the grid's failing
+  cells are the test-only commit, and the fix follows. Every outcome other
+  than agreement is a `Known` line with a true reason, scoped no wider than
+  what it names. How to write one is in
+  [the how-to](docs/how-to.md#check-a-rule-that-reads-a-literal-with-a-grid).
+- **Campaigns feed the grid.** A fuzz campaign explores how calls combine. Each
+  disagreement it finds becomes a grid axis or cell first, then a walk fix or
+  a `Known` line. A fuzz limit is only for what a grid cannot hold (what the
+  data decide on rows, refusals Polars names in no fixed order, a cause in
+  the harness), and always has a Polars control, never a match of the
+  refusal's words alone. Campaigns run once at the end of a change, not in
+  each round of review.
+- **Run what the change touches while working.** Between edits, run the grid
+  being extended and the focused tests of the code changed. Run the whole
+  suite of each changed package, the host, the view and the API checks once,
+  after the last code change.
+- **Reviews judge the grid.** A reviewer reads whether the grid's axes cover
+  the rule and whether each `Known` line and limit is true and narrow, probes
+  Polars where in doubt, and reruns a checkpoint only when its evidence is
+  missing, stale or contradictory. A small fix after an accepted review gets a
+  review of that fix alone.
+
 ## Command Inventory
 
 `default-members = ["."]` limits unqualified Cargo commands to the core.
