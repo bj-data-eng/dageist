@@ -279,6 +279,7 @@ fn the_key_of_a_window_in_agg_and_in_having_is_what_polars_says() {
 
 #[derive(Default)]
 struct Given {
+    goes_on: bool,
     stands: &'static str,
     context: &'static str,
     method: Option<(&'static catalog::Entry, &'static str)>,
@@ -400,10 +401,14 @@ fn given_case(point: &Given) -> Result<Case, String> {
         };
         given.insert(parameter.name().to_owned(), value);
     }
-    let made = then(
+    let mut made = then(
         operand(family, point.receiver, true),
         call(id, Value::Object(given)),
     );
+    // A call that the chain goes on from to an aggregate, which takes one value of what it is given.
+    if point.goes_on {
+        made = then(made, one("Expr.first"));
+    }
     // What stands beside an aggregate is met by it where the chain goes on, as one operand is by
     // another.
     let value = match point.stands {
@@ -448,6 +453,19 @@ fn given_known() -> Vec<Known> {
             "Polars has no kernel of a bitwise call or of a floor division for the dtype Null where a group evaluates it, which the tables measured with a column of a dtype: what the kernels of a group refuse of a null literal is tracked by #245",
         )
         .saying("not supported for dtype `null`"),
+        Known::new(
+            Kind::PolarsRefusesOnly,
+            Pattern::new()
+                .one_of("receiver", &["literal", "null"])
+                .is("then", "goes on to an aggregate"),
+            "where an aggregate takes one value of what a call makes of a literal, Polars refuses the map of one value beside many, and a sort of a literal by many, that it allows where the call ends, and allows the quantile of one in a campaign: what the aggregate meets of the call is not the call's rule, which the walk does not follow",
+        )
+        .saying_one_of(&[
+            "output length of `map`",
+            "lengths don't match: `sort_by`",
+            "replacement value length",
+            "`default` input for `replace_strict` must have the same length",
+        ]),
         Known::new(
             Kind::PolarsRefusesOnly,
             Pattern::new().is("method", "Expr.gather.indices"),
@@ -533,6 +551,11 @@ fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says()
             labelled(&[("alone", "alone"), ("as an operand", "as an operand")]),
             |point, stands| point.stands = stands,
         )
+        .axis(
+            "then",
+            labelled(&[("ends", false), ("goes on to an aggregate", true)]),
+            |point, goes_on| point.goes_on = *goes_on,
+        )
         .axis("context", labelled(&CONTEXTS), |point, context| {
             point.context = context;
         })
@@ -559,5 +582,5 @@ fn a_method_given_values_beside_what_it_follows_in_a_group_is_what_polars_says()
             |point, argument| point.argument = argument,
         )
         .judge(&Question::any_refusal().at(Depth::Rows), given_case);
-    verdicts.assert_agree(&given_known(), 1_300);
+    verdicts.assert_agree(&given_known(), 3_000);
 }
