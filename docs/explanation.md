@@ -2212,6 +2212,17 @@ Python reads no `*` after, so they are written, and read back, before the pairs.
 host's tests write every document of the [corpus](#the-corpus-of-step-documents) as
 text and read it back as the same document.
 
+A step that groups is written as Polars writes it, `.group_by(…)` and then the calls on
+the group by: `lf.group_by(pl.col("k")).having(pl.col("x").sum().gt(1)).agg(total=pl.col("x").sum())`.
+Those calls are the step's own links, and reading takes the calls that follow a group by and are
+calls on one, `LazyGroupBy.<name>`, as far as the call that finishes the grouping: Python gives a
+table again there, so a call after it is a step of its own, as `.sort(…)` is in
+`lf.group_by(…).agg(…).sort(…)`. A group by that the calls do not finish, because none follows or
+what follows is no call on a group by, is refused at the `group_by` as the document refuses it, with
+the reason it records, and a call out of order, a second `having`, at that call; a call on a group by
+that stands on the table, as `lf.agg(…)`, is refused for where it stands. A `# step:` comment
+names the step by its `group_by`, and is refused before a call on the group by.
+
 The text is a notation of dageist's steps, not a promise that Python runs it the
 same. Dageist adds functions of its own beside Polars', and the writer leaves
 nothing out that a step holds, so pasted into Python a text may not run as written,
