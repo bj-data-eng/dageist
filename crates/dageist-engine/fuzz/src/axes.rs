@@ -193,16 +193,17 @@ pub fn arguments(param: &Param, varied: &Value, column: &Column) -> Result<Value
 /// # Errors
 ///
 /// When a needed parameter is of a kind no grid gives a value of, and for a text padded to a length
-/// above what memory holds, which Polars never ends making.
+/// of 2^24 characters or more, which Polars does not end making within a cell's deadline.
 pub fn method_given(
     param: &Param,
     literal: &Literal,
     column: &Column,
     literal_first: bool,
 ) -> Result<Value, String> {
+    // A text padded to millions of characters for each row takes Polars longer than a cell may.
     if param.role() == Role::Length
         && param.entry.family() == catalog::Family::Text
-        && literal.written().is_at_least(f64::from(1_u32 << 31))
+        && literal.written().is_at_least(f64::from(1_u32 << 24))
     {
         return Err("Polars never ends: it pads a text to the length it is given".to_owned());
     }
