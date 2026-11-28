@@ -276,16 +276,13 @@ fn the_patterns_match_a_label_whole_by_its_start_among_several_by_a_word_in_it_a
     assert_eq!(cells(Pattern::new().is("chain", "neg")), 1);
     assert_eq!(cells(Pattern::new().starts("chain", "abs")), 2);
     assert_eq!(
-        cells(Pattern::new().one_of("chain", &["neg", "abs, sum"])),
+        cells(Pattern::new().one_of("chain", ["neg", "abs, sum"])),
         2
     );
-    assert_eq!(cells(Pattern::new().contains_one_of("chain", &["diff"])), 1);
+    assert_eq!(cells(Pattern::new().contains_one_of("chain", ["diff"])), 1);
     // A part is a whole part of the label: `abs` is one of `abs, sum`, not of `abs_diff, max`.
-    assert_eq!(cells(Pattern::new().has_one_of("chain", &["abs"])), 1);
-    assert_eq!(
-        cells(Pattern::new().has_one_of("chain", &["max", "sum"])),
-        2
-    );
+    assert_eq!(cells(Pattern::new().has_one_of("chain", ["abs"])), 1);
+    assert_eq!(cells(Pattern::new().has_one_of("chain", ["max", "sum"])), 2);
     assert_eq!(cells(Pattern::new()), 3);
 }
 
@@ -362,6 +359,15 @@ fn an_axis_relabelled_keeps_its_values_and_what_it_leaves_out() {
     assert_eq!(axis.labels().collect::<Vec<_>>(), ["1 is 10", "2 is 20"]);
     assert_eq!(axis.get("2 is 20"), Some(&2));
     assert_eq!(axis.left_out()[0].label, "0");
+}
+
+#[test]
+fn a_choice_of_one_axis_joined_replaces_the_same_label_left_out_of_the_other() {
+    let joined = numbers("n", &[1])
+        .leave_out("2", "two is even")
+        .and(numbers("other", &[2]).leave_out("1", "one is odd"));
+    assert_eq!(joined.labels().collect::<Vec<_>>(), ["1", "2"]);
+    assert!(joined.left_out().is_empty());
 }
 
 #[test]

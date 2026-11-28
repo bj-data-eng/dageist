@@ -4,29 +4,38 @@ use super::Kind;
 use super::verdicts::Cell;
 
 /// How a pattern matches the label of one axis.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Matcher {
-    Is(&'static str),
-    Starts(&'static str),
-    OneOf(&'static [&'static str]),
-    ContainsOneOf(&'static [&'static str]),
-    HasOneOf(&'static [&'static str]),
+    Is(String),
+    Starts(String),
+    OneOf(Vec<String>),
+    ContainsOneOf(Vec<String>),
+    HasOneOf(Vec<String>),
 }
 
 impl Matcher {
-    fn matches(self, label: &str) -> bool {
+    fn matches(&self, label: &str) -> bool {
         match self {
             Self::Is(word) => label == word,
-            Self::Starts(prefix) => label.starts_with(prefix),
-            Self::OneOf(words) => words.contains(&label),
-            Self::ContainsOneOf(words) => words.iter().any(|word| label.contains(word)),
-            Self::HasOneOf(parts) => label.split(", ").any(|part| parts.contains(&part)),
+            Self::Starts(prefix) => label.starts_with(prefix.as_str()),
+            Self::OneOf(words) => words.iter().any(|word| word == label),
+            Self::ContainsOneOf(words) => words.iter().any(|word| label.contains(word.as_str())),
+            Self::HasOneOf(parts) => label
+                .split(", ")
+                .any(|part| parts.iter().any(|held| held == part)),
         }
     }
 }
 
+fn owned<S: AsRef<str>>(words: impl IntoIterator<Item = S>) -> Vec<String> {
+    words
+        .into_iter()
+        .map(|word| word.as_ref().to_owned())
+        .collect()
+}
+
 /// The cells that hold certain choices: every part must match the label of its axis. A pattern
-/// with no part matches every cell.
+/// with no part matches every cell. The words a pattern matches may be derived, as an axis is.
 #[derive(Debug, Clone, Default)]
 pub struct Pattern {
     parts: Vec<(&'static str, Matcher)>,
@@ -40,32 +49,44 @@ impl Pattern {
 
     /// The label of `axis` is `label`.
     #[must_use]
-    pub fn is(self, axis: &'static str, label: &'static str) -> Self {
-        self.part(axis, Matcher::Is(label))
+    pub fn is(self, axis: &'static str, label: impl Into<String>) -> Self {
+        self.part(axis, Matcher::Is(label.into()))
     }
 
     /// The label of `axis` starts with `prefix`.
     #[must_use]
-    pub fn starts(self, axis: &'static str, prefix: &'static str) -> Self {
-        self.part(axis, Matcher::Starts(prefix))
+    pub fn starts(self, axis: &'static str, prefix: impl Into<String>) -> Self {
+        self.part(axis, Matcher::Starts(prefix.into()))
     }
 
     /// The label of `axis` is one of `labels`.
     #[must_use]
-    pub fn one_of(self, axis: &'static str, labels: &'static [&'static str]) -> Self {
-        self.part(axis, Matcher::OneOf(labels))
+    pub fn one_of<S: AsRef<str>>(
+        self,
+        axis: &'static str,
+        labels: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.part(axis, Matcher::OneOf(owned(labels)))
     }
 
     /// The label of `axis` holds one of `words` anywhere in it.
     #[must_use]
-    pub fn contains_one_of(self, axis: &'static str, words: &'static [&'static str]) -> Self {
-        self.part(axis, Matcher::ContainsOneOf(words))
+    pub fn contains_one_of<S: AsRef<str>>(
+        self,
+        axis: &'static str,
+        words: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.part(axis, Matcher::ContainsOneOf(owned(words)))
     }
 
     /// The label of `axis`, made of parts joined by `", "`, has one of `parts` among them.
     #[must_use]
-    pub fn has_one_of(self, axis: &'static str, parts: &'static [&'static str]) -> Self {
-        self.part(axis, Matcher::HasOneOf(parts))
+    pub fn has_one_of<S: AsRef<str>>(
+        self,
+        axis: &'static str,
+        parts: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.part(axis, Matcher::HasOneOf(owned(parts)))
     }
 
     fn part(mut self, axis: &'static str, matcher: Matcher) -> Self {

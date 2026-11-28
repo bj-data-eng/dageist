@@ -194,23 +194,32 @@ impl<V> Choices<V> {
         self
     }
 
-    /// The same axis with the choices of `other` after its own, and what `other` leaves out.
+    /// The same axis with the choices of `other` after its own, and what either leaves out that
+    /// the other does not hold: a choice of one replaces the same label left out of the other.
     ///
     /// # Panics
     ///
-    /// When a label is on both, or either was thinned.
+    /// When a label is a choice of both, or either was thinned.
     #[must_use]
-    pub fn and(self, other: Self) -> Self {
+    pub fn and(mut self, other: Self) -> Self {
         assert!(
             self.thinned.is_none() && other.thinned.is_none(),
             "an axis is joined before it is thinned"
         );
+        let held: Vec<String> = other
+            .choices
+            .iter()
+            .map(|(label, _)| label.clone())
+            .collect();
+        self.left_out.retain(|left| !held.contains(&left.label));
         let mut joined = other
             .choices
             .into_iter()
             .fold(self, |axis, (label, value)| axis.with(label, value));
         for left in other.left_out {
-            joined = joined.leave_out(left.label, left.reason);
+            if !joined.has(&left.label) {
+                joined = joined.leave_out(left.label, left.reason);
+            }
         }
         joined
     }
